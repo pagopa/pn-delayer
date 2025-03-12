@@ -25,10 +25,32 @@ Parameters:
     Description: 'Where to send CDC'
 
 Resources:
-    NullResource:
-        Type: AWS::CloudFormation::WaitConditionHandle
+  # PaperDeliveryDriverCapacities DynamoDB Table
+    PaperDeliveryDriverCapacitiesTable:
+      Type: AWS::DynamoDB::Table
+      UpdateReplacePolicy: Retain
+      DeletionPolicy: Retain
+      Properties:
+        TableName: !Sub '${ProjectName}-PaperDeliveryDriverCapacities'
+        AttributeDefinitions:
+          - AttributeName: "pk"
+            AttributeType: "S"
+          - AttributeName: "activationDateFrom"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "pk"
+            KeyType: "HASH"
+          - AttributeName: "activationDateFrom"
+            KeyType: "RANGE"
+        BillingMode: "PAY_PER_REQUEST"
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
 
 Outputs:
-    SampleOutput:
-      Description: A Sample Output
-      Value: 'na'
+  # Dynamo tables
+    PaperDeliveryDriverCapacitiesDynamoTableName:
+      Description: Name of dynamodb table containing capacities
+      Value: !Ref PaperDeliveryDriverCapacitiesTable
+    PaperDeliveryDriverCapacitiesDynamoTableArn:
+      Description: ARN of dynamodb table containing capacities
+      Value: !Sub '${PaperDeliveryDriverCapacitiesTable.Arn}'

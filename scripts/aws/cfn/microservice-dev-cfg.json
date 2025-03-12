@@ -1,3 +1,6 @@
 {
-  "Parameters" : {}
+  "Parameters" : {
+    "MinTasksNumber": "0",
+    "MaxTasksNumber": "0"
+  }
 }

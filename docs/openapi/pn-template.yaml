@@ -1,10 +1,10 @@
 openapi: 3.0.1
 info:
-  title: PN Template BE Microservice
+  title: PN Delayer
   description: Documentation APIs v1.0
   termsOfService: https://termofservice.it
   x-api-id: api-internal-template
-  x-summary: 'Piattaforma Notifiche: API template'
+  x-summary: 'SEND: API delayer'
   version: '1.0.0'
   contact:
     email: pn@pagopa.it
@@ -27,7 +27,7 @@ paths:
           description: Ok
         '500':
           description: Internal Server Error
-  /template/api/httpheaders:
+  /delayer/api/httpheaders:
     get:
       summary: Build a map of all the Http Header for the request
       operationId: getHttpHeadersMap
