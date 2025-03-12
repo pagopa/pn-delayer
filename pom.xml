@@ -87,7 +87,7 @@
 						</goals>
 						<phase>process-resources</phase>
 						<configuration>
-							<inputSpec>${project.basedir}/docs/openapi/pn-template.yaml</inputSpec>
+							<inputSpec>${project.basedir}/docs/openapi/pn-delayer.yaml</inputSpec>
 							<generatorName>spring</generatorName>
               				<library>spring-boot</library>
 							<generateApiDocumentation>false</generateApiDocumentation>
