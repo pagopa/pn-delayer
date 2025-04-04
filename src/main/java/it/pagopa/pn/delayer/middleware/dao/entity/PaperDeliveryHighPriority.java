@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -11,7 +13,7 @@ public class PaperDeliveryHighPriority {
     // pk DeliveryDriverId##province
 
     private String pk;
-    private String createdAt;
+    private Instant createdAt;
     private String tenderId;
     private String requestId;
     private String deliveryDriverId;

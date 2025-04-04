@@ -1,14 +1,19 @@
 package it.pagopa.pn.delayer.middleware.dao.entity;
 
-import lombok.Data;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.Instant;
 
-@Data
+@Builder
+@Getter
+@Setter
 public class PaperDeliveryReadyToSend {
     //pk deliveryDate##requestId
-    private String pk; //fixed value
+    private Instant deliveryDate;
     private String requestId;
-    private Instant createdAt;
     private String iun;
+    private String deliveryDriverId;
+    private String province;
 }

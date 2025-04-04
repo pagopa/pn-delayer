@@ -1,23 +1,37 @@
 package it.pagopa.pn.delayer.middleware.dao.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
 import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryDriverCapacitiesDispatched;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
-import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-@RequiredArgsConstructor
 public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements PaperDeliveryDriverCapacitiesDispatchedDAO {
 
     private final ConcurrentHashMap<String, PaperDeliveryDriverCapacitiesDispatched> data = new ConcurrentHashMap<>();
     private final PaperDeliveryUtils paperDeliveryUtils;
+
+    public PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl(PaperDeliveryUtils paperDeliveryUtils) throws IOException {
+        this.paperDeliveryUtils = paperDeliveryUtils;
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        ClassPathResource classPathResource = new ClassPathResource("json/PaperDeliveryDriverCapacitiesDispatched.json");
+        List<PaperDeliveryDriverCapacitiesDispatched> capacities = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {});
+        capacities.forEach(dispatched -> dispatched.setDeliveryDate(paperDeliveryUtils.calculateNextWeek(Instant.now())));
+        capacities.forEach(dispatched -> data.put(dispatched.getPk() + "##" + dispatched.getDeliveryDate(), dispatched));
+    }
 
     @Override
     public Mono<Boolean> update(String deliveryDriverId, String geoKey, String tenderId, Integer increment) {
@@ -37,7 +51,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements Pa
         capacity.setGeoKey(geoKey);
         capacity.setTenderId(tenderId);
         capacity.setCapacity(increment);
-        capacity.setDeliveryDate(paperDeliveryUtils.calculateNextWeek(Instant.now().toString()));
+        capacity.setDeliveryDate(paperDeliveryUtils.calculateNextWeek(Instant.now()));
         return capacity;
     }
 
@@ -53,11 +67,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements Pa
         return data.values();
     }
 
-    private String constructKey(PaperDeliveryDriverCapacitiesDispatched capacity) {
-        return capacity.getPk() + "##" + capacity.getDeliveryDate();
-    }
-
     public String constructPk(String deliveryDriverId, String geoKey) {
-        return deliveryDriverId + "##" + geoKey + "##" + paperDeliveryUtils.calculateNextWeek(Instant.now().toString());
+        return deliveryDriverId + "##" + geoKey + "##" + paperDeliveryUtils.calculateNextWeek(Instant.now());
     }
 }

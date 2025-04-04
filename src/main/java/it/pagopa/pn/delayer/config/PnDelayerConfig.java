@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import it.pagopa.pn.commons.conf.SharedAutoConfiguration;
 
+import java.time.Duration;
+
 
 @Configuration
 @ConfigurationProperties( prefix = "pn.delayer" )
@@ -14,4 +16,5 @@ import it.pagopa.pn.commons.conf.SharedAutoConfiguration;
 public class PnDelayerConfig {
     private int deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
     private int highPriorityQuerySize;
+    private Duration deliveryDateInterval;
 }

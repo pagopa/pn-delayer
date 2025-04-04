@@ -50,7 +50,7 @@
         "tenderId":"c0d82f6e-ee85-4e27-97df-bef27c5c5377",
         "deliveryDriverId": 4,
         "geoKey": "18100",
-        "capacity": 400,
+        "capacity": 500,
         "peakCapacity": 500,
         "createdAt": "2025-03-31T14:13:16.813402"
     },

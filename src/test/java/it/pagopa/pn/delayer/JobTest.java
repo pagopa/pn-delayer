@@ -1,46 +1,41 @@
-/*
 package it.pagopa.pn.delayer;
 
-import it.pagopa.pn.delayer.config.PnDelayerConfig;
-import it.pagopa.pn.delayer.middleware.dao.DeliveryDriverProvincePartitionDAO;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryDriverCapacities;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryDriverCapacitiesDispatched;
 import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryDriverCapacitiesInMemoryDbImpl;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryHighPriorityInMemoryDbImpl;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryReadyToSendInMemoryDbImpl;
-import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
+import it.pagopa.pn.delayer.middleware.dao.impl.*;
+import it.pagopa.pn.delayer.service.HighPriorityServiceImpl;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.JobParametersBuilder;
-import org.springframework.batch.test.JobLauncherTestUtils;
-import org.springframework.batch.test.context.SpringBatchTest;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.*;
+import java.util.stream.Stream;
 
-@SpringBatchTest
 @TestPropertySource("classpath:application-test.properties")
 @SpringJUnitConfig(classes = {DelayerApplication.class})
-@Sql("classpath:schema-h2-test.sql")
+@Slf4j
+@Execution(ExecutionMode.CONCURRENT)
 class JobTest {
 
     @Autowired
-    JobLauncherTestUtils jobLauncherTestUtils;
-
-    @Autowired
-    DeliveryDriverProvincePartitionDAO dao;
+    HighPriorityServiceImpl highPriorityService;
 
     @Autowired
     PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl paperDeliveryDriverCapacitiesDispatched;
@@ -54,49 +49,94 @@ class JobTest {
     @Autowired
     PaperDeliveryDriverCapacitiesInMemoryDbImpl paperDeliveryDriverCapacities;
 
-    @Test
-    void testJob(@Autowired Job job) throws Exception {
-        jobLauncherTestUtils.setJob(job);
-        List<String> paperDeliveryTupleInMemory = dao.retrievePartition();
-        var pks = String.join(",", paperDeliveryTupleInMemory);
-        JobParameters jobParameters = new JobParametersBuilder()
-                .addJobParameter("pks", pks, String.class)
-                .addJobParameter("createdAt", Instant.now().toString(), String.class)
-                .toJobParameters();
+    private static List<String> paperDeliveryTupleInMemory;
+    private static final String REPORT_FILE = "src/test/resources/test_report.csv";
+    private static Path reportFilePath;
+    private static final List<TestReport> testReports = new ArrayList<>();
+    private static Instant startTime;
 
-        JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
-        Assertions.assertEquals("COMPLETED", jobExecution.getExitStatus().getExitCode());
-        Assertions.assertEquals(637, jobExecution.getStepExecutions().size());
-        Assertions.assertEquals(637, jobExecution.getStepExecutions().stream().filter(stepExecution -> stepExecution.getExitStatus().getExitCode().equals("COMPLETED")).count());
-        Assertions.assertEquals(0, jobExecution.getAllFailureExceptions().size());
+    private final String tenderId = "c0d82f6e-ee85-4e27-97df-bef27c5c5377";
 
-        List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.getAll();
-        List<PaperDeliveryReadyToSend> readyToSendList = paperDeliveryReadyToSend.getByDeliveryDate(Instant.now().toString());
-        Collection<PaperDeliveryDriverCapacitiesDispatched> dispatchedList = paperDeliveryDriverCapacitiesDispatched.getAll();
-        Collection<PaperDeliveryDriverCapacities> capacitiesList = paperDeliveryDriverCapacities.getAll();
+    @BeforeAll
+    static void setUp() throws IOException {
+        startTime = Instant.now();
+        DeliveryDriverProvincePartitionInMemoryDbImpl dao = new DeliveryDriverProvincePartitionInMemoryDbImpl();
+       paperDeliveryTupleInMemory = dao.retrievePartition();
+        reportFilePath = Paths.get(REPORT_FILE);
+        Files.deleteIfExists(reportFilePath);
+        List<String> header = List.of("deliveryDriverId,province,paperDeliveryRequest,provinceCapacity,startedDispatchedProvinceCapacity,finalDispatchedProvinceCapacity,capCapacity,startedDispatchedCapCapacity,finalDispatchedCapCapacity,paperDeliveryReadyToSend,paperDeliveryExcess,executionTime");
+        Files.write(reportFilePath, header, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+    }
 
-        //controllo eccedenze
-        Assertions.assertEquals(1105, highPriorityList.size());
-        Assertions.assertEquals(0, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("3##GR")).count());
-        Assertions.assertEquals(0, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("4##MI")).count());
-        Assertions.assertEquals(0, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("1##PU")).count());
-        Assertions.assertEquals(0, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("5##PA")).count());
-        Assertions.assertEquals(5, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("3##CO")).count());
-        Assertions.assertEquals(400, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("6##FG")).count());
-        Assertions.assertEquals(400, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("5##VR")).count());
-        Assertions.assertEquals(100, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("4##IM")).count());
-        Assertions.assertEquals(5, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("3##CO")
-                && paperDeliveryHighPriority.getCreatedAt().equalsIgnoreCase("2025-03-31T13:09:19.972634Z")).count());
-        Assertions.assertEquals(0, highPriorityList.stream().filter(paperDeliveryHighPriority -> paperDeliveryHighPriority.getPk().equals("3##CO")
-                && paperDeliveryHighPriority.getCreatedAt().equalsIgnoreCase("2025-03-24T13:09:19.960638Z")).count());
+    @AfterAll
+    static void closeReportFileNio() throws IOException {
+        Instant endTime = Instant.now();
+        testReports.sort(Comparator.comparing(TestReport::getPaperDeliveryRequest).reversed());
+        Files.write(reportFilePath, testReports.stream().map(TestReport::toString).toList(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        Duration duration = Duration.between(startTime, endTime);
+        String reportLine = "Tempo totale di esecuzione: " + duration.toMillis() + "ms";
+        Files.write(reportFilePath, List.of(reportLine), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+    }
 
-        //controllo readyToSend
-        Assertions.assertEquals(3900, readyToSendList.size());
+    private static Stream<String> paperDeliveryTupleProvider() {
+        return paperDeliveryTupleInMemory.stream();
+    }
 
-        //controllo capacità utilizzata
-        Assertions.assertEquals(19, dispatchedList.size());
+    @ParameterizedTest
+    @MethodSource("paperDeliveryTupleProvider")
+    void parameterizedJobRunTest(String tuple) {
+        TestReport testReport = prepareTestReport(tuple);
+        Instant start = Instant.now();
+        highPriorityService.initHighPriorityBatch(tuple).block();
+        Instant end = Instant.now();
+        Duration duration = Duration.between(start, end);
+        verifyAndCloseTestReport(testReport, duration.toMillis(), tuple);
+    }
 
+    private TestReport prepareTestReport(String tuple) {
+        TestReport testReport = new TestReport(tuple);
 
+        List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get(tuple);
+        testReport.setPaperDeliveryRequest(highPriorityList.size());
+
+        Integer provinceCapacity = paperDeliveryDriverCapacities.getPaperDeliveryDriverCapacities(tenderId, testReport.getDeliveryDriverId(), testReport.getProvince()).block();
+        testReport.setProvinceCapacity(provinceCapacity);
+        testReport.setStartedDispatchedProvinceCapacity(paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), testReport.getProvince()).block());
+
+        HashMap<String, Integer> capDispatchedCapacity = new HashMap<>();
+        HashMap<String, Integer> capCapacity = new HashMap<>();
+        highPriorityList.stream()
+                .map(PaperDeliveryHighPriority::getCap)
+                .distinct()
+                .toList()
+                .forEach(cap -> {
+                    capDispatchedCapacity.put(cap, paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), cap).block());
+                    capCapacity.put(cap,  paperDeliveryDriverCapacities.getPaperDeliveryDriverCapacities(tenderId, testReport.getDeliveryDriverId(), cap).block());
+                });
+        testReport.setCapCapacity(capCapacity);
+        testReport.setStartedDispatchedCapCapacity(capDispatchedCapacity);
+        return testReport;
+    }
+
+    private void verifyAndCloseTestReport(TestReport testReport, Long duration, String tuple) {
+        testReport.setExecutionTime(duration + "ms");
+
+        List<PaperDeliveryReadyToSend> readyToSendList = paperDeliveryReadyToSend.getByDeliveryDate(Instant.now().plus(14, java.time.temporal.ChronoUnit.DAYS).toString());
+        testReport.setPaperDeliveryReadyToSend(readyToSendList.stream().filter(delivery -> delivery.getDeliveryDriverId().equals(testReport.getDeliveryDriverId())
+                && delivery.getProvince().equalsIgnoreCase(testReport.getProvince())).count());
+
+        List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get(tuple);
+        testReport.setPaperDeliveryExcess(highPriorityList.size());
+
+        Integer dispatchedProvinceCapacity = paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), testReport.getProvince()).block();
+        testReport.setFinalDispatchedProvinceCapacity(dispatchedProvinceCapacity);
+
+        Map<String, Integer> finalDispatchedCapCapacity = new HashMap<>();
+        testReport.getStartedDispatchedCapCapacity().keySet()
+                .forEach(cap -> {
+                    finalDispatchedCapCapacity.put(cap, paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), cap).block());
+                });
+        testReport.setFinalDispatchedCapCapacity(finalDispatchedCapCapacity);
+        testReports.add(testReport);
     }
 }
-*/

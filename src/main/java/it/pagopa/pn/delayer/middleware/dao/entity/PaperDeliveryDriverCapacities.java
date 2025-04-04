@@ -2,12 +2,14 @@ package it.pagopa.pn.delayer.middleware.dao.entity;
 
 import lombok.Data;
 
+import java.time.Instant;
+
 @Data
 public class PaperDeliveryDriverCapacities {
     //map key tenderId##deliveryDriverId##geoKey##activationDateFrom
     private String pk;
-    private String activationDateFrom;
-    private String activationDateTo;
+    private Instant activationDateFrom;
+    private Instant activationDateTo;
     private String tenderId;
     private String deliveryDriverId;
     private String geoKey;

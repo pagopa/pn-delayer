@@ -2,8 +2,13 @@ package it.pagopa.pn.delayer.middleware.dao.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryHighPriorityDAO;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryReadyToSendDAO;
 import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
+import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -12,7 +17,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -20,10 +24,14 @@ import java.util.stream.Collectors;
 @Component
 public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHighPriorityDAO {
 
+    private final PaperDeliveryUtils paperDeliveryUtils;
+    private final PaperDeliveryReadyToSendDAO paperDeliveryReadyToSendDAO;
+
     private final ConcurrentHashMap<String, List<PaperDeliveryHighPriority>> data = new ConcurrentHashMap<>();
 
-    public PaperDeliveryHighPriorityInMemoryDbImpl() throws IOException {
+    public PaperDeliveryHighPriorityInMemoryDbImpl(PaperDeliveryUtils paperDeliveryUtils, PaperDeliveryReadyToSendDAO paperDeliveryReadyToSendDAO) throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
         ClassPathResource classPathResource = new ClassPathResource("json/PaperDeliveryHighPriority.json");
         List<PaperDeliveryHighPriority> highPriorityList = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {});
         data.putAll(highPriorityList.stream()
@@ -32,11 +40,13 @@ public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHig
                         Collectors.collectingAndThen(
                                 Collectors.toList(),
                                 list -> {
-                                    list.sort(Comparator.comparing(item -> Instant.parse(item.getCreatedAt())));
+                                    list.sort(Comparator.comparing(PaperDeliveryHighPriority::getCreatedAt));
                                     return list;
                                 }
                         )
                 )));
+        this.paperDeliveryUtils = paperDeliveryUtils;
+        this.paperDeliveryReadyToSendDAO = paperDeliveryReadyToSendDAO;
     }
 
     @Override
@@ -61,8 +71,19 @@ public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHig
 
     @Override
     public Mono<Page<PaperDeliveryHighPriority>> getChunck(String pk, int limit, Map<String, AttributeValue> lastEvaluatedKey) {
-        return Mono.just(Page.create(data.get(pk)
+        List<PaperDeliveryHighPriority> highPriorities = data.get(pk);
+        if(CollectionUtils.isEmpty(highPriorities)) {
+            return Mono.just(Page.create(Collections.emptyList()));
+        }
+        return Mono.just(Page.create(highPriorities
                 .stream().limit(limit).toList()));
+    }
+
+    @Override
+    public Mono<Integer> executeTransaction(PaperDeliveryTransactionRequest paperDeliveryTransactionRequest) {
+        return paperDeliveryReadyToSendDAO.insert(paperDeliveryTransactionRequest.getPaperDeliveryReadyToSendList())
+                .flatMap(savedItems -> delete(paperDeliveryTransactionRequest.getPaperDeliveryHighPriorityList().get(0).getPk(),
+                        paperDeliveryTransactionRequest.getPaperDeliveryHighPriorityList()));
     }
 
     public List<PaperDeliveryHighPriority> getAll() {

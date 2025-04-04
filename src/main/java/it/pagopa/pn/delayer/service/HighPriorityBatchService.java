@@ -4,5 +4,5 @@ import reactor.core.publisher.Mono;
 
 public interface HighPriorityBatchService {
 
-    Mono<Void> initHighPriorityBatch(String pk);
+    Mono<Integer> initHighPriorityBatch(String pk);
 }

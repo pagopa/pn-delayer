@@ -1,42 +1,9 @@
 [
     {
-        "pk": "3##22031",
-        "deliveryDate": "2025-04-07T00:00:00Z",
-        "tenderId":"c0d82f6e-ee85-4e27-97df-bef27c5c5377",
-        "deliveryDriverId": 3,
-        "geoKey": "22031",
-        "capacity": 50
-    },
-    {
-        "pk": "3##CO",
-        "deliveryDate": "2025-04-07T00:00:00Z",
-        "tenderId":"c0d82f6e-ee85-4e27-97df-bef27c5c5377",
-        "deliveryDriverId": 3,
-        "geoKey": "CO",
-        "capacity": 100
-    },
-    {
-        "pk": "1##PU",
-        "deliveryDate": "2025-04-07T00:00:00Z",
-        "tenderId":"c0d82f6e-ee85-4e27-97df-bef27c5c5377",
-        "deliveryDriverId": 1,
-        "geoKey": "PU",
-        "capacity": 4700
-    },
-    {
-        "pk": "1##61010",
-        "deliveryDate": "2025-04-07T00:00:00Z",
-        "tenderId":"c0d82f6e-ee85-4e27-97df-bef27c5c5377",
-        "deliveryDriverId": 1,
-        "geoKey": "61010",
-        "capacity": 4700
-    },
-    {
-        "pk": "5##PA",
-        "deliveryDate": "2025-04-07T00:00:00Z",
+        "pk": "5##90010",
         "tenderId":"c0d82f6e-ee85-4e27-97df-bef27c5c5377",
         "deliveryDriverId": 5,
-        "geoKey": "PA",
+        "geoKey": "90010",
         "capacity": 600
     }
 ]

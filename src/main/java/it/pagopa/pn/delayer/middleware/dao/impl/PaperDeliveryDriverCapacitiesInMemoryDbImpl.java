@@ -24,6 +24,7 @@ public class PaperDeliveryDriverCapacitiesInMemoryDbImpl implements PaperDeliver
 
     public PaperDeliveryDriverCapacitiesInMemoryDbImpl() throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         ClassPathResource classPathResource = new ClassPathResource("json/PaperDeliveryDriverCapacities.json");
         List<PaperDeliveryDriverCapacities> capacityList = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {
         });
@@ -39,9 +40,9 @@ public class PaperDeliveryDriverCapacitiesInMemoryDbImpl implements PaperDeliver
                 .filter(driverCapacities -> driverCapacities.getDeliveryDriverId().equalsIgnoreCase(deliveryDriverId)
                         && driverCapacities.getGeoKey().equalsIgnoreCase(geoKey)
                         && driverCapacities.getTenderId().equalsIgnoreCase(tenderId)
-                        && now.isAfter(Instant.parse(driverCapacities.getActivationDateFrom()))
-                        && (StringUtils.isBlank(driverCapacities.getActivationDateTo()) || now.isBefore(Instant.parse(driverCapacities.getActivationDateTo()))))
-                .min((o1, o2) -> Instant.parse(o2.getActivationDateFrom()).compareTo(Instant.parse(o1.getActivationDateFrom())))
+                        && now.isAfter(driverCapacities.getActivationDateFrom())
+                        && (driverCapacities.getActivationDateTo() == null || now.isBefore(driverCapacities.getActivationDateTo())))
+                .min((o1, o2) -> o2.getActivationDateFrom().compareTo(o1.getActivationDateFrom()))
                 .map(PaperDeliveryDriverCapacities::getCapacity)
                 .orElse(0));
     }

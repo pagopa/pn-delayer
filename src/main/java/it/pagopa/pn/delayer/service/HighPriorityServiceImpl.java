@@ -4,17 +4,17 @@ import it.pagopa.pn.delayer.config.PnDelayerConfig;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryHighPriorityDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryReadyToSendDAO;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryDriverCapacities;
 import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
+import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,14 +23,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HighPriorityServiceImpl implements HighPriorityBatchService {
 
-    private final PaperDeliveryReadyToSendDAO paperDeliveryReadyToSendDAO;
     private final PaperDeliveryDriverCapacitiesDispatchedDAO paperDeliveryDispatchedCapacityInMemoryDb;
     private final PaperDeliveryDriverCapacitiesDAO paperDeliveryCapacityInMemoryDb;
     private final PaperDeliveryHighPriorityDAO paperDeliveryHighPriorityDAO;
     private final PnDelayerConfig pnDelayerConfig;
+    private final PaperDeliveryUtils paperDeliveryUtils;
 
     @Override
-    public Mono<Void> initHighPriorityBatch(String pk) {
+    public Mono<Integer> initHighPriorityBatch(String pk) {
         return paperDeliveryHighPriorityDAO.getChunck(pk, pnDelayerConfig.getHighPriorityQuerySize(), new HashMap<>())
                 .flatMap(paperDeliveryHighPriorityPage -> {
                     if (CollectionUtils.isEmpty(paperDeliveryHighPriorityPage.items())) {
@@ -50,35 +50,38 @@ public class HighPriorityServiceImpl implements HighPriorityBatchService {
     private Mono<Integer> processChunk(List<PaperDeliveryHighPriority> chunk) {
         PaperDeliveryHighPriority paperDeliveryHighPriority = chunk.get(0);
         return evaluateCapacity(paperDeliveryHighPriority.getProvince(), paperDeliveryHighPriority.getDeliveryDriverId(), paperDeliveryHighPriority.getTenderId())
-                .flatMap(provinceCapacity -> {
-                    if (provinceCapacity != 0 && chunk.size() < provinceCapacity) {
-                        return evaluateCapCapacityAndWrite(chunk, paperDeliveryHighPriority.getDeliveryDriverId(), paperDeliveryHighPriority.getTenderId(), paperDeliveryHighPriority.getProvince());
-                    } else {
-                        var finalList = chunk.stream().limit(provinceCapacity).toList();
-                        log.info("Writing papers {}", finalList.size());
-                        return evaluateCapCapacityAndWrite(finalList, paperDeliveryHighPriority.getDeliveryDriverId(), paperDeliveryHighPriority.getTenderId(), paperDeliveryHighPriority.getProvince());
-
-                    }
-                });
+                .map(tuple -> checkCapacityAndFilterList(tuple, chunk))
+                .flatMap(filteredChunk -> evaluateCapCapacityAndWrite(filteredChunk, paperDeliveryHighPriority.getDeliveryDriverId(), paperDeliveryHighPriority.getTenderId(),
+                                paperDeliveryHighPriority.getProvince()));
     }
 
     private Mono<Integer> evaluateCapCapacityAndWrite(List<PaperDeliveryHighPriority> paperDeliveryHighPriorities, String deliveryDriverId, String tenderId, String province) {
-        List<PaperDeliveryHighPriority> deliveryRequestToSend = new ArrayList<>();
+        PaperDeliveryTransactionRequest deliveryRequestToSend = new PaperDeliveryTransactionRequest();
         Map<String, List<PaperDeliveryHighPriority>> capMap = groupDeliveryOnCap(paperDeliveryHighPriorities);
         return Flux.fromIterable(capMap.entrySet())
                 .flatMap(stringListEntry -> evaluateCapacity(stringListEntry.getKey(), deliveryDriverId, tenderId)
-                        .filter(capCapacity -> capCapacity != 0)
-                        .map(capCapacity -> stringListEntry.getValue().size() < capCapacity ? stringListEntry.getValue(): stringListEntry.getValue().stream().limit(capCapacity).toList())
-                        .filter(paperDeliveryList -> !CollectionUtils.isEmpty(paperDeliveryList))
-                        .flatMap(paperDeliveryList -> {
-                                deliveryRequestToSend.addAll(paperDeliveryList);
-                                return paperDeliveryDispatchedCapacityInMemoryDb.update(deliveryDriverId, stringListEntry.getKey(), tenderId, paperDeliveryList.size())
-                                        .flatMap(updatedCapCapacity -> paperDeliveryDispatchedCapacityInMemoryDb.update(deliveryDriverId, province, tenderId, deliveryRequestToSend.size()));
+                        .flatMap(tuple -> {
+                            List<PaperDeliveryHighPriority> filteredList = checkCapacityAndFilterList(tuple, stringListEntry.getValue());
+                            deliveryRequestToSend.getPaperDeliveryHighPriorityList().addAll(filteredList);
+                            deliveryRequestToSend.getPaperDeliveryReadyToSendList().addAll(paperDeliveryUtils.mapToPaperDeliveryReadyToSend(filteredList, tuple.getT1(), tuple.getT2()));
+                            return paperDeliveryDispatchedCapacityInMemoryDb.update(deliveryDriverId, stringListEntry.getKey(), tenderId, filteredList.size())
+                                    .flatMap(updatedCapCapacity -> paperDeliveryDispatchedCapacityInMemoryDb.update(deliveryDriverId, province, tenderId, filteredList.size()));
                         }))
                 .collectList()
                 .thenReturn(deliveryRequestToSend)
-                .filter(aInt -> !CollectionUtils.isEmpty(deliveryRequestToSend))
-                .flatMap(aInt -> paperDeliveryReadyToSendDAO.executeTransaction(deliveryRequestToSend));
+                .filter(paperDeliveryTransactionRequest -> !CollectionUtils.isEmpty(paperDeliveryTransactionRequest.getPaperDeliveryHighPriorityList()) &&
+                        !CollectionUtils.isEmpty(paperDeliveryTransactionRequest.getPaperDeliveryReadyToSendList()))
+                .flatMap(paperDeliveryHighPriorityDAO::executeTransaction);
+
+    }
+
+    private List<PaperDeliveryHighPriority> checkCapacityAndFilterList(Tuple2<Integer, Integer> tuple, List<PaperDeliveryHighPriority> paperDeliveryHighPriorities) {
+        int remainingCapacity = tuple.getT2() == 0 ? tuple.getT1() : tuple.getT1() - tuple.getT2();
+        if (remainingCapacity == 0) {
+            return Collections.emptyList();
+        } else {
+            return paperDeliveryHighPriorities.size() < remainingCapacity ? paperDeliveryHighPriorities : paperDeliveryHighPriorities.stream().limit(remainingCapacity).toList();
+        }
     }
 
     private static Map<String, List<PaperDeliveryHighPriority>> groupDeliveryOnCap(List<PaperDeliveryHighPriority> paperDeliveryHighPriorities) {
@@ -88,16 +91,15 @@ public class HighPriorityServiceImpl implements HighPriorityBatchService {
                         Collectors.collectingAndThen(
                                 Collectors.toList(),
                                 list -> {
-                                    list.sort(Comparator.comparing(item -> Instant.parse(item.getCreatedAt())));
+                                    list.sort(Comparator.comparing(PaperDeliveryHighPriority::getCreatedAt));
                                     return list;
                                 }
                         )
                 ));
     }
 
-    private Mono<Integer> evaluateCapacity(String geoKey, String deliveryDriverId, String tenderId) {
+    private Mono<Tuple2<Integer, Integer>> evaluateCapacity(String geoKey, String deliveryDriverId, String tenderId) {
         return paperDeliveryCapacityInMemoryDb.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey)
-                .zipWith(paperDeliveryDispatchedCapacityInMemoryDb.get(deliveryDriverId, geoKey))
-                .map(tuple -> tuple.getT2() == 0 ? tuple.getT1() : tuple.getT1() - tuple.getT2());
+                .zipWith(paperDeliveryDispatchedCapacityInMemoryDb.get(deliveryDriverId, geoKey));
     }
 }
