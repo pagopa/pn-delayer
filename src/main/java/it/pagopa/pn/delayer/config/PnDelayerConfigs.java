@@ -1,4 +1,4 @@
-package it.pagopa.pn.config;
+package it.pagopa.pn.delayer.config;
 
 import it.pagopa.pn.commons.conf.SharedAutoConfiguration;
 import lombok.Data;
