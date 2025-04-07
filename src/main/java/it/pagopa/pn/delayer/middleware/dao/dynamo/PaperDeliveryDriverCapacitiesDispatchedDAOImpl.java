@@ -1,5 +1,6 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo;
 
+import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -8,6 +9,7 @@ import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.ReadBatch;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
@@ -26,14 +28,14 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
     private final DynamoDbAsyncClient dynamoDbAsyncClient;
     private final DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient;
 
-    public PaperDeliveryDriverCapacitiesDispatchedDAOImpl(DynamoDbAsyncTable<PaperDeliveryDriverCapacitiesDispatched> table, DynamoDbAsyncClient dynamoDbAsyncClient, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
-        this.table = table;
+    public PaperDeliveryDriverCapacitiesDispatchedDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbAsyncClient dynamoDbAsyncClient, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
+        this.table = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesDispatchedTableName(), TableSchema.fromBean(PaperDeliveryDriverCapacitiesDispatched.class));
         this.dynamoDbAsyncClient = dynamoDbAsyncClient;
         this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
     }
 
     @Override
-    public Mono<UpdateItemResponse> update(String pk, Instant deliveryDate, Integer increment) {
+    public Mono<UpdateItemResponse> updateCounter(String pk, Instant deliveryDate, Integer increment) {
         log.info("update pk={} increment={}", pk, increment);
 
         Map<String, AttributeValue> key = new HashMap<>();
@@ -56,8 +58,10 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
 
     @Override
     public Mono<PaperDeliveryDriverCapacitiesDispatched> get(String pk, Instant deliveryDate) {
-        log.info("get pk={}", pk);
-        return Mono.fromFuture(table.getItem(Key.builder().partitionValue(pk).sortValue(String.valueOf(deliveryDate)).build()))
+        return Mono.fromFuture(table.getItem(Key.builder()
+                        .partitionValue(pk)
+                        .sortValue(String.valueOf(deliveryDate))
+                        .build()))
                 .doOnSuccess(item -> log.info("Retrieved item: {}", item))
                 .doOnError(e -> log.error("Error retrieving item with pk {}: {}", pk, e.getMessage()));
     }
@@ -73,7 +77,8 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
                         .build())
                 .toList();
 
-        ReadBatch.Builder<PaperDeliveryDriverCapacitiesDispatched> readBatchBuilder = ReadBatch.builder(PaperDeliveryDriverCapacitiesDispatched.class)
+        ReadBatch.Builder<PaperDeliveryDriverCapacitiesDispatched> readBatchBuilder = ReadBatch
+                .builder(PaperDeliveryDriverCapacitiesDispatched.class)
                 .mappedTableResource(table);
 
         keys.forEach(readBatchBuilder::addGetItem);
@@ -84,7 +89,9 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
                 .build();
 
         return Mono.from(dynamoDbEnhancedClient.batchGetItem(request))
-                .flatMapMany(batchGetItemResponse -> Flux.fromIterable(batchGetItemResponse.resultsForTable(table)))
+                .map(batchGetResultPage -> batchGetResultPage.resultsForTable(table))
+                .doOnNext(items -> log.info("Retrieved item: {}", items.size()))
+                .flatMapMany(Flux::fromIterable)
                 .doOnError(e -> log.error("Error retrieving items with pks {}: {}", pks, e.getMessage()));
     }
 }

@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.time.Duration;
 
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.DYNAMODB;
-import static org.testcontainers.containers.localstack.LocalStackContainer.Service.SQS;
 
 /**
  * Classe che permette di creare un container Docker di LocalStack.
@@ -26,7 +25,7 @@ public class LocalStackTestConfig {
 
     static LocalStackContainer localStack =
             new LocalStackContainer(DockerImageName.parse("localstack/localstack:1.0.4").asCompatibleSubstituteFor("localstack/localstack"))
-                    .withServices(DYNAMODB, SQS)
+                    .withServices(DYNAMODB)
                     .withClasspathResourceMapping("testcontainers/init.sh",
                             "/docker-entrypoint-initaws.d/make-storages.sh", BindMode.READ_ONLY)
                     .withClasspathResourceMapping("testcontainers/credentials",

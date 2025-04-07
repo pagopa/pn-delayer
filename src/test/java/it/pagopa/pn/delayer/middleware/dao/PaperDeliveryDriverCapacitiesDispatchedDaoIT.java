@@ -11,43 +11,43 @@ import reactor.test.StepVerifier;
 import java.time.Instant;
 import java.util.List;
 
-public class PaperDeliveryDriverCapacitiesDispatchedDaoIT extends BaseTest.WithLocalStack {
+
+class PaperDeliveryDriverCapacitiesDispatchedDaoIT extends BaseTest.WithLocalStack {
 
     @Autowired
     PaperDeliveryDriverCapacitiesDispatchedDAO paperDeliveryDriverCapacitiesDispatchedDao;
 
     @Test
-    void testGet() {
+    void testUpdateAndGet() {
         PaperDeliveryDriverCapacitiesDispatched entity = new PaperDeliveryDriverCapacitiesDispatched();
         entity.setDeliveryDriverIdGeokey("pk");
-        entity.setDeliveryDate(String.valueOf(Instant.now().plusSeconds(7889400)));
+        Instant deliveryDate = Instant.parse("2025-04-07T00:00:00Z");
+        entity.setDeliveryDate(deliveryDate);
 
-        paperDeliveryDriverCapacitiesDispatchedDao.update("pk", Instant.now().plusSeconds(7889400), 5).block();
+        paperDeliveryDriverCapacitiesDispatchedDao.updateCounter("pk", deliveryDate, 5).block();
 
-        PaperDeliveryDriverCapacitiesDispatched response = paperDeliveryDriverCapacitiesDispatchedDao.get("iun", Instant.now().plusSeconds(7889400)).block();
+        PaperDeliveryDriverCapacitiesDispatched response = paperDeliveryDriverCapacitiesDispatchedDao.get("pk", deliveryDate).block();
         assert response != null;
         Assertions.assertEquals(entity.getDeliveryDriverIdGeokey(), response.getDeliveryDriverIdGeokey());
         Assertions.assertEquals(entity.getDeliveryDate(), response.getDeliveryDate());
-    }
+        Assertions.assertEquals(5, response.getUsedCapacity());
 
-    @Test
-    void testUpdate() {
-        PaperDeliveryDriverCapacitiesDispatched entity = new PaperDeliveryDriverCapacitiesDispatched();
-        entity.setDeliveryDriverIdGeokey("pk");
-        entity.setDeliveryDate(String.valueOf(Instant.now().plusSeconds(7889400)));
+        paperDeliveryDriverCapacitiesDispatchedDao.updateCounter("pk", deliveryDate, 5).block();
 
-        paperDeliveryDriverCapacitiesDispatchedDao.update("pk", Instant.now().plusSeconds(7889400), 5).block();
-
-        PaperDeliveryDriverCapacitiesDispatched response = paperDeliveryDriverCapacitiesDispatchedDao.get("iun", Instant.now().plusSeconds(7889400)).block();
-        assert response != null;
-        Assertions.assertEquals(entity.getDeliveryDriverIdGeokey(), response.getDeliveryDriverIdGeokey());
-        Assertions.assertEquals(entity.getDeliveryDate(), response.getDeliveryDate());
+        PaperDeliveryDriverCapacitiesDispatched response2 = paperDeliveryDriverCapacitiesDispatchedDao.get("pk", deliveryDate).block();
+        assert response2 != null;
+        Assertions.assertEquals(entity.getDeliveryDriverIdGeokey(), response2.getDeliveryDriverIdGeokey());
+        Assertions.assertEquals(entity.getDeliveryDate(), response2.getDeliveryDate());
+        Assertions.assertEquals(10, response2.getUsedCapacity());
     }
 
     @Test
     void testBatchGetItem() {
-        List<String> pks = List.of("test-pk1", "test-pk2");
+        List<String> pks = List.of("test-pk1", "test-pk2", "test-pk3");
         Instant deliveryDate = Instant.now();
+
+        paperDeliveryDriverCapacitiesDispatchedDao.updateCounter("test-pk1", deliveryDate, 5).block();
+        paperDeliveryDriverCapacitiesDispatchedDao.updateCounter("test-pk2", deliveryDate, 5).block();
 
         StepVerifier.create(paperDeliveryDriverCapacitiesDispatchedDao.batchGetItem(pks, deliveryDate))
                 .expectNextCount(2)

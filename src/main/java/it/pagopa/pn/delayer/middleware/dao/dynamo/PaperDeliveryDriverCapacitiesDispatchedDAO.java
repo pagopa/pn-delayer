@@ -10,7 +10,7 @@ import java.util.List;
 
 public interface PaperDeliveryDriverCapacitiesDispatchedDAO {
 
-    Mono<UpdateItemResponse> update(String pk, Instant deliveryDate, Integer increment);
+    Mono<UpdateItemResponse> updateCounter(String pk, Instant deliveryDate, Integer increment);
 
     Mono<PaperDeliveryDriverCapacitiesDispatched> get(String pk, Instant deliveryDate);
 
