@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: 'Example microservice deploy'
+Description: 'Microservice deploy for pn-delayer'
 
 Parameters:
   ProjectName:
@@ -67,21 +67,58 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  PaperDeliveryDriverCapacitiesTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryDriverCapacities'
+
+  PaperDeliveryDriverCapacitiesTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryDriverCapacities'
+
+  PaperDeliveryDriverCapacitiesDispatchedTableName:
+    Type: String
+    Description: 'DynamoDB table name for  PaperDeliveryDriverCapacitiesDispatched'
+
+  PaperDeliveryDriverCapacitiesDispatchedTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing  PaperDeliveryDriverCapacitiesDispatched'
+
+  PaperDeliveryHighPriorityTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryHighPriority'
+
+  PaperDeliveryHighPriorityTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryHighPriority'
+
+  PaperDeliveryReadyToSendTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryReadyToSend'
+
+  PaperDeliveryReadyToSendTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryReadyToSend'
+
+
 Resources:
 
-  # PN-TemplateBeMs microservice
-  TemplateBeMsMicroservice:
+  # pn-delayer microservice
+  DelayerMicroservice:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-service.yaml"
       Parameters:
-        MicroServiceUniqueName: !Sub '${ProjectName}-template-ms-be'
+        MicroServiceUniqueName: !Sub '${ProjectName}-delayer'
         CpuValue: 512
         MemoryAmount: 2GB
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         ContainerImageURI: !Sub '${ContainerImageUri}'
         ContainerEnvEntry1: !Sub 'AWS_REGIONCODE=${AWS::Region}'
-        MappedPaths: '/template-ms-be/*'
+        ContainerEnvEntry2: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=${PaperDeliveryDriverCapacitiesTableName}'
+        ContainerEnvEntry3: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESDISPATCHEDTABLENAME=${PaperDeliveryDriverCapacitiesDispatchedTableName}'
+        ContainerEnvEntry4: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME=${PaperDeliveryHighPriorityTableName}'
+        ContainerEnvEntry5: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYREAYTOSENDTABLENAME=${PaperDeliveryReadyToSendTableName}'
+        MappedPaths: '/delayer/*'
         ECSClusterName: !Ref ECSClusterName
         Subnets: !Ref SubnetsIds
         VpcId: !Ref VpcId
@@ -89,3 +126,43 @@ Resources:
         LoadBalancerListenerArn: !Ref ApplicationLoadBalancerListenerArn
         LoadbalancerRulePriority: !Ref MicroserviceNumber
         CloudwatchLogKinesisStreamArn: !Ref LogsKinesisSourceStreamArn
+
+  # Grant operational rights to pn-Delayer microservice
+  DelayerMicroserviceTaskManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:UpdateItem
+              - dynamodb:Query
+              - dynamodb:BatchGetItem
+            Resource:
+              - !Sub "${PaperDeliveryDriverCapacitiesDispatchedTableArn}"
+              - !Sub "${PaperDeliveryDriverCapacitiesDispatchedTableArn}/*"
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+            Resource:
+              - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:TransactWriteItems
+            Resource:
+              - !Sub "${PaperDeliveryHighPriorityTableArn}"
+              - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
+              - !Sub "${PaperDeliveryReadyToSendTableArn}"
+              - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
+
+
+
+
