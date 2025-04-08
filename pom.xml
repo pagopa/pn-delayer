@@ -60,17 +60,14 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>localstack</artifactId>
+<!--			Non inserendo la versione, viene utilizzata una dipendenza di Localstack che richiede l 'SDK 1 di AWS-->
+			<version>1.20.6</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>junit-jupiter</artifactId>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>de.idealo.spring</groupId>
-			<artifactId>spring-cloud-stream-binder-sqs</artifactId>
-			<version>1.9.0</version>
 		</dependency>
 
 	</dependencies>
