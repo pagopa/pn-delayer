@@ -1,7 +1,8 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacities;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -18,27 +19,26 @@ import java.util.Map;
 @Slf4j
 public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriverCapacitiesDAO {
 
-    private final DynamoDbAsyncTable<PaperDeliveryDriverCapacities> table;
+    private final DynamoDbAsyncTable<PaperDeliveryDriverCapacity> table;
 
     public PaperDeliveryDriverCapacitiesDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
-        this.table = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName(), TableSchema.fromBean(PaperDeliveryDriverCapacities.class));
+        this.table = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName(), TableSchema.fromBean(PaperDeliveryDriverCapacity.class));
     }
 
     @Override
-    public Mono<PaperDeliveryDriverCapacities> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey) {
-        Instant now = Instant.now();
+    public Mono<PaperDeliveryDriverCapacity> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey, Instant deliveryDate) {
 
-        QueryConditional keyCondition = QueryConditional.sortLessThan(Key.builder()
-                .partitionValue(PaperDeliveryDriverCapacities.buildKey(tenderId, deliveryDriverId, geoKey))
-                .sortValue(now.toString()).build());
+        QueryConditional keyCondition = QueryConditional.sortLessThanOrEqualTo(Key.builder()
+                .partitionValue(PaperDeliveryDriverCapacity.buildKey(tenderId, deliveryDriverId, geoKey))
+                .sortValue(deliveryDate.toString()).build());
 
         Map<String, AttributeValue> expressionValues = new HashMap<>();
-        expressionValues.put(":now", AttributeValue.builder().s(now.toString()).build());
+        expressionValues.put(":now", AttributeValue.builder().s(deliveryDate.toString()).build());
 
         Map<String, String> expressionAttributeNames = new HashMap<>();
         expressionAttributeNames.put("#to", "activationDateTo");
 
-        String filterExpression = "attribute_not_exists(" + PaperDeliveryDriverCapacities.COL_ACTIVATION_DATE_TO + ") OR #to >= :now";
+        String filterExpression = "attribute_not_exists(" + PaperDeliveryDriverCapacity.COL_ACTIVATION_DATE_TO + ") OR #to >= :now";
 
         QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
                 .queryConditional(keyCondition)

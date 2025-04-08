@@ -1,6 +1,7 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

@@ -1,4 +1,4 @@
-package it.pagopa.pn.delayer.middleware.dao.dynamo;
+package it.pagopa.pn.delayer.middleware.dao;
 
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
 import reactor.core.publisher.Flux;

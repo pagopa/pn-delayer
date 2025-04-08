@@ -2,12 +2,11 @@ package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
 import lombok.Data;
 import lombok.Getter;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
 @Data
-public class PaperDeliveryDriverCapacities {
+public class PaperDeliveryDriverCapacity {
 
     public static final String COL_PK = "pk";
     public static final String COL_ACTIVATION_DATE_FROM = "activationDateFrom";

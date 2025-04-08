@@ -1,20 +1,22 @@
 package it.pagopa.pn.delayer.middleware.dao;
 
 import it.pagopa.pn.delayer.BaseTest;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.PaperDeliveryDriverCapacitiesDAO;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacities;
+import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import reactor.core.publisher.Mono;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 
-public class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
+class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
 
     @Autowired
     PaperDeliveryDriverCapacitiesDAO paperDeliveryDriverCapacitiesDao;
@@ -22,17 +24,21 @@ public class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack 
     @Autowired
     DynamoDbAsyncClient dynamoDbAsyncClient;
 
+    @Autowired
+    PnDelayerConfigs pnDelayerConfigs;
+
     @Test
-    void getPaperDeliveryDriverCapacities() {
+    void getPaperDeliveryDriverCapacitiesCloseIntervalSelected() {
 
         String tenderId = "tenderId";
-        String deliveryDriverId = "deliveryDriverId";
-        String geokey = "geokey";
+        String deliveryDriverId = "deliveryDriverId1";
+        String geokey = "geokey1";
+        String capacity = "10";
         Instant now = Instant.now();
-        Instant past = now.minusSeconds(6000);
-        Instant future = now.plusSeconds(6000);
+        Instant past = now.minus(10, ChronoUnit.DAYS);
+        Instant future = now.plus(10, ChronoUnit.DAYS);
 
-        PaperDeliveryDriverCapacities capacities  = new PaperDeliveryDriverCapacities();
+        PaperDeliveryDriverCapacity capacities  = new PaperDeliveryDriverCapacity();
         capacities.setPk(String.join("##", tenderId, deliveryDriverId, geokey));
         capacities.setActivationDateFrom(past.toString());
         capacities.setActivationDateTo(future.toString());
@@ -41,62 +47,56 @@ public class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack 
         itemMap.put("pk", AttributeValue.builder().s(capacities.getPk()).build());
         itemMap.put("activationDateFrom", AttributeValue.builder().s(capacities.getActivationDateFrom()).build());
         itemMap.put("activationDateTo", AttributeValue.builder().s(capacities.getActivationDateTo()).build());
+        itemMap.put("capacity", AttributeValue.builder().s(capacity).build());
 
-        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName("pn-PaperDeliveryDriverCapacities").build());
-        PaperDeliveryDriverCapacities result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geokey).block();
+        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build());
 
-        Assertions.assertNotNull(result);
-        Assertions.assertEquals(capacities.getPk(), result.getPk());
-        Assertions.assertEquals(capacities.getActivationDateFrom(), result.getActivationDateFrom());
-    }
+        itemMap.put("activationDateFrom", AttributeValue.builder().s("2025-01-01T00:00:00Z").build());
+        itemMap.remove("activationDateTo");
+        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build());
 
-    @Test
-    void getPaperDeliveryDriverCapacities_afterRange() {
-        String tenderId = "tenderId";
-        String deliveryDriverId = "deliveryDriverId";
-        String geokey = "geokey";
-        Instant now = Instant.now();
-        Instant past = now.minusSeconds(12000);
-        Instant beforePast = now.minusSeconds(6000);
+        itemMap.put("activationDateFrom", AttributeValue.builder().s(now.minus(60, ChronoUnit.DAYS).toString()).build());
+        itemMap.put("activationDateTo", AttributeValue.builder().s(now.minus(30, ChronoUnit.DAYS).toString()).build());
+        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build());
 
-        PaperDeliveryDriverCapacities capacities = new PaperDeliveryDriverCapacities();
-        capacities.setPk(String.join("##", tenderId, deliveryDriverId, geokey));
-        capacities.setActivationDateFrom(past.toString());
-        capacities.setActivationDateTo(beforePast.toString());
-
-        Map<String, AttributeValue> itemMap = new HashMap<>();
-        itemMap.put("pk", AttributeValue.builder().s(capacities.getPk()).build());
-        itemMap.put("activationDateFrom", AttributeValue.builder().s(capacities.getActivationDateFrom()).build());
-        itemMap.put("activationDateTo", AttributeValue.builder().s(capacities.getActivationDateTo()).build());
-
-        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName("pn-PaperDeliveryDriverCapacities").build()).join();
-        PaperDeliveryDriverCapacities result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geokey).block();
-
-        Assertions.assertNull(result);
-    }
-
-    @Test
-    void getPaperDeliveryDriverCapacities_openRange() {
-        String tenderId = "tenderId";
-        String deliveryDriverId = "deliveryDriverId";
-        String geokey = "geokey";
-        Instant now = Instant.now();
-        Instant past = now.minusSeconds(12000);
-
-        PaperDeliveryDriverCapacities capacities = new PaperDeliveryDriverCapacities();
-        capacities.setPk(String.join("##", tenderId, deliveryDriverId, geokey));
-        capacities.setActivationDateFrom(past.toString());
-
-        Map<String, AttributeValue> itemMap = new HashMap<>();
-        itemMap.put("pk", AttributeValue.builder().s(capacities.getPk()).build());
-        itemMap.put("activationDateFrom", AttributeValue.builder().s(capacities.getActivationDateFrom()).build());
-
-        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName("pn-PaperDeliveryDriverCapacities").build()).join();
-        PaperDeliveryDriverCapacities result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geokey).block();
+        PaperDeliveryDriverCapacity result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geokey, now).block();
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(capacities.getPk(), result.getPk());
         Assertions.assertEquals(capacities.getActivationDateFrom(), result.getActivationDateFrom());
+        Assertions.assertEquals(capacities.getActivationDateTo(), result.getActivationDateTo());
+    }
+
+    @Test
+    void getPaperDeliveryDriverCapacitiesOpenIntervalSelected() {
+        String tenderId = "tenderId";
+        String deliveryDriverId = "deliveryDriverId2";
+        String geokey = "geokey2";
+        String capacity = "10";
+        Instant now = Instant.now();
+        String pk = String.join("##", tenderId, deliveryDriverId, geokey);
+
+        Map<String, AttributeValue> itemMap = new HashMap<>();
+        itemMap.put("pk", AttributeValue.builder().s(pk).build());
+        itemMap.put("activationDateFrom", AttributeValue.builder().s(now.minus(90, ChronoUnit.DAYS).toString()).build());
+        itemMap.put("activationDateTo", AttributeValue.builder().s(now.minus(60, ChronoUnit.DAYS).toString()).build());
+        itemMap.put("capacity", AttributeValue.builder().s(capacity).build());
+
+        Mono.fromFuture(dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build())).block();
+
+        itemMap.put("activationDateFrom", AttributeValue.builder().s("2025-01-01T00:00:00Z").build());
+        itemMap.remove("activationDateTo");
+        Mono.fromFuture(dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build())).block();
+
+        itemMap.put("activationDateFrom", AttributeValue.builder().s(now.minus(60, ChronoUnit.DAYS).toString()).build());
+        itemMap.put("activationDateTo", AttributeValue.builder().s(now.minus(30, ChronoUnit.DAYS).toString()).build());
+        Mono.fromFuture(dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build())).block();
+
+        PaperDeliveryDriverCapacity result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geokey, now).block();
+
+        Assertions.assertNotNull(result);
+        Assertions.assertEquals(pk, result.getPk());
+        Assertions.assertEquals("2025-01-01T00:00:00Z", result.getActivationDateFrom());
         Assertions.assertNull(result.getActivationDateTo());
     }
 }
