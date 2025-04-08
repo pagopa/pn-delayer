@@ -25,10 +25,116 @@ Parameters:
     Description: 'Where to send CDC'
 
 Resources:
-    NullResource:
-        Type: AWS::CloudFormation::WaitConditionHandle
+  # PaperDeliveryDriverCapacities DynamoDB Table
+  PaperDeliveryDriverCapacitiesTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveryDriverCapacities'
+      AttributeDefinitions:
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "activationDateFrom"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "activationDateFrom"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliveryDriverCapacitiesDispatchedTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveryDriverCapacitiesDispatched'
+      AttributeDefinitions:
+        - AttributeName: "deliveryDriverIdGeokey"
+          AttributeType: "S"
+        - AttributeName: "deliveryDate"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "deliveryDriverIdGeokey"
+          KeyType: "HASH"
+        - AttributeName: "deliveryDate"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliveryHighPriorityTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveryHighPriority'
+      AttributeDefinitions:
+        - AttributeName: "deliveryDriverIdGeokey"
+          AttributeType: "S"
+        - AttributeName: "createdAt"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "deliveryDriverIdGeokey"
+          KeyType: "HASH"
+        - AttributeName: "createdAt"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliveryReadyToSendTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveryReadyToSend'
+      AttributeDefinitions:
+        - AttributeName: "deliveryDate"
+          AttributeType: "S"
+        - AttributeName: "requestId"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "deliveryDate"
+          KeyType: "HASH"
+        - AttributeName: "requestId"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
 Outputs:
-    SampleOutput:
-      Description: A Sample Output
-      Value: 'na'
+  # Dynamo tables
+  PaperDeliveryDriverCapacitiesTableName:
+    Description: Name of dynamodb table containing capacities
+    Value: !Ref PaperDeliveryDriverCapacitiesTable
+  PaperDeliveryDriverCapacitiesTableArn:
+    Description: ARN of dynamodb table containing capacities
+    Value: !Sub '${PaperDeliveryDriverCapacitiesTable.Arn}'
+
+  PaperDeliveryDriverCapacitiesDispatchedTableName:
+    Description: Name of dynamodb table containing dispatched capacities
+    Value: !Ref PaperDeliveryDriverCapacitiesDispatchedTable
+  PaperDeliveryDriverCapacitiesDispatchedTableArn:
+    Description: ARN of dynamodb table containing dispatched capacities
+    Value: !Sub '${PaperDeliveryDriverCapacitiesDispatchedTable.Arn}'
+
+  PaperDeliveryHighPriorityTableName:
+    Description: Name of dynamodb table containing HighPriority paper deliveries
+    Value: !Ref PaperDeliveryHighPriorityTable
+  PaperDeliveryHighPriorityTableArn:
+    Description: ARN of dynamodb table containing HighPriority paper deliveries
+    Value: !Sub '${PaperDeliveryHighPriorityTable.Arn}'
+
+  PaperDeliveryReadyToSendTableName:
+    Description: Name of dynamodb table containing ReadyToSend paper deliveries
+    Value: !Ref PaperDeliveryReadyToSendTable
+  PaperDeliveryReadyToSendTableArn:
+    Description: ARN of dynamodb table containing ReadyToSend paper deliveries
+    Value: !Sub '${PaperDeliveryReadyToSendTable.Arn}'
