@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.time.Duration;
 
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.DYNAMODB;
+
 /**
  * Classe che permette di creare un container Docker di LocalStack.
  * Il container (e quindi la classe) può essere condivisa tra più classi di test.
