@@ -1,20 +1,17 @@
 package it.pagopa.pn.delayer;
 
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
-import it.pagopa.pn.delayer.middleware.dao.impl.*;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.middleware.dao.inmemory.*;
 import it.pagopa.pn.delayer.service.HighPriorityServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 

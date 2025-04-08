@@ -1,8 +1,8 @@
 package it.pagopa.pn.delayer.utils;
 
-import it.pagopa.pn.delayer.config.PnDelayerConfig;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +18,7 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class PaperDeliveryUtils {
 
-    private final PnDelayerConfig pnDelayerConfig;
+    private final PnDelayerConfigs pnDelayerConfig;
 
     public List<PaperDeliveryReadyToSend> mapToPaperDeliveryReadyToSend(List<PaperDeliveryHighPriority> items, Integer capCapacity, Integer dispatchedCapCapacity) {
         List<PaperDeliveryReadyToSend> paperDeliveryReadyToSendList = items.stream()

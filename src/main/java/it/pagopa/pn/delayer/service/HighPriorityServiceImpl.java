@@ -1,10 +1,10 @@
 package it.pagopa.pn.delayer.service;
 
-import it.pagopa.pn.delayer.config.PnDelayerConfig;
+import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryHighPriorityDAO;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +23,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HighPriorityServiceImpl implements HighPriorityBatchService {
 
-    private final PaperDeliveryDriverCapacitiesDispatchedDAO paperDeliveryDispatchedCapacityInMemoryDb;
-    private final PaperDeliveryDriverCapacitiesDAO paperDeliveryCapacityInMemoryDb;
+    private final PaperDeliveryDriverCapacitiesDispatchedDAO paperDeliveryDispatchedCapacityDAO;
+    private final PaperDeliveryDriverCapacitiesDAO paperDeliveryCapacityDAO;
     private final PaperDeliveryHighPriorityDAO paperDeliveryHighPriorityDAO;
-    private final PnDelayerConfig pnDelayerConfig;
+    private final PnDelayerConfigs pnDelayerConfig;
     private final PaperDeliveryUtils paperDeliveryUtils;
 
     @Override
@@ -64,8 +64,8 @@ public class HighPriorityServiceImpl implements HighPriorityBatchService {
                             List<PaperDeliveryHighPriority> filteredList = checkCapacityAndFilterList(tuple, stringListEntry.getValue());
                             deliveryRequestToSend.getPaperDeliveryHighPriorityList().addAll(filteredList);
                             deliveryRequestToSend.getPaperDeliveryReadyToSendList().addAll(paperDeliveryUtils.mapToPaperDeliveryReadyToSend(filteredList, tuple.getT1(), tuple.getT2()));
-                            return paperDeliveryDispatchedCapacityInMemoryDb.update(deliveryDriverId, stringListEntry.getKey(), tenderId, filteredList.size())
-                                    .flatMap(updatedCapCapacity -> paperDeliveryDispatchedCapacityInMemoryDb.update(deliveryDriverId, province, tenderId, filteredList.size()));
+                            return paperDeliveryDispatchedCapacityDAO.updateCounter(deliveryDriverId, stringListEntry.getKey(),filteredList.size())
+                                    .flatMap(updatedCapCapacity -> paperDeliveryDispatchedCapacityDAO.updateCounter(deliveryDriverId, province,filteredList.size()));
                         }))
                 .collectList()
                 .thenReturn(deliveryRequestToSend)
@@ -99,7 +99,7 @@ public class HighPriorityServiceImpl implements HighPriorityBatchService {
     }
 
     private Mono<Tuple2<Integer, Integer>> evaluateCapacity(String geoKey, String deliveryDriverId, String tenderId) {
-        return paperDeliveryCapacityInMemoryDb.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey)
-                .zipWith(paperDeliveryDispatchedCapacityInMemoryDb.get(deliveryDriverId, geoKey));
+        return paperDeliveryCapacityDAO.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey)
+                .zipWith(paperDeliveryDispatchedCapacityDAO.get(deliveryDriverId, geoKey));
     }
 }

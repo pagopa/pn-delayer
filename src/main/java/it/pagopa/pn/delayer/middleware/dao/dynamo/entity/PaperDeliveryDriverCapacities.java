@@ -1,4 +1,4 @@
-package it.pagopa.pn.delayer.middleware.dao.entity;
+package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
 import lombok.Data;
 

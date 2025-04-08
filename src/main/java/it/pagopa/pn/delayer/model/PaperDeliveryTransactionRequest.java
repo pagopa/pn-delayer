@@ -1,7 +1,7 @@
 package it.pagopa.pn.delayer.model;
 
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
 import lombok.Data;
 
 import java.util.ArrayList;

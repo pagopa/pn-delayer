@@ -1,11 +1,9 @@
-package it.pagopa.pn.delayer.middleware.dao.impl;
+package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryDriverCapacities;
-import jakarta.annotation.PostConstruct;
-import org.apache.commons.lang3.StringUtils;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacities;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;

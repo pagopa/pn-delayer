@@ -1,7 +1,7 @@
-package it.pagopa.pn.delayer.middleware.dao.impl;
+package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryReadyToSendDAO;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;

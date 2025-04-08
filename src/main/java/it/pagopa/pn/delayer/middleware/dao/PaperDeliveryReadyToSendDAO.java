@@ -1,7 +1,7 @@
 package it.pagopa.pn.delayer.middleware.dao;
 
 
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
 import reactor.core.publisher.Mono;
 
 import java.util.List;

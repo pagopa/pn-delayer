@@ -1,12 +1,11 @@
-package it.pagopa.pn.delayer.middleware.dao.impl;
+package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryHighPriorityDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryReadyToSendDAO;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import org.springframework.core.io.ClassPathResource;

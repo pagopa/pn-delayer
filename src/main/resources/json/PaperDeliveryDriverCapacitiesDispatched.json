@@ -1,9 +1,9 @@
 [
     {
-        "pk": "5##90010",
+        "deliveryDriverIdGeokey": "5##90010",
         "tenderId":"c0d82f6e-ee85-4e27-97df-bef27c5c5377",
         "deliveryDriverId": 5,
         "geoKey": "90010",
-        "capacity": 600
+        "usedCapacity": 600
     }
 ]

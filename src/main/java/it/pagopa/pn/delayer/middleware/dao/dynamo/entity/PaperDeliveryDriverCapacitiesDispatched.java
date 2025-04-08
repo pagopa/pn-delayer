@@ -30,7 +30,11 @@ public class PaperDeliveryDriverCapacitiesDispatched {
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DRIVER_ID)}))
     private String deliveryDriverId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_GEO_KEY)}))
-    private String geokey;
+    private String geoKey;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_CAPACITY)}))
     private int usedCapacity;
+
+    public static String buildPk(String deliveryDriverId, String geoKey) {
+        return String.join("##", deliveryDriverId, geoKey);
+    }
 }

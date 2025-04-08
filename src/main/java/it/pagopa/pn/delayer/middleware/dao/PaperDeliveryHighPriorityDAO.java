@@ -1,9 +1,7 @@
 package it.pagopa.pn.delayer.middleware.dao;
 
 
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryHighPriorityInMemoryDbImpl;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;

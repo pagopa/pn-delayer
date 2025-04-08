@@ -1,4 +1,4 @@
-package it.pagopa.pn.delayer.middleware.dao.impl;
+package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

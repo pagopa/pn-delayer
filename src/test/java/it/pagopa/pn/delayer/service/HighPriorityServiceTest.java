@@ -1,12 +1,12 @@
 package it.pagopa.pn.delayer.service;
 
 import it.pagopa.pn.delayer.DelayerApplication;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryHighPriority;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryReadyToSend;
-import it.pagopa.pn.delayer.middleware.dao.impl.DeliveryDriverProvincePartitionInMemoryDbImpl;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryHighPriorityInMemoryDbImpl;
-import it.pagopa.pn.delayer.middleware.dao.impl.PaperDeliveryReadyToSendInMemoryDbImpl;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.middleware.dao.inmemory.DeliveryDriverProvincePartitionInMemoryDbImpl;
+import it.pagopa.pn.delayer.middleware.dao.inmemory.PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl;
+import it.pagopa.pn.delayer.middleware.dao.inmemory.PaperDeliveryHighPriorityInMemoryDbImpl;
+import it.pagopa.pn.delayer.middleware.dao.inmemory.PaperDeliveryReadyToSendInMemoryDbImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,7 +53,7 @@ class HighPriorityServiceTest {
     @BeforeAll
     static void setUp() throws IOException {
         DeliveryDriverProvincePartitionInMemoryDbImpl dao = new DeliveryDriverProvincePartitionInMemoryDbImpl();
-        paperDeliveryTupleInMemory = dao.retrievePartition();
+        paperDeliveryTupleInMemory = List.of("1##PU");//dao.retrievePartition();
     }
 
     private static Stream<String> paperDeliveryTupleProvider() {

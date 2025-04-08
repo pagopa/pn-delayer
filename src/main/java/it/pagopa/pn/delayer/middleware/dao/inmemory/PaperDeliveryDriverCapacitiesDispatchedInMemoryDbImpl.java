@@ -1,14 +1,19 @@
-package it.pagopa.pn.delayer.middleware.dao.impl;
+package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import it.pagopa.pn.commons.abstractions.impl.MiddlewareTypes;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
-import it.pagopa.pn.delayer.middleware.dao.entity.PaperDeliveryDriverCapacitiesDispatched;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
+import it.pagopa.pn.delayer.model.ImplementationType;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -18,6 +23,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@ConditionalOnProperty(name = PaperDeliveryDriverCapacitiesDispatchedDAO.IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.INMEMORY)
 public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements PaperDeliveryDriverCapacitiesDispatchedDAO {
 
     private final ConcurrentHashMap<String, PaperDeliveryDriverCapacitiesDispatched> data = new ConcurrentHashMap<>();
@@ -30,36 +36,41 @@ public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements Pa
         ClassPathResource classPathResource = new ClassPathResource("json/PaperDeliveryDriverCapacitiesDispatched.json");
         List<PaperDeliveryDriverCapacitiesDispatched> capacities = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {});
         capacities.forEach(dispatched -> dispatched.setDeliveryDate(paperDeliveryUtils.calculateNextWeek(Instant.now())));
-        capacities.forEach(dispatched -> data.put(dispatched.getPk() + "##" + dispatched.getDeliveryDate(), dispatched));
+        capacities.forEach(dispatched -> data.put(dispatched.getDeliveryDriverIdGeokey() + "##" + dispatched.getDeliveryDate(), dispatched));
     }
 
     @Override
-    public Mono<Boolean> update(String deliveryDriverId, String geoKey, String tenderId, Integer increment) {
-        String pk = constructPk(deliveryDriverId, geoKey);
-        data.merge(pk, createNewCapacity(deliveryDriverId, geoKey, tenderId, increment),
+    public Mono<UpdateItemResponse> updateCounter(String deliveryDriverId, String geoKey, Integer increment) {
+        String mapPk = constructPk(deliveryDriverId + "##" + geoKey);
+        data.merge(mapPk, createNewCapacity(deliveryDriverId, geoKey, increment),
                 (existingValue, newValue) -> {
-                    existingValue.setCapacity(existingValue.getCapacity() + increment);
+                    existingValue.setUsedCapacity(existingValue.getUsedCapacity() + increment);
                     return existingValue;
                 });
-        return Mono.just(true);
+        return Mono.just(UpdateItemResponse.builder().build());
     }
 
-    private PaperDeliveryDriverCapacitiesDispatched createNewCapacity(String deliveryDriverId, String geoKey, String tenderId, Integer increment) {
+    private PaperDeliveryDriverCapacitiesDispatched createNewCapacity(String deliveryDriverId, String geoKey,  Integer increment) {
         PaperDeliveryDriverCapacitiesDispatched capacity = new PaperDeliveryDriverCapacitiesDispatched();
-        capacity.setPk(deliveryDriverId + "##" + geoKey);
+        capacity.setDeliveryDriverIdGeokey(deliveryDriverId + "##" + geoKey);
         capacity.setDeliveryDriverId(deliveryDriverId);
         capacity.setGeoKey(geoKey);
-        capacity.setTenderId(tenderId);
-        capacity.setCapacity(increment);
+        capacity.setUsedCapacity(increment);
         capacity.setDeliveryDate(paperDeliveryUtils.calculateNextWeek(Instant.now()));
         return capacity;
     }
 
     @Override
     public Mono<Integer> get(String deliveryDriverId, String geoKey) {
-        return Mono.just(Optional.ofNullable(data.get(constructPk(deliveryDriverId, geoKey)))
-                .map(PaperDeliveryDriverCapacitiesDispatched::getCapacity)
+        String pk = deliveryDriverId + "##" + geoKey;
+        return Mono.just(Optional.ofNullable(data.get(constructPk(pk)))
+                .map(PaperDeliveryDriverCapacitiesDispatched::getUsedCapacity)
                 .orElse(0));
+    }
+
+    @Override
+    public Flux<PaperDeliveryDriverCapacitiesDispatched> batchGetItem(List<String> pks, Instant deliveryDate) {
+        return null;
     }
 
 
@@ -67,7 +78,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements Pa
         return data.values();
     }
 
-    public String constructPk(String deliveryDriverId, String geoKey) {
-        return deliveryDriverId + "##" + geoKey + "##" + paperDeliveryUtils.calculateNextWeek(Instant.now());
+    public String constructPk(String pk) {
+        return pk + "##" + paperDeliveryUtils.calculateNextWeek(Instant.now());
     }
 }
