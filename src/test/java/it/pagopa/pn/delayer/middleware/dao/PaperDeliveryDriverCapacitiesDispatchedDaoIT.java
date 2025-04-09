@@ -1,7 +1,6 @@
 package it.pagopa.pn.delayer.middleware.dao;
 
 import it.pagopa.pn.delayer.BaseTest;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.PaperDeliveryDriverCapacitiesDispatchedDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
