@@ -4,6 +4,8 @@ import lombok.Data;
 import lombok.Getter;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
+import java.time.Instant;
+
 @DynamoDbBean
 @Data
 public class PaperDeliveryDriverCapacity {
@@ -21,9 +23,9 @@ public class PaperDeliveryDriverCapacity {
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_ACTIVATION_DATE_FROM)}))
-    private String activationDateFrom;
+    private Instant activationDateFrom;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_ACTIVATION_DATE_TO)}))
-    private String activationDateTo;
+    private Instant activationDateTo;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TENDER_ID)}))
     private String tenderId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DRIVER_ID)}))
@@ -35,7 +37,7 @@ public class PaperDeliveryDriverCapacity {
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PEAK_CAPACITY)}))
     private int peakCapacity;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_CREATED_AT)}))
-    private String createdAt;
+    private Instant createdAt;
 
     @DynamoDbIgnore
     public static String buildKey(String tenderId, String deliveryDriverId, String geokey) {

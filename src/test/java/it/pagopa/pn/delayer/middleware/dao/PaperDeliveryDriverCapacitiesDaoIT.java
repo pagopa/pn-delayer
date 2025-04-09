@@ -40,13 +40,13 @@ class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
 
         PaperDeliveryDriverCapacity capacities  = new PaperDeliveryDriverCapacity();
         capacities.setPk(String.join("##", tenderId, deliveryDriverId, geokey));
-        capacities.setActivationDateFrom(past.toString());
-        capacities.setActivationDateTo(future.toString());
+        capacities.setActivationDateFrom(past);
+        capacities.setActivationDateTo(future);
 
         Map<String, AttributeValue> itemMap = new HashMap<>();
         itemMap.put("pk", AttributeValue.builder().s(capacities.getPk()).build());
-        itemMap.put("activationDateFrom", AttributeValue.builder().s(capacities.getActivationDateFrom()).build());
-        itemMap.put("activationDateTo", AttributeValue.builder().s(capacities.getActivationDateTo()).build());
+        itemMap.put("activationDateFrom", AttributeValue.builder().s(capacities.getActivationDateFrom().toString()).build());
+        itemMap.put("activationDateTo", AttributeValue.builder().s(capacities.getActivationDateTo().toString()).build());
         itemMap.put("capacity", AttributeValue.builder().s(capacity).build());
 
         dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build());
@@ -96,7 +96,7 @@ class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(pk, result.getPk());
-        Assertions.assertEquals("2025-01-01T00:00:00Z", result.getActivationDateFrom());
+        Assertions.assertEquals(Instant.parse("2025-01-01T00:00:00Z"), result.getActivationDateFrom());
         Assertions.assertNull(result.getActivationDateTo());
     }
 }
