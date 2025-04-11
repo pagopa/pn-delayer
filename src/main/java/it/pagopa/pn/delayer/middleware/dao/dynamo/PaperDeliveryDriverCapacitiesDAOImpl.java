@@ -3,7 +3,9 @@ package it.pagopa.pn.delayer.middleware.dao.dynamo;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
+import it.pagopa.pn.delayer.model.ImplementationType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.*;
@@ -15,8 +17,11 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
+import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
+
 @Component
 @Slf4j
+@ConditionalOnProperty(name = IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.DYNAMO, matchIfMissing = true)
 public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriverCapacitiesDAO {
 
     private final DynamoDbAsyncTable<PaperDeliveryDriverCapacity> table;
@@ -26,7 +31,7 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
     }
 
     @Override
-    public Mono<PaperDeliveryDriverCapacity> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey, Instant deliveryDate) {
+    public Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey, Instant deliveryDate) {
 
         QueryConditional keyCondition = QueryConditional.sortLessThanOrEqualTo(Key.builder()
                 .partitionValue(PaperDeliveryDriverCapacity.buildKey(tenderId, deliveryDriverId, geoKey))
@@ -51,6 +56,9 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
                 .scanIndexForward(false)
                 .build();
 
-        return Mono.from(table.query(queryRequest).items());
+        return Mono.from(table.query(queryRequest).items().limit(1))
+                .map(PaperDeliveryDriverCapacity::getCapacity)
+                .switchIfEmpty(Mono.just(0))
+                .doOnError(e -> log.error("Error while querying PaperDeliveryDriverCapacities", e));
     }
 }

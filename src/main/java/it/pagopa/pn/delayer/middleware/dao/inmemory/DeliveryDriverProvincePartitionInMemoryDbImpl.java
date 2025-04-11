@@ -1,0 +1,30 @@
+package it.pagopa.pn.delayer.middleware.dao.inmemory;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import it.pagopa.pn.delayer.middleware.dao.DeliveryDriverProvincePartitionDAO;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+@Component
+public class DeliveryDriverProvincePartitionInMemoryDbImpl implements DeliveryDriverProvincePartitionDAO {
+
+    @Override
+    public List<String> retrievePartition() throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        ClassPathResource classPathResource = new ClassPathResource("json/DeliveryDriverProvinceParameter.json");
+        Map<String, List<String>> partionList = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {});
+        return createDeliveryDriverProvincePartition(partionList);
+    }
+
+    private List<String> createDeliveryDriverProvincePartition(Map<String, List<String>> partionList) {
+        return partionList.entrySet().stream()
+                .map(entry -> entry.getValue().stream().map(s -> entry.getKey() + "##" + s).toList())
+                .flatMap(List::stream)
+                .toList();
+    }
+}

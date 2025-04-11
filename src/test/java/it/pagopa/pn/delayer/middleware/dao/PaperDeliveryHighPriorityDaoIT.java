@@ -36,11 +36,11 @@ class PaperDeliveryHighPriorityDaoIT extends BaseTest.WithLocalStack {
 
         IntStream.range(0, 10).forEach(i -> {
             PaperDeliveryHighPriority paperDeliveryHighPriority = new PaperDeliveryHighPriority();
-            paperDeliveryHighPriority.setDeliveryDriverIdGeokey("deliveryDriverId##geokey");
+            paperDeliveryHighPriority.setDeliveryDriverIdGeoKey("deliveryDriverId1##geokey1");
             paperDeliveryHighPriority.setCreatedAt(Instant.parse("2025-04-07T00:00:00Z").plus(i, ChronoUnit.MINUTES));
 
             Map<String, AttributeValue> itemMap = new HashMap<>();
-            itemMap.put("deliveryDriverIdGeokey", AttributeValue.builder().s(paperDeliveryHighPriority.getDeliveryDriverIdGeokey()).build());
+            itemMap.put("deliveryDriverIdGeokey", AttributeValue.builder().s(paperDeliveryHighPriority.getDeliveryDriverIdGeoKey()).build());
             itemMap.put("createdAt", AttributeValue.builder().s(paperDeliveryHighPriority.getCreatedAt().toString()).build());
 
             dynamoDbAsyncClient.putItem(PutItemRequest.builder()
@@ -50,13 +50,14 @@ class PaperDeliveryHighPriorityDaoIT extends BaseTest.WithLocalStack {
                     .join();
         });
 
-        String deliveryDriverId = "deliveryDriverId";
-        String geokey = "geokey";
+        String deliveryDriverId = "deliveryDriverId1";
+        String geokey = "geokey1";
 
         Page<PaperDeliveryHighPriority> result = paperDeliveryHighPriorityDao.getPaperDeliveryHighPriority(deliveryDriverId, geokey, null).block();
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(5, result.items().size());
+        System.out.println(result.items());
         Assertions.assertEquals("2025-04-07T00:00:00Z", result.items().get(0).getCreatedAt().toString());
 
         Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
@@ -64,7 +65,7 @@ class PaperDeliveryHighPriorityDaoIT extends BaseTest.WithLocalStack {
         lastEvaluatedKey.put("createdAt", AttributeValue.builder().s("2025-04-07T00:04:00Z").build());
 
         Page<PaperDeliveryHighPriority> resultWithLastEvaluated = paperDeliveryHighPriorityDao.getPaperDeliveryHighPriority(deliveryDriverId, geokey, lastEvaluatedKey).block();
-
+        System.out.println(resultWithLastEvaluated.items());
         Assertions.assertNotNull(resultWithLastEvaluated);
         Assertions.assertEquals(5, resultWithLastEvaluated.items().size());
         Assertions.assertEquals("2025-04-07T00:05:00Z", resultWithLastEvaluated.items().get(0).getCreatedAt().toString());
@@ -75,10 +76,10 @@ class PaperDeliveryHighPriorityDaoIT extends BaseTest.WithLocalStack {
         List<PaperDeliveryHighPriority> highPrioritiesList = IntStream.range(0, 3)
                 .mapToObj(i -> {
                     PaperDeliveryHighPriority paperDeliveryHighPriority = new PaperDeliveryHighPriority();
-                    paperDeliveryHighPriority.setDeliveryDriverIdGeokey("deliveryDriverId##geokey");
+                    paperDeliveryHighPriority.setDeliveryDriverIdGeoKey("deliveryDriverId##geokey");
                     paperDeliveryHighPriority.setCreatedAt(Instant.parse("2025-04-07T00:00:00Z").plus(i, ChronoUnit.HOURS));
                     Map<String, AttributeValue> itemMap = new HashMap<>();
-                    itemMap.put("deliveryDriverIdGeokey", AttributeValue.builder().s(paperDeliveryHighPriority.getDeliveryDriverIdGeokey()).build());
+                    itemMap.put("deliveryDriverIdGeokey", AttributeValue.builder().s(paperDeliveryHighPriority.getDeliveryDriverIdGeoKey()).build());
                     itemMap.put("createdAt", AttributeValue.builder().s(paperDeliveryHighPriority.getCreatedAt().toString()).build());
                     dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryHighPriorityTableName()).build()).join();
                     return paperDeliveryHighPriority;

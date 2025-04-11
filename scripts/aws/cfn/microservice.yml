@@ -103,6 +103,16 @@ Parameters:
     Type: Number
     Description: 'Max elements quantity for high priority query'
 
+  DeliveryDateDayOfWeek:
+    Type: String
+    Description: 'Day of the week for delivery date. 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday'
+    Default: 1
+
+  DeliveryDateInterval:
+    Type: String
+    Description: 'Interval for deliveryDate'
+    Default: 1d
+
 
 Resources:
 
@@ -123,6 +133,8 @@ Resources:
         ContainerEnvEntry4: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME=${PaperDeliveryHighPriorityTableName}'
         ContainerEnvEntry5: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYREAYTOSENDTABLENAME=${PaperDeliveryReadyToSendTableName}'
         ContainerEnvEntry6: !Sub 'PN_DELAYER_HIGHPRIORITYQUERYLIMIT =${HighPriorityQueryLimit}'
+        ContainerEnvEntry7: !Sub 'PN_DELAYER_DELIVERYDATEDAYOFWEEK=${DeliveryDateDayOfWeek}'
+        ContainerEnvEntry8: !Sub 'PN_DELAYER_DELIVERYDATEINTERVAL=${DeliveryDateInterval}'
         MappedPaths: '/delayer/*'
         ECSClusterName: !Ref ECSClusterName
         Subnets: !Ref SubnetsIds

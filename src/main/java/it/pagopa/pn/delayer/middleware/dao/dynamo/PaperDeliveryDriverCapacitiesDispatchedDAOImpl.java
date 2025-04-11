@@ -3,7 +3,9 @@ package it.pagopa.pn.delayer.middleware.dao.dynamo;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
+import it.pagopa.pn.delayer.model.ImplementationType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -14,29 +16,38 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.ReadBatch;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
-import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
+import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched.*;
+
 @Component
 @Slf4j
+@ConditionalOnProperty(name = IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.DYNAMO, matchIfMissing = true)
 public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeliveryDriverCapacitiesDispatchedDAO {
 
     private final DynamoDbAsyncTable<PaperDeliveryDriverCapacitiesDispatched> table;
     private final DynamoDbAsyncClient dynamoDbAsyncClient;
     private final DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient;
 
-    public PaperDeliveryDriverCapacitiesDispatchedDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbAsyncClient dynamoDbAsyncClient, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
+    public PaperDeliveryDriverCapacitiesDispatchedDAOImpl(PnDelayerConfigs pnDelayerConfigs,
+                                                          DynamoDbAsyncClient dynamoDbAsyncClient,
+                                                          DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
         this.table = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesDispatchedTableName(), TableSchema.fromBean(PaperDeliveryDriverCapacitiesDispatched.class));
         this.dynamoDbAsyncClient = dynamoDbAsyncClient;
         this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
     }
 
     @Override
-    public Mono<UpdateItemResponse> updateCounter(String pk, Instant deliveryDate, Integer increment) {
+    public Mono<UpdateItemResponse> updateCounter(String deliveryDriverId, String geoKey, Integer increment, Instant deliveryDate) {
+        String pk = PaperDeliveryDriverCapacitiesDispatched.buildPk(deliveryDriverId, geoKey);
         log.info("update pk={} increment={}", pk, increment);
 
         Map<String, AttributeValue> key = new HashMap<>();
@@ -45,10 +56,14 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
 
         Map<String, AttributeValue> attributeValue = new HashMap<>();
         attributeValue.put(":v", AttributeValue.builder().n(String.valueOf(increment)).build());
+        attributeValue.put(":deliveryDriver", AttributeValue.builder().s(deliveryDriverId).build());
+        attributeValue.put(":geoKey", AttributeValue.builder().s(geoKey).build());
+
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                 .tableName(table.tableName())
                 .key(key)
-                .updateExpression("ADD " + PaperDeliveryDriverCapacitiesDispatched.COL_CAPACITY + " :v")
+                .updateExpression("ADD " + COL_CAPACITY + " :v" +
+                        " SET " + COL_DELIVERY_DRIVER_ID + " = :deliveryDriver," + COL_GEO_KEY + "= :geoKey")
                 .expressionAttributeValues(attributeValue)
                 .build();
 
@@ -58,12 +73,14 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
     }
 
     @Override
-    public Mono<PaperDeliveryDriverCapacitiesDispatched> get(String pk, Instant deliveryDate) {
+    public Mono<Integer> get(String deliveryDriverId, String geoKey, Instant deliveryDate) {
+        String pk = PaperDeliveryDriverCapacitiesDispatched.buildPk(deliveryDriverId, geoKey);
         return Mono.fromFuture(table.getItem(Key.builder()
                         .partitionValue(pk)
                         .sortValue(String.valueOf(deliveryDate))
                         .build()))
-                .doOnSuccess(item -> log.info("Retrieved item: {}", item))
+                .map(PaperDeliveryDriverCapacitiesDispatched::getUsedCapacity)
+                .doOnSuccess(item -> log.info("Retrieved capacity for pk [{}] and deliveryWeek [{}] = {}",pk, deliveryDate, item))
                 .doOnError(e -> log.error("Error retrieving item with pk {}: {}", pk, e.getMessage()));
     }
 
