@@ -99,6 +99,10 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryReadyToSend'
 
+  HighPriorityQueryLimit:
+    Type: Number
+    Description: 'Max elements quantity for high priority query'
+
 
 Resources:
 
@@ -118,6 +122,7 @@ Resources:
         ContainerEnvEntry3: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESDISPATCHEDTABLENAME=${PaperDeliveryDriverCapacitiesDispatchedTableName}'
         ContainerEnvEntry4: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME=${PaperDeliveryHighPriorityTableName}'
         ContainerEnvEntry5: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYREAYTOSENDTABLENAME=${PaperDeliveryReadyToSendTableName}'
+        ContainerEnvEntry6: !Sub 'PN_DELAYER_HIGHPRIORITYQUERYLIMIT =${HighPriorityQueryLimit}'
         MappedPaths: '/delayer/*'
         ECSClusterName: !Ref ECSClusterName
         Subnets: !Ref SubnetsIds
