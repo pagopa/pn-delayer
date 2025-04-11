@@ -1,6 +1,7 @@
 {
-  "Parameters" : {
+  "Parameters": {
     "MinTasksNumber": "0",
-    "MaxTasksNumber": "0"
+    "MaxTasksNumber": "0",
+    "HighPriorityQueryLimit": "1000"
   }
 }

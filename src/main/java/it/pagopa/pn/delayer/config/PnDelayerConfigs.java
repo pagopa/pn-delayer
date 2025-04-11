@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 public class PnDelayerConfigs {
 
     private Dao dao;
+    private int highPriorityQueryLimit;
 
     @Data
     public static class Dao {
