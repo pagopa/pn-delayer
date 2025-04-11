@@ -6,11 +6,13 @@ import it.pagopa.pn.commons.utils.metrics.cloudwatch.CloudWatchMetricHandler;
 import lombok.CustomLog;
 import org.springframework.boot.actuate.metrics.MetricsEndpoint;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
 @CustomLog
 @Import(CloudWatchMetricHandler.class)
+@Profile("!test")
 public class SpringAnalyzerActivation extends SpringAnalyzer {
 
     MeterRegistry meterRegistry;
