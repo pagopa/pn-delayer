@@ -23,7 +23,7 @@ public class PaperDeliveryHighPriority {
     public static final String COL_IUN = "iun";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_DELIVERY_DRIVER_ID_GEOKEY)}))
-    private String deliveryDriverIdGeokey;
+    private String deliveryDriverIdGeoKey;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_CREATED_AT)}))
     private Instant createdAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TENDER_ID)}))
@@ -48,5 +48,15 @@ public class PaperDeliveryHighPriority {
     @DynamoDbIgnore
     public static String buildKey(String deliveryDriverId, String geokey) {
         return String.join("##", deliveryDriverId, geokey);
+    }
+
+    @DynamoDbIgnore
+    public static String retrieveDeliveryDriverId(String deliveryDriverIdGeokey) {
+        return deliveryDriverIdGeokey.split("##")[0];
+    }
+
+    @DynamoDbIgnore
+    public static String retrieveGeoKey(String deliveryDriverIdGeokey) {
+        return deliveryDriverIdGeokey.split("##")[1];
     }
 }
