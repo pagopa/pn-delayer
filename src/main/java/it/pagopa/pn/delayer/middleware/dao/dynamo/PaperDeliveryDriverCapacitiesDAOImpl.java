@@ -26,7 +26,7 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
     }
 
     @Override
-    public Mono<PaperDeliveryDriverCapacity> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey, Instant deliveryDate) {
+    public Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey, Instant deliveryDate) {
 
         QueryConditional keyCondition = QueryConditional.sortLessThanOrEqualTo(Key.builder()
                 .partitionValue(PaperDeliveryDriverCapacity.buildKey(tenderId, deliveryDriverId, geoKey))
@@ -51,6 +51,9 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
                 .scanIndexForward(false)
                 .build();
 
-        return Mono.from(table.query(queryRequest).items());
+        return Mono.from(table.query(queryRequest).items().limit(1))
+                .map(PaperDeliveryDriverCapacity::getCapacity)
+                .switchIfEmpty(Mono.just(0))
+                .doOnError(e -> log.error("Error while querying PaperDeliveryDriverCapacities", e));
     }
 }
