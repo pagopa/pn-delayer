@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched.*;
+
 @Component
 @Slf4j
 public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeliveryDriverCapacitiesDispatchedDAO {
@@ -36,7 +38,8 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
     }
 
     @Override
-    public Mono<UpdateItemResponse> updateCounter(String pk, Instant deliveryDate, Integer increment) {
+    public Mono<UpdateItemResponse> updateCounter(String deliveryDriverId, String geoKey, Integer increment, Instant deliveryDate) {
+        String pk = PaperDeliveryDriverCapacitiesDispatched.buildPk(deliveryDriverId, geoKey);
         log.info("update pk={} increment={}", pk, increment);
 
         Map<String, AttributeValue> key = new HashMap<>();
@@ -45,10 +48,14 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
 
         Map<String, AttributeValue> attributeValue = new HashMap<>();
         attributeValue.put(":v", AttributeValue.builder().n(String.valueOf(increment)).build());
+        attributeValue.put(":deliveryDriver", AttributeValue.builder().s(deliveryDriverId).build());
+        attributeValue.put(":geoKey", AttributeValue.builder().s(geoKey).build());
+
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                 .tableName(table.tableName())
                 .key(key)
-                .updateExpression("ADD " + PaperDeliveryDriverCapacitiesDispatched.COL_CAPACITY + " :v")
+                .updateExpression("ADD " + COL_CAPACITY + " :v" +
+                        " SET " + COL_DELIVERY_DRIVER_ID + " = :deliveryDriver," + COL_GEO_KEY + "= :geoKey")
                 .expressionAttributeValues(attributeValue)
                 .build();
 
@@ -58,12 +65,15 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
     }
 
     @Override
-    public Mono<PaperDeliveryDriverCapacitiesDispatched> get(String pk, Instant deliveryDate) {
+    public Mono<Integer> get(String deliveryDriverId, String geoKey, Instant deliveryDate) {
+        String pk = PaperDeliveryDriverCapacitiesDispatched.buildPk(deliveryDriverId, geoKey);
         return Mono.fromFuture(table.getItem(Key.builder()
                         .partitionValue(pk)
                         .sortValue(String.valueOf(deliveryDate))
                         .build()))
-                .doOnSuccess(item -> log.info("Retrieved item: {}", item))
+                .map(PaperDeliveryDriverCapacitiesDispatched::getUsedCapacity)
+                .switchIfEmpty(Mono.just(0))
+                .doOnSuccess(item -> log.info("Retrieved capacity for pk [{}] and deliveryWeek [{}] = {}",pk, deliveryDate, item))
                 .doOnError(e -> log.error("Error retrieving item with pk {}: {}", pk, e.getMessage()));
     }
 
