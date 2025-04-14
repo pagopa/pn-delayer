@@ -53,7 +53,11 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
 
         return Mono.from(table.query(queryRequest).items().limit(1))
                 .map(PaperDeliveryDriverCapacity::getCapacity)
-                .switchIfEmpty(Mono.just(0))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("No PaperDeliveryDriverCapacity found for tenderId: {}, deliveryDriverId: {}, geoKey: {}, deliveryDate: {}",
+                            tenderId, deliveryDriverId, geoKey, deliveryDate);
+                    return Mono.just(0);
+                }))
                 .doOnError(e -> log.error("Error while querying PaperDeliveryDriverCapacities", e));
     }
 }
