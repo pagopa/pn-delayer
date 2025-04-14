@@ -54,7 +54,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                 .tableName(table.tableName())
                 .key(key)
-                .updateExpression("ADD " + COL_CAPACITY + " :v" +
+                .updateExpression("ADD " + COL_USED_CAPACITY + " :v" +
                         " SET " + COL_DELIVERY_DRIVER_ID + " = :deliveryDriver," + COL_GEO_KEY + "= :geoKey")
                 .expressionAttributeValues(attributeValue)
                 .build();
@@ -73,13 +73,13 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
                         .build()))
                 .map(PaperDeliveryDriverCapacitiesDispatched::getUsedCapacity)
                 .switchIfEmpty(Mono.just(0))
-                .doOnSuccess(item -> log.info("Retrieved capacity for pk [{}] and deliveryWeek [{}] = {}",pk, deliveryDate, item))
-                .doOnError(e -> log.error("Error retrieving item with pk {}: {}", pk, e.getMessage()));
+                .doOnSuccess(item -> log.info("Retrieved used capacity for pk [{}] and deliveryWeek [{}] = {}",pk, deliveryDate, item))
+                .doOnError(e -> log.error("Error retrieving usedCapacity item with pk {}: {}", pk, e.getMessage()));
     }
 
     @Override
     public Flux<PaperDeliveryDriverCapacitiesDispatched> batchGetItem(List<String> pks, Instant deliveryDate) {
-        log.info("batchGetItem pks={} deliveryDate={}", pks, deliveryDate);
+        log.info("batchGetItem for usedCapacity pks={} deliveryDate={}", pks, deliveryDate);
 
         List<Key> keys = pks.stream()
                 .map(pk -> Key.builder()
@@ -101,9 +101,9 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
 
         return Mono.from(dynamoDbEnhancedClient.batchGetItem(request))
                 .map(batchGetResultPage -> batchGetResultPage.resultsForTable(table))
-                .doOnNext(items -> log.info("Retrieved item: {}", items.size()))
+                .doOnNext(items -> log.info("Retrieved usedCapacity items: {}", items.size()))
                 .flatMapMany(Flux::fromIterable)
-                .doOnError(e -> log.error("Error retrieving items with pks {}: {}", pks, e.getMessage()));
+                .doOnError(e -> log.error("Error retrieving usedCapacity items with pks {}: {}", pks, e.getMessage()));
     }
 }
 

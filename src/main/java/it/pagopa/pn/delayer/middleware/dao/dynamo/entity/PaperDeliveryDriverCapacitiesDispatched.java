@@ -17,7 +17,7 @@ public class PaperDeliveryDriverCapacitiesDispatched {
     public static final String COL_DELIVERY_DATE = "deliveryDate";
     public static final String COL_DELIVERY_DRIVER_ID = "deliveryDriverId";
     public static final String COL_GEO_KEY = "geoKey";
-    public static final String COL_CAPACITY = "usedCapacity";
+    public static final String COL_USED_CAPACITY = "usedCapacity";
 
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_DELIVERY_DRIVER_ID_GEOKEY)}))
@@ -28,7 +28,7 @@ public class PaperDeliveryDriverCapacitiesDispatched {
     private String deliveryDriverId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_GEO_KEY)}))
     private String geoKey;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_CAPACITY)}))
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_USED_CAPACITY)}))
     private int usedCapacity;
 
     public static String buildPk(String deliveryDriverId, String geoKey) {
