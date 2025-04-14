@@ -125,4 +125,20 @@ class PaperDeliveryUtilsTest {
 
         assertEquals(50, tempItems.stream().filter(item -> item.getDeliveryDate().equals(weekDayStart)).count());
     }
+
+    @Test
+    void calculateNextWeek1() {
+        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
+        Instant createdAt = Instant.parse("2025-04-01T10:00:00Z");
+        Instant result = paperDeliveryUtils.calculateNextWeek(createdAt);
+        assertEquals(Instant.parse("2025-04-07T00:00:00Z"), result);
+    }
+
+    @Test
+    void calculateNextWeek2() {
+        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(3);
+        Instant createdAt = Instant.parse("2025-04-07T00:00:00Z");
+        Instant result = paperDeliveryUtils.calculateNextWeek(createdAt);
+        assertEquals(Instant.parse("2025-04-09T00:00:00Z"), result);
+    }
 }
