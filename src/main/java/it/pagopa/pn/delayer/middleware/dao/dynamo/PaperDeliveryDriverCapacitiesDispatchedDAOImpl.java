@@ -3,7 +3,9 @@ package it.pagopa.pn.delayer.middleware.dao.dynamo;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
+import it.pagopa.pn.delayer.model.ImplementationType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -21,10 +23,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
 import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched.*;
 
 @Component
 @Slf4j
+@ConditionalOnProperty(name = IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.DYNAMO, matchIfMissing = true)
 public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeliveryDriverCapacitiesDispatchedDAO {
 
     private final DynamoDbAsyncTable<PaperDeliveryDriverCapacitiesDispatched> table;
