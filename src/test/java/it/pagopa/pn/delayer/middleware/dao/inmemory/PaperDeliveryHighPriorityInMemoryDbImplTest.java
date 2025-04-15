@@ -1,17 +1,20 @@
 package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
@@ -21,16 +24,20 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PaperDeliveryHighPriorityInMemoryDbImplTest{
 
-    @InjectMocks
     PaperDeliveryHighPriorityInMemoryDbImpl dao;
 
     @Mock
     PaperDeliveryReadyToSendInMemoryDbImpl paperDeliveryReadyToSendInMemoryDb;
 
-
     @Mock
     PnDelayerConfigs pnDelayerConfigs;
 
+    @BeforeEach
+    void setUp() throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        dao = new PaperDeliveryHighPriorityInMemoryDbImpl(pnDelayerConfigs, paperDeliveryReadyToSendInMemoryDb, objectMapper);
+    }
 
 
     @Test

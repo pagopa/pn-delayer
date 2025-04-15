@@ -1,18 +1,27 @@
 package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
 import java.time.Instant;
 
 @ExtendWith(MockitoExtension.class)
 class PaperDeliveryDriverCapacitiesInMemoryDbImplTest {
 
-    @InjectMocks
     PaperDeliveryDriverCapacitiesInMemoryDbImpl dao;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        dao = new PaperDeliveryDriverCapacitiesInMemoryDbImpl(objectMapper);
+    }
 
     @Test
     void returnsCorrectCapacityForMatchingEntry() {

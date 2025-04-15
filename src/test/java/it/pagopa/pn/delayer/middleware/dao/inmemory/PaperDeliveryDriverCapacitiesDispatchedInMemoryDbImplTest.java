@@ -1,15 +1,17 @@
 package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
+import java.io.IOException;
 import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -18,11 +20,15 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImplTest {
 
-    @InjectMocks
     PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl dao;
 
     @Mock
     PaperDeliveryUtils paperDeliveryUtils;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        dao = new PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl(paperDeliveryUtils, new ObjectMapper());
+    }
 
 
     @Test
