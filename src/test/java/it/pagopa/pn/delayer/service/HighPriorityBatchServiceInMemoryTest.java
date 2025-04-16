@@ -72,13 +72,13 @@ class HighPriorityBatchServiceInMemoryTest {
     @ParameterizedTest
     @MethodSource("paperDeliveryTupleProvider")
     void parameterizedJobRunTest(String tuple) {
-        highPriorityService.initHighPriorityBatch(tuple, new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch(tuple, new HashMap<>(), Instant.now()).block();
         verify(tuple);
     }
 
     @Test
     void testInitHighPriorityBatch() {
-        highPriorityService.initHighPriorityBatch("3##GR", new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch("3##GR", new HashMap<>(), Instant.now()).block();
         Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(Instant.now());
 
         List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get("3##GR");

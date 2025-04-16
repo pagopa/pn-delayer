@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.HashMap;
 
 @RestController
@@ -17,9 +18,9 @@ public class TestController {
 
     private final HighPriorityBatchService highPriorityBatchService;
 
-    @GetMapping("/execute-job")
+    @GetMapping("/delayer-private/execute-job")
     public Mono<Void> executeJob(@RequestParam(value = "deliveryDriverIdGeoKey") String pk) {
-        return highPriorityBatchService.initHighPriorityBatch(pk, new HashMap<>())
-                .doOnNext(result -> log.info("Batch completed"));
+        return highPriorityBatchService.initHighPriorityBatch(pk, new HashMap<>(), Instant.now())
+                .doOnSuccess(result -> log.info("Batch completed"));
     }
 }

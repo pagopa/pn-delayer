@@ -42,7 +42,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
     }
 
     @Override
-    public Mono<UpdateItemResponse> updateCounter(String deliveryDriverId, String geoKey, Integer increment, Instant deliveryDate) {
+    public Mono<Integer> updateCounter(String deliveryDriverId, String geoKey, Integer increment, Instant deliveryDate) {
         String pk = PaperDeliveryDriverCapacitiesDispatched.buildPk(deliveryDriverId, geoKey);
         log.info("update pk={} increment={}", pk, increment);
 
@@ -64,6 +64,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
                 .build();
 
         return Mono.fromFuture(dynamoDbAsyncClient.updateItem(updateRequest))
+                .thenReturn(increment)
                 .doOnSuccess(r -> log.info("Update successful for pk={} increment={}", pk, increment))
                 .doOnError(e -> log.error("Error updating item with pk {}: {}", pk, e.getMessage()));
     }

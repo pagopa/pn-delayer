@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
-import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -51,10 +50,10 @@ class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImplTest {
 
         when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(deliveryDate);
 
-        Mono<UpdateItemResponse> response = dao.updateCounter(deliveryDriverId, geoKey, 10, deliveryDate);
+        Mono<Integer> response = dao.updateCounter(deliveryDriverId, geoKey, 10, deliveryDate);
 
         Assertions.assertEquals(10, dao.get(deliveryDriverId, geoKey, deliveryDate).block());
-        Assertions.assertEquals(UpdateItemResponse.builder().build(), response.block());
+        Assertions.assertEquals(10, response.block());
     }
 
     @Test

@@ -9,6 +9,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 
 @Component
@@ -23,7 +24,8 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     public void run(String... args) {
         if(args.length != 0 && StringUtils.isNotBlank(args[0])){
             log.info("Starting batch for pk: {}", args[0]);
-            highPriorityBatchService.initHighPriorityBatch(args[0], new HashMap<>()).block();
+            var startExecutionBatch = Instant.now();
+            highPriorityBatchService.initHighPriorityBatch(args[0], new HashMap<>(), startExecutionBatch).block();
             int exitCode = SpringApplication.exit(applicationContext, () -> 0);
             System.exit(exitCode);
         } else {

@@ -12,7 +12,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -42,7 +41,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements Pa
     }
 
     @Override
-    public Mono<UpdateItemResponse> updateCounter(String deliveryDriverId, String geoKey, Integer increment, Instant deliveryDate) {
+    public Mono<Integer> updateCounter(String deliveryDriverId, String geoKey, Integer increment, Instant deliveryDate) {
         String mapPk = constructPk(deliveryDriverId + "##" + geoKey, deliveryDate);
         data.merge(mapPk, createNewCapacity(deliveryDriverId, geoKey, increment),
                 (existingValue, newValue) -> {
@@ -51,7 +50,7 @@ public class PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl implements Pa
                 });
         log.info("updated PaperDeliveryDriverCapacitiesDispatched with deliveryDriverId: {}, geoKey: {}, increment: {}, deliveryDate: {}",
                 deliveryDriverId, geoKey, increment, deliveryDate);
-        return Mono.just(UpdateItemResponse.builder().build());
+        return Mono.just(increment);
     }
 
     private PaperDeliveryDriverCapacitiesDispatched createNewCapacity(String deliveryDriverId, String geoKey, Integer increment) {

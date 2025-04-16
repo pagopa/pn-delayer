@@ -14,7 +14,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
 import java.time.Instant;
 import java.util.List;
@@ -31,17 +30,17 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
     private final PaperDeliveryUtils paperDeliveryUtils;
 
     @Override
-    public Mono<Void> initHighPriorityBatch(String pk, Map<String, AttributeValue> lastEvaluatedKey) {
+    public Mono<Void> initHighPriorityBatch(String pk, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch) {
         return paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(PaperDeliveryHighPriority.retrieveDeliveryDriverId(pk),
                         PaperDeliveryHighPriority.retrieveGeoKey(pk), lastEvaluatedKey)
                 .flatMap(paperDeliveryHighPriorityPage -> {
                     if (CollectionUtils.isEmpty(paperDeliveryHighPriorityPage.items())) {
                         return Mono.empty();
                     }
-                    return processChunk(paperDeliveryHighPriorityPage.items())
+                    return processChunk(paperDeliveryHighPriorityPage.items(), startExecutionBatch)
                             .flatMap(unused -> {
                                 if (!CollectionUtils.isEmpty(paperDeliveryHighPriorityPage.lastEvaluatedKey())) {
-                                    return initHighPriorityBatch(pk, paperDeliveryHighPriorityPage.lastEvaluatedKey());
+                                    return initHighPriorityBatch(pk, paperDeliveryHighPriorityPage.lastEvaluatedKey(), startExecutionBatch);
                                 } else {
                                     return Mono.empty();
                                 }
@@ -49,13 +48,14 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
                 });
     }
 
-    private Mono<List<PaperDeliveryHighPriority>> processChunk(List<PaperDeliveryHighPriority> chunk) {
+    private Mono<List<PaperDeliveryHighPriority>> processChunk(List<PaperDeliveryHighPriority> chunk, Instant startExecutionBatch) {
         PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(Instant.now());
+        Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(startExecutionBatch);
         PaperDeliveryHighPriority paperDeliveryHighPriority = chunk.get(0);
         return retrieveCapacities(paperDeliveryHighPriority.getProvince(), paperDeliveryHighPriority.getDeliveryDriverId(), paperDeliveryHighPriority.getTenderId(), deliveryWeek)
                 .map(tuple -> paperDeliveryUtils.checkCapacityAndFilterList(tuple, chunk))
                 .filter(filteredChunk -> !CollectionUtils.isEmpty(filteredChunk))
+                .doOnDiscard(List.class, filteredChunk -> log.warn("No capacity for province={} and deliveryDriverId={}, no records will be processed", paperDeliveryHighPriority.getProvince(), paperDeliveryHighPriority.getDeliveryDriverId()))
                 .flatMap(filteredChunk -> evaluateCapCapacity(filteredChunk, paperDeliveryHighPriority.getDeliveryDriverId(), paperDeliveryHighPriority.getTenderId(), paperDeliveryHighPriority.getProvince(), deliveryWeek, transactionRequest))
                 .filter(paperDeliveryUtils::checkListsSize)
                 .flatMap(unused -> paperDeliveryHighPriorityDAO.executeTransaction(transactionRequest.getPaperDeliveryHighPriorityList(), transactionRequest.getPaperDeliveryReadyToSendList()))
@@ -65,16 +65,18 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
     private Mono<PaperDeliveryTransactionRequest> evaluateCapCapacity(List<PaperDeliveryHighPriority> paperDeliveryHighPriorities, String deliveryDriverId, String tenderId, String province, Instant deliveryWeek, PaperDeliveryTransactionRequest transactionRequest) {
         Map<String, List<PaperDeliveryHighPriority>> capMap = paperDeliveryUtils.groupDeliveryOnCapAndOrderOnCreatedAt(paperDeliveryHighPriorities);
         return Flux.fromIterable(capMap.entrySet())
-                .flatMap(entry -> processCapGroupAndUpdateCounter(entry.getKey(), entry.getValue(), deliveryDriverId, tenderId, province, deliveryWeek, transactionRequest))
+                .flatMap(entry -> processCapGroupAndUpdateCounter(entry.getKey(), entry.getValue(), deliveryDriverId, tenderId, deliveryWeek, transactionRequest))
+                .reduce(0, Integer::sum)
+                .flatMap(numberOfDeliveries -> paperDeliveryDispatchedCapacityDAO.updateCounter(deliveryDriverId, province, numberOfDeliveries, deliveryWeek))
                 .then(Mono.just(transactionRequest));
     }
 
-    private Mono<UpdateItemResponse> processCapGroupAndUpdateCounter(String cap, List<PaperDeliveryHighPriority> deliveries, String deliveryDriverId, String tenderId, String province, Instant deliveryWeek, PaperDeliveryTransactionRequest transactionRequest) {
+    private Mono<Integer> processCapGroupAndUpdateCounter(String cap, List<PaperDeliveryHighPriority> deliveries, String deliveryDriverId, String tenderId, Instant deliveryWeek, PaperDeliveryTransactionRequest transactionRequest) {
         return retrieveCapacities(cap, deliveryDriverId, tenderId, deliveryWeek)
-                .map(tuple -> paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, tuple))
+                .map(registryCapacityAndUsedCapacity -> paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, registryCapacityAndUsedCapacity))
                 .filter(numberOfDeliveries -> numberOfDeliveries > 0)
-                .flatMap(numberOfDeliveries -> paperDeliveryDispatchedCapacityDAO.updateCounter(deliveryDriverId, cap, numberOfDeliveries, deliveryWeek)
-                        .flatMap(updateItemResponse -> paperDeliveryDispatchedCapacityDAO.updateCounter(deliveryDriverId, province, numberOfDeliveries, deliveryWeek)));
+                .doOnDiscard(Integer.class, numberOfDeliveries -> log.warn("No capacity for cap={} and deliveryDriverId={}, no records will be processed", cap, deliveryDriverId))
+                .flatMap(numberOfDeliveries -> paperDeliveryDispatchedCapacityDAO.updateCounter(deliveryDriverId, cap, numberOfDeliveries, deliveryWeek));
     }
 
     private Mono<Tuple2<Integer, Integer>> retrieveCapacities(String geoKey, String deliveryDriverId, String tenderId, Instant deliveryWeek) {

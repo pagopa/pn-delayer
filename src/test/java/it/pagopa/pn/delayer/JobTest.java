@@ -8,6 +8,7 @@ import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,6 +36,7 @@ import java.util.stream.Stream;
 @SpringJUnitConfig(classes = {DelayerApplication.class})
 @Slf4j
 @Execution(ExecutionMode.CONCURRENT)
+@Disabled("This test should only be run locally")
 class JobTest {
 
     @Autowired
@@ -93,11 +95,12 @@ class JobTest {
     @ParameterizedTest
     @MethodSource("paperDeliveryTupleProvider")
     void parameterizedJobRunTest(String tuple) {
-        Instant deliveryDate = paperDeliveryUtils.calculateNextWeek(Instant.now());
+        Instant now = Instant.now();
+        Instant deliveryDate = paperDeliveryUtils.calculateNextWeek(now);
         TestReport testReport = prepareTestReport(tuple,deliveryDate);
         Instant start = Instant.now();
 
-        highPriorityService.initHighPriorityBatch(tuple, new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch(tuple, new HashMap<>(), now).block();
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
 

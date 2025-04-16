@@ -14,7 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -53,7 +52,7 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(Page.create(Collections.emptyList())));
 
-        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>(), Instant.now()).block();
 
         verify(paperDeliveryHighPriorityDAO, times(1)).getPaperDeliveryHighPriority(anyString(), anyString(), anyMap());
         verify(paperDeliveryHighPriorityDAO, times(0)).executeTransaction(anyList(), anyList());
@@ -66,7 +65,7 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryDispatchedCapacityDAO.get(anyString(), anyString(), any()))
                 .thenReturn(Mono.just(0));
         when(paperDeliveryDispatchedCapacityDAO.updateCounter(anyString(), anyString(), anyInt(), any()))
-                .thenReturn(Mono.just(UpdateItemResponse.builder().build()));
+                .thenReturn(Mono.just(10));
         when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
         when(paperDeliveryUtils.filterAndPrepareDeliveries(anyList(), any(), any()))
                 .thenReturn(1);
@@ -91,7 +90,7 @@ class HighPriorityBatchServiceTest {
 
         when(paperDeliveryHighPriorityDAO.executeTransaction(anyList(), anyList())).thenReturn(Mono.empty());
 
-        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>(), Instant.now()).block();
 
         verify(paperDeliveryHighPriorityDAO, times(2)).getPaperDeliveryHighPriority(anyString(), anyString(), anyMap());
         verify(paperDeliveryHighPriorityDAO, times(2)).executeTransaction(anyList(), anyList());
@@ -105,7 +104,7 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryDispatchedCapacityDAO.get(anyString(), anyString(), any()))
                 .thenReturn(Mono.just(0));
         when(paperDeliveryDispatchedCapacityDAO.updateCounter(anyString(), anyString(), anyInt(), any()))
-                .thenReturn(Mono.just(UpdateItemResponse.builder().build()));
+                .thenReturn(Mono.just(10));
         when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(page));
@@ -121,7 +120,7 @@ class HighPriorityBatchServiceTest {
                 .thenReturn(Map.of("00100", page.items()));
         when(paperDeliveryHighPriorityDAO.executeTransaction(anyList(), anyList())).thenReturn(Mono.empty());
 
-        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>(), Instant.now()).block();
 
         verify(paperDeliveryHighPriorityDAO, times(1)).getPaperDeliveryHighPriority(anyString(), anyString(), anyMap());
         verify(paperDeliveryHighPriorityDAO, times(1)).executeTransaction(anyList(), anyList());
@@ -139,7 +138,7 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(page));
 
-        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>(), Instant.now()).block();
 
         verify(paperDeliveryHighPriorityDAO, times(1)).getPaperDeliveryHighPriority(anyString(), anyString(), anyMap());
         verify(paperDeliveryHighPriorityDAO, times(0)).executeTransaction(anyList(), anyList());
@@ -155,7 +154,7 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(page));
 
-        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>()).block();
+        highPriorityService.initHighPriorityBatch("1##RM", new HashMap<>(),Instant.now()).block();
 
         verify(paperDeliveryHighPriorityDAO, times(1)).getPaperDeliveryHighPriority(anyString(), anyString(), anyMap());
         verify(paperDeliveryHighPriorityDAO, times(0)).executeTransaction(anyList(), anyList());
