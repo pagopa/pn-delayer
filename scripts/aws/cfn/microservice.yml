@@ -113,6 +113,13 @@ Parameters:
     Description: 'Interval for deliveryDate setting'
     Default: 1d
 
+  PnDelayerInputsKinesisDataStreamArn:
+    Type: String
+    Description: 'pn-delayer_inputs kinesis stream ARN'
+
+  PnDelayerInputsKinesisDataStreamKMSArn:
+    Type: String
+    Description: 'pn-delayer_inputs kinesis stream KMS ARN'
 
 Resources:
 
@@ -144,6 +151,41 @@ Resources:
         LoadbalancerRulePriority: !Ref MicroserviceNumber
         CloudwatchLogKinesisStreamArn: !Ref LogsKinesisSourceStreamArn
 
+  PnCoreEventBusToDelayerInputsKinesis:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route Events from kinesis data stream to pn-core-event-bus
+      RoleArn: !GetAtt "DelayerInputsRole.Arn" 
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
+      EventPattern:
+        detail-type: [ "PreparePhaseOneOutcomeEvent" ]
+      Targets: 
+        - Arn: !Ref PnDelayerInputsKinesisDataStreamArn
+          Id: !Sub ${ProjectName}-DelayerInputsKinesisDataStream
+          DeadLetterConfig: 
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+
+  DelayerInputsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-DelayerInputs-eventBusRolePolicy
+          PolicyDocument:
+            Statement:
+              - Sid: decryptKMS
+                Action:
+                  - kms:Decrypt
+                Effect: Allow
+                Resource: 
+                  - !Ref PnDelayerInputsKinesisDataStreamKMSArn
+                  
   # Grant operational rights to pn-Delayer microservice
   DelayerMicroserviceTaskManagedPolicy:
     Type: AWS::IAM::ManagedPolicy
