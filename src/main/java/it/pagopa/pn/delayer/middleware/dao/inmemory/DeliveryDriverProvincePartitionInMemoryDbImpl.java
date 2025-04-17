@@ -35,7 +35,7 @@ public class DeliveryDriverProvincePartitionInMemoryDbImpl implements DeliveryDr
 
     private List<String> createDeliveryDriverProvincePartition(Map<String, List<String>> partionList) {
         return partionList.entrySet().stream()
-                .map(entry -> entry.getValue().stream().map(s -> entry.getKey() + "##" + s).toList())
+                .map(entry -> entry.getValue().stream().map(s -> entry.getKey() + "~" + s).toList())
                 .flatMap(List::stream)
                 .toList();
     }

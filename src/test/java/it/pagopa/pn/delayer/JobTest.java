@@ -43,7 +43,7 @@ class JobTest {
     HighPriorityBatchServiceImpl highPriorityService;
 
     @Autowired
-    PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl paperDeliveryDriverCapacitiesDispatched;
+    PaperDeliveryDriverUsedCapacitiesInMemoryDbImpl paperDeliveryDriverUsedCapacities;
 
     @Autowired
     PaperDeliveryHighPriorityInMemoryDbImpl paperDeliveryHighPriority;
@@ -74,7 +74,7 @@ class JobTest {
         paperDeliveryTupleInMemory = dao.retrievePartition();
         reportFilePath = Paths.get(REPORT_FILE);
         Files.deleteIfExists(reportFilePath);
-        List<String> header = List.of("deliveryDriverId,province,paperDeliveryRequest,provinceCapacity,startedDispatchedProvinceCapacity,finalDispatchedProvinceCapacity,capCapacity,startedDispatchedCapCapacity,finalDispatchedCapCapacity,paperDeliveryExcess,executionTime");
+        List<String> header = List.of("unifiedDeliveryDriver,province,paperDeliveryRequest,provinceCapacity,startedUsedProvinceCapacity,finalUsedProvinceCapacity,capCapacity,startedUsedCapCapacity,finalUsedCapCapacity,paperDeliveryExcess,executionTime");
         Files.write(reportFilePath, header, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
 
@@ -113,22 +113,22 @@ class JobTest {
         List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get(tuple);
         testReport.setPaperDeliveryRequest(highPriorityList.size());
 
-        Integer provinceCapacity = paperDeliveryDriverCapacities.getPaperDeliveryDriverCapacities(tenderId, testReport.getDeliveryDriverId(), testReport.getProvince(), Instant.now()).block();
+        Integer provinceCapacity = paperDeliveryDriverCapacities.getPaperDeliveryDriverCapacities(tenderId, testReport.getUnifiedDeliveryDriver(), testReport.getProvince(), Instant.now()).block();
         testReport.setProvinceCapacity(provinceCapacity);
-        testReport.setStartedDispatchedProvinceCapacity(paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), testReport.getProvince(), now).block());
+        testReport.setStartedUsedProvinceCapacity(paperDeliveryDriverUsedCapacities.get(testReport.getUnifiedDeliveryDriver(), testReport.getProvince(), now).block());
 
-        HashMap<String, Integer> capDispatchedCapacity = new HashMap<>();
+        HashMap<String, Integer> capUsedCapacity = new HashMap<>();
         HashMap<String, Integer> capCapacity = new HashMap<>();
         highPriorityList.stream()
                 .map(PaperDeliveryHighPriority::getCap)
                 .distinct()
                 .toList()
                 .forEach(cap -> {
-                    capDispatchedCapacity.put(cap, paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), cap, now).block());
-                    capCapacity.put(cap,  paperDeliveryDriverCapacities.getPaperDeliveryDriverCapacities(tenderId, testReport.getDeliveryDriverId(), cap, Instant.now()).block());
+                    capUsedCapacity.put(cap, paperDeliveryDriverUsedCapacities.get(testReport.getUnifiedDeliveryDriver(), cap, now).block());
+                    capCapacity.put(cap,  paperDeliveryDriverCapacities.getPaperDeliveryDriverCapacities(tenderId, testReport.getUnifiedDeliveryDriver(), cap, Instant.now()).block());
                 });
         testReport.setCapCapacity(capCapacity);
-        testReport.setStartedDispatchedCapCapacity(capDispatchedCapacity);
+        testReport.setStartedUsedCapCapacity(capUsedCapacity);
         return testReport;
     }
 
@@ -140,13 +140,13 @@ class JobTest {
         List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get(tuple);
         testReport.setPaperDeliveryExcess(highPriorityList.size());
 
-        Integer dispatchedProvinceCapacity = paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), testReport.getProvince(), now).block();
-        testReport.setFinalDispatchedProvinceCapacity(dispatchedProvinceCapacity);
+        Integer usedProvinceCapacity = paperDeliveryDriverUsedCapacities.get(testReport.getUnifiedDeliveryDriver(), testReport.getProvince(), now).block();
+        testReport.setFinalUsedProvinceCapacity(usedProvinceCapacity);
 
-        Map<String, Integer> finalDispatchedCapCapacity = new HashMap<>();
-        testReport.getStartedDispatchedCapCapacity().keySet()
-                .forEach(cap -> finalDispatchedCapCapacity.put(cap, paperDeliveryDriverCapacitiesDispatched.get(testReport.getDeliveryDriverId(), cap, now).block()));
-        testReport.setFinalDispatchedCapCapacity(finalDispatchedCapCapacity);
+        Map<String, Integer> finalUsedCapCapacity = new HashMap<>();
+        testReport.getStartedUsedCapCapacity().keySet()
+                .forEach(cap -> finalUsedCapCapacity.put(cap, paperDeliveryDriverUsedCapacities.get(testReport.getUnifiedDeliveryDriver(), cap, now).block()));
+        testReport.setFinalUsedCapCapacity(finalUsedCapCapacity);
         testReports.add(testReport);
     }
 }

@@ -42,18 +42,18 @@ class PaperDeliveryHighPriorityInMemoryDbImplTest{
 
     @Test
     void delete_handlesEmptyListToRemove() {
-        List<PaperDeliveryHighPriority> paperDeliveryHighPriorities = dao.get("4##IM")
+        List<PaperDeliveryHighPriority> paperDeliveryHighPriorities = dao.get("4~IM")
                         .stream().limit(1).toList();
 
-        dao.delete("4##IM", paperDeliveryHighPriorities).block();
-        Assertions.assertEquals(499, dao.get("4##IM").size());
+        dao.delete("4~IM", paperDeliveryHighPriorities).block();
+        Assertions.assertEquals(499, dao.get("4~IM").size());
     }
 
     @Test
     void get_returnsListForExistingKey() {
-        List<PaperDeliveryHighPriority> result = dao.get("5##PA");
+        List<PaperDeliveryHighPriority> result = dao.get("5~PA");
         Assertions.assertEquals(500, result.size());
-        Assertions.assertTrue(result.stream().allMatch(item -> item.getDeliveryDriverIdGeoKey().equals("5##PA")));
+        Assertions.assertTrue(result.stream().allMatch(item -> item.getUnifiedDeliveryDriverGeoKey().equals("5~PA")));
     }
 
     @Test
@@ -73,16 +73,16 @@ class PaperDeliveryHighPriorityInMemoryDbImplTest{
 
     @Test
     void getPaperDeliveryHighPriority_returnsEmptyPageForNonExistingKey() {
-        String deliveryDriverId = "driver2";
+        String unifiedDeliveryDriver = "driver2";
         String geoKey = "geo2";
-        Page<PaperDeliveryHighPriority> result = dao.getPaperDeliveryHighPriority(deliveryDriverId, geoKey, null).block();
+        Page<PaperDeliveryHighPriority> result = dao.getPaperDeliveryHighPriority(unifiedDeliveryDriver, geoKey, null).block();
         assert result != null;
         Assertions.assertEquals(Collections.emptyList(), result.items());
     }
 
     @Test
     void executeTransaction_movesItemsToReadyToSendAndDeletesFromHighPriority() {
-        String pk = "5##PA";
+        String pk = "5~PA";
         List<PaperDeliveryHighPriority> highPriorities = dao.get(pk);
         List<PaperDeliveryReadyToSend> readyToSendList = List.of(
                 new PaperDeliveryReadyToSend()

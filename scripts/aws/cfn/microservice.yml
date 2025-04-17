@@ -75,13 +75,13 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryDriverCapacities'
 
-  PaperDeliveryDriverCapacitiesDispatchedTableName:
+  PaperDeliveryDriverUsedCapacitiesTableName:
     Type: String
-    Description: 'DynamoDB table name for  PaperDeliveryDriverCapacitiesDispatched'
+    Description: 'DynamoDB table name for  PaperDeliveryDriverUsedCapacities'
 
-  PaperDeliveryDriverCapacitiesDispatchedTableArn:
+  PaperDeliveryDriverUsedCapacitiesTableArn:
     Type: String
-    Description: 'ARN of dynamodb table containing  PaperDeliveryDriverCapacitiesDispatched'
+    Description: 'ARN of dynamodb table containing  PaperDeliveryDriverUsedCapacities'
 
   PaperDeliveryHighPriorityTableName:
     Type: String
@@ -129,7 +129,7 @@ Resources:
         ContainerImageURI: !Sub '${ContainerImageUri}'
         ContainerEnvEntry1: !Sub 'AWS_REGIONCODE=${AWS::Region}'
         ContainerEnvEntry2: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=${PaperDeliveryDriverCapacitiesTableName}'
-        ContainerEnvEntry3: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESDISPATCHEDTABLENAME=${PaperDeliveryDriverCapacitiesDispatchedTableName}'
+        ContainerEnvEntry3: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME=${PaperDeliveryDriverUsedCapacitiesTableName}'
         ContainerEnvEntry4: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME=${PaperDeliveryHighPriorityTableName}'
         ContainerEnvEntry5: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYREAYTOSENDTABLENAME=${PaperDeliveryReadyToSendTableName}'
         ContainerEnvEntry6: !Sub 'PN_DELAYER_HIGHPRIORITYQUERYLIMIT =${HighPriorityQueryLimit}'
@@ -158,8 +158,8 @@ Resources:
               - dynamodb:Query
               - dynamodb:BatchGetItem
             Resource:
-              - !Sub "${PaperDeliveryDriverCapacitiesDispatchedTableArn}"
-              - !Sub "${PaperDeliveryDriverCapacitiesDispatchedTableArn}/*"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
           - Effect: Allow
             Action:
               - dynamodb:GetItem

@@ -11,7 +11,7 @@ import java.util.Map;
 
 public interface PaperDeliveryHighPriorityDAO {
 
-    Mono<Page<PaperDeliveryHighPriority>> getPaperDeliveryHighPriority(String deliveryDriverId, String geoKey, Map<String, AttributeValue> lastEvaluatedKey);
+    Mono<Page<PaperDeliveryHighPriority>> getPaperDeliveryHighPriority(String unifiedDeliveryDriver, String geoKey, Map<String, AttributeValue> lastEvaluatedKey);
 
     Mono<Void> executeTransaction(List<PaperDeliveryHighPriority> paperDeliveryHighPriority, List<PaperDeliveryReadyToSend> paperDeliveryReadyToSend);
 }

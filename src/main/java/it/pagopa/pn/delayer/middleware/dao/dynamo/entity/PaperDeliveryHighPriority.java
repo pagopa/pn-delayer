@@ -10,11 +10,11 @@ import java.time.Instant;
 @Data
 public class PaperDeliveryHighPriority {
 
-    public static final String COL_DELIVERY_DRIVER_ID_GEOKEY = "deliveryDriverIdGeokey";
+    public static final String COL_UNIFIED_DELIVERY_DRIVER_GEOKEY = "unifiedDeliveryDriverGeokey";
     public static final String COL_CREATED_AT = "createdAt";
     public static final String COL_TENDER_ID = "tenderId";
     public static final String COL_REQUEST_ID = "requestId";
-    public static final String COL_DELIVERY_DRIVER_ID = "deliveryDriverId";
+    public static final String COL_UNIFIED_DELIVERY_DRIVER = "unifiedDeliveryDriver";
     public static final String COL_PROVINCE = "province";
     public static final String COL_PRODUCT_TYPE = "productType";
     public static final String COL_SENDER_PA_ID = "senderPaId";
@@ -22,16 +22,16 @@ public class PaperDeliveryHighPriority {
     public static final String COL_CAP = "cap";
     public static final String COL_IUN = "iun";
 
-    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_DELIVERY_DRIVER_ID_GEOKEY)}))
-    private String deliveryDriverIdGeoKey;
+    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER_GEOKEY)}))
+    private String unifiedDeliveryDriverGeoKey;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_CREATED_AT)}))
     private Instant createdAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TENDER_ID)}))
     private String tenderId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_REQUEST_ID)}))
     private String requestId;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DRIVER_ID)}))
-    private String deliveryDriverId;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER)}))
+    private String unifiedDeliveryDriver;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PROVINCE)}))
     private String province;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PRODUCT_TYPE)}))
@@ -46,17 +46,17 @@ public class PaperDeliveryHighPriority {
     private String iun;
 
     @DynamoDbIgnore
-    public static String buildKey(String deliveryDriverId, String geokey) {
-        return String.join("##", deliveryDriverId, geokey);
+    public static String buildKey(String unifiedDeliveryDriver, String geokey) {
+        return String.join("~", unifiedDeliveryDriver, geokey);
     }
 
     @DynamoDbIgnore
-    public static String retrieveDeliveryDriverId(String deliveryDriverIdGeokey) {
-        return deliveryDriverIdGeokey.split("##")[0];
+    public static String retrieveunifiedDeliveryDriver(String unifiedDeliveryDriverGeokey) {
+        return unifiedDeliveryDriverGeokey.split("~")[0];
     }
 
     @DynamoDbIgnore
-    public static String retrieveGeoKey(String deliveryDriverIdGeokey) {
-        return deliveryDriverIdGeokey.split("##")[1];
+    public static String retrieveGeoKey(String unifiedDeliveryDriverGeokey) {
+        return unifiedDeliveryDriverGeokey.split("~")[1];
     }
 }

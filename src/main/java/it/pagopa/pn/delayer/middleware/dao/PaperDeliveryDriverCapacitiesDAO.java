@@ -7,6 +7,6 @@ import java.time.Instant;
 
 public interface PaperDeliveryDriverCapacitiesDAO {
 
-    Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey, Instant deliveryDate);
+    Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String unifiedDeliveryDriver, String geoKey, Instant deliveryDate);
 
 }

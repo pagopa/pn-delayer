@@ -24,7 +24,7 @@ public class PnDelayerConfigs {
     @Data
     public static class Dao {
         private String paperDeliveryDriverCapacitiesTableName;
-        private String paperDeliveryDriverCapacitiesDispatchedTableName;
+        private String paperDeliveryDriverUsedCapacitiesTableName;
         private String paperDeliveryHighPriorityTableName;
         private String paperDeliveryReadyToSendTableName;
     }

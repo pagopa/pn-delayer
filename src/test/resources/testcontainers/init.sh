@@ -14,12 +14,12 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
 
 aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
-    --table-name pn-PaperDeliveryDriverCapacitiesDispatched  \
+    --table-name pn-PaperDeliveryDriverUsedCapacities\
     --attribute-definitions \
-        AttributeName=deliveryDriverIdGeokey,AttributeType=S \
+        AttributeName=unifiedDeliveryDriverGeokey,AttributeType=S \
         AttributeName=deliveryDate,AttributeType=S \
     --key-schema \
-        AttributeName=deliveryDriverIdGeokey,KeyType=HASH \
+        AttributeName=unifiedDeliveryDriverGeokey,KeyType=HASH \
         AttributeName=deliveryDate,KeyType=RANGE \
     --provisioned-throughput \
         ReadCapacityUnits=10,WriteCapacityUnits=5
@@ -28,10 +28,10 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
     --table-name pn-PaperDeliveryHighPriority  \
     --attribute-definitions \
-        AttributeName=deliveryDriverIdGeokey,AttributeType=S \
+        AttributeName=unifiedDeliveryDriverGeokey,AttributeType=S \
         AttributeName=createdAt,AttributeType=S \
     --key-schema \
-        AttributeName=deliveryDriverIdGeokey,KeyType=HASH \
+        AttributeName=unifiedDeliveryDriverGeokey,KeyType=HASH \
         AttributeName=createdAt,KeyType=RANGE \
     --provisioned-throughput \
         ReadCapacityUnits=10,WriteCapacityUnits=5

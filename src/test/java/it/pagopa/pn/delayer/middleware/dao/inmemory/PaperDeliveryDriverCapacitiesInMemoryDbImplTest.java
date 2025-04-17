@@ -26,10 +26,10 @@ class PaperDeliveryDriverCapacitiesInMemoryDbImplTest {
     @Test
     void returnsCorrectCapacityForMatchingEntry() {
         String tenderId = "c0d82f6e-ee85-4e27-97df-bef27c5c5377";
-        String deliveryDriverId = "1";
+        String unifiedDeliveryDriver = "1";
         String geoKey = "61010";
         Instant deliveryDate = Instant.parse("2025-01-01T00:00:00.000Z");
-        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey, deliveryDate).block();
+        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryDate).block();
 
         Assertions.assertEquals(5000, result);
     }
@@ -37,11 +37,11 @@ class PaperDeliveryDriverCapacitiesInMemoryDbImplTest {
     @Test
     void returnsZeroWhenNoMatchingEntryExists() {
         String tenderId = "tender2";
-        String deliveryDriverId = "driver2";
+        String unifiedDeliveryDriver = "driver2";
         String geoKey = "geo2";
         Instant deliveryDate = Instant.parse("2023-10-01T10:00:00Z");
 
-        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey, deliveryDate).block();
+        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryDate).block();
 
         Assertions.assertEquals(0, result);
     }
@@ -49,22 +49,22 @@ class PaperDeliveryDriverCapacitiesInMemoryDbImplTest {
     @Test
     void returnsZeroWhenDeliveryDateIsOutsideActivationRange() {
         String tenderId = "c0d82f6e-ee85-4e27-97df-bef27c5c5377";
-        String deliveryDriverId = "1";
+        String unifiedDeliveryDriver = "1";
         String geoKey = "61010";
         Instant deliveryDate = Instant.parse("2024-01-01T00:00:00.000Z");
 
-        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey, deliveryDate).block();
+        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryDate).block();
         Assertions.assertEquals(0, result);
     }
 
     @Test
     void returnsCapacityForEntryWithValidCloseInterval() {
         String tenderId = "c0d82f6e-ee85-4e27-97df-bef27c5c5377";
-        String deliveryDriverId = "4";
+        String unifiedDeliveryDriver = "4";
         String geoKey = "MI";
         Instant deliveryDate = Instant.parse("2025-04-01T00:00:00.000Z");
 
-        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey, deliveryDate).block();
+        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryDate).block();
 
         Assertions.assertEquals(5000, result);
     }
@@ -72,11 +72,11 @@ class PaperDeliveryDriverCapacitiesInMemoryDbImplTest {
     @Test
     void returnsCapacityForEntryWithInvalidCloseInterval() {
         String tenderId = "c0d82f6e-ee85-4e27-97df-bef27c5c5377";
-        String deliveryDriverId = "3";
+        String unifiedDeliveryDriver = "3";
         String geoKey = "GR";
         Instant deliveryDate = Instant.parse("2025-05-01T00:00:00.000Z");
 
-        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geoKey, deliveryDate).block();
+        Integer result = dao.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryDate).block();
 
         Assertions.assertEquals(1000, result);
     }

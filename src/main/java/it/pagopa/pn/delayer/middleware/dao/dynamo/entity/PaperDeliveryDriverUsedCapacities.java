@@ -11,27 +11,27 @@ import java.time.Instant;
 
 @DynamoDbBean
 @Data
-public class PaperDeliveryDriverCapacitiesDispatched {
+public class PaperDeliveryDriverUsedCapacities {
 
-    public static final String COL_DELIVERY_DRIVER_ID_GEOKEY = "deliveryDriverIdGeokey";
+    public static final String COL_DELIVERY_DRIVER_ID_GEOKEY = "unifiedDeliveryDriverGeokey";
     public static final String COL_DELIVERY_DATE = "deliveryDate";
-    public static final String COL_DELIVERY_DRIVER_ID = "deliveryDriverId";
+    public static final String COL_DELIVERY_DRIVER_ID = "unifiedDeliveryDriver";
     public static final String COL_GEO_KEY = "geoKey";
     public static final String COL_USED_CAPACITY = "usedCapacity";
 
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_DELIVERY_DRIVER_ID_GEOKEY)}))
-    private String deliveryDriverIdGeokey;
+    private String unifiedDeliveryDriverGeokey;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_DELIVERY_DATE)}))
     private Instant deliveryDate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DRIVER_ID)}))
-    private String deliveryDriverId;
+    private String unifiedDeliveryDriver;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_GEO_KEY)}))
     private String geoKey;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_USED_CAPACITY)}))
     private int usedCapacity;
 
-    public static String buildPk(String deliveryDriverId, String geoKey) {
-        return String.join("##", deliveryDriverId, geoKey);
+    public static String buildPk(String unifiedDeliveryDriver, String geoKey) {
+        return String.join("~", unifiedDeliveryDriver, geoKey);
     }
 }

@@ -14,7 +14,7 @@ public class PaperDeliveryDriverCapacity {
     public static final String COL_ACTIVATION_DATE_FROM = "activationDateFrom";
     public static final String COL_ACTIVATION_DATE_TO = "activationDateTo";
     public static final String COL_TENDER_ID = "tenderId";
-    public static final String COL_DELIVERY_DRIVER_ID = "deliveryDriverId";
+    public static final String COL_UNIFIED_DELIVERY_DRIVER = "unifiedDeliveryDriver";
     public static final String COL_GEO_KEY = "geoKey";
     public static final String COL_CAPACITY = "capacity";
     public static final String COL_PEAK_CAPACITY = "peakCapacity";
@@ -28,8 +28,8 @@ public class PaperDeliveryDriverCapacity {
     private Instant activationDateTo;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TENDER_ID)}))
     private String tenderId;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DRIVER_ID)}))
-    private String deliveryDriverId;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER)}))
+    private String unifiedDeliveryDriver;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_GEO_KEY)}))
     private String geoKey;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_CAPACITY)}))
@@ -40,7 +40,7 @@ public class PaperDeliveryDriverCapacity {
     private Instant createdAt;
 
     @DynamoDbIgnore
-    public static String buildKey(String tenderId, String deliveryDriverId, String geokey) {
-        return String.join("##", tenderId, deliveryDriverId, geokey);
+    public static String buildKey(String tenderId, String deliveryDriver, String geokey) {
+        return String.join("~", tenderId, deliveryDriver, geokey);
     }
 }

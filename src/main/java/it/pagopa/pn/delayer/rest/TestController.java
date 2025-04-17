@@ -19,7 +19,7 @@ public class TestController {
     private final HighPriorityBatchService highPriorityBatchService;
 
     @GetMapping("/delayer-private/execute-job")
-    public Mono<Void> executeJob(@RequestParam(value = "deliveryDriverIdGeoKey") String pk) {
+    public Mono<Void> executeJob(@RequestParam(value = "unifiedDeliveryDriverGeoKey") String pk) {
         return highPriorityBatchService.initHighPriorityBatch(pk, new HashMap<>(), Instant.now())
                 .doOnSuccess(result -> log.info("Batch completed"));
     }
