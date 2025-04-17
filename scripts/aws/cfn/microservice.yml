@@ -185,6 +185,16 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !Ref PnDelayerInputsKinesisDataStreamKMSArn
+              - Sid: putEventsToKinesis
+                Action:
+                  - kinesis:GetRecords
+                  - kinesis:GetShardIterator
+                  - kinesis:DescribeStream
+                  - kinesis:DescribeStreamSummary
+                  - kinesis:ListShards
+                Effect: Allow
+                Resource: 
+                  - !Ref PnDelayerInputsKinesisDataStreamArn
                   
   # Grant operational rights to pn-Delayer microservice
   DelayerMicroserviceTaskManagedPolicy:

@@ -127,7 +127,7 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  ### Kinesis Data Stream: CDC for PN-ACTION DynamoDB Table (INSERT CDC ARE THE INTERESTED ONE)
+  ### Kinesis Data Stream: kinesis data stream for pn-delayer-inputs
   PnDelayerInputsKinesisDataStream:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Retain
@@ -143,7 +143,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StandardAlarmThresholdsMs: !Ref PnDelayerInputsStandardAlarmThresholdsMs
         OnCallAlarmThresholdsMs: !Ref PnDelayerInputsnOnCallAlarmThresholdsMs
-
+        
 Outputs:
   # Dynamo tables
   PaperDeliveryDriverCapacitiesTableName:
@@ -176,8 +176,8 @@ Outputs:
 
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn
-    Description: "Kinesis source stream ARN"
+    Description: "PnDelayerInputs Kinesis source stream ARN"
 
   PnDelayerInputsKinesisDataStreamKMSArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamKeyArn
-    Description: "Kinesis source stream KMS ARN"
+    Description: "PnDelayerInputs Kinesis stream KMS ARN"
