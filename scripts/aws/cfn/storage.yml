@@ -46,19 +46,19 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  PaperDeliveryDriverCapacitiesDispatchedTable:
+  PaperDeliveryDriverUsedCapacitiesTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryDriverCapacitiesDispatched'
+      TableName: !Sub '${ProjectName}-PaperDeliveryDriverUsedCapacities'
       AttributeDefinitions:
-        - AttributeName: "deliveryDriverIdGeokey"
+        - AttributeName: "unifiedDeliveryDriverGeokey"
           AttributeType: "S"
         - AttributeName: "deliveryDate"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "deliveryDriverIdGeokey"
+        - AttributeName: "unifiedDeliveryDriverGeokey"
           KeyType: "HASH"
         - AttributeName: "deliveryDate"
           KeyType: "RANGE"
@@ -76,12 +76,12 @@ Resources:
     Properties:
       TableName: !Sub '${ProjectName}-PaperDeliveryHighPriority'
       AttributeDefinitions:
-        - AttributeName: "deliveryDriverIdGeokey"
+        - AttributeName: "unifiedDeliveryDriverGeokey"
           AttributeType: "S"
         - AttributeName: "createdAt"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "deliveryDriverIdGeokey"
+        - AttributeName: "unifiedDeliveryDriverGeokey"
           KeyType: "HASH"
         - AttributeName: "createdAt"
           KeyType: "RANGE"
@@ -118,12 +118,12 @@ Outputs:
     Description: ARN of dynamodb table containing capacities
     Value: !Sub '${PaperDeliveryDriverCapacitiesTable.Arn}'
 
-  PaperDeliveryDriverCapacitiesDispatchedTableName:
-    Description: Name of dynamodb table containing dispatched capacities
-    Value: !Ref PaperDeliveryDriverCapacitiesDispatchedTable
-  PaperDeliveryDriverCapacitiesDispatchedTableArn:
-    Description: ARN of dynamodb table containing dispatched capacities
-    Value: !Sub '${PaperDeliveryDriverCapacitiesDispatchedTable.Arn}'
+  PaperDeliveryDriverUsedCapacitiesTableName:
+    Description: Name of dynamodb table containing used capacities
+    Value: !Ref PaperDeliveryDriverUsedCapacitiesTable
+  PaperDeliveryDriverUsedCapacitiesTableArn:
+    Description: ARN of dynamodb table containing used capacities
+    Value: !Sub '${PaperDeliveryDriverUsedCapacitiesTable.Arn}'
 
   PaperDeliveryHighPriorityTableName:
     Description: Name of dynamodb table containing HighPriority paper deliveries

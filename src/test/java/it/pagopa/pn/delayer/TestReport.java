@@ -6,36 +6,36 @@ import java.util.Map;
 
 @Data
 public class TestReport {
-    private String deliveryDriverId;
+    private String unifiedDeliveryDriver;
     private String province;
     private Integer paperDeliveryRequest;
     private Integer provinceCapacity;
-    private Integer startedDispatchedProvinceCapacity;
-    private Integer finalDispatchedProvinceCapacity;
+    private Integer startedUsedProvinceCapacity;
+    private Integer finalUsedProvinceCapacity;
     private Map<String, Integer> capCapacity;
-    private Map<String, Integer> startedDispatchedCapCapacity;
-    private Map<String, Integer> finalDispatchedCapCapacity;
+    private Map<String, Integer> startedUsedCapCapacity;
+    private Map<String, Integer> finalUsedCapCapacity;
     private Integer paperDeliveryExcess;
     private String executionTime;
 
     @Override
     public String toString() {
-        return  deliveryDriverId + ',' +
+        return  unifiedDeliveryDriver + ',' +
                 province + ',' +
                 paperDeliveryRequest + ',' +
                 provinceCapacity + ',' +
-                startedDispatchedProvinceCapacity + ',' +
-                finalDispatchedProvinceCapacity + ',' +
+                startedUsedProvinceCapacity + ',' +
+                finalUsedProvinceCapacity + ',' +
                 capCapacity.toString().replace(",",";") + ',' +
-                startedDispatchedCapCapacity.toString().replace(",",";") + ',' +
-                finalDispatchedCapCapacity.toString().replace(",",";") + ',' +
+                startedUsedCapCapacity.toString().replace(",",";") + ',' +
+                finalUsedCapCapacity.toString().replace(",",";") + ',' +
                 paperDeliveryExcess + ',' +
                 executionTime;
     }
 
     public TestReport(String tuple) {
-        String[] splited = tuple.split("##");
-        this.deliveryDriverId = splited[0];
+        String[] splited = tuple.split("~");
+        this.unifiedDeliveryDriver = splited[0];
         this.province = splited[1];
     }
 }

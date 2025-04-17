@@ -43,9 +43,9 @@ public class PaperDeliveryHighPriorityDAOImpl implements PaperDeliveryHighPriori
     }
 
     @Override
-    public Mono<Page<PaperDeliveryHighPriority>> getPaperDeliveryHighPriority(String deliveryDriverId, String geoKey, Map<String, AttributeValue> lastEvaluatedKey) {
+    public Mono<Page<PaperDeliveryHighPriority>> getPaperDeliveryHighPriority(String unifiedDeliveryDriver, String geoKey, Map<String, AttributeValue> lastEvaluatedKey) {
         QueryConditional keyCondition = QueryConditional.keyEqualTo(Key.builder()
-                .partitionValue(PaperDeliveryHighPriority.buildKey(deliveryDriverId, geoKey))
+                .partitionValue(PaperDeliveryHighPriority.buildKey(unifiedDeliveryDriver, geoKey))
                 .build());
 
         QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder()

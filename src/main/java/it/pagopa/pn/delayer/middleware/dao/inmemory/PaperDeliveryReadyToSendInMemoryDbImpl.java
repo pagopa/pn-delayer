@@ -15,7 +15,7 @@ public class PaperDeliveryReadyToSendInMemoryDbImpl {
     private final ConcurrentHashMap<String, PaperDeliveryReadyToSend> data = new ConcurrentHashMap<>();
 
     public Mono<Integer> insert(List<PaperDeliveryReadyToSend> paperDeliveryReadyToSend) {
-        paperDeliveryReadyToSend.forEach(readyToSend -> data.put(readyToSend.getDeliveryDate() + "##" + readyToSend.getRequestId(), readyToSend));
+        paperDeliveryReadyToSend.forEach(readyToSend -> data.put(readyToSend.getDeliveryDate() + "~" + readyToSend.getRequestId(), readyToSend));
         return Mono.just(paperDeliveryReadyToSend.size());
     }
     public List<PaperDeliveryReadyToSend> getByDeliveryDate(Instant deliveryDate) {

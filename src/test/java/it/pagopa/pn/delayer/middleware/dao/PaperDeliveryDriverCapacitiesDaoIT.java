@@ -30,14 +30,14 @@ class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
     void getPaperDeliveryDriverCapacitiesCloseIntervalSelected() {
 
         String tenderId = "tenderId";
-        String deliveryDriverId = "deliveryDriverId1";
+        String unifiedDeliveryDriver = "unifiedDeliveryDriver1";
         String geokey = "geokey1";
         Instant now = Instant.now();
         Instant past = now.minus(10, ChronoUnit.DAYS);
         Instant future = now.plus(10, ChronoUnit.DAYS);
 
         PaperDeliveryDriverCapacity capacities  = new PaperDeliveryDriverCapacity();
-        capacities.setPk(String.join("##", tenderId, deliveryDriverId, geokey));
+        capacities.setPk(String.join("~", tenderId, unifiedDeliveryDriver, geokey));
         capacities.setActivationDateFrom(past);
         capacities.setActivationDateTo(future);
 
@@ -59,7 +59,7 @@ class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
         itemMap.put("capacity", AttributeValue.builder().s("60").build());
         dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build()).join();
 
-        Integer result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geokey, now).block();
+        Integer result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geokey, now).block();
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(10, result);
@@ -68,10 +68,10 @@ class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
     @Test
     void getPaperDeliveryDriverCapacitiesOpenIntervalSelected() {
         String tenderId = "tenderId";
-        String deliveryDriverId = "deliveryDriverId2";
+        String unifiedDeliveryDriver = "unifiedDeliveryDriver2";
         String geokey = "geokey2";
         Instant now = Instant.now();
-        String pk = String.join("##", tenderId, deliveryDriverId, geokey);
+        String pk = String.join("~", tenderId, unifiedDeliveryDriver, geokey);
 
         Map<String, AttributeValue> itemMap = new HashMap<>();
         itemMap.put("pk", AttributeValue.builder().s(pk).build());
@@ -91,7 +91,7 @@ class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
         itemMap.put("capacity", AttributeValue.builder().s("20").build());
         dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build()).join();
 
-        Integer result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, deliveryDriverId, geokey, now).block();
+        Integer result = paperDeliveryDriverCapacitiesDao.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geokey, now).block();
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(30, result);

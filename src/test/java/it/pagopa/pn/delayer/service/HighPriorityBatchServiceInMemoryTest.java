@@ -39,7 +39,7 @@ class HighPriorityBatchServiceInMemoryTest {
     private HighPriorityBatchService highPriorityService;
 
     @Autowired
-    PaperDeliveryDriverCapacitiesDispatchedInMemoryDbImpl paperDeliveryDriverCapacitiesDispatched;
+    PaperDeliveryDriverUsedCapacitiesInMemoryDbImpl paperDeliveryDriverUsedCapacities;
 
     @Autowired
     PaperDeliveryDriverCapacitiesInMemoryDbImpl paperDeliveryDriverCapacities;
@@ -61,7 +61,7 @@ class HighPriorityBatchServiceInMemoryTest {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         DeliveryDriverProvincePartitionInMemoryDbImpl dao = new DeliveryDriverProvincePartitionInMemoryDbImpl(objectMapper);
-        highPriorityService = new HighPriorityBatchServiceImpl(paperDeliveryDriverCapacitiesDispatched, paperDeliveryDriverCapacities, paperDeliveryHighPriority, paperDeliveryUtils);
+        highPriorityService = new HighPriorityBatchServiceImpl(paperDeliveryDriverUsedCapacities, paperDeliveryDriverCapacities, paperDeliveryHighPriority, paperDeliveryUtils);
         paperDeliveryTupleInMemory = dao.retrievePartition();
     }
 
@@ -78,23 +78,23 @@ class HighPriorityBatchServiceInMemoryTest {
 
     @Test
     void testInitHighPriorityBatch() {
-        highPriorityService.initHighPriorityBatch("3##GR", new HashMap<>(), Instant.now()).block();
+        highPriorityService.initHighPriorityBatch("3~GR", new HashMap<>(), Instant.now()).block();
         Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(Instant.now());
 
-        List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get("3##GR");
-        Integer dispatchedProvinceCapacity = paperDeliveryDriverCapacitiesDispatched.get("3", "GR", deliveryWeek).block();
+        List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get("3~GR");
+        Integer usedProvinceCapacity = paperDeliveryDriverUsedCapacities.get("3", "GR", deliveryWeek).block();
         List<String> capList = List.of("58010", "58100");
-        Map<String, Integer> finalDispatchedCapCapacity = new HashMap<>();
+        Map<String, Integer> finalUsedCapCapacity = new HashMap<>();
         capList.forEach(cap -> {
-            Integer dispatchedCapacity = paperDeliveryDriverCapacitiesDispatched.get("3", cap, deliveryWeek).block();
-            finalDispatchedCapCapacity.put(cap, dispatchedCapacity);
+            Integer usedCapacity = paperDeliveryDriverUsedCapacities.get("3", cap, deliveryWeek).block();
+            finalUsedCapCapacity.put(cap, usedCapacity);
         });
 
 
         Assertions.assertEquals(0, highPriorityList.size());
-        Assertions.assertEquals(1000, dispatchedProvinceCapacity);
-        Assertions.assertEquals(500, finalDispatchedCapCapacity.get("58010"));
-        Assertions.assertEquals(500, finalDispatchedCapCapacity.get("58100"));
+        Assertions.assertEquals(1000, usedProvinceCapacity);
+        Assertions.assertEquals(500, finalUsedCapCapacity.get("58010"));
+        Assertions.assertEquals(500, finalUsedCapCapacity.get("58100"));
         Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek).size());
         Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(1, ChronoUnit.DAYS)).size());
         Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(2, ChronoUnit.DAYS)).size());
@@ -108,75 +108,75 @@ class HighPriorityBatchServiceInMemoryTest {
     private void verify(String tuple) {
         Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(Instant.now());
 
-        String[] tupleSplit = tuple.split("##");
+        String[] tupleSplit = tuple.split("~");
         List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get(tuple);
-        Integer dispatchedProvinceCapacity = paperDeliveryDriverCapacitiesDispatched.get(tupleSplit[0], tupleSplit[1], deliveryWeek).block();
+        Integer usedProvinceCapacity = paperDeliveryDriverUsedCapacities.get(tupleSplit[0], tupleSplit[1], deliveryWeek).block();
         List<String> capList = List.of("58010", "58100", "18100", "37028", "20080", "65010", "71029", "22031", "61010", "90010");
-        Map<String, Integer> finalDispatchedCapCapacity = new HashMap<>();
+        Map<String, Integer> finalUsedCapCapacity = new HashMap<>();
         capList.forEach(cap -> {
-            Integer dispatchedCapacity = paperDeliveryDriverCapacitiesDispatched.get(tupleSplit[0], cap, deliveryWeek).block();
-            finalDispatchedCapCapacity.put(cap, dispatchedCapacity);
+            Integer usedCapacity = paperDeliveryDriverUsedCapacities.get(tupleSplit[0], cap, deliveryWeek).block();
+            finalUsedCapCapacity.put(cap, usedCapacity);
         });
 
 
-        if (tuple.equalsIgnoreCase("3##GR")) {
+        if (tuple.equalsIgnoreCase("3~GR")) {
             Assertions.assertEquals(0, highPriorityList.size());
-            Assertions.assertEquals(1000, dispatchedProvinceCapacity);
-            Assertions.assertEquals(500, finalDispatchedCapCapacity.get("58010"));
-            Assertions.assertEquals(500, finalDispatchedCapCapacity.get("58100"));
+            Assertions.assertEquals(1000, usedProvinceCapacity);
+            Assertions.assertEquals(500, finalUsedCapCapacity.get("58010"));
+            Assertions.assertEquals(500, finalUsedCapCapacity.get("58100"));
         }
 
-        if (tuple.equalsIgnoreCase("4##IM")) {
+        if (tuple.equalsIgnoreCase("4~IM")) {
             Assertions.assertEquals(100, highPriorityList.size());
-            Assertions.assertEquals(400, dispatchedProvinceCapacity);
-            Assertions.assertEquals(400, finalDispatchedCapCapacity.get("18100"));
+            Assertions.assertEquals(400, usedProvinceCapacity);
+            Assertions.assertEquals(400, finalUsedCapCapacity.get("18100"));
         }
 
-        if (tuple.equalsIgnoreCase("5##VR")) {
+        if (tuple.equalsIgnoreCase("5~VR")) {
             Assertions.assertEquals(400, highPriorityList.size());
-            Assertions.assertEquals(100, dispatchedProvinceCapacity);
-            Assertions.assertEquals(100, finalDispatchedCapCapacity.get("37028"));
+            Assertions.assertEquals(100, usedProvinceCapacity);
+            Assertions.assertEquals(100, finalUsedCapCapacity.get("37028"));
         }
 
-        if (tuple.equalsIgnoreCase("4##MI")) {
+        if (tuple.equalsIgnoreCase("4~MI")) {
             Assertions.assertEquals(0, highPriorityList.size());
-            Assertions.assertEquals(500, dispatchedProvinceCapacity);
-            Assertions.assertEquals(500, finalDispatchedCapCapacity.get("20080"));
+            Assertions.assertEquals(500, usedProvinceCapacity);
+            Assertions.assertEquals(500, finalUsedCapCapacity.get("20080"));
         }
 
-        if (tuple.equalsIgnoreCase("1##PE")) {
+        if (tuple.equalsIgnoreCase("1~PE")) {
             Assertions.assertEquals(200, highPriorityList.size());
-            Assertions.assertEquals(300, dispatchedProvinceCapacity);
-            Assertions.assertEquals(300, finalDispatchedCapCapacity.get("65010"));
+            Assertions.assertEquals(300, usedProvinceCapacity);
+            Assertions.assertEquals(300, finalUsedCapCapacity.get("65010"));
         }
 
-        if (tuple.equalsIgnoreCase("6##FG")) {
+        if (tuple.equalsIgnoreCase("6~FG")) {
             Assertions.assertEquals(400, highPriorityList.size());
-            Assertions.assertEquals(100, dispatchedProvinceCapacity);
-            Assertions.assertEquals(100, finalDispatchedCapCapacity.get("71029"));
+            Assertions.assertEquals(100, usedProvinceCapacity);
+            Assertions.assertEquals(100, finalUsedCapCapacity.get("71029"));
         }
 
-        if (tuple.equalsIgnoreCase("3##CO")) {
+        if (tuple.equalsIgnoreCase("3~CO")) {
             Assertions.assertEquals(5, highPriorityList.size());
-            Assertions.assertEquals(500, dispatchedProvinceCapacity);
-            Assertions.assertEquals(500, finalDispatchedCapCapacity.get("22031"));
-            Assertions.assertEquals(5, highPriorityList.stream().filter(delivery -> delivery.getDeliveryDriverIdGeoKey().equals("3##CO")
+            Assertions.assertEquals(500, usedProvinceCapacity);
+            Assertions.assertEquals(500, finalUsedCapCapacity.get("22031"));
+            Assertions.assertEquals(5, highPriorityList.stream().filter(delivery -> delivery.getUnifiedDeliveryDriverGeoKey().equals("3~CO")
                     && delivery.getCreatedAt().toString().contains("2025-03-31T")).count());
-            Assertions.assertEquals(0, highPriorityList.stream().filter(delivery -> delivery.getDeliveryDriverIdGeoKey().equals("3##CO")
+            Assertions.assertEquals(0, highPriorityList.stream().filter(delivery -> delivery.getUnifiedDeliveryDriverGeoKey().equals("3~CO")
                     && delivery.getCreatedAt().toString().contains("2025-03-24T")).count());
         }
 
 
-        if (tuple.equalsIgnoreCase("1##PU")) {
+        if (tuple.equalsIgnoreCase("1~PU")) {
             Assertions.assertEquals(0, highPriorityList.size());
-            Assertions.assertEquals(500, dispatchedProvinceCapacity);
-            Assertions.assertEquals(500, finalDispatchedCapCapacity.get("61010"));
+            Assertions.assertEquals(500, usedProvinceCapacity);
+            Assertions.assertEquals(500, finalUsedCapCapacity.get("61010"));
         }
 
-        if (tuple.equalsIgnoreCase("5##PA")) {
+        if (tuple.equalsIgnoreCase("5~PA")) {
             Assertions.assertEquals(100, highPriorityList.size());
-            Assertions.assertEquals(400, dispatchedProvinceCapacity);
-            Assertions.assertEquals(1000, finalDispatchedCapCapacity.get("90010"));
+            Assertions.assertEquals(400, usedProvinceCapacity);
+            Assertions.assertEquals(1000, finalUsedCapCapacity.get("90010"));
         }
     }
 }
