@@ -113,6 +113,10 @@ Parameters:
     Description: 'Interval for deliveryDate setting'
     Default: 1d
 
+  # Log group parameters
+  EcsLogGroup:
+    Type: String
+    Description: 'Ecs log group name'
 
 Resources:
 
@@ -143,6 +147,7 @@ Resources:
         LoadBalancerListenerArn: !Ref ApplicationLoadBalancerListenerArn
         LoadbalancerRulePriority: !Ref MicroserviceNumber
         CloudwatchLogKinesisStreamArn: !Ref LogsKinesisSourceStreamArn
+        EcsLogGroup: !Ref EcsLogGroup
 
   # Grant operational rights to pn-Delayer microservice
   DelayerMicroserviceTaskManagedPolicy:
@@ -179,6 +184,22 @@ Resources:
               - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
               - !Sub "${PaperDeliveryReadyToSendTableArn}"
               - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
+
+  DelayerMicroserviceCloudWatchDashboard:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-cloudwatch-dashboard.yaml"
+      Parameters:
+        DashboardName: !Sub "${ProjectName}-delayer"
+        DynamoDBTableNames: !Join
+          - ','
+          - - !Ref PaperDeliveryDriverCapacitiesTableName
+            - !Ref PaperDeliveryDriverUsedCapacitiesTableName
+            - !Ref PaperDeliveryHighPriorityTableName
+            - !Ref PaperDeliveryReadyToSendTableName
+        LogGroupsNames: !Join
+          - ','
+          - - !Sub '/aws/ecs/${ProjectName}-delayer'
 
 
 
