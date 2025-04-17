@@ -154,7 +154,7 @@ Resources:
   PnCoreEventBusToDelayerInputsKinesis:
     Type: AWS::Events::Rule
     Properties: 
-      Description: Route Events from kinesis data stream to pn-core-event-bus
+      Description: Route Events from pn-core-event-bus to kinesis
       RoleArn: !GetAtt "DelayerInputsRole.Arn" 
       EventBusName: !Sub '${ProjectName}-CoreEventBus'
       EventPattern:
@@ -179,20 +179,19 @@ Resources:
         - PolicyName: !Sub ${ProjectName}-DelayerInputs-eventBusRolePolicy
           PolicyDocument:
             Statement:
-              - Sid: decryptKMS
+              - Sid: KMSAllowList
                 Action:
                   - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
                 Effect: Allow
                 Resource: 
                   - !Ref PnDelayerInputsKinesisDataStreamKMSArn
-              - Sid: putEventsToKinesis
-                Action:
-                  - kinesis:GetRecords
-                  - kinesis:GetShardIterator
-                  - kinesis:DescribeStream
-                  - kinesis:DescribeStreamSummary
-                  - kinesis:ListShards
+              - Sid: putEventsToKinesis 
                 Effect: Allow
+                Action:
+                  - kinesis:PutRecords
+                  - kinesis:PutRecord
                 Resource: 
                   - !Ref PnDelayerInputsKinesisDataStreamArn
                   
