@@ -31,10 +31,10 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
     }
 
     @Override
-    public Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String deliveryDriverId, String geoKey, Instant deliveryDate) {
+    public Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String unifiedDeliveryDriver, String geoKey, Instant deliveryDate) {
 
         QueryConditional keyCondition = QueryConditional.sortLessThanOrEqualTo(Key.builder()
-                .partitionValue(PaperDeliveryDriverCapacity.buildKey(tenderId, deliveryDriverId, geoKey))
+                .partitionValue(PaperDeliveryDriverCapacity.buildKey(tenderId, unifiedDeliveryDriver, geoKey))
                 .sortValue(deliveryDate.toString()).build());
 
         Map<String, AttributeValue> expressionValues = new HashMap<>();
@@ -59,8 +59,8 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
         return Mono.from(table.query(queryRequest).items().limit(1))
                 .map(PaperDeliveryDriverCapacity::getCapacity)
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.error("No PaperDeliveryDriverCapacity found for tenderId: {}, deliveryDriverId: {}, geoKey: {}, deliveryDate: {}",
-                            tenderId, deliveryDriverId, geoKey, deliveryDate);
+                    log.error("No PaperDeliveryDriverCapacity found for tenderId: {}, unifiedDeliveryDriver: {}, geoKey: {}, deliveryDate: {}",
+                            tenderId, unifiedDeliveryDriver, geoKey, deliveryDate);
                     return Mono.just(0);
                 }))
                 .doOnError(e -> log.error("Error while querying PaperDeliveryDriverCapacities", e));

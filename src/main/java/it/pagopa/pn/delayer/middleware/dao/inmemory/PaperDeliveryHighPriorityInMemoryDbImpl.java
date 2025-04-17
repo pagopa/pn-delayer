@@ -40,7 +40,7 @@ public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHig
         List<PaperDeliveryHighPriority> highPriorityList = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {});
         data.putAll(highPriorityList.stream()
                 .collect(Collectors.groupingBy(
-                        PaperDeliveryHighPriority::getDeliveryDriverIdGeoKey,
+                        PaperDeliveryHighPriority::getUnifiedDeliveryDriverGeoKey,
                         Collectors.collectingAndThen(
                                 Collectors.toList(),
                                 list -> {
@@ -75,13 +75,13 @@ public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHig
     }
 
     @Override
-    public Mono<Page<PaperDeliveryHighPriority>> getPaperDeliveryHighPriority(String deliveryDriverId, String geoKey, Map<String, AttributeValue> lastEvaluatedKey) {
-        List<PaperDeliveryHighPriority> highPriorities = data.get(PaperDeliveryHighPriority.buildKey(deliveryDriverId, geoKey));
+    public Mono<Page<PaperDeliveryHighPriority>> getPaperDeliveryHighPriority(String unifiedDeliveryDriver, String geoKey, Map<String, AttributeValue> lastEvaluatedKey) {
+        List<PaperDeliveryHighPriority> highPriorities = data.get(PaperDeliveryHighPriority.buildKey(unifiedDeliveryDriver, geoKey));
         if(CollectionUtils.isEmpty(highPriorities)) {
-            log.info("No PaperDeliveryHighPriority found for deliveryDriverId: {}, geoKey: {}", deliveryDriverId, geoKey);
+            log.info("No PaperDeliveryHighPriority found for unifiedDeliveryDriver: {}, geoKey: {}", unifiedDeliveryDriver, geoKey);
             return Mono.just(Page.create(Collections.emptyList()));
         }
-        log.info("Found {} PaperDeliveryHighPriority for deliveryDriverId: {}, geoKey: {}", highPriorities.size(), deliveryDriverId, geoKey);
+        log.info("Found {} PaperDeliveryHighPriority for unifiedDeliveryDriver: {}, geoKey: {}", highPriorities.size(), unifiedDeliveryDriver, geoKey);
         return Mono.just(Page.create(highPriorities
                 .stream().limit(pnDelayerConfigs.getHighPriorityQueryLimit()).toList()));
     }
@@ -90,7 +90,7 @@ public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHig
     public Mono<Void> executeTransaction(List<PaperDeliveryHighPriority> paperDeliveryHighPriority, List<PaperDeliveryReadyToSend> paperDeliveryReadyToSend) {
         return paperDeliveryReadyToSendDAO.insert(paperDeliveryReadyToSend)
                 .doOnNext(savedItems -> log.info("Inserted {} PaperDeliveryReadyToSend", savedItems))
-                .flatMap(savedItems -> delete(paperDeliveryHighPriority.get(0).getDeliveryDriverIdGeoKey(), paperDeliveryHighPriority))
+                .flatMap(savedItems -> delete(paperDeliveryHighPriority.get(0).getUnifiedDeliveryDriverGeoKey(), paperDeliveryHighPriority))
                 .doOnNext(deletedItems -> log.info("Deleted {} PaperDeliveryHighPriority", paperDeliveryHighPriority.size()));
     }
 }

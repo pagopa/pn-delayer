@@ -1,8 +1,8 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDispatchedDAO;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverUsedCapacities;
 import it.pagopa.pn.delayer.model.ImplementationType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,35 +24,35 @@ import java.util.List;
 import java.util.Map;
 
 import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
-import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacitiesDispatched.*;
+import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverUsedCapacities.*;
 
 @Component
 @Slf4j
 @ConditionalOnProperty(name = IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.DYNAMO, matchIfMissing = true)
-public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeliveryDriverCapacitiesDispatchedDAO {
+public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDeliveryDriverUsedCapacitiesDAO {
 
-    private final DynamoDbAsyncTable<PaperDeliveryDriverCapacitiesDispatched> table;
+    private final DynamoDbAsyncTable<PaperDeliveryDriverUsedCapacities> table;
     private final DynamoDbAsyncClient dynamoDbAsyncClient;
     private final DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient;
 
-    public PaperDeliveryDriverCapacitiesDispatchedDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbAsyncClient dynamoDbAsyncClient, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
-        this.table = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesDispatchedTableName(), TableSchema.fromBean(PaperDeliveryDriverCapacitiesDispatched.class));
+    public PaperDeliveryDriverUsedUsedCapacitiesDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbAsyncClient dynamoDbAsyncClient, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
+        this.table = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverUsedCapacitiesTableName(), TableSchema.fromBean(PaperDeliveryDriverUsedCapacities.class));
         this.dynamoDbAsyncClient = dynamoDbAsyncClient;
         this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
     }
 
     @Override
-    public Mono<UpdateItemResponse> updateCounter(String deliveryDriverId, String geoKey, Integer increment, Instant deliveryDate) {
-        String pk = PaperDeliveryDriverCapacitiesDispatched.buildPk(deliveryDriverId, geoKey);
+    public Mono<Integer> updateCounter(String unifiedDeliveryDriver, String geoKey, Integer increment, Instant deliveryDate) {
+        String pk = PaperDeliveryDriverUsedCapacities.buildPk(unifiedDeliveryDriver, geoKey);
         log.info("update pk={} increment={}", pk, increment);
 
         Map<String, AttributeValue> key = new HashMap<>();
-        key.put(PaperDeliveryDriverCapacitiesDispatched.COL_DELIVERY_DRIVER_ID_GEOKEY, AttributeValue.builder().s(pk).build());
-        key.put(PaperDeliveryDriverCapacitiesDispatched.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());
+        key.put(PaperDeliveryDriverUsedCapacities.COL_DELIVERY_DRIVER_ID_GEOKEY, AttributeValue.builder().s(pk).build());
+        key.put(PaperDeliveryDriverUsedCapacities.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());
 
         Map<String, AttributeValue> attributeValue = new HashMap<>();
         attributeValue.put(":v", AttributeValue.builder().n(String.valueOf(increment)).build());
-        attributeValue.put(":deliveryDriver", AttributeValue.builder().s(deliveryDriverId).build());
+        attributeValue.put(":deliveryDriver", AttributeValue.builder().s(unifiedDeliveryDriver).build());
         attributeValue.put(":geoKey", AttributeValue.builder().s(geoKey).build());
 
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
@@ -64,25 +64,26 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
                 .build();
 
         return Mono.fromFuture(dynamoDbAsyncClient.updateItem(updateRequest))
+                .thenReturn(increment)
                 .doOnSuccess(r -> log.info("Update successful for pk={} increment={}", pk, increment))
                 .doOnError(e -> log.error("Error updating item with pk {}: {}", pk, e.getMessage()));
     }
 
     @Override
-    public Mono<Integer> get(String deliveryDriverId, String geoKey, Instant deliveryDate) {
-        String pk = PaperDeliveryDriverCapacitiesDispatched.buildPk(deliveryDriverId, geoKey);
+    public Mono<Integer> get(String unifiedDeliveryDriver, String geoKey, Instant deliveryDate) {
+        String pk = PaperDeliveryDriverUsedCapacities.buildPk(unifiedDeliveryDriver, geoKey);
         return Mono.fromFuture(table.getItem(Key.builder()
                         .partitionValue(pk)
                         .sortValue(String.valueOf(deliveryDate))
                         .build()))
-                .map(PaperDeliveryDriverCapacitiesDispatched::getUsedCapacity)
+                .map(PaperDeliveryDriverUsedCapacities::getUsedCapacity)
                 .switchIfEmpty(Mono.just(0))
                 .doOnSuccess(item -> log.info("Retrieved used capacity for pk [{}] and deliveryWeek [{}] = {}",pk, deliveryDate, item))
                 .doOnError(e -> log.error("Error retrieving usedCapacity item with pk {}: {}", pk, e.getMessage()));
     }
 
     @Override
-    public Flux<PaperDeliveryDriverCapacitiesDispatched> batchGetItem(List<String> pks, Instant deliveryDate) {
+    public Flux<PaperDeliveryDriverUsedCapacities> batchGetItem(List<String> pks, Instant deliveryDate) {
         log.info("batchGetItem for usedCapacity pks={} deliveryDate={}", pks, deliveryDate);
 
         List<Key> keys = pks.stream()
@@ -92,8 +93,8 @@ public class PaperDeliveryDriverCapacitiesDispatchedDAOImpl implements PaperDeli
                         .build())
                 .toList();
 
-        ReadBatch.Builder<PaperDeliveryDriverCapacitiesDispatched> readBatchBuilder = ReadBatch
-                .builder(PaperDeliveryDriverCapacitiesDispatched.class)
+        ReadBatch.Builder<PaperDeliveryDriverUsedCapacities> readBatchBuilder = ReadBatch
+                .builder(PaperDeliveryDriverUsedCapacities.class)
                 .mappedTableResource(table);
 
         keys.forEach(readBatchBuilder::addGetItem);
