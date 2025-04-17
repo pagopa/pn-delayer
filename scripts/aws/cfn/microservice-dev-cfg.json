@@ -4,6 +4,7 @@
     "MaxTasksNumber": "0",
     "HighPriorityQueryLimit": "1000",
     "DeliveryDateDayOfWeek": "1",
-    "DeliveryDateInterval": "1d"
+    "DeliveryDateInterval": "1d",
+    "PaperDeliveryCutOffDuration": "7d"
   }
 }

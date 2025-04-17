@@ -113,6 +113,10 @@ Parameters:
     Description: 'Interval for deliveryDate setting'
     Default: 1d
 
+  PaperDeliveryCutOffDuration:
+    Type: String
+    Description: 'Cut off duration for paper delivery. available value = 7d (weekly cut-off), 0d (no cut-off))'
+    Default: 7d
 
 Resources:
 
@@ -135,6 +139,7 @@ Resources:
         ContainerEnvEntry6: !Sub 'PN_DELAYER_HIGHPRIORITYQUERYLIMIT =${HighPriorityQueryLimit}'
         ContainerEnvEntry7: !Sub 'PN_DELAYER_DELIVERYDATEDAYOFWEEK=${DeliveryDateDayOfWeek}'
         ContainerEnvEntry8: !Sub 'PN_DELAYER_DELIVERYDATEINTERVAL=${DeliveryDateInterval}'
+        ContainerEnvEntry9: !Sub 'PN_DELAYER_PAPERDELIVERYCUTOFFDURATION=${PaperDeliveryCutOffDuration}'
         MappedPaths: '/delayer/*'
         ECSClusterName: !Ref ECSClusterName
         Subnets: !Ref SubnetsIds

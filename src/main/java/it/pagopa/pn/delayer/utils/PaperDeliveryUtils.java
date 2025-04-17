@@ -84,20 +84,24 @@ public class PaperDeliveryUtils {
      the first valid interval is retrieved, and consequently, the first available deliveryDate for sending the shipment.
      */
     private void enrichWithDeliveryDate(List<PaperDeliveryReadyToSend> tempItems, Integer capCapacity, Integer usedCapCapacity) {
-        Map<Instant, Integer> partitionedCapacity = retrieveCapacityInterval(capCapacity, pnDelayerConfig.getDeliveryDateInterval(), usedCapCapacity);
-        tempItems.forEach(shipment -> partitionedCapacity.entrySet().stream()
-                .filter(entry -> entry.getValue() > 0)
-                .findFirst()
-                .ifPresentOrElse(entry -> {
-                    shipment.setDeliveryDate(entry.getKey());
-                    partitionedCapacity.put(entry.getKey(), entry.getValue() - 1);
-                }, () -> {
-                    Instant farthestDate = partitionedCapacity.keySet()
-                            .stream()
-                            .max(Instant::compareTo)
-                            .orElseThrow(() -> new PnInternalException("No delivery date found in capacity interval Map", ERROR_CODE_NO_DELIVERY_DATE));
-                    shipment.setDeliveryDate(farthestDate);
-                }));
+        if (pnDelayerConfig.getPaperDeliveryCutOffDuration().isZero()) {
+            tempItems.forEach(shipment -> shipment.setDeliveryDate(Instant.now()));
+        }else {
+            Map<Instant, Integer> partitionedCapacity = retrieveCapacityInterval(capCapacity, pnDelayerConfig.getDeliveryDateInterval(), usedCapCapacity);
+            tempItems.forEach(shipment -> partitionedCapacity.entrySet().stream()
+                    .filter(entry -> entry.getValue() > 0)
+                    .findFirst()
+                    .ifPresentOrElse(entry -> {
+                        shipment.setDeliveryDate(entry.getKey());
+                        partitionedCapacity.put(entry.getKey(), entry.getValue() - 1);
+                    }, () -> {
+                        Instant farthestDate = partitionedCapacity.keySet()
+                                .stream()
+                                .max(Instant::compareTo)
+                                .orElseThrow(() -> new PnInternalException("No delivery date found in capacity interval Map", ERROR_CODE_NO_DELIVERY_DATE));
+                        shipment.setDeliveryDate(farthestDate);
+                    }));
+        }
     }
 
     /**
@@ -147,13 +151,13 @@ public class PaperDeliveryUtils {
     }
 
     /**
-     * This method calculates the next delivery week based on the configured day of the week.
-     * It takes the createdAt timestamp and finds the next occurrence of the specified day of the week.
+     * This method calculates the start day of the delivery week based on the configured day of the week and cutoff period.
      */
-    public Instant calculateNextWeek(Instant createdAt) {
-        LocalDate dateTime = LocalDate.ofInstant(createdAt, ZoneOffset.UTC);
-        LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(pnDelayerConfig.getDeliveryDateDayOfWeek())));
-        return nextWeek.atStartOfDay().toInstant(ZoneOffset.UTC);
+    public Instant calculateDeliveryWeek(Instant createdAt) {
+        Instant datePlusCutOff = createdAt.plus(pnDelayerConfig.getPaperDeliveryCutOffDuration());
+        LocalDate dateTime = LocalDate.ofInstant(datePlusCutOff, ZoneOffset.UTC);
+        LocalDate deliveryWeekStartDay = dateTime.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(pnDelayerConfig.getDeliveryDateDayOfWeek())));
+        return deliveryWeekStartDay.atStartOfDay().toInstant(ZoneOffset.UTC);
     }
 
 }

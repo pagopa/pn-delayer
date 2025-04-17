@@ -48,7 +48,7 @@ class PaperDeliveryDriverUsedCapacitiesInMemoryDbImplTest {
         String geoKey = "geo2";
         Instant deliveryDate = Instant.now();
 
-        when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(deliveryDate);
+        when(paperDeliveryUtils.calculateDeliveryWeek(any())).thenReturn(deliveryDate);
 
         Mono<Integer> response = dao.updateCounter(unifiedDeliveryDriver, geoKey, 10, deliveryDate);
 
