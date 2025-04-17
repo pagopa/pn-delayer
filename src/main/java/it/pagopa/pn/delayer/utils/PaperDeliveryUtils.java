@@ -2,16 +2,18 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import reactor.util.function.Tuple2;
 
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -24,13 +26,64 @@ public class PaperDeliveryUtils {
 
     private final PnDelayerConfigs pnDelayerConfig;
 
+
+    public Integer filterAndPrepareDeliveries(List<PaperDeliveryHighPriority> deliveries, PaperDeliveryTransactionRequest transactionRequest, Tuple2<Integer, Integer> tuple) {
+        List<PaperDeliveryHighPriority> filteredList = checkCapacityAndFilterList(tuple, deliveries);
+        if (CollectionUtils.isEmpty(filteredList)) {
+            return 0;
+        }
+        transactionRequest.getPaperDeliveryHighPriorityList().addAll(filteredList);
+        transactionRequest.getPaperDeliveryReadyToSendList().addAll(mapToPaperDeliveryReadyToSend(filteredList, tuple.getT1(), tuple.getT2()));
+        return filteredList.size();
+    }
+
+    public List<PaperDeliveryHighPriority> checkCapacityAndFilterList(Tuple2<Integer, Integer> tuple, List<PaperDeliveryHighPriority> paperDeliveryHighPriorities) {
+        int remainingCapacity = tuple.getT1() - Math.max(tuple.getT2(), 0);
+        return remainingCapacity == 0 ?
+                Collections.emptyList() : paperDeliveryHighPriorities.stream().limit(Math.min(remainingCapacity, paperDeliveryHighPriorities.size())).toList();
+    }
+
+    public boolean checkListsSize(PaperDeliveryTransactionRequest transactionRequest) {
+        return !CollectionUtils.isEmpty(transactionRequest.getPaperDeliveryHighPriorityList()) &&
+                !CollectionUtils.isEmpty(transactionRequest.getPaperDeliveryReadyToSendList()) &&
+                transactionRequest.getPaperDeliveryReadyToSendList().size() == transactionRequest.getPaperDeliveryHighPriorityList().size();
+    }
+
+    public Map<String, List<PaperDeliveryHighPriority>> groupDeliveryOnCapAndOrderOnCreatedAt(List<PaperDeliveryHighPriority> paperDeliveryHighPriorities) {
+        return paperDeliveryHighPriorities.stream()
+                .collect(Collectors.groupingBy(
+                        PaperDeliveryHighPriority::getCap,
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                list -> {
+                                    list.sort(Comparator.comparing(PaperDeliveryHighPriority::getCreatedAt));
+                                    return list;
+                                }
+                        )
+                ));
+    }
+    private List<PaperDeliveryReadyToSend> mapToPaperDeliveryReadyToSend(List<PaperDeliveryHighPriority> items, Integer capCapacity, Integer dispatchedCapCapacity) {
+        List<PaperDeliveryReadyToSend> paperDeliveryReadyToSendList = items.stream()
+                .map(paperDeliveryHighPriority -> {
+                    PaperDeliveryReadyToSend paperDeliveryReadyToSend = new PaperDeliveryReadyToSend();
+                    paperDeliveryReadyToSend.setRequestId(paperDeliveryHighPriority.getRequestId());
+                    paperDeliveryReadyToSend.setIun(paperDeliveryHighPriority.getIun());
+                    return paperDeliveryReadyToSend;
+                })
+                .toList();
+
+        enrichWithDeliveryDate(paperDeliveryReadyToSendList, capCapacity, dispatchedCapCapacity);
+
+        return paperDeliveryReadyToSendList;
+    }
+
     /**
      This method deals with the assignment of the deliveryDate for each shipment received in input.
      Based on the weekly capacity, the distribution of shipments within the week is calculated based on a configurable interval (default 1d).
      The weekly capacity is then distributed across all the calculated intervals, and based on the shipments already allocated,
      the first valid interval is retrieved, and consequently, the first available deliveryDate for sending the shipment.
      */
-    public void enrichWithDeliveryDate(List<PaperDeliveryReadyToSend> tempItems, Integer capCapacity, Integer dispatchedCapCapacity) {
+    private void enrichWithDeliveryDate(List<PaperDeliveryReadyToSend> tempItems, Integer capCapacity, Integer dispatchedCapCapacity) {
         Map<Instant, Integer> partitionedCapacity = retrieveCapacityInterval(capCapacity, pnDelayerConfig.getDeliveryDateInterval(), dispatchedCapCapacity);
         tempItems.forEach(shipment -> partitionedCapacity.entrySet().stream()
                 .filter(entry -> entry.getValue() > 0)
