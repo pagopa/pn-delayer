@@ -122,12 +122,12 @@ Parameters:
     Type: String
     Description: 'Batch log group name'
 
-  MaxvCpus:
+  MaxvCpus:   ##TODEFINE in order to set the max number of parallel jobs
     Type: String
     Default: 128
     Description: The maximum number of Amazon EC2 vCPUs that an environment can reach.
 
-  VCPU:
+  VCPU:     ##TODEFINE in order to set the max number of parallel jobs
     Type: String
     Default: 0.25
     Description: The number of vCPUs reserved for the container.
@@ -157,7 +157,7 @@ Resources:
       ComputeResources:
         MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
-        SecurityGroupIds: #Dubbio su chi può raggiungere il batch 
+        SecurityGroupIds:
           - !Ref BatchSecurityGroup
         Subnets: !Split [",", !Ref SubnetsIds]
       State: ENABLED
@@ -185,6 +185,23 @@ Resources:
             awslogs-group: !Ref "BatchLogGroup"
             awslogs-region: !Ref AWS::Region
             awslogs-stream-prefix: !Sub '${ProjectName}-delayer-logs'
+        Environment:
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
+            Value: !Ref PaperDeliveryDriverCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
+            Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
+            Value: !Ref PaperDeliveryHighPriorityTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYREAYTOSENDTABLENAME
+            Value: !Ref PaperDeliveryReadyToSendTableName
+          - Name: PN_DELAYER_HIGHPRIORITYQUERYLIMIT
+            Value: !Ref HighPriorityQueryLimit
+          - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
+            Value: !Ref DeliveryDateDayOfWeek
+          - Name: PN_DELAYER_DELIVERYDATEINTERVAL
+            Value: !Ref DeliveryDateInterval
+          - Name: AWS_REGIONCODE
+            Value: !Ref AWS::Region
       PlatformCapabilities:
         - FARGATE
       Tags:
@@ -294,6 +311,96 @@ Resources:
           - ','
           - - !Sub '/aws/ecs/${ProjectName}-delayer'
 
+  PnDelayerAlarmTopicPublisherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-delayer-alarm-topic-publischer-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ events.amazonaws.com ]
+            Action: [ "sts:AssumeRole" ]
+      Path: /
+      Policies:
+        - PolicyName: !Sub '${ProjectName}-delayer-alarm-topic-publischer-policy'
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "sns:Publish"
+                Resource: !Ref AlarmSNSTopicArn
 
+    ### Enable sending notifications to SNS topic when the job is in failed status.
+  BatchBridgeStateRule:
+   Type: AWS::Events::Rule
+   Properties:
+     Description: The EventBridge rule to match Batch state change
+     RoleArn: !GetAtt PnDelayerAlarmTopicPublisherRole.Arn
+     EventPattern:
+       source:
+         - aws.batch
+       detail-type:
+         - Batch Job State Change
+       detail:
+         status:
+           - FAILED
+         jobDefinition:
+          - !Ref BatchProcessingJobDefinition
+     State: ENABLED
+     Targets:
+       - Arn: !Ref AlarmSNSTopicArn
+         Id: !Sub "${ProjectName}-delayer"
 
+  # Create alarm
+  FailedInvocationMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-delayer-FailedInvocation-Alarm"
+      AlarmDescription: "CloudWatch alarm for when pn-delayer job failes."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      Dimensions:
+        - Name: RuleName
+          Value: !Ref BatchBridgeStateRule
+      DatapointsToAlarm: 1
+      MetricName: "Invocations"
+      Namespace: "AWS/Events"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 144 # 12 hours
+      Period: 300 # 5 minutes
+      Statistic: Sum
+      Threshold: 1
 
+  ErrorFatalLogsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref BatchLogGroup
+      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${ProjectName}-delayer-ErrorFatalMetric"
+
+  ErrorFatalLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: ErrorFatalLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-delayer-ErrorFatalLogs-Alarm"
+      AlarmDescription: "CloudWatch alarm for when LogSaver LogGroup has ERROR or FATAL line."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-delayer-ErrorFatalMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
