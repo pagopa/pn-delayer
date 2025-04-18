@@ -314,7 +314,7 @@ Resources:
   PnDelayerAlarmTopicPublisherRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${ProjectName}-delayer-alarm-topic-publischer-role'
+      RoleName: !Sub '${ProjectName}-delayer-alarm-topic-publisher-role'
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -323,7 +323,7 @@ Resources:
             Action: [ "sts:AssumeRole" ]
       Path: /
       Policies:
-        - PolicyName: !Sub '${ProjectName}-delayer-alarm-topic-publischer-policy'
+        - PolicyName: !Sub '${ProjectName}-delayer-alarm-topic-publisher-policy'
           PolicyDocument:
             Statement:
               - Effect: Allow
