@@ -113,41 +113,134 @@ Parameters:
     Description: 'Interval for deliveryDate setting'
     Default: 1d
 
-  # Log group parameters
-  EcsLogGroup:
+  VpcCidr:
     Type: String
-    Description: 'Ecs log group name'
+    Description: 'VPC Cidr default'
+
+  # Log group parameters
+  BatchLogGroup:
+    Type: String
+    Description: 'Batch log group name'
+
+  MaxvCpus:
+    Type: String
+    Default: 128
+    Description: The maximum number of Amazon EC2 vCPUs that an environment can reach.
+
+  VCPU:
+    Type: String
+    Default: 0.25
+    Description: The number of vCPUs reserved for the container.
+
+  ComputeResourceType:
+    Type: String
+    Default: FARGATE
+    AllowedValues:
+      - FARGATE_SPOT
+      - FARGATE
+    Description: Enter FARGATE_SPOT or FARGATE.
+
+  Memory:
+    Type: String
+    Default: 2048
+    Description: The memory hard limit (in MiB) present to the container.
 
 Resources:
 
-  # pn-delayer microservice
-  DelayerMicroservice:
-    Type: AWS::CloudFormation::Stack
+  ## Compute Environment
+  ComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-service.yaml"
-      Parameters:
-        MicroServiceUniqueName: !Sub '${ProjectName}-delayer'
-        CpuValue: 512
-        MemoryAmount: 2GB
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        ContainerImageURI: !Sub '${ContainerImageUri}'
-        ContainerEnvEntry1: !Sub 'AWS_REGIONCODE=${AWS::Region}'
-        ContainerEnvEntry2: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=${PaperDeliveryDriverCapacitiesTableName}'
-        ContainerEnvEntry3: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME=${PaperDeliveryDriverUsedCapacitiesTableName}'
-        ContainerEnvEntry4: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME=${PaperDeliveryHighPriorityTableName}'
-        ContainerEnvEntry5: !Sub 'PN_DELAYER_DAO_PAPERDELIVERYREAYTOSENDTABLENAME=${PaperDeliveryReadyToSendTableName}'
-        ContainerEnvEntry6: !Sub 'PN_DELAYER_HIGHPRIORITYQUERYLIMIT =${HighPriorityQueryLimit}'
-        ContainerEnvEntry7: !Sub 'PN_DELAYER_DELIVERYDATEDAYOFWEEK=${DeliveryDateDayOfWeek}'
-        ContainerEnvEntry8: !Sub 'PN_DELAYER_DELIVERYDATEINTERVAL=${DeliveryDateInterval}'
-        MappedPaths: '/delayer/*'
-        ECSClusterName: !Ref ECSClusterName
-        Subnets: !Ref SubnetsIds
-        VpcId: !Ref VpcId
-        EcsDefaultSecurityGroup: !Ref EcsDefaultSecurityGroup
-        LoadBalancerListenerArn: !Ref ApplicationLoadBalancerListenerArn
-        LoadbalancerRulePriority: !Ref MicroserviceNumber
-        CloudwatchLogKinesisStreamArn: !Ref LogsKinesisSourceStreamArn
-        EcsLogGroup: !Ref EcsLogGroup
+      Type: MANAGED
+      ServiceRole: !Ref BatchServiceRole
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-compute-environment'
+      ComputeResources:
+        MaxvCpus: !Ref MaxvCpus
+        Type: !Ref ComputeResourceType
+        SecurityGroupIds: #Dubbio su chi può raggiungere il batch 
+          - !Ref BatchSecurityGroup
+        Subnets: !Split [",", !Ref SubnetsIds]
+      State: ENABLED
+
+  BatchProcessingJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      PropagateTags: true
+      JobDefinitionName: !Sub '${ProjectName}-delayer-job-definition'
+      ContainerProperties:
+        Image: !Ref ContainerImageUri
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+        ResourceRequirements:
+          - Value: !Ref VCPU
+            Type: VCPU
+          - Value: !Ref Memory
+            Type: MEMORY
+        JobRoleArn: !GetAtt "BatchTaskExecutionRole.Arn"
+        ExecutionRoleArn: !GetAtt "BatchTaskExecutionRole.Arn"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref "BatchLogGroup"
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-logs'
+      PlatformCapabilities:
+        - FARGATE
+      Tags:
+        Service: Batch
+        Name: JobDefinitionTag
+        Expected: MergeTag
+
+  ## JobQueue
+  JobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref ComputeEnvironment
+      State: ENABLED
+      Priority: 1
+      JobQueueName: !Sub '${ProjectName}-delayer-job-queue'
+
+  BatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  BatchTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-delayer-taskexec-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ ecs-tasks.amazonaws.com ]
+            Action: [ "sts:AssumeRole" ]
+      Path: /
+      ManagedPolicyArns:
+        - !Ref DelayerMicroserviceTaskManagedPolicy
+    
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Batch Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
 
   # Grant operational rights to pn-Delayer microservice
   DelayerMicroserviceTaskManagedPolicy:
