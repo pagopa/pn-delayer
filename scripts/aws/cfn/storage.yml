@@ -24,6 +24,14 @@ Parameters:
     Type: String
     Description: 'Where to send CDC'
 
+  LogsKinesisSourceStreamArn:
+    Type: String
+    Description: 'Where to send Logs'
+
+  LogRetention:
+    Type: Number
+    Default: 14
+
 Resources:
   # PaperDeliveryDriverCapacities DynamoDB Table
   PaperDeliveryDriverCapacitiesTable:
@@ -109,6 +117,17 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
+  PnDelayerLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-delayer'
+        LogGroupRetention: !Ref LogRetention
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
+
 Outputs:
   # Dynamo tables
   PaperDeliveryDriverCapacitiesTableName:
@@ -138,3 +157,7 @@ Outputs:
   PaperDeliveryReadyToSendTableArn:
     Description: ARN of dynamodb table containing ReadyToSend paper deliveries
     Value: !Sub '${PaperDeliveryReadyToSendTable.Arn}'
+
+  # Log group exports
+  EcsLogGroup:
+    Value: !GetAtt PnDelayerLogGroup.Outputs.LogGroupName
