@@ -250,8 +250,47 @@ Resources:
             StringEquals:
               sts:SourceAccount: !Ref "AWS::AccountId"
       Path: /
-      ManagedPolicyArns:
-        - !Ref DelayerMicroserviceTaskManagedPolicy
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action:
+                - "ecr:GetAuthorizationToken"
+                - "ecr:BatchCheckLayerAvailability"
+                - "ecr:GetDownloadUrlForLayer"
+                - "ecr:BatchGetImage"
+                - "logs:CreateLogStream"
+                - "logs:PutLogEvents"
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+                - dynamodb:BatchGetItem
+              Resource:
+                - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+                - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
+                - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:TransactWriteItems
+              Resource:
+                - !Sub "${PaperDeliveryHighPriorityTableArn}"
+                - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
+                - !Sub "${PaperDeliveryReadyToSendTableArn}"
+                - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
     
   BatchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -264,42 +303,6 @@ Resources:
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: "0.0.0.0/0"
-
-  # Grant operational rights to pn-Delayer microservice
-  DelayerMicroserviceTaskManagedPolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - dynamodb:GetItem
-              - dynamodb:UpdateItem
-              - dynamodb:Query
-              - dynamodb:BatchGetItem
-            Resource:
-              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
-              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
-          - Effect: Allow
-            Action:
-              - dynamodb:GetItem
-              - dynamodb:Query
-            Resource:
-              - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
-              - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
-          - Effect: Allow
-            Action:
-              - dynamodb:GetItem
-              - dynamodb:PutItem
-              - dynamodb:DeleteItem
-              - dynamodb:Query
-              - dynamodb:TransactWriteItems
-            Resource:
-              - !Sub "${PaperDeliveryHighPriorityTableArn}"
-              - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
-              - !Sub "${PaperDeliveryReadyToSendTableArn}"
-              - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
 
   DelayerMicroserviceCloudWatchDashboard:
     Type: AWS::CloudFormation::Stack
