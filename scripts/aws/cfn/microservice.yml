@@ -231,8 +231,8 @@ Resources:
               Service: batch.amazonaws.com
             Action: "sts:AssumeRole"
             Condition:
-              StringEquals:
-                sts:SourceAccount: !Ref "AWS::AccountId"
+              ArnLike:
+                sts:SourceArn: !Sub arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/pn-delayer-job-definition:*
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
 
