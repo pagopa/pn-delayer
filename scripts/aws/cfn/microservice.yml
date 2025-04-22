@@ -232,7 +232,7 @@ Resources:
             Action: sts:AssumeRole
             Condition:
               StringEquals:
-                sts:SourceAccount: !Ref "AWS::AccountId"
+                aws:SourceAccount: !Ref "AWS::AccountId"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
 
@@ -248,7 +248,7 @@ Resources:
             Action: "sts:AssumeRole"
             Condition:
               StringEquals:
-                sts:SourceAccount: !Ref "AWS::AccountId"
+                aws:SourceAccount: !Ref "AWS::AccountId"
       Path: /
       Policies:
         - PolicyName: AmazonECSTaskExecutionRolePolicy
@@ -330,6 +330,9 @@ Resources:
             Principal:
               Service: events.amazonaws.com 
             Action: "sts:AssumeRole" 
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
       Path: /
       Policies:
         - PolicyName: !Sub '${ProjectName}-delayer-alarm-topic-publisher-policy'
