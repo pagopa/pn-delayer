@@ -159,5 +159,5 @@ Outputs:
     Value: !Sub '${PaperDeliveryReadyToSendTable.Arn}'
 
   # Log group exports
-  EcsLogGroup:
+  BatchLogGroup:
     Value: !GetAtt PnDelayerLogGroup.Outputs.LogGroupName
