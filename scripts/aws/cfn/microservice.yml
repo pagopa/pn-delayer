@@ -145,6 +145,14 @@ Parameters:
     Default: 2048
     Description: The memory hard limit (in MiB) present to the container.
 
+  PnDelayerInputsKinesisDataStreamArn:
+    Type: String
+    Description: 'pn-delayer_inputs kinesis stream ARN'
+
+  PnDelayerInputsKinesisDataStreamKMSArn:
+    Type: String
+    Description: 'pn-delayer_inputs kinesis stream KMS ARN'
+
 Resources:
 
   ## Compute Environment
@@ -416,3 +424,50 @@ Resources:
       Period: 60
       Statistic: Sum
       Threshold: 1
+
+  PnCoreEventBusToDelayerInputsKinesis:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route Events from pn-core-event-bus to kinesis
+      RoleArn: !GetAtt "DelayerInputsRole.Arn" 
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
+      EventPattern:
+        detail-type: [ "PreparePhaseOneOutcomeEvent" ]
+      Targets: 
+        - Arn: !Ref PnDelayerInputsKinesisDataStreamArn
+          Id: !Sub ${ProjectName}-DelayerInputsKinesisDataStream
+          DeadLetterConfig: 
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+
+  DelayerInputsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-DelayerInputs-eventBusRolePolicy
+          PolicyDocument:
+            Statement:
+              - Sid: KMSAllowList
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Effect: Allow
+                Resource: 
+                  - !Ref PnDelayerInputsKinesisDataStreamKMSArn
+              - Sid: putEventsToKinesis 
+                Effect: Allow
+                Action:
+                  - kinesis:PutRecords
+                  - kinesis:PutRecord
+                Resource: 
+                  - !Ref PnDelayerInputsKinesisDataStreamArn

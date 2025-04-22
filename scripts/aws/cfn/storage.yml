@@ -24,6 +24,24 @@ Parameters:
     Type: String
     Description: 'Where to send CDC'
 
+  PnDelayerInputsRetentionHours:
+    Type: Number
+    Default: 168
+    Description: Number of hours to retain data records in the stream
+
+  PnDelayerInputsStandardAlarmThresholdsMs:
+    Type: Number
+    Default: 2000000
+    Description: Threshold for standard alarms in milliseconds
+
+  PnDelayerInputsnOnCallAlarmThresholdsMs:
+    Type: Number
+    Default: 2000000
+    Description: Threshold for oncall alarms in milliseconds 
+
+  AlarmSNSTopicArn:
+    Type: String
+    
   LogsKinesisSourceStreamArn:
     Type: String
     Description: 'Where to send Logs'
@@ -117,6 +135,23 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
+  ### Kinesis Data Stream: kinesis data stream for pn-delayer-inputs
+  PnDelayerInputsKinesisDataStream:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-data-stream.yaml"
+      Parameters:
+        StreamName: "pn-delayer_inputs"
+        # PROVISIONED MODE: follow shard configuration
+        StreamRetentionHours: !Ref PnDelayerInputsRetentionHours
+        RequireManagedKey: true
+        # USES SNSTopic used for all Kinesis alarms
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        StandardAlarmThresholdsMs: !Ref PnDelayerInputsStandardAlarmThresholdsMs
+        OnCallAlarmThresholdsMs: !Ref PnDelayerInputsnOnCallAlarmThresholdsMs
+        
   PnDelayerLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -158,6 +193,14 @@ Outputs:
     Description: ARN of dynamodb table containing ReadyToSend paper deliveries
     Value: !Sub '${PaperDeliveryReadyToSendTable.Arn}'
 
+  PnDelayerInputsKinesisDataStreamArn:
+    Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn
+    Description: "PnDelayerInputs Kinesis source stream ARN"
+
+  PnDelayerInputsKinesisDataStreamKMSArn:
+    Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamKeyArn
+    Description: "PnDelayerInputs Kinesis stream KMS ARN"
+    
   # Log group exports
   BatchLogGroup:
     Value: !GetAtt PnDelayerLogGroup.Outputs.LogGroupName
