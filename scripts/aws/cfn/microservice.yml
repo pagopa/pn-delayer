@@ -229,7 +229,7 @@ Resources:
           - Effect: Allow
             Principal:
               Service: batch.amazonaws.com
-            Action: sts:AssumeRole
+            Action: "sts:AssumeRole"
             Condition:
               StringEquals:
                 sts:SourceAccount: !Ref "AWS::AccountId"
@@ -244,8 +244,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: [ ecs-tasks.amazonaws.com ]
-            Action: [ "sts:AssumeRole" ]
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
             Condition:
               StringEquals:
                 sts:SourceAccount: !Ref "AWS::AccountId"
@@ -328,8 +328,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: [ events.amazonaws.com ]
-            Action: [ "sts:AssumeRole" ]
+              Service: events.amazonaws.com 
+            Action: "sts:AssumeRole" 
             Condition:
               StringEquals:
                 sts:SourceAccount: !Ref "AWS::AccountId"
