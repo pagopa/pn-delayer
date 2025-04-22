@@ -124,7 +124,7 @@ Parameters:
 
   MaxvCpus:   ##TODEFINE in order to set the max number of parallel jobs
     Type: String
-    Default: 128
+    Default: 8
     Description: The maximum number of Amazon EC2 vCPUs that an environment can reach.
 
   VCPU:     ##TODEFINE in order to set the max number of parallel jobs
@@ -230,6 +230,9 @@ Resources:
             Principal:
               Service: batch.amazonaws.com
             Action: sts:AssumeRole
+            Condition:
+            StringEquals:
+              sts:SourceAccount: !Ref "AWS::AccountId"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
 
@@ -243,6 +246,9 @@ Resources:
             Principal:
               Service: [ ecs-tasks.amazonaws.com ]
             Action: [ "sts:AssumeRole" ]
+            Condition:
+            StringEquals:
+              sts:SourceAccount: !Ref "AWS::AccountId"
       Path: /
       ManagedPolicyArns:
         - !Ref DelayerMicroserviceTaskManagedPolicy
@@ -321,6 +327,9 @@ Resources:
             Principal:
               Service: [ events.amazonaws.com ]
             Action: [ "sts:AssumeRole" ]
+            Condition:
+            StringEquals:
+              sts:SourceAccount: !Ref "AWS::AccountId"
       Path: /
       Policies:
         - PolicyName: !Sub '${ProjectName}-delayer-alarm-topic-publisher-policy'
@@ -357,7 +366,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${ProjectName}-delayer-FailedInvocation-Alarm"
-      AlarmDescription: "CloudWatch alarm for when pn-delayer job failes."
+      AlarmDescription: "CloudWatch alarm for when pn-delayer job fails."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
