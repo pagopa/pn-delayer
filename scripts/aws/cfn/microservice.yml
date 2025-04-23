@@ -122,7 +122,6 @@ Parameters:
     Type: String
     Description: 'VPC Cidr default'
 
-  # Log group parameters
   BatchLogGroup:
     Type: String
     Description: 'Batch log group name'
@@ -162,6 +161,41 @@ Parameters:
     Type: String
     Default: ' '
     Description: 'Input tuple unifiedDeliveryDriverProvince for the job'
+
+  # OpenApi Bucket params
+  MicroserviceBucketName:
+    Type: String
+    Default: ''
+    Description: 'Name of the bucket where the microservice files are copied during deploy'
+
+  MicroserviceBucketBaseKey:
+    Type: String
+    Default: ''
+    Description: 'Base key of the microservice in the s3 bucket'
+
+  KinesisPaperDeliveryLambdaDLQARN:
+    Type: String
+    Description: 'DLQ ARN for KinesisPaperDeliveryLambda'
+
+  KinesisPaperDeliveryLambdaMaxRetry:
+    Type: Number
+    Default: 1
+    Description: 'Maximum retry attempts for KinesisPaperDeliveryLambda'
+
+  KinesisPaperDeliveryLambdaBatchSize:
+    Type: Number
+    Default: 25
+    Description: 'Batch size for KinesisPaperDeliveryLambda'
+
+  KinesisPaperDeliveryLambdaName:
+    Type: String
+    Description: 'PaperDeliveryLambda function name'
+
+  KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds:
+    Type: Number
+    Default: 20
+    Description: 'Maximum batching window in seconds for KinesisPaperDeliveryLambda'
+
 
 Resources:
 
@@ -486,3 +520,108 @@ Resources:
                   - kinesis:PutRecord
                 Resource:
                   - !Ref PnDelayerInputsKinesisDataStreamArn
+
+  #########################################################
+  ###         KinesisPaperDeliveryLambda                ###
+  #########################################################
+
+  KinesisPaperDeliveryLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${KinesisPaperDeliveryLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  KinesisPaperDeliveryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref KinesisPaperDeliveryLambdaName
+      Runtime: nodejs18.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/kinesisPaperDeliveryLambda.zip"
+      Role: !GetAtt KinesisPaperDeliveryLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
+          BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  KinesisPaperDeliveryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-kinesisPaperDeliveryLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  KinesisPaperDeliveryLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-kinesisPaperDeliveryLambdaPolicy
+      Roles:
+        - !Ref KinesisPaperDeliveryLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - kinesis:DescribeStream
+              - kinesis:DescribeStreamSummary
+              - kinesis:GetShardIterator
+              - kinesis:GetRecords
+              - kinesis:ListShards
+              - kinesis:ListStreams
+              - kinesis:SubscribeToShard
+            Resource: !Ref PnDelayerInputsKinesisDataStreamArn
+          - Effect: Allow
+            Action: dynamodb:BatchWriteItem
+            Resource: !Ref PaperDeliveryHighPriorityTableArn
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:SendMessage
+            Resource:
+              !Ref KinesisPaperDeliveryLambdaDLQARN
+
+  PaperDeliveryLambdaKinesisSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: !Sub ${PaperDeliveryLambdaBatchSize}
+      BisectBatchOnFunctionError: true
+      EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
+      FunctionName: !Ref KinesisPaperDeliveryLambda
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      MaximumBatchingWindowInSeconds: !Sub ${KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds}
+      MaximumRetryAttempts: !Ref KinesisPaperDeliveryLambdaMaxRetry
+      StartingPosition: TRIM_HORIZON
+      DestinationConfig:
+        OnFailure:
+          Destination: !Ref KinesisPaperDeliveryLambdaDLQARN
+
+  KinesisPaperDeliveryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref KinesisPaperDeliveryLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn

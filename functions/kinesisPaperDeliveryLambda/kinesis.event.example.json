@@ -1,0 +1,75 @@
+[{
+  "version": "0",
+  "id": "4e109c63-4763-5af7-e258-d16bd0102215",
+  "detail-type": "PreparePhaseOneOutcomeEvent",
+  "source": "Pipe pn-paper-channel-to-delayer-pipe",
+  "account": "830192246553",
+  "time": "2025-04-23T14:46:12Z",
+  "region": "eu-south-1",
+  "resources": [],
+  "detail": {
+    "source": "pn-paperchannel_to_delayer",
+    "body": {
+      "requestId": "PREPARE_ANALOG_DOMICILE.IUN_MDYR-UXHL-LVRQ-202504-Q-1.RECINDEX_0.ATTEMPT_0",
+      "unifiedDeliveryDriver": "driver1",
+      "senderPaId": "paId",
+      "recipientId": "recipientId",
+      "tenderId": "tenderId",
+      "iun": "MDYR-UXHL-LVRQ-202504-Q-1",
+      "recipientNormalizedAddress": {
+        "cap": "87100",
+        "pr": "CS"
+      }
+    }
+  }
+},
+  {
+    "version": "0",
+    "id": "4e109c63-4763-5af7-e258-d16bd0102214",
+    "detail-type": "PreparePhaseOneOutcomeEvent",
+    "source": "Pipe pn-paper-channel-to-delayer-pipe",
+    "account": "830192246553",
+    "time": "2025-04-23T14:46:12Z",
+    "region": "eu-south-1",
+    "resources": [],
+    "detail": {
+      "source": "pn-paperchannel_to_delayer",
+      "body": {
+        "requestId": "PREPARE_ANALOG_DOMICILE.IUN_MDYR-UXHL-LVRQ-202504-Q-1.RECINDEX_0.ATTEMPT_1",
+        "unifiedDeliveryDriver": "driver1",
+        "senderPaId": "paId",
+        "recipientId": "recipientId",
+        "tenderId": "tenderId",
+        "iun": "MDYR-UXHL-LVRQ-202504-Q-1",
+        "recipientNormalizedAddress": {
+          "cap": "87100",
+          "pr": "CS"
+        }
+      }
+    }
+  },
+    {
+      "version": "0",
+      "id": "4e109c63-4763-5af7-e258-d16bd0102217",
+      "detail-type": "PreparePhaseOneOutcomeEvent",
+      "source": "Pipe pn-paper-channel-to-delayer-pipe",
+      "account": "830192246553",
+      "time": "2025-04-23T14:46:12Z",
+      "region": "eu-south-1",
+      "resources": [],
+      "detail": {
+        "source": "pn-paperchannel_to_delayer",
+        "body": {
+          "requestId": "PREPARE_ANALOG_DOMICILE.IUN_MDYR-UXHL-LVRQ-202504-Q-1.RECINDEX_0.ATTEMPT_2",
+          "unifiedDeliveryDriver": "driver1",
+          "senderPaId": "paId",
+          "recipientId": "recipientId",
+          "tenderId": "tenderId",
+          "iun": "MDYR-UXHL-LVRQ-202504-Q-1",
+          "recipientNormalizedAddress": {
+            "cap": "87100",
+            "pr": "CS"
+          }
+        }
+      }
+}]
