@@ -153,6 +153,10 @@ Parameters:
     Type: String
     Description: 'pn-delayer_inputs kinesis stream KMS ARN'
 
+  UnifiedDeliveryDriverProvince:
+    Type: String
+    Description: 'Input tuple unifiedDeliveryDriverProvince for the job'
+
 Resources:
 
   ## Compute Environment
@@ -210,6 +214,8 @@ Resources:
             Value: !Ref DeliveryDateInterval
           - Name: AWS_REGIONCODE
             Value: !Ref AWS::Region
+          - Name: PN_DELAYER_UNIFIEDDELIVERYDRIVERPROVINCE
+            Value: !Ref UnifiedDeliveryDriverProvince
       PlatformCapabilities:
         - FARGATE
       Tags:
