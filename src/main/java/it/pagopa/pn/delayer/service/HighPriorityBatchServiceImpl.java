@@ -35,6 +35,7 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
                         PaperDeliveryHighPriority.retrieveGeoKey(pk), lastEvaluatedKey)
                 .flatMap(paperDeliveryHighPriorityPage -> {
                     if (CollectionUtils.isEmpty(paperDeliveryHighPriorityPage.items())) {
+                        log.warn("No high priority records found for pk={}", pk);
                         return Mono.empty();
                     }
                     return processChunk(paperDeliveryHighPriorityPage.items(), startExecutionBatch)

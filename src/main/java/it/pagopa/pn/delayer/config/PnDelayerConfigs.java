@@ -21,6 +21,7 @@ public class PnDelayerConfigs {
     private Duration deliveryDateInterval;
     private int highPriorityQueryLimit;
     private Duration paperDeliveryCutOffDuration;
+    private String unifiedDeliveryDriverProvince;
 
     @Data
     public static class Dao {
