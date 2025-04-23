@@ -160,6 +160,7 @@ Parameters:
 
   UnifiedDeliveryDriverProvince:
     Type: String
+    Default: ' '
     Description: 'Input tuple unifiedDeliveryDriverProvince for the job'
 
 Resources:
@@ -221,6 +222,9 @@ Resources:
             Value: !Ref AWS::Region
           - Name: PN_DELAYER_UNIFIEDDELIVERYDRIVERPROVINCE
             Value: !Ref UnifiedDeliveryDriverProvince
+          - Name: PN_DELAYER_PAPERDELIVERYCUTOFFDURATION
+            Value: !Ref PaperDeliveryCutOffDuration
+
       PlatformCapabilities:
         - FARGATE
       Tags:
