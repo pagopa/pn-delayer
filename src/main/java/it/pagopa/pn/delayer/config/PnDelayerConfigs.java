@@ -20,6 +20,7 @@ public class PnDelayerConfigs {
     private int deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
     private Duration deliveryDateInterval;
     private int highPriorityQueryLimit;
+    private String unifiedDeliveryDriverProvince;
 
     @Data
     public static class Dao {
