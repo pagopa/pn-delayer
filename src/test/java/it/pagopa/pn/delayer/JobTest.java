@@ -32,7 +32,9 @@ import java.util.stream.Stream;
         "spring.application.name=PN-DELAYER-MS-BE",
         "pn.delayer.delivery-date-day-of-week=1",
         "pn.delayer.high-priority-query-limit=1000",
-        "pn.delayer.delivery-date-interval=1d"})
+        "pn.delayer.delivery-date-interval=1d",
+        "pn.delayer.paper-delivery-cut-off-duration=7d"
+})
 @SpringJUnitConfig(classes = {DelayerApplication.class})
 @Slf4j
 @Execution(ExecutionMode.CONCURRENT)
@@ -96,7 +98,7 @@ class JobTest {
     @MethodSource("paperDeliveryTupleProvider")
     void parameterizedJobRunTest(String tuple) {
         Instant now = Instant.now();
-        Instant deliveryDate = paperDeliveryUtils.calculateNextWeek(now);
+        Instant deliveryDate = paperDeliveryUtils.calculateDeliveryWeek(now);
         TestReport testReport = prepareTestReport(tuple,deliveryDate);
         Instant start = Instant.now();
 
@@ -133,7 +135,7 @@ class JobTest {
     }
 
     private void verifyAndCloseTestReport(TestReport testReport, Long duration, String tuple) {
-        Instant now = paperDeliveryUtils.calculateNextWeek(Instant.now());
+        Instant now = paperDeliveryUtils.calculateDeliveryWeek(Instant.now());
 
         testReport.setExecutionTime(duration + "ms");
 

@@ -29,7 +29,9 @@ import java.util.stream.Stream;
         "spring.application.name=PN-DELAYER-MS-BE",
         "pn.delayer.delivery-date-day-of-week=1",
         "pn.delayer.high-priority-query-limit=1000",
-        "pn.delayer.delivery-date-interval=1d"})
+        "pn.delayer.delivery-date-interval=1d",
+        "pn.delayer.paper-delivery-cut-off-duration=7d"
+})
 @SpringJUnitConfig(classes = {DelayerApplication.class})
 @Slf4j
 @Execution(ExecutionMode.CONCURRENT)
@@ -79,7 +81,7 @@ class HighPriorityBatchServiceInMemoryTest {
     @Test
     void testInitHighPriorityBatch() {
         highPriorityService.initHighPriorityBatch("3~GR", new HashMap<>(), Instant.now()).block();
-        Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(Instant.now());
+        Instant deliveryWeek = paperDeliveryUtils.calculateDeliveryWeek(Instant.now());
 
         List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get("3~GR");
         Integer usedProvinceCapacity = paperDeliveryDriverUsedCapacities.get("3", "GR", deliveryWeek).block();
@@ -106,7 +108,7 @@ class HighPriorityBatchServiceInMemoryTest {
 
 
     private void verify(String tuple) {
-        Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(Instant.now());
+        Instant deliveryWeek = paperDeliveryUtils.calculateDeliveryWeek(Instant.now());
 
         String[] tupleSplit = tuple.split("~");
         List<PaperDeliveryHighPriority> highPriorityList = paperDeliveryHighPriority.get(tuple);

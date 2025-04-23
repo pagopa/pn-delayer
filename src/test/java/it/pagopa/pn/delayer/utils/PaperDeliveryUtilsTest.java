@@ -47,6 +47,8 @@ class PaperDeliveryUtilsTest {
     void filterAndPrepareDeliveriesLessCapacityThanDeliveries() {
         when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
         when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(1));
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
+
         PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
         List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
 
@@ -61,6 +63,8 @@ class PaperDeliveryUtilsTest {
     void filterAndPrepareDeliveriesAllCapacity() {
         when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
         when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(1));
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
+
         PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
         List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
 
@@ -75,6 +79,7 @@ class PaperDeliveryUtilsTest {
     void filterAndPrepareDeliveriesAllCapacityVerifyPartitionOnDay() {
         when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(1));
         when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1); //Lunedì
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
 
         Instant weekDayStart = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(1)))
                 .atStartOfDay().toInstant(ZoneOffset.UTC);
@@ -99,6 +104,7 @@ class PaperDeliveryUtilsTest {
     void filterAndPrepareDeliveriesAllCapacityVerifyPartitionOnHours() {
         when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofHours(12));
         when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
 
         Instant weekDayStart = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(1)))
                 .atStartOfDay().toInstant(ZoneOffset.UTC);
@@ -126,6 +132,7 @@ class PaperDeliveryUtilsTest {
     void enrichWithDeliveryDateOnWeek() {
         when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(7));
         when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1); //Lunedì
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
 
         Instant weekDayStart = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(1)))
                 .atStartOfDay().toInstant(ZoneOffset.UTC);
@@ -209,19 +216,39 @@ class PaperDeliveryUtilsTest {
     }
 
     @Test
-    void calculateNextWeek1() {
+    void calculateDeliveryWeekWithCutOff1() {
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
         when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
         Instant createdAt = Instant.parse("2025-04-01T10:00:00Z");
-        Instant result = paperDeliveryUtils.calculateNextWeek(createdAt);
+        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
         assertEquals(Instant.parse("2025-04-07T00:00:00Z"), result);
     }
 
     @Test
-    void calculateNextWeek2() {
+    void calculateDeliveryWeekWithCutOff2() {
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
         when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(3);
         Instant createdAt = Instant.parse("2025-04-07T00:00:00Z");
-        Instant result = paperDeliveryUtils.calculateNextWeek(createdAt);
+        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
         assertEquals(Instant.parse("2025-04-09T00:00:00Z"), result);
+    }
+
+    @Test
+    void calculateDeliveryWeekNoCutOff1() {
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(0));
+        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
+        Instant createdAt = Instant.parse("2025-04-01T10:00:00Z");
+        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
+        assertEquals(Instant.parse("2025-03-31T00:00:00Z"), result);
+    }
+
+    @Test
+    void calculateDeliveryWeekNoCutOff2() {
+        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(0));
+        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(3);
+        Instant createdAt = Instant.parse("2025-04-07T00:00:00Z");
+        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
+        assertEquals(Instant.parse("2025-04-02T00:00:00Z"), result);
     }
 
     private static List<PaperDeliveryHighPriority> getHighPriorityDeliveries() {

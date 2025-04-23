@@ -51,7 +51,7 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
 
     private Mono<List<PaperDeliveryHighPriority>> processChunk(List<PaperDeliveryHighPriority> chunk, Instant startExecutionBatch) {
         PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        Instant deliveryWeek = paperDeliveryUtils.calculateNextWeek(startExecutionBatch);
+        Instant deliveryWeek = paperDeliveryUtils.calculateDeliveryWeek(startExecutionBatch);
         PaperDeliveryHighPriority paperDeliveryHighPriority = chunk.get(0);
         return retrieveCapacities(paperDeliveryHighPriority.getProvince(), paperDeliveryHighPriority.getUnifiedDeliveryDriver(), paperDeliveryHighPriority.getTenderId(), deliveryWeek)
                 .map(tuple -> paperDeliveryUtils.checkCapacityAndFilterList(tuple, chunk))

@@ -113,6 +113,11 @@ Parameters:
     Description: 'Interval for deliveryDate setting'
     Default: 1d
 
+  PaperDeliveryCutOffDuration:
+    Type: String
+    Description: 'Cut off duration for paper delivery. available value = 7d (weekly cut-off), 0d (no cut-off))'
+    Default: 7d
+
   VpcCidr:
     Type: String
     Description: 'VPC Cidr default'
@@ -155,6 +160,7 @@ Parameters:
 
   UnifiedDeliveryDriverProvince:
     Type: String
+    Default: ' '
     Description: 'Input tuple unifiedDeliveryDriverProvince for the job'
 
 Resources:
@@ -216,6 +222,9 @@ Resources:
             Value: !Ref AWS::Region
           - Name: PN_DELAYER_UNIFIEDDELIVERYDRIVERPROVINCE
             Value: !Ref UnifiedDeliveryDriverProvince
+          - Name: PN_DELAYER_PAPERDELIVERYCUTOFFDURATION
+            Value: !Ref PaperDeliveryCutOffDuration
+
       PlatformCapabilities:
         - FARGATE
       Tags:
@@ -305,7 +314,7 @@ Resources:
                 - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
                 - !Sub "${PaperDeliveryReadyToSendTableArn}"
                 - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
-    
+
   BatchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -342,8 +351,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: events.amazonaws.com 
-            Action: "sts:AssumeRole" 
+              Service: events.amazonaws.com
+            Action: "sts:AssumeRole"
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref "AWS::AccountId"
@@ -433,16 +442,16 @@ Resources:
 
   PnCoreEventBusToDelayerInputsKinesis:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       Description: Route Events from pn-core-event-bus to kinesis
-      RoleArn: !GetAtt "DelayerInputsRole.Arn" 
+      RoleArn: !GetAtt "DelayerInputsRole.Arn"
       EventBusName: !Sub '${ProjectName}-CoreEventBus'
       EventPattern:
         detail-type: [ "PreparePhaseOneOutcomeEvent" ]
-      Targets: 
+      Targets:
         - Arn: !Ref PnDelayerInputsKinesisDataStreamArn
           Id: !Sub ${ProjectName}-DelayerInputsKinesisDataStream
-          DeadLetterConfig: 
+          DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
   DelayerInputsRole:
@@ -468,12 +477,12 @@ Resources:
                   - kms:Encrypt
                   - kms:GenerateDataKey
                 Effect: Allow
-                Resource: 
+                Resource:
                   - !Ref PnDelayerInputsKinesisDataStreamKMSArn
-              - Sid: putEventsToKinesis 
+              - Sid: putEventsToKinesis
                 Effect: Allow
                 Action:
                   - kinesis:PutRecords
                   - kinesis:PutRecord
-                Resource: 
+                Resource:
                   - !Ref PnDelayerInputsKinesisDataStreamArn

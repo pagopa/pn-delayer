@@ -34,7 +34,7 @@ public class PaperDeliveryDriverUsedCapacitiesInMemoryDbImpl implements PaperDel
         ClassPathResource classPathResource = new ClassPathResource("json/PaperDeliveryDriverCapacitiesUsed.json");
         List<PaperDeliveryDriverUsedCapacities> capacities = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {
         });
-        Instant deliveryDte = paperDeliveryUtils.calculateNextWeek(Instant.now());
+        Instant deliveryDte = paperDeliveryUtils.calculateDeliveryWeek(Instant.now());
         capacities.forEach(used -> used.setDeliveryDate(deliveryDte));
         capacities.forEach(used -> data.put(used.getUnifiedDeliveryDriverGeokey() + "~" + used.getDeliveryDate(), used));
         log.info("loaded {} PaperDeliveryDriverCapacitiesUsed with deliveryDate: {}", capacities.size(), deliveryDte);
@@ -59,7 +59,7 @@ public class PaperDeliveryDriverUsedCapacitiesInMemoryDbImpl implements PaperDel
         capacity.setUnifiedDeliveryDriver(unifiedDeliveryDriver);
         capacity.setGeoKey(geoKey);
         capacity.setUsedCapacity(increment);
-        capacity.setDeliveryDate(paperDeliveryUtils.calculateNextWeek(Instant.now()));
+        capacity.setDeliveryDate(paperDeliveryUtils.calculateDeliveryWeek(Instant.now()));
         return capacity;
     }
 

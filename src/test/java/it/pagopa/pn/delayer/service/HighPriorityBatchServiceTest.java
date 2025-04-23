@@ -66,7 +66,7 @@ class HighPriorityBatchServiceTest {
                 .thenReturn(Mono.just(0));
         when(paperDeliveryUsedCapacityDAO.updateCounter(anyString(), anyString(), anyInt(), any()))
                 .thenReturn(Mono.just(10));
-        when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
+        when(paperDeliveryUtils.calculateDeliveryWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
         when(paperDeliveryUtils.filterAndPrepareDeliveries(anyList(), any(), any()))
                 .thenReturn(1);
         when(paperDeliveryUtils.checkListsSize(any())).thenReturn(true);
@@ -105,10 +105,10 @@ class HighPriorityBatchServiceTest {
                 .thenReturn(Mono.just(0));
         when(paperDeliveryUsedCapacityDAO.updateCounter(anyString(), anyString(), anyInt(), any()))
                 .thenReturn(Mono.just(10));
-        when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
+        when(paperDeliveryUtils.calculateDeliveryWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(page));
-        when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
+        when(paperDeliveryUtils.calculateDeliveryWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
         when(paperDeliveryUtils.filterAndPrepareDeliveries(anyList(), any(), any()))
                 .thenReturn(1);
         when(paperDeliveryUtils.checkListsSize(any())).thenReturn(true);
@@ -134,7 +134,7 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryUsedCapacityDAO.get(anyString(), anyString(), any()))
                 .thenReturn(Mono.just(0))
                 .thenReturn(Mono.just(1));
-        when(paperDeliveryUtils.calculateNextWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
+        when(paperDeliveryUtils.calculateDeliveryWeek(any())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(page));
 
