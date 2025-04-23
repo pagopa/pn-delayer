@@ -68,6 +68,7 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
         return Flux.fromIterable(capMap.entrySet())
                 .flatMap(entry -> processCapGroupAndUpdateCounter(entry.getKey(), entry.getValue(), unifiedDeliveryDriver, tenderId, deliveryWeek, transactionRequest))
                 .reduce(0, Integer::sum)
+                .filter(numberOfDeliveries -> numberOfDeliveries > 0)
                 .flatMap(numberOfDeliveries -> paperDeliveryUsedCapacityDAO.updateCounter(unifiedDeliveryDriver, province, numberOfDeliveries, deliveryWeek))
                 .then(Mono.just(transactionRequest));
     }

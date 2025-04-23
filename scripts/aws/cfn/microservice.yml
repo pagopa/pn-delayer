@@ -210,7 +210,7 @@ Resources:
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
             Value: !Ref PaperDeliveryHighPriorityTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYREAYTOSENDTABLENAME
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYREADYTOSENDTABLENAME
             Value: !Ref PaperDeliveryReadyToSendTableName
           - Name: PN_DELAYER_HIGHPRIORITYQUERYLIMIT
             Value: !Ref HighPriorityQueryLimit
