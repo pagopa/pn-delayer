@@ -163,6 +163,44 @@ Parameters:
     Default: ' '
     Description: 'Input tuple unifiedDeliveryDriverProvince for the job'
 
+  # OpenApi Bucket params
+  MicroserviceBucketName:
+    Type: String
+    Default: ''
+    Description: 'Name of the bucket where the microservice files are copied during deploy'
+
+  MicroserviceBucketBaseKey:
+    Type: String
+    Default: ''
+    Description: 'Base key of the microservice in the s3 bucket'
+    
+  SubmitPaperDeliveryJobLambdaName:
+    Type: String
+    Description: Name of the PnDelayerSubmitPaperDeliveryJob Lambda.
+
+  LambdaRuntime:
+    Type: String
+    Default: nodejs20.x
+    Description: Runtime for Lambdas.
+
+  SubmitPaperDeliveryJobLambdaDLQARN:
+    Type: String
+    Description: 'DLQ ARN for KinesisPaperDeliveryLambda'
+
+  SubmitPaperDeliveryJobLambdaMaxRetry:
+    Type: Number
+    Default: 1
+    Description: 'Maximum retry attempts for KinesisPaperDeliveryLambda'
+
+  SubmitPaperDeliveryJobLambdaCron:
+    Type: String
+    Default: '0 0/5 * * ? *'
+    Description: 'Cron expression for SubmitPaperDeliveryJobLambda'
+
+  SubmitPaperDeliveryJobInputTuplesParameter:
+    Type: String
+    Description: 'SSM parameter name for SubmitPaperDeliveryJob input tuples'
+
 Resources:
 
   ## Compute Environment
@@ -486,3 +524,107 @@ Resources:
                   - kinesis:PutRecord
                 Resource:
                   - !Ref PnDelayerInputsKinesisDataStreamArn
+
+  SubmitPaperDeliveryJobLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PnDelayerSubmitPaperDeliveryJobLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  SubmitPaperDeliveryJobLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref SubmitPaperDeliveryJobLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/submitPaperDeliveryJobLambda.zip"
+      Role: !GetAtt SubmitPaperDeliveryJobLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          JOB_QUEUE: !Ref JobQueue
+          JOB_DEFINITION: !Ref BatchProcessingJobDefinition
+          JOB_NAME: !Ref BatchProcessingJobDefinition
+          JOB_INPUT_PARAMETER: !Ref SubmitPaperDeliveryJobInputTuplesParameter
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  SubmitPaperDeliveryJobLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-SubmitPaperDeliveryJobLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  SubmitPaperDeliveryJobLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-submitPaperDeliveryJobLambdaPolicy
+      Roles:
+        - !Ref SubmitPaperDeliveryJobLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - batch:SubmitJob
+              - batch:DescribeJobs
+            Resource: !Ref JobQueue
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:SendMessage
+            Resource:
+              !Ref SubmitPaperDeliveryJobLambdaDLQARN
+          - Effect: Allow
+            Action:
+              - ssm:GetParameter
+            Resource:
+              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${SubmitPaperDeliveryJobInputTuplesParameter}
+
+  SubmitPaperDeliveryJobLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SubmitPaperDeliveryJobLambdaName
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+
+  #Scheduled Event Bridge Rule that send event to target lambda
+  SubmitPaperDeliveryJobLambdaScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-delayer-SubmitPaperDeliveryJobLambdaScheduledRule'
+      ScheduleExpression: !Sub cron(${SubmitPaperDeliveryJobLambdaCron})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SubmitPaperDeliveryJobLambda.Arn
+          Id: PnDelayerSubmitPaperDeliveryJobLambdaTarget
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SubmitPaperDeliveryJobLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SubmitPaperDeliveryJobLambdaScheduledRule.Arn

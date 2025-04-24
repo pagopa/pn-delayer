@@ -5,6 +5,8 @@
     "HighPriorityQueryLimit": "1000",
     "DeliveryDateDayOfWeek": "1",
     "DeliveryDateInterval": "1d",
-    "PaperDeliveryCutOffDuration": "7d"
+    "PaperDeliveryCutOffDuration": "7d",
+    "SubmitPaperDeliveryJobLambdaCron": "cron(0 0 ? * 2 *)",
+    "SubmitPaperDeliveryJobInputTuplesParameter": "config/pn-delayer/unifiedDeliveryDriver-province"
   }
 }

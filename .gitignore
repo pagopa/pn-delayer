@@ -34,3 +34,29 @@ build/
 .history
 .vscode
 target
+
+# coverage
+.nyc_output/
+coverage/
+
+# lambda
+function.zip
+code_layer.zip
+lib_layer.zip
+nodejs/
+
+# Node.js
+node_modules/
+
+# coverage
+.nyc_output/
+coverage/
+
+# lambda
+function.zip
+code_layer.zip
+lib_layer.zip
+nodejs/
+
+# Node.js
+node_modules/
