@@ -34,7 +34,6 @@ import java.util.stream.Stream;
 })
 @SpringJUnitConfig(classes = {DelayerApplication.class})
 @Slf4j
-@Execution(ExecutionMode.CONCURRENT)
 class HighPriorityBatchServiceInMemoryTest {
 
 
