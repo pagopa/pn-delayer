@@ -7,6 +7,7 @@
     "DeliveryDateInterval": "1d",
     "PaperDeliveryCutOffDuration": "7d",
     "SubmitPaperDeliveryJobLambdaCron": "cron(0 0 ? * 2 *)",
-    "SubmitPaperDeliveryJobInputTuplesParameter": "config/pn-delayer/unifiedDeliveryDriver-province"
+    "SubmitPaperDeliveryJobInputTuplesParameter": "config/pn-delayer/unifiedDeliveryDriver-province",
+    "SubmitPaperDeliveryJobInputEnvName": "PN_DELAYER_UNIFIEDDELIVERYDRIVERPROVINCE"
   }
 }

@@ -1,12 +1,12 @@
 const { SSMClient, GetParameterCommand } = require("@aws-sdk/client-ssm");
 
-const retrieveDeliveryDriverIdProvince = async (parameterName) => {
+const retrieveUnifiedDeliveryDriverProvince = async () => {
+  const parameterName = process.env.JOB_INPUT_PARAMETER;
   const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
 
   try {
     const command = new GetParameterCommand({
-      Name: parameterName,
-      WithDecryption: true,
+      Name: parameterName
     });
 
     const response = await ssmClient.send(command);
@@ -17,4 +17,4 @@ const retrieveDeliveryDriverIdProvince = async (parameterName) => {
   }
 };
 
-module.exports = { retrieveDeliveryDriverIdProvince };
+module.exports = { retrieveUnifiedDeliveryDriverProvince };

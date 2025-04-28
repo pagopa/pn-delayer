@@ -201,6 +201,10 @@ Parameters:
     Type: String
     Description: 'SSM parameter name for SubmitPaperDeliveryJob input tuples'
 
+  SubmitPaperDeliveryJobInputEnvName:
+    Type: String
+    Description: 'Environment variable name for SubmitPaperDeliveryJob input tuples'
+
 Resources:
 
   ## Compute Environment
@@ -549,6 +553,7 @@ Resources:
           JOB_DEFINITION: !Ref BatchProcessingJobDefinition
           JOB_NAME: !Ref BatchProcessingJobDefinition
           JOB_INPUT_PARAMETER: !Ref SubmitPaperDeliveryJobInputTuplesParameter
+          JOB_INPUT_ENV_NAME: !Ref SubmitPaperDeliveryJobInputEnvName
       TracingConfig:
         Mode: Active
       Layers:
@@ -586,6 +591,7 @@ Resources:
             Action:
               - batch:SubmitJob
               - batch:DescribeJobs
+              - batch:ListJobs
             Resource: !Ref JobQueue
           - Effect: Allow
             Action:
