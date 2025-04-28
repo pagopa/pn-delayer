@@ -173,6 +173,11 @@ Parameters:
     Default: ''
     Description: 'Base key of the microservice in the s3 bucket'
 
+  LambdaRuntime:
+    Type: String
+    Default: nodejs20.x
+    Description: Runtime for Lambdas.
+
   KinesisPaperDeliveryLambdaDLQARN:
     Type: String
     Description: 'DLQ ARN for KinesisPaperDeliveryLambda'
@@ -536,7 +541,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref KinesisPaperDeliveryLambdaName
-      Runtime: nodejs18.x
+      Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
       Code:
         S3Bucket: !Ref MicroserviceBucketName
