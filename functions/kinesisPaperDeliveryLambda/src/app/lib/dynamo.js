@@ -27,7 +27,7 @@ async function batchWriteHighPriorityRecords(paperDeliveryHighPriorityRecords) {
     const response = await docClient.send(command);
     console.log(`Batch write successful for ${paperDeliveryHighPriorityRecords.length} items.`);
 
-    if (response.UnprocessedItems && response.UnprocessedItems[tableName]) {
+    if (response?.UnprocessedItems[tableName]) {
       const writeRequests = response.UnprocessedItems[tableName];
       console.log("error saving highPriorities items totalErrors:" + writeRequests.length);
       batchItemFailures = batchItemFailures.concat(
@@ -36,6 +36,7 @@ async function batchWriteHighPriorityRecords(paperDeliveryHighPriorityRecords) {
             writeRequest.PutRequest.Item.requestId.S
         )
       );
+      console.warn("batchItemFailures:" + JSON.stringify(batchItemFailures));
     }
   } catch (error) {
     console.error('Error in batch write:', error);
