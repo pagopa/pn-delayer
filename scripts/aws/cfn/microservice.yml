@@ -610,7 +610,7 @@ Resources:
   PaperDeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      BatchSize: !Sub ${PaperDeliveryLambdaBatchSize}
+      BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
       FunctionName: !Ref KinesisPaperDeliveryLambda
