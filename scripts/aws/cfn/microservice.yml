@@ -205,18 +205,14 @@ Parameters:
     Type: String
     Description: Name of the PnDelayerSubmitPaperDeliveryJob Lambda.
 
-  SubmitPaperDeliveryJobLambdaDLQARN:
-    Type: String
-    Description: 'DLQ ARN for KinesisPaperDeliveryLambda'
-
   SubmitPaperDeliveryJobLambdaMaxRetry:
     Type: Number
     Default: 1
-    Description: 'Maximum retry attempts for KinesisPaperDeliveryLambda'
+    Description: 'Maximum retry attempts for SubmitPaperDeliveryJobLambda'
 
   SubmitPaperDeliveryJobLambdaCron:
     Type: String
-    Default: '0 0/5 * * ? *'
+    Default: '*/2 * * * *'
     Description: 'Cron expression for SubmitPaperDeliveryJobLambda'
 
   SubmitPaperDeliveryJobInputTuplesParameter:
@@ -662,7 +658,7 @@ Resources:
   SubmitPaperDeliveryJobLambdaSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub '${PnDelayerSubmitPaperDeliveryJobLambdaName}-sec-group'
+      GroupDescription: !Sub '${SubmitPaperDeliveryJobLambdaName}-sec-group'
       VpcId: !Ref VpcId
 
   # Lambda function
@@ -681,7 +677,6 @@ Resources:
           REGION: !Sub ${AWS::Region}
           JOB_QUEUE: !Ref JobQueue
           JOB_DEFINITION: !Ref BatchProcessingJobDefinition
-          JOB_NAME: !Ref BatchProcessingJobDefinition
           JOB_INPUT_PARAMETER: !Ref SubmitPaperDeliveryJobInputTuplesParameter
           JOB_INPUT_ENV_NAME: !Ref SubmitPaperDeliveryJobInputEnvName
       TracingConfig:
@@ -723,14 +718,6 @@ Resources:
               - batch:DescribeJobs
               - batch:ListJobs
             Resource: !Ref JobQueue
-          - Effect: Allow
-            Action:
-              - sqs:ChangeMessageVisibility
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-              - sqs:SendMessage
-            Resource:
-              !Ref SubmitPaperDeliveryJobLambdaDLQARN
           - Effect: Allow
             Action:
               - ssm:GetParameter

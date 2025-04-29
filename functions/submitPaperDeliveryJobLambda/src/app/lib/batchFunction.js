@@ -1,7 +1,6 @@
 const { BatchClient, SubmitJobCommand, ListJobsCommand } = require ("@aws-sdk/client-batch");
 const jobQueue = process.env.JOB_QUEUE;
 const jobDefinition = process.env.JOB_DEFINITION;
-const jobName = process.env.JOB_NAME;
 const jobInputEnvName = process.env.JOB_INPUT_ENV_NAME;
 
 const batchClient = new BatchClient({ region: process.env.AWS_REGION });
@@ -28,6 +27,7 @@ async function listJobsByStatus() {
 }
 
 async function submitJobs(tuples){
+    const jobName = "JOB_" + new Date().toISOString();
     let submittedJobs = [];
     try {
         for (const unifiedDeliveryDriverProvince of tuples) {

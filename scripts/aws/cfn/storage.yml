@@ -250,5 +250,3 @@ Outputs:
 
   SubmitPaperDeliveryJobLambdaName:
     Value: !Sub "${ProjectName}-delayer-submitPaperDeliveryJobLambda"
-
-
