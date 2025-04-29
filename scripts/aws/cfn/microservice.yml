@@ -595,6 +595,9 @@ Resources:
               - kinesis:ListStreams
               - kinesis:SubscribeToShard
             Resource: !Ref PnDelayerInputsKinesisDataStreamArn
+          - Action: kms:Decrypt
+            Effect: Allow
+            Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource: !Ref PaperDeliveryHighPriorityTableArn
