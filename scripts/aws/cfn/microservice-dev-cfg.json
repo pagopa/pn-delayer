@@ -5,6 +5,9 @@
     "HighPriorityQueryLimit": "1000",
     "DeliveryDateDayOfWeek": "1",
     "DeliveryDateInterval": "1d",
-    "PaperDeliveryCutOffDuration": "7d"
+    "PaperDeliveryCutOffDuration": "7d",
+    "KinesisPaperDeliveryLambdaMaxRetry": "3",
+    "KinesisPaperDeliveryLambdaBatchSize": "25",
+    "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60"
   }
 }
