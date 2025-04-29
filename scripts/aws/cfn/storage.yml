@@ -231,7 +231,7 @@ Outputs:
     Value: !GetAtt PnDelayerLogGroup.Outputs.LogGroupName
 
   KinesisPaperDeliveryLambdaName:
-    Value: !GetAtt KinesisPaperDeliveryLambdaLogGroup.Outputs.LogGroupName
+    Value: !Sub "${ProjectName}-delayer-kinesisPaperDeliveryLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
