@@ -3,10 +3,10 @@ const { expect } = require("chai");
 
 describe('enrichWithCreatedAt', () => {
   it('adds unique createdAt timestamps to each record', () => {
-    const records = [{}, {}, {}];
+    const records = [{entity:{}}, {entity:{}}, {entity:{}}];
     const result = enrichWithCreatedAt(records);
-    expect(result[0].createdAt).not.equal(result[1].createdAt);
-    expect(result[1].createdAt).not.equal(result[2].createdAt);
+    expect(result[0].entity.createdAt).not.equal(result[1].entity.createdAt);
+    expect(result[1].entity.createdAt).not.equal(result[2].entity.createdAt);
   });
 
   it('returns an empty array when input is empty', () => {

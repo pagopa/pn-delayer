@@ -2,7 +2,7 @@ function enrichWithCreatedAt(paperDeliveryHighPriorityRecords) {
   let millis = 1;
   return paperDeliveryHighPriorityRecords.map(item => {
     const now = new Date();
-    item.createdAt = new Date(now.getTime() + millis).toISOString();
+    item.entity.createdAt = new Date(now.getTime() + millis).toISOString();
     millis++;
     return item;
   });
