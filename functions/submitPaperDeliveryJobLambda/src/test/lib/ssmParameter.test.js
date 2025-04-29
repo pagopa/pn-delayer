@@ -31,6 +31,28 @@ describe('retrieveUnifiedDeliveryDriverProvince', () => {
     sinon.assert.calledWith(mockSend, sinon.match.instanceOf(GetParameterCommand));
   });
 
+  it('returns the empty map when retrieval is successful with empry object', async () => {
+    const mockValue = '{}';
+    mockSend.resolves({ Parameter: { Value: mockValue } });
+
+    const result = await retrieveUnifiedDeliveryDriverProvince();
+
+    expect(result).equal(mockValue);
+    sinon.assert.calledOnce(mockSend);
+    sinon.assert.calledWith(mockSend, sinon.match.instanceOf(GetParameterCommand));
+  });
+
+  it('returns the empty map when retrieval is successful with null value', async () => {
+    const mockValue = null;
+    mockSend.resolves({ Parameter: { Value: mockValue } });
+
+    const result = await retrieveUnifiedDeliveryDriverProvince();
+
+    expect(result).to.deep.equal({});
+    sinon.assert.calledOnce(mockSend);
+    sinon.assert.calledWith(mockSend, sinon.match.instanceOf(GetParameterCommand));
+  });
+
   it('throws an error when the parameter does not exist', async () => {
     mockSend.rejects(new Error('ParameterNotFound'));
 

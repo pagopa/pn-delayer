@@ -10,7 +10,7 @@ const retrieveUnifiedDeliveryDriverProvince = async () => {
     });
 
     const response = await ssmClient.send(command);
-    return response.Parameter.Value;
+    return response?.Parameter?.Value ?? {};
   } catch (error) {
     console.error(`Error retrieving parameter ${parameterName}:`, error);
     throw error;
