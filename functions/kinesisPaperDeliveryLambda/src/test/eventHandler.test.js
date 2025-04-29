@@ -61,6 +61,7 @@ describe("Lambda Handler Tests", () => {
     const event = {
       mockKinesisData: [
         {
+              kinesisSeqNumber: '1234567890',
               unifiedDeliveryDriver: 'driver1',
               recipientNormalizedAddress: { pr: 'address1', cap: '12345'},
               requestId: 'request1',
@@ -77,8 +78,8 @@ describe("Lambda Handler Tests", () => {
     mockDynamoDBClient.rejectsOnce("Simulated DynamoDB Error");
 
     const result = await lambda.handleEvent(event);
-    expect(result.batchItemFailures).to.include(
-      "request1"
+    expect(result.batchItemFailures).to.deep.equal(
+      [ { itemIdentifier: '1234567890' } ] 
     );
   });
 
@@ -92,6 +93,7 @@ describe("Lambda Handler Tests", () => {
     const event = {
       mockKinesisData: [
         {
+              kinesisSeqNumber: '1234567890',
               unifiedDeliveryDriver: 'driver1',
               recipientNormalizedAddress: { pr: 'address1', cap: '12345'},
               requestId: 'request1',
@@ -101,6 +103,7 @@ describe("Lambda Handler Tests", () => {
               iun: 'iun1'
         },
         {
+              kinesisSeqNumber: '1234567891',
               unifiedDeliveryDriver: 'driver2',
               recipientNormalizedAddress: { pr: 'address2', cap: '54321' },
               requestId: 'request2',
@@ -110,6 +113,7 @@ describe("Lambda Handler Tests", () => {
               iun: 'iun2'
         },
         {
+              kinesisSeqNumber: '1234567891',
               unifiedDeliveryDriver: 'driver3',
               recipientNormalizedAddress: { pr: 'address3', cap: '67890' },
               requestId: 'request3',
@@ -122,8 +126,8 @@ describe("Lambda Handler Tests", () => {
     };
 
     const result = await lambda.handleEvent(event);
-    expect(result.batchItemFailures).to.include(
-      "request1"
+    expect(result.batchItemFailures).to.deep.equal(
+      [ { itemIdentifier: '1234567890' } ] 
     );
   });
 

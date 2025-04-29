@@ -16,7 +16,7 @@ async function batchWriteHighPriorityRecords(paperDeliveryHighPriorityRecords) {
         RequestItems: {
           [tableName]: paperDeliveryHighPriorityRecords.map(record => ({
             PutRequest: {
-              Item: record
+              Item: record.entity
             }
           }))
         }
@@ -27,20 +27,25 @@ async function batchWriteHighPriorityRecords(paperDeliveryHighPriorityRecords) {
     const response = await docClient.send(command);
     console.log(`Batch write successful for ${paperDeliveryHighPriorityRecords.length} items.`);
 
-    if (response?.UnprocessedItems[tableName]) {
-      const writeRequests = response.UnprocessedItems[tableName];
-      console.log("error saving highPriorities items totalErrors:" + writeRequests.length);
-      batchItemFailures = batchItemFailures.concat(
-        writeRequests.map(
-          (writeRequest) =>
-            writeRequest.PutRequest.Item.requestId.S
-        )
-      );
+    const writeRequests = response.UnprocessedItems[tableName];
+    if (writeRequests) {
+      const failedIDs = [];
+      console.log(`Unprocessed items: ${writeRequests.length}`);
+      for (const writeRequest of writeRequests) {
+        const unprocessedEntity = writeRequest.PutRequest.Item;
+        const failedRecord = paperDeliveryHighPriorityRecords.find(record => record.entity.requestId === unprocessedEntity.requestId.S);
+        if (failedRecord) {
+          failedIDs.push(failedRecord.kinesisSeqNumber);
+        }
+      }
+      batchItemFailures = batchItemFailures.concat(failedIDs.map((i) => {
+        return { itemIdentifier: i };
+      }));
       console.warn("batchItemFailures:" + JSON.stringify(batchItemFailures));
     }
   } catch (error) {
     console.error('Error in batch write:', error);
-    batchItemFailures = batchItemFailures.concat(paperDeliveryHighPriorityRecords.map(item => item.requestId));
+    batchItemFailures = batchItemFailures.concat(paperDeliveryHighPriorityRecords.map((i) => { return { itemIdentifier: i.kinesisSeqNumber }; }));
   }
   return batchItemFailures;
 }

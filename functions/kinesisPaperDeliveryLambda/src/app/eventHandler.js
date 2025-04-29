@@ -9,12 +9,12 @@ exports.handleEvent = async (event) => {
   console.log(`KinesisData.length: ${kinesisData.length}`);
   let batchItemFailures = [];
 
-  if (kinesisData.length === 0) {
+  if (!kinesisData || kinesisData.length === 0) {
     console.log("No events to process");
     return { batchItemFailures };
   }
 
-  const paperDeliveryHighPriorityRecords = kinesisData.map((data) => buildPaperDeliveryHighPriorityRecord(data));
+  const paperDeliveryHighPriorityRecords = kinesisData.map(event => ({entity : {...buildPaperDeliveryHighPriorityRecord(event)}, kinesisSeqNumber: event.kinesisSeqNumber}))
   enrichWithCreatedAt(paperDeliveryHighPriorityRecords);
 
   try {
