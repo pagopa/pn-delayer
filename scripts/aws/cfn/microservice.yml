@@ -212,7 +212,7 @@ Parameters:
 
   SubmitPaperDeliveryJobLambdaCron:
     Type: String
-    Default: '*/2 * * * *'
+    Default: '*/2 * * * ? *'
     Description: 'Cron expression for SubmitPaperDeliveryJobLambda'
 
   SubmitPaperDeliveryJobInputTuplesParameter:
