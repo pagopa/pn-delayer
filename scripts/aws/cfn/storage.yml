@@ -188,6 +188,17 @@ Resources:
         HasDLQ: "false"
         QueueHasAlarm: "true"
 
+  SubmitPaperDeliveryJobLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-submitPaperDeliveryJobLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
 Outputs:
   # Dynamo tables
   PaperDeliveryDriverCapacitiesTableName:
@@ -236,3 +247,6 @@ Outputs:
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
     Description: pn-delayer_kinesis_paper_delivery_DLQ' queue ARN
+
+  SubmitPaperDeliveryJobLambdaName:
+    Value: !Sub "${ProjectName}-delayer-submitPaperDeliveryJobLambda"
