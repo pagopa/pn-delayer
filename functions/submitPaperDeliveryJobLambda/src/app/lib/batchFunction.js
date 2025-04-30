@@ -11,7 +11,7 @@ async function listJobsByStatus() {
     try {
         for (const status of jobStatuses) {
             const listJobsCommand = new ListJobsCommand({
-                jobQueue,
+                jobQueue: jobQueue,
                 jobStatus: status,
             });
             const jobs = await batchClient.send(listJobsCommand);

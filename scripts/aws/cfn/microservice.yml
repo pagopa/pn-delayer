@@ -716,8 +716,11 @@ Resources:
             Action:
               - batch:SubmitJob
               - batch:DescribeJobs
-              - batch:ListJobs
             Resource: !Ref JobQueue
+          - Effect: Allow
+            Action:
+              - batch:ListJobs
+            Resource: "*"
           - Effect: Allow
             Action:
               - ssm:GetParameter
