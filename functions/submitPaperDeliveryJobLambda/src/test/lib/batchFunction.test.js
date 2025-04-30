@@ -16,18 +16,27 @@ afterEach(() => {
 
 describe('listJobsByStatus', () => {
 
-  it('returns all jobs in progress across multiple statuses', async () => {
+  it('returns jobs in progress on first status', async () => {
     mockSend
-      .onCall(0).resolves({ jobSummaryList: [{ jobId: '1' }] })
-      .onCall(1).resolves({ jobSummaryList: [{ jobId: '2' }] })
-      .onCall(2).resolves({ jobSummaryList: [] })
-      .onCall(3).resolves({ jobSummaryList: [] })
-      .onCall(4).resolves({ jobSummaryList: [{ jobId: '3' }] });
+      .onCall(0).resolves({ jobSummaryList: [{ jobId: '1' }] });
 
     const result = await listJobsByStatus();
 
-    expect(result).to.deep.equal([{ jobId: '1' }, { jobId: '2' }, { jobId: '3' }]);
-    sinon.assert.callCount(mockSend, 5);
+    expect(result).to.deep.equal(true);
+    sinon.assert.callCount(mockSend, 1);
+    sinon.assert.calledWith(mockSend, sinon.match.instanceOf(ListJobsCommand));
+
+  });
+
+  it('returns jobs in progress on second status', async () => {
+    mockSend
+      .onCall(0).resolves({ jobSummaryList: [] })
+      .onCall(1).resolves({ jobSummaryList: [{ jobId: '1' }] });
+
+    const result = await listJobsByStatus();
+
+    expect(result).to.deep.equal(true);
+    sinon.assert.callCount(mockSend, 2);
     sinon.assert.calledWith(mockSend, sinon.match.instanceOf(ListJobsCommand));
 
   });
@@ -37,7 +46,7 @@ describe('listJobsByStatus', () => {
 
     const result = await listJobsByStatus();
 
-    expect(result).to.deep.equal([]);
+    expect(result).to.deep.equal(false);
     sinon.assert.callCount(mockSend, 5);
   });
 

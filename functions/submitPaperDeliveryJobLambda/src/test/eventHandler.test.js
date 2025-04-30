@@ -21,7 +21,7 @@ afterEach(() => {
 
 describe('handleEvent', () => {
   it('returns an empty array when jobs are in progress', async () => {
-    listJobsByStatusStub.resolves([{ jobId: '1' }, { jobId: '2' }]);
+    listJobsByStatusStub.resolves(true);
 
     const result = await handleEvent();
 
@@ -32,7 +32,7 @@ describe('handleEvent', () => {
   });
 
   it('returns sent tuples when no jobs are in progress', async () => {
-    listJobsByStatusStub.resolves([]);
+    listJobsByStatusStub.resolves(false);
     submitJobsStub.resolves(['job1#driver1~province1', 'job2#driver1~province2','job3#driver2~province3']);
     retrieveUnifiedDeliveryDriverProvinceStub.resolves({
     driver1: ['province1', 'province2'],
@@ -56,7 +56,7 @@ describe('handleEvent', () => {
   });
 
   it('handles empty delivery driver province map gracefully', async () => {
-    listJobsByStatusStub.resolves([]);
+    listJobsByStatusStub.resolves(false);
     retrieveUnifiedDeliveryDriverProvinceStub.resolves({});
   
     const result = await handleEvent();
@@ -77,7 +77,7 @@ describe('handleEvent', () => {
   });
 
   it('throws an error when retrieveUnifiedDeliveryDriverProvince fails', async () => {
-    listJobsByStatusStub.resolves([]);
+    listJobsByStatusStub.resolves(false);
     retrieveUnifiedDeliveryDriverProvinceStub.rejects(new Error('SSM error'));
 
     await expect(handleEvent()).to.be.rejectedWith('SSM error');

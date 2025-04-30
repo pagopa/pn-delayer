@@ -4,8 +4,8 @@ const batchFunction = require ("./lib/batchFunction.js");
 exports.handleEvent = async () => {
     let submittedJobs = [];
     const jobsInProgress = await batchFunction.listJobsByStatus();
-    if (jobsInProgress.length > 0) {
-       console.log(`Sono presenti ${jobsInProgress.length} Job in esecuzione o in attesa`);
+    if (jobsInProgress) {
+       console.log(`Sono presenti Job in esecuzione o in attesa`);
        return submittedJobs;
     }
 

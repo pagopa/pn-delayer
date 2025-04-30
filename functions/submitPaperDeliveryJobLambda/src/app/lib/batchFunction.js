@@ -6,8 +6,8 @@ const jobInputEnvName = process.env.JOB_INPUT_ENV_NAME;
 const batchClient = new BatchClient({ region: process.env.AWS_REGION });
 
 async function listJobsByStatus() {
-    const jobStatuses = ["SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING"];
-    let jobsInProgress = [];
+    const jobStatuses = ["RUNNING", "STARTING", "RUNNABLE", "PENDING", "SUBMITTED"];
+    let foundJob = false;
     try {
         for (const status of jobStatuses) {
             const listJobsCommand = new ListJobsCommand({
@@ -16,14 +16,15 @@ async function listJobsByStatus() {
             });
             const jobs = await batchClient.send(listJobsCommand);
             if (jobs.jobSummaryList && jobs.jobSummaryList.length > 0) {
-              jobsInProgress = jobsInProgress.concat(jobs.jobSummaryList);
+                foundJob = true;
+                break;
             }
         }
     } catch (error) {
         console.error("Errore durante il recupero dei Job:", error);
         throw error;
     }
-    return jobsInProgress;
+    return foundJob;
 }
 
 async function submitJobs(tuples){
