@@ -157,10 +157,15 @@ Parameters:
     Type: String
     Description: 'pn-delayer_inputs kinesis stream KMS ARN'
 
-  UnifiedDeliveryDriverProvince:
+  JobInputUnifiedDeliveryDriver:
     Type: String
     Default: ' '
-    Description: 'Input tuple unifiedDeliveryDriverProvince for the job'
+    Description: 'Input unifiedDeliveryDriver for the job'
+
+  JobInputProvinceList:
+    Type: String
+    Default: ' '
+    Description: 'Input Province list for the job'
 
   # OpenApi Bucket params
   MicroserviceBucketName:
@@ -219,9 +224,13 @@ Parameters:
     Type: String
     Description: 'SSM parameter name for SubmitPaperDeliveryJob input tuples'
 
-  SubmitPaperDeliveryJobInputEnvName:
+  SubmitPaperDeliveryJobInputDriverEnvName:
     Type: String
-    Description: 'Environment variable name for SubmitPaperDeliveryJob input tuples'
+    Description: 'SSM parameter name for SubmitPaperDeliveryJob input driver env name'
+
+  SubmitPaperDeliveryJobInputProvincesEnvName:
+    Type: String
+    Description: 'SSM parameter name for SubmitPaperDeliveryJob input provinces env name'
 
 Resources:
 
@@ -280,8 +289,10 @@ Resources:
             Value: !Ref DeliveryDateInterval
           - Name: AWS_REGIONCODE
             Value: !Ref AWS::Region
-          - Name: PN_DELAYER_UNIFIEDDELIVERYDRIVERPROVINCE
-            Value: !Ref UnifiedDeliveryDriverProvince
+          - Name: PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER
+            Value: !Ref JobInputUnifiedDeliveryDriver
+          - Name: PN_DELAYER_JOBINPUT_PROVINCELIST
+            Value: !Ref JobInputProvinceList
           - Name: PN_DELAYER_PAPERDELIVERYCUTOFFDURATION
             Value: !Ref PaperDeliveryCutOffDuration
 
@@ -678,7 +689,8 @@ Resources:
           JOB_QUEUE: !Ref JobQueue
           JOB_DEFINITION: !Ref BatchProcessingJobDefinition
           JOB_INPUT_PARAMETER: !Ref SubmitPaperDeliveryJobInputTuplesParameter
-          JOB_INPUT_ENV_NAME: !Ref SubmitPaperDeliveryJobInputEnvName
+          JOB_INPUT_DRIVER_ENV_NAME: !Ref SubmitPaperDeliveryJobInputDriverEnvName
+          JOB_INPUT_PROVINCE_LIST_ENV_NAME: !Ref SubmitPaperDeliveryJobInputProvincesEnvName
       TracingConfig:
         Mode: Active
       Layers:
@@ -716,7 +728,9 @@ Resources:
             Action:
               - batch:SubmitJob
               - batch:DescribeJobs
-            Resource: !Ref JobQueue
+            Resource:
+              - !Ref BatchProcessingJobDefinition
+              - !Ref JobQueue
           - Effect: Allow
             Action:
               - batch:ListJobs
@@ -725,7 +739,7 @@ Resources:
             Action:
               - ssm:GetParameter
             Resource:
-              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${SubmitPaperDeliveryJobInputTuplesParameter}
+              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SubmitPaperDeliveryJobInputTuplesParameter}
 
   SubmitPaperDeliveryJobLambdaAlarms:
     Type: AWS::CloudFormation::Stack
