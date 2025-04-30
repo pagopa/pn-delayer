@@ -9,7 +9,7 @@
     "KinesisPaperDeliveryLambdaMaxRetry": "3",
     "KinesisPaperDeliveryLambdaBatchSize": "25",
     "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60",
-    "SubmitPaperDeliveryJobLambdaCron": "*/2 * * * *",
+    "SubmitPaperDeliveryJobLambdaCron": "*/2 * * * ? *",
     "SubmitPaperDeliveryJobInputTuplesParameter": "config/pn-delayer/unifiedDeliveryDriver-province",
     "SubmitPaperDeliveryJobInputEnvName": "PN_DELAYER_UNIFIEDDELIVERYDRIVERPROVINCE"
   }
