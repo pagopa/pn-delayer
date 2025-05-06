@@ -40,15 +40,15 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
                     .map(index -> pnDelayerConfigs.getJobInput().getProvinceList().get(index))
                     .map(province -> {
                         String unifiedDeliveryDriverProvince = String.join("~", unifiedDeliveryDriver, province);
-                        log.info("Starting batch for pk: {}", unifiedDeliveryDriver);
+                        log.info("Starting batch for pk: {}", unifiedDeliveryDriverProvince);
                         addMDC(unifiedDeliveryDriverProvince);
                         return doExecute(unifiedDeliveryDriverProvince);
                     }).orElseGet(() -> {
-                        log.info("Province on index [{}] not found, cannot start batch", jobIndex);
+                        log.error("Province on index [{}] not found, cannot start batch", jobIndex);
                         return SpringApplication.exit(applicationContext, () -> 1);
                     });
         } else {
-            log.info("No job index found, cannot start batch");
+            log.error("No job index found, cannot start batch");
             exitCode = SpringApplication.exit(applicationContext, () -> 1);
         }
         log.info("Batch finished with exit code: {}", exitCode);
@@ -57,7 +57,6 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
 
     private int doExecute(String unifiedDeliveryDriverProvince) {
         try {
-            log.info("Starting batch for pk: {}", unifiedDeliveryDriverProvince);
             var startExecutionBatch = Instant.now();
             Mono<Void> monoExcecution = highPriorityBatchService.initHighPriorityBatch(unifiedDeliveryDriverProvince, new HashMap<>(), startExecutionBatch);
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
