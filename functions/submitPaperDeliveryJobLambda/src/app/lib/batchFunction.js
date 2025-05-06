@@ -48,7 +48,7 @@ async function submitJob(driver, provinces, compactDate){
             jobName,
             jobQueue,
             arrayProperties:{
-                       'size': provinces.length
+                       size: provinces.length
                    },
             containerOverrides: {
              environment: [
