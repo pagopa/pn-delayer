@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -31,26 +32,36 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         int exitCode;
-        String unifiedDeliveryDriverProvince = pnDelayerConfigs.getUnifiedDeliveryDriverProvince();
-        addMDC(unifiedDeliveryDriverProvince);
-        if (StringUtils.hasText(unifiedDeliveryDriverProvince)) {
-            exitCode = doExecute(unifiedDeliveryDriverProvince);
+        String unifiedDeliveryDriver = pnDelayerConfigs.getJobInput().getUnifiedDeliveryDriver();
+        String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
+        if (StringUtils.hasText(jobIndex)) {
+            exitCode = Optional.of(jobIndex)
+                    .map(Integer::parseInt)
+                    .map(index -> pnDelayerConfigs.getJobInput().getProvinceList().get(index))
+                    .map(province -> {
+                        String unifiedDeliveryDriverProvince = String.join("~", unifiedDeliveryDriver, province);
+                        log.info("Starting batch for pk: {}", unifiedDeliveryDriverProvince);
+                        addMDC(unifiedDeliveryDriverProvince);
+                        return doExecute(unifiedDeliveryDriverProvince);
+                    }).orElseGet(() -> {
+                        log.error("Province on index [{}] not found, cannot start batch", jobIndex);
+                        return SpringApplication.exit(applicationContext, () -> 1);
+                    });
         } else {
-            log.warn("No pk provided, cannot start batch");
+            log.error("No job index found, cannot start batch");
             exitCode = SpringApplication.exit(applicationContext, () -> 1);
         }
+        log.info("Batch finished with exit code: {}", exitCode);
         System.exit(exitCode);
     }
 
     private int doExecute(String unifiedDeliveryDriverProvince) {
         try {
-            log.info("Starting batch for pk: {}", unifiedDeliveryDriverProvince);
             var startExecutionBatch = Instant.now();
             Mono<Void> monoExcecution = highPriorityBatchService.initHighPriorityBatch(unifiedDeliveryDriverProvince, new HashMap<>(), startExecutionBatch);
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error("Error while executing batch", e);
             return 1;
         }

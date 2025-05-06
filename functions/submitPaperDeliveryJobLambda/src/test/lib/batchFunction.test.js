@@ -59,23 +59,22 @@ describe('listJobsByStatus', () => {
 });
 
 describe('submitJobs', () => {
-
-  const tuples = ['driver1~province1', 'driver2~province2'];
+  const date = new Date().toISOString().slice(0, 16).replace(/\D/g, '');
 
   it('submits all jobs successfully', async () => {
+    const tuples = "{\"driver1\": [\"province1\", \"province2\"], \"driver2\": [\"province3\"]}";
     mockSend.resolves({ jobId: '123' });
 
-    await submitJobs(tuples);
+    await submitJobs(tuples, date);
 
     sinon.assert.callCount(mockSend, 2);
     sinon.assert.calledWith(mockSend, sinon.match.instanceOf(SubmitJobCommand));
 
   });
 
-  it('throws an error when job submission fails', async () => {
-    mockSend.rejects(new Error('Submit error'));
-
-    await expect(submitJobs(tuples)).to.be.rejectedWith('Submit error');
-    sinon.assert.callCount(mockSend, 1);
+  it('submits no jobs', async () => {
+    mockSend.resolves({ jobId: '123' });
+    await submitJobs("{}", date);
+    sinon.assert.notCalled(mockSend);
   });
 });

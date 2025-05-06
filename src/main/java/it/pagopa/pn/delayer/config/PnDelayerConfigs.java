@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
 import java.time.Duration;
+import java.util.List;
 
 @Configuration
 @ConfigurationProperties(prefix = "pn.delayer")
@@ -17,11 +18,18 @@ public class PnDelayerConfigs {
     public static final String IMPLEMENTATION_TYPE_PROPERTY_NAME = "pn.delayer.storage.impl";
 
     private Dao dao;
+    private JobInput jobInput;
     private int deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
     private Duration deliveryDateInterval;
     private int highPriorityQueryLimit;
     private Duration paperDeliveryCutOffDuration;
-    private String unifiedDeliveryDriverProvince;
+
+
+    @Data
+    public static class JobInput {
+        private String unifiedDeliveryDriver;
+        private List<String> provinceList;
+    }
 
     @Data
     public static class Dao {

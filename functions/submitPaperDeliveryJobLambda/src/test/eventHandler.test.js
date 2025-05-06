@@ -34,10 +34,7 @@ describe('handleEvent', () => {
   it('returns sent tuples when no jobs are in progress', async () => {
     listJobsByStatusStub.resolves(false);
     submitJobsStub.resolves(['job1#driver1~province1', 'job2#driver1~province2','job3#driver2~province3']);
-    retrieveUnifiedDeliveryDriverProvinceStub.resolves({
-    driver1: ['province1', 'province2'],
-    driver2: ['province3']
-  });
+    retrieveUnifiedDeliveryDriverProvinceStub.resolves("{\"driver1\": [\"province1\", \"province2\"], \"driver2\": [\"province3\"]}");
 
     const result = await handleEvent();
 
@@ -48,24 +45,20 @@ describe('handleEvent', () => {
   );
     sinon.assert.calledOnce(listJobsByStatusStub);
     sinon.assert.calledOnce(retrieveUnifiedDeliveryDriverProvinceStub);
-    sinon.assert.calledWith(submitJobsStub, 
-      ['driver1~province1',
-      'driver1~province2',
-      'driver2~province3']
-    );
+    sinon.assert.calledWith(submitJobsStub, "{\"driver1\": [\"province1\", \"province2\"], \"driver2\": [\"province3\"]}");
   });
 
   it('handles empty delivery driver province map gracefully', async () => {
     listJobsByStatusStub.resolves(false);
     retrieveUnifiedDeliveryDriverProvinceStub.resolves({});
-  
+    submitJobsStub.resolves([]);
+
     const result = await handleEvent();
   
     expect(result).to.deep.equal([]);
     sinon.assert.calledOnce(listJobsByStatusStub);
     sinon.assert.calledOnce(retrieveUnifiedDeliveryDriverProvinceStub);
-    sinon.assert.notCalled(submitJobsStub);
-  });
+    });
 
   it('throws an error when listJobsByStatus fails', async () => {
     listJobsByStatusStub.rejects(new Error('Batch error'));

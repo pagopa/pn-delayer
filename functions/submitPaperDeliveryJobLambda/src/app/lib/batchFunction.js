@@ -1,7 +1,8 @@
 const { BatchClient, SubmitJobCommand, ListJobsCommand } = require ("@aws-sdk/client-batch");
 const jobQueue = process.env.JOB_QUEUE;
 const jobDefinition = process.env.JOB_DEFINITION;
-const jobInputEnvName = process.env.JOB_INPUT_ENV_NAME;
+const jobInputDriverEnvName = process.env.JOB_INPUT_DRIVER_ENV_NAME;
+const jobInputProvinceListEnvName = process.env.JOB_INPUT_PROVINCE_LIST_ENV_NAME;
 
 const batchClient = new BatchClient({ region: process.env.AWS_REGION });
 
@@ -27,34 +28,47 @@ async function listJobsByStatus() {
     return foundJob;
 }
 
-async function submitJobs(tuples){
-    const jobName = "JOB_" + new Date().toISOString();
+async function submitJobs(deliveryDriverProvinceMap, compactDate) {
     let submittedJobs = [];
+    Object.entries(JSON.parse(deliveryDriverProvinceMap))
+        .flatMap(async ([driver, provinces]) => {
+             const response = await submitJob(driver, provinces, compactDate);
+             submittedJobs.push(`${response.jobId}#${driver}`);
+             console.log(`Submitted job ${response.jobId} for unified delivery Driver: ${driver}`);
+        });
+
+    return submittedJobs;
+}
+
+async function submitJob(driver, provinces, compactDate){
     try {
-        for (const unifiedDeliveryDriverProvince of tuples) {
-          const params = {
+        const jobName = `JOB_${driver}_${compactDate}`;
+        const params = {
             jobDefinition,
             jobName,
             jobQueue,
+            arrayProperties:{
+                       size: provinces.length
+                   },
             containerOverrides: {
-              environment: [
-                {
-                  name: jobInputEnvName,
-                  value: unifiedDeliveryDriverProvince,
-                },
-              ],
+             environment: [
+               {
+                 name: jobInputDriverEnvName,
+                 value: driver
+               },
+               {
+                 name: jobInputProvinceListEnvName,
+                 value: provinces.join(",")
+               }
+             ],
             },
-          };
+        };
 
-          const command = new SubmitJobCommand(params);
-          const response = await batchClient.send(command);
-          submittedJobs.push(`${response.jobId}#${unifiedDeliveryDriverProvince}`);
-          console.log(`Submitted job ${response.jobId} for tuple: ${unifiedDeliveryDriverProvince}`);
-        }
-        return submittedJobs;
+        const command = new SubmitJobCommand(params);
+        return await batchClient.send(command);
     } catch (error) {
-        console.error("Errore durante la submit dei Job:", error);
-        throw error;
+       console.error("Errore durante la submit dei Job:", error);
+       throw error;
     }
 }
 
