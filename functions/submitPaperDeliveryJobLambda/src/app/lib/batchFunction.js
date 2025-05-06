@@ -29,15 +29,17 @@ async function listJobsByStatus() {
 }
 
 async function submitJobs(deliveryDriverProvinceMap, compactDate) {
-    let submittedJobs = [];
-    Object.entries(JSON.parse(deliveryDriverProvinceMap))
-        .flatMap(async ([driver, provinces]) => {
-             const response = await submitJob(driver, provinces, compactDate);
-             submittedJobs.push(`${response.jobId}#${driver}`);
-             console.log(`Submitted job ${response.jobId} for unified delivery Driver: ${driver}`);
-        });
+  const entries = Object.entries(JSON.parse(deliveryDriverProvinceMap));
 
-    return submittedJobs;
+  const responses = await Promise.all(
+    entries.map(async ([driver, provinces]) => {
+      const response = await submitJob(driver, provinces, compactDate);
+      console.log(`Submitted job ${response.jobId} for unified delivery Driver: ${driver}`);
+      return `${response.jobId}#${driver}`;
+    })
+  );
+
+  return responses;
 }
 
 async function submitJob(driver, provinces, compactDate){
