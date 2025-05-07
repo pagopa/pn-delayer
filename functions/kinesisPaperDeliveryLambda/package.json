@@ -1,7 +1,7 @@
 {
   "name": "kinesisPaperDeliveryLambda",
   "version": "1.0.0",
-  "description": "",
+  "description": "AWS Lambda function to read kinesis event of prepare phase 1 and send to high priority table",
   "main": "index.js",
   "scripts": {
     "test-build": "npm run-script test && npm run-script coverage && npm run-script sonar && npm run-script build",
