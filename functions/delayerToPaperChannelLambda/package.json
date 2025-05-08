@@ -1,7 +1,7 @@
 {
-  "name": "submitPaperDeliveryJobLambda",
+  "name": "delayerToPaperChannelLambda",
   "version": "1.0.0",
-  "description": "AWS Lambda function to submit aws job for delayer",
+  "description": "AWS Lambda function to read readyToSend table and send to paper channel phase 2",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -12,10 +12,9 @@
     "sonar": "node sonarqube-scanner.js"
   },
   "devDependencies": {
-    "@aws-sdk/client-batch": "^3.787.0",
-    "@aws-sdk/client-ssm": "^3.583.0",
-    "@aws-sdk/client-sts": "^3.567.0",
-    "@smithy/util-stream": "^2.2.0",
+    "@aws-sdk/client-dynamodb": "^3.252.0",
+    "@aws-sdk/client-sqs": "^3.408.0",
+    "@aws-sdk/lib-dynamodb": "^3.254.0",
     "aws-sdk-client-mock": "^4.0.0",
     "axios-mock-adapter": "^1.22.0",
     "chai": "^4.3.10",

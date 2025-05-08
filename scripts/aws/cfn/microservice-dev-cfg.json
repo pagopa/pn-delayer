@@ -3,6 +3,7 @@
     "MinTasksNumber": "0",
     "MaxTasksNumber": "0",
     "HighPriorityQueryLimit": "1000",
+    "PaperDeliveryReadyToSendQueryLimit": "1000",
     "DeliveryDateDayOfWeek": "1",
     "DeliveryDateInterval": "1d",
     "PaperDeliveryCutOffDuration": "7d",
@@ -10,6 +11,7 @@
     "KinesisPaperDeliveryLambdaBatchSize": "25",
     "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60",
     "SubmitPaperDeliveryJobLambdaCron": "*/2 * * * ? *",
+    "DelayerToPaperChannelLambdaCron": "0/15 * * * ? *",
     "SubmitPaperDeliveryJobInputTuplesParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
     "SubmitPaperDeliveryJobInputDriverEnvName": "PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER",
     "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST"
