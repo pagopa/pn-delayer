@@ -109,10 +109,6 @@ Parameters:
     Default: 1000
     Description: 'Max elements quantity for ready to send query'
 
-  DelayerToPaperChannelQueueUrl:
-    Type: String
-    Description: 'SQS queue URL for DelayerToPaperChannel'
-
   DeliveryDateDayOfWeek:
     Type: Number
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
@@ -723,7 +719,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
           PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
-          DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueUrl
+          DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
       TracingConfig:
         Mode: Active
       Layers:
