@@ -712,7 +712,7 @@ Resources:
       Handler: "index.handler"
       Code:
         S3Bucket: !Ref MicroserviceBucketName
-        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerToPaperChannelLambda"
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerToPaperChannelLambda.zip"
       Role: !GetAtt DelayerToPaperChannelLambdaRole.Arn
       Environment:
         Variables:
