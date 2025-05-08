@@ -12,6 +12,7 @@
     "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60",
     "SubmitPaperDeliveryJobLambdaCron": "*/2 * * * ? *",
     "DelayerToPaperChannelLambdaCron": "0/15 * * * ? *",
+    "DelayerToPaperChannelRecoveryLambdaCron": "0 0 * * ? *",
     "SubmitPaperDeliveryJobInputTuplesParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
     "SubmitPaperDeliveryJobInputDriverEnvName": "PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER",
     "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST"
