@@ -21,11 +21,11 @@ describe("prepareAndSendSqsMessages", () => {
 
     it("should send messages successfully", async () => {
         const mockItems = [
-            { requestId: { S: "1" }, iun: { S: "iun1" } },
-            { requestId: { S: "2" }, iun: { S: "iun2" } },
+            { requestId: "1" , iun: "iun1"},
+            { requestId: "2", iun: "iun2"},
         ];
         sqsMock.onCall(0).resolves({
-            Successful: [{ Id: "1" }, { Id: "2" }],
+            Successful: [{ Id: "0" }, { Id: "1" }],
             Failed: [],
         });
 
@@ -40,16 +40,16 @@ describe("prepareAndSendSqsMessages", () => {
     it("should send messages multiple chunk", async () => {
 
         const mockItems = Array.from({ length: 15 }, (_, i) => ({
-            requestId: { S: `req${i + 1}` },
-            iun: { S: `iun${i + 1}` },
+            requestId: `req${i + 1}` ,
+            iun: `iun${i + 1}`,
         }));
 
         sqsMock.onCall(0).resolves({
-            Successful: [{ Id: "req1" }, { Id: "req2" },{ Id: "req3" },{ Id: "req4" },{ Id: "req5" },{ Id: "req9" },{ Id: "req10" }],
-            Failed: [{ Id: "req6" },{ Id: "req7" },{ Id: "req8" }],
+            Successful: [{ Id: "0" }, { Id: "1" },{ Id: "2" },{ Id: "3" },{ Id: "4" },{ Id: "8" },{ Id: "9" }],
+            Failed: [{ Id: "5" },{ Id: "6" },{ Id: "7" }],
         }).onCall(1).resolves({
-            Successful: [{ Id: "req11" },{ Id: "req14" },{ Id: "req15" }],
-            Failed: [{ Id: "req12" },{ Id: "req13" }],
+            Successful: [{ Id: "0" },{ Id: "3" },{ Id: "4" }],
+            Failed: [{ Id: "1" },{ Id: "2" }],
         });
 
         const results = await prepareAndSendSqsMessages(mockItems);
@@ -62,12 +62,12 @@ describe("prepareAndSendSqsMessages", () => {
 
     it("should handle failed messages", async () => {
         const mockItems = [
-            { requestId: { S: "1" }, iun: { S: "iun1" } },
-            { requestId: { S: "2" }, iun: { S: "iun2" } },
+            { requestId: "1" , iun: "iun1"},
+            { requestId: "2", iun: "iun2"},
         ];
         sqsMock.onCall(0).resolves({
-            Successful: [{ Id: "1" }],
-            Failed: [ { Id: "2" }],
+            Successful: [{ Id: "0" }],
+            Failed: [ { Id: "1" }],
         });
 
         const results = await prepareAndSendSqsMessages(mockItems);
@@ -80,8 +80,8 @@ describe("prepareAndSendSqsMessages", () => {
 
     it("should handle errors during SendMessageBatch", async () => {
         const mockItems = [
-            { requestId: { S: "1" }, iun: { S: "iun1" } },
-            { requestId: { S: "2" }, iun: { S: "iun2" } },
+            { requestId: "1", iun: "iun1"},
+            { requestId: "2", iun: "iun2"},
         ];
         sqsMock.onCall(0).rejects(new Error("Simulated sqs Error"));
 

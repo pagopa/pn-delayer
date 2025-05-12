@@ -3,7 +3,7 @@ const sqsSender = require("./lib/sqsSender");
 
 exports.handleEvent = async () => {
     try {
-        const deliveryDate = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())).toISOString();
+        const deliveryDate = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())).toISOString().replace(/\.\d{3}Z$/, 'Z');
         const items = await dynamo.getItems(deliveryDate);
         if (items.length === 0) {
             console.log(`No items found for deliveryDate: ${deliveryDate}`);
