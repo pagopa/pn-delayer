@@ -210,6 +210,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  DelayerToPaperChannelRecoveryLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayerToPaperChannelRecoveryLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
 Outputs:
   # Dynamo tables
   PaperDeliveryDriverCapacitiesTableName:
@@ -257,6 +268,9 @@ Outputs:
 
   DelayerToPaperChannelLambdaName:
     Value: !Sub "${ProjectName}-delayerToPaperChannelLambda"
+
+  DelayerToPaperChannelRecoveryLambdaName:
+    Value: !Sub "${ProjectName}-delayerToPaperChannelRecoveryLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN

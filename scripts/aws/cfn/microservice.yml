@@ -109,6 +109,11 @@ Parameters:
     Default: 1000
     Description: 'Max elements quantity for ready to send query'
 
+  PaperDeliveryReadyToSendRecoveryDeliveryDate:
+    Type: String
+    Default: ''
+    Description: 'Delivery date for readyToSend table query. (format yyyy-MM-ddThh:mm:ssZ)'
+
   DeliveryDateDayOfWeek:
     Type: Number
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
@@ -257,6 +262,15 @@ Parameters:
       - ENABLED
       - DISABLED
     Description: 'State of the DelayerToPaperChannelRule'
+
+  DelayerToPaperChannelRecoveryLambdaCron:
+    Type: String
+    Default: '0 0 * * ? *'
+    Description: 'Cron expression for DelayerToPaperChanneRecoverylLambda'
+
+  DelayerToPaperChannelRecoveryLambdaName:
+    Type: String
+    Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
 
 Resources:
 
@@ -782,6 +796,97 @@ Resources:
       Targets:
         - Arn: !GetAtt DelayerToPaperChannelLambda.Arn
           Id: PnDelayerToPaperChannelLambdaTarget
+
+  #########################################################
+  ###         RecoveryLambda                ###
+  #########################################################
+
+  DelayerToPaperChannelRecoveryLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${DelayerToPaperChannelRecoveryLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  DelayerToPaperChannelRecoveryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref DelayerToPaperChannelRecoveryLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerToPaperChannelRecoveryLambda.zip"
+      Role: !GetAtt DelayerToPaperChannelRecoveryLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+          PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
+          PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE: !Ref PaperDeliveryReadyToSendRecoveryDeliveryDate
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  DelayerToPaperChannelRecoveryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-DelayerToPaperChannelRecoveryLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  DelayerToPaperChannelRecoveryLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DelayerToPaperChannelRecoveryLambdaPolicy
+      Roles:
+        - !Ref DelayerToPaperChannelRecoveryLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:BatchWriteItem
+              - dynamodb:DeleteItem
+            Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - sqs:SendMessage
+            Resource: !Ref  DelayerToPaperChannelQueueARN
+
+  DelayerToPaperChannelRecoveryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DelayerToPaperChannelRecoveryLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  # EventBridge Rule for scheduling the Lambda
+  DelayerToPaperChannelRecoveryScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-DelayerToPaperChannelRecoveryScheduleRule'
+      ScheduleExpression: !Sub cron(${DelayerToPaperChannelRecoveryLambdaCron})
+      State: !Ref DelayerToPaperChannelRuleState
+      Targets:
+        - Arn: !GetAtt DelayerToPaperChannelRecoveryLambda.Arn
+          Id: PnDelayerToPaperChannelRecoveryLambdaTarget
 
   SubmitPaperDeliveryJobLambdaSecGroup:
     Type: AWS::EC2::SecurityGroup
