@@ -4,7 +4,7 @@ const sqsSender = require("./lib/sqsSender");
 
 exports.handleEvent = async () => {
     const dayToRecovery = process.env.PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE;
-    const deliveryDate = dayToRecovery || new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - 1)).toISOString();
+    const deliveryDate = dayToRecovery || new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - 1)).toISOString().replace(/\.\d{3}Z$/, 'Z');
     await processReadyToSendItems(deliveryDate);
     console.log("Lambda execution completed successfully.");
 };

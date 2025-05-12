@@ -72,7 +72,7 @@ afterEach(() => {
         successes: ['1'],
         failures: ['2']
       };
-      const unprocessedItems = [{DeleteRequest: { Key: { deliveryDate : {S:"2025-07-07T00:00:00.000Z"}, requestId: {S:"1"} } }}];
+      const unprocessedItems = [{DeleteRequest: { Key: { deliveryDate : {S:"2025-07-07T00:00:00Z"}, requestId: {S:"1"} } }}];
 
       getItemsChunkStub.resolves({ items, lastKey: null });
       prepareAndSendSqsMessagesStub.resolves(sendMessageResponse);
@@ -201,7 +201,7 @@ afterEach(() => {
 
         const firstChunk = {
             items,
-            lastKey: { requestId: {S:'3' }, deliveryDate: {S:'2023-10-01T00:00:00.000Z' }},
+            lastKey: { requestId: {S:'3' }, deliveryDate: {S:'2023-10-01T00:00:00Z' }},
         };
         const secondChunk = {
             items,
@@ -243,7 +243,7 @@ afterEach(() => {
         consoleLogStub.restore();
     });
         it('calculates the correct deliveryDate based on DAY_TO_RECOVERY', async () => {
-        process.env.PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE = "2025-05-06T00:00:00.000Z";
+        process.env.PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE = "2025-05-06T00:00:00Z";
     
         getItemsChunkStub.resolves({ items: [], lastKey: null }); 
         const consoleLogStub = sinon.stub(console, 'log');
@@ -251,7 +251,7 @@ afterEach(() => {
         await handleEvent();
     
         sinon.assert.calledOnce(getItemsChunkStub);
-        sinon.assert.calledWith(getItemsChunkStub, "2025-05-06T00:00:00.000Z");
+        sinon.assert.calledWith(getItemsChunkStub, "2025-05-06T00:00:00Z");
     
         consoleLogStub.restore();
         delete process.env.PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE;
@@ -260,7 +260,7 @@ afterEach(() => {
             new Date().getUTCFullYear(),
             new Date().getUTCMonth(),
             new Date().getUTCDate() - 1
-        )).toISOString();
+        )).toISOString().replace(/\.\d{3}Z$/, 'Z');
     
         getItemsChunkStub.resetHistory();
         consoleLogStub.resetHistory();

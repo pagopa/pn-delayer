@@ -112,7 +112,7 @@ Parameters:
   PaperDeliveryReadyToSendRecoveryDeliveryDate:
     Type: String
     Default: ''
-    Description: 'Delivery date for readyToSend table query'
+    Description: 'Delivery date for readyToSend table query. (format yyyy-MM-ddThh:mm:ssZ)'
 
   DeliveryDateDayOfWeek:
     Type: Number
@@ -861,10 +861,11 @@ Resources:
             Action:
               - dynamodb:Query
               - dynamodb:BatchWriteItem
+              - dynamodb:DeleteItem
             Resource: !Ref PaperDeliveryReadyToSendTableArn
           - Effect: Allow
             Action:
-              - sqs:SendMessageBatch
+              - sqs:SendMessage
             Resource: !Ref  DelayerToPaperChannelQueueARN
 
   DelayerToPaperChannelRecoveryLambdaAlarms:
