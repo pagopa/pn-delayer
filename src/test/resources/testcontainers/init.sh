@@ -1,5 +1,16 @@
 echo " - Create pn-delayer TABLES"
 
+echo "### CREATE QUEUES ###"
+queues="pn-delayer_to_paperchannel"
+for qn in  $( echo $queues | tr " " "\n" ) ; do
+    echo creating queue $qn ...
+    aws --profile default --region us-east-1 --endpoint-url http://localstack:4566 \
+        sqs create-queue \
+        --attributes '{"DelaySeconds":"2"}' \
+        --queue-name $qn
+    echo ending create queue
+done
+
 aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
     --table-name pn-PaperDeliveryDriverCapacities  \
