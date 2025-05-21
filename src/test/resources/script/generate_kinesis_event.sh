@@ -14,8 +14,8 @@ if [ ! -f "$INPUT_FILE" ]; then
   exit 1
 fi
 
-echo "{" > kinesis.event.example.json
-echo "  \"Records\": [" >> kinesis.event.example.json
+echo "{" > ../../../../functions/kinesisPaperDeliveryLambda/kinesis.event.example.json
+echo "  \"Records\": [" >> ../../../../functions/kinesisPaperDeliveryLambda/kinesis.event.example.json
 
 NUM_ELEMENTS=$(jq '. | length' "$INPUT_FILE")
 
@@ -64,11 +64,11 @@ EOF
 
     ENCODED_DATA=$(echo -n "$JSON_TO_ENCODE" | base64 -w 0)
 
-    SEQUENCE_NUMBER=$(printf "%056d" $RANDOM$RANDOM$RANDOM$RANDOM)
+    SEQUENCE_NUMBER=$(printf "%056d" $RANDOM$RANDOM)
 
     TIMESTAMP=$(date +%s.%3N)
 
-    cat <<EOF >> kinesis.event.example.json
+    cat <<EOF >> ../../../../functions/kinesisPaperDeliveryLambda/kinesis.event.example.json
       {
           "kinesis": {
               "kinesisSchemaVersion": "1.0",
@@ -88,12 +88,11 @@ EOF
 EOF
 
     if [ $i -lt $((NUM_ELEMENTS-1)) ]; then
-        echo "," >> kinesis.event.example.json
+        echo "," >> ../../../../functions/kinesisPaperDeliveryLambda/kinesis.event.example.json
     fi
 done
 
-echo "" >> kinesis.event.example.json
-echo "  ]" >> kinesis.event.example.json
-echo "}" >> kinesis.event.example.json
+echo "  ]" >> ../../../../functions/kinesisPaperDeliveryLambda/kinesis.event.example.json
+echo "}" >> ../../../../functions/kinesisPaperDeliveryLambda/kinesis.event.example.json
 
 echo "File kinesis.event.example.json generato con successo!"

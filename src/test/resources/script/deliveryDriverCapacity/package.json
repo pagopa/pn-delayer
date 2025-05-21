@@ -1,0 +1,12 @@
+{
+  "name": "delivery-driver-capacity",
+  "version": "1.0.0",
+  "description": "",
+  "main": "insert_capacity.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.454.0",
+    "@aws-sdk/credential-provider-ini": "^3.454.0",
+    "@aws-sdk/credential-provider-sso": "^3.454.0",
+    "@aws-sdk/util-dynamodb": "^3.454.0"
+  }
+}
