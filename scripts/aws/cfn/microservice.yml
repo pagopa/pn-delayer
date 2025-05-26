@@ -232,11 +232,11 @@ Parameters:
 
   SubmitPaperDeliveryJobInputDriverEnvName:
     Type: String
-    Description: 'SSM parameter name for SubmitPaperDeliveryJob input driver env name'
+    Description: 'env name for SubmitPaperDeliveryJob input driver'
 
   SubmitPaperDeliveryJobInputProvincesEnvName:
     Type: String
-    Description: 'SSM parameter name for SubmitPaperDeliveryJob input provinces env name'
+    Description: 'env name for SubmitPaperDeliveryJob input provinces '
 
   DelayerToPaperChannelLambdaCron:
     Type: String

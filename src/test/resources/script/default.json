@@ -1,0 +1,38 @@
+[
+  {
+    "requestId": "PREPARE_ANALOG_DOMICILE.IUN_MDYR-UXHL-LVRQ-202504-Q-1.RECINDEX_0.ATTEMPT_0",
+    "unifiedDeliveryDriver": "driver1",
+    "senderPaId": "paId",
+    "recipientId": "recipientId",
+    "tenderId": "tenderId",
+    "iun": "MDYR-UXHL-LVRQ-202504-Q-1",
+    "recipientNormalizedAddress": {
+      "cap": "87100",
+      "pr": "CS"
+    }
+  },
+  {
+    "requestId": "PREPARE_ANALOG_DOMICILE.IUN_MDYR-UXHL-LVRQ-202504-Q-3.RECINDEX_0.ATTEMPT_0",
+    "unifiedDeliveryDriver": "driver1",
+    "senderPaId": "paId",
+    "recipientId": "recipientId",
+    "tenderId": "tenderId",
+    "iun": "MDYR-UXHL-LVRQ-202504-Q-3",
+    "recipientNormalizedAddress": {
+      "cap": "87100",
+      "pr": "CS"
+    }
+  },
+  {
+    "requestId": "PREPARE_ANALOG_DOMICILE.IUN_MDYR-UXHL-LVRQ-202504-Q-2.RECINDEX_0.ATTEMPT_0",
+    "unifiedDeliveryDriver": "driver1",
+    "senderPaId": "paId",
+    "recipientId": "recipientId",
+    "tenderId": "tenderId",
+    "iun": "MDYR-UXHL-LVRQ-202504-Q-2",
+    "recipientNormalizedAddress": {
+      "cap": "87100",
+      "pr": "CS"
+    }
+  }
+]
