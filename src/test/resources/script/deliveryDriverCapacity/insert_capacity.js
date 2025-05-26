@@ -7,11 +7,11 @@ const { AwsDynamoDBClient } = require('./AwsDynamoDBClient');
 
 const options = {
   options: {
-    cicdProfile: { type: 'string', short: 'c' },
     coreProfile: { type: 'string', short: 'p' },
     fileName: { type: 'string', short: 'f' },
     tenderId: { type: 'string', short: 't' },
     local: { type: 'boolean', short: 'l', default: false },
+    noSSO: { type: 'boolean', short: 'a', default: false},
     clearTable: { type: 'boolean', short: 'r', default: false }
   }
 };
@@ -25,20 +25,20 @@ async function main() {
   console.time('csv-to-dynamo-processing');
 
   const parsedArgs = parseArgs(options);
-  if (!parsedArgs.values.cicdProfile ||
-    !parsedArgs.values.coreProfile ||
+  if (!parsedArgs.values.coreProfile ||
     !parsedArgs.values.fileName ||
     !parsedArgs.values.tenderId) {
     console.error('Missing required arguments. Usage:');
-    console.error('node insert_capacity.js --cicdProfile <cicdProfile> --coreProfile <coreProfile> --fileName <nome del file csv> --tenderId <id della gara>');
+    console.error('node insert_capacity.js -coreProfile <coreProfile> --fileName <nome del file csv> --tenderId <id della gara>');
     process.exit(1);
   }
 
   const awsAuthClient = new AwsAuthClient();
 
-  const coreTemporaryCredentials = await awsAuthClient.ssoCredentials(
+  const coreTemporaryCredentials = await awsAuthClient.getCredentials(
     parsedArgs.values.coreProfile,
-    parsedArgs.values.local
+    parsedArgs.values.local,
+    parsedArgs.values.noSSO
   );
 
   const awsDynamoDBClient = new AwsDynamoDBClient(
