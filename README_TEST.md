@@ -138,7 +138,7 @@ N.B.
   PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME=Pn-PaperDeliveryHighPriority
   PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME=pn-PaperDeliveryDriverUsedCapacities
   PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=pn-PaperDeliveryDriverCapacities
-  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/pn-delayer_to_paperchannel
+  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/local-delayer_to_paperchannel
   PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER=<specificare un unified deliver driver presente nelle spedizioni della tabella Pn-PaperDeliveryHighPriority>
   PN_DELAYER_JOBINPUT_PROVINCELIST=<specificare una lista di province (sigla) contenente necessariamente le province presenti nelle spedizioni della tabella Pn-PaperDeliveryHighPriority ma anche province per le quali non sono presenti spedizioni per testare i vari scenari>
   ```
@@ -164,7 +164,7 @@ Passaggi necessari per eseguire i test di integrazione:
   AWS_ACCESS_KEY_ID=PN-TEST
   AWS_ENDPOINT_URL=http://localhost:4566
   PAPERDELIVERYREADYTOSEND_TABLENAME=pn-PaperDeliveryReadyToSend
-  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/pn-delayer_to_paperchannel
+  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/local-delayer_to_paperchannel
   ```
 - Aggiungere il seguente script all'interno del file `package.json`:
   
@@ -182,7 +182,7 @@ Passaggi necessari per eseguire i test di integrazione:
   ```
 **Verifiche**
 - Accedere dalla console di localstack (https://app.localstack.cloud/inst/default/resources/dynamodb) alla tabella pn-PaperDeliveryReadyToSend e verificare che tutti gli item aventi pk(deliveryDate) pari alla data di esecuzione della lambda siano stati correttamente cancellati.
-- Verificare sempre sulla console di localstack (https://app.localstack.cloud/inst/default/resources/sqs) la presenza di un numero di messaggi sulla coda pn-delayer_to_paperchannel pari al numero di item cancellati. il payload dei messaggi dovrà avere la seguente struttura:
+- Verificare sempre sulla console di localstack (https://app.localstack.cloud/inst/default/resources/sqs) la presenza di un numero di messaggi sulla coda local-delayer_to_paperchannel pari al numero di item cancellati. il payload dei messaggi dovrà avere la seguente struttura:
   ```
   {
     requestId: <item.requestId>,
@@ -208,7 +208,7 @@ Passaggi necessari per eseguire i test di integrazione:
   AWS_ACCESS_KEY_ID=PN-TEST
   AWS_ENDPOINT_URL=http://localhost:4566
   PAPERDELIVERYREADYTOSEND_TABLENAME=pn-PaperDeliveryReadyToSend
-  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/pn-delayer_to_paperchannel
+  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/local-delayer_to_paperchannel
   ?PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE=2025-01-01T00:00:00Z
   ```
 - Aggiungere il seguente script all'interno del file `package.json`:
@@ -228,7 +228,7 @@ Passaggi necessari per eseguire i test di integrazione:
 
 **Verifiche**
 - Accedere dalla console di localstack (https://app.localstack.cloud/inst/default/resources/dynamodb) alla tabella pn-PaperDeliveryReadyToSend e verificare che tutti gli item aventi pk(deliveryDate) pari a `PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE` o a `Date.now() - 1d` siano stati correttamente cancellati.
-- Verificare sempre sulla console di localstack (https://app.localstack.cloud/inst/default/resources/sqs) la presenza di un numero di messaggi sulla coda pn-delayer_to_paperchannel pari al numero di item cancellati. il payload dei messaggi dovrà avere la seguente struttura:
+- Verificare sempre sulla console di localstack (https://app.localstack.cloud/inst/default/resources/sqs) la presenza di un numero di messaggi sulla coda local-delayer_to_paperchannel pari al numero di item cancellati. il payload dei messaggi dovrà avere la seguente struttura:
   ```
   {
     requestId: <item.requestId>,
