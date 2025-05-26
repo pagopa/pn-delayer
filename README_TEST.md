@@ -1,21 +1,21 @@
 ## Test
 **Premessa**   
-Non è possibile eseguire in locale il JOB automaticamente partendo dalla sua invocazione dalla lambda `Pn-delayer-submitPaperDeliveryJobLambda` sarà quindi necessario avviare manualmente il microservizio in locale passando le env necessarie per l'esecuzione.
+Non è possibile eseguire in locale il JOB automaticamente partendo dalla sua invocazione dalla lambda `Pn-delayer-submitPaperDeliveryJobLambda` sarà quindi necessario avviare manualmente il microservizio `pn-delayer` in locale passando le env necessarie per l'esecuzione.
 
-**Azioni preliminari**s   
+**Azioni preliminari**   
 1. **Inserimento capacità dei recapitisti**  
 Prima di eseguire un test completo è necessario lanciare lo script `src/test/resources/script/deliveryDriverCapacity/insert_capacity.js` per popolare la tabella `pn-PaperDeliveryDriverCapacities`.
     ``` 
     npm install
-    node insert_capacity.js --cicdProfile <cicdProfile> --coreProfile <coreProfile> --fileName <nome del file csv> --tenderId <id della gara> [--local] [--clearTable]
+    node insert_capacity.js --coreProfile <coreProfile> --fileName <nome del file csv> --tenderId <id della gara> [--local] [--clearTable] [--noSSO]
     ```
     parametri:
-    - **cicdProfile** = obbligatorio - profilo dell'account CI AWS
     - **coreProfile** = obbligatorio - profilo dell'account core AWS
     - **fileName** = obbligatorio - nome del file csv contenente le province e i cap da popolare
     - **tenderId** = obbligatorio - id della gara
     - **local** = opzionale - booleano che indica se eseguire lo script localmente tramite localstack - default: false
     - **clearTable** = opzionale - booleano che indica se è necessario svuotare la tabella prima di eseguire lo script - default: false (pulizia della tabella consentita solo in locale)
+    - **noSSO** = opzionale - booleano che indica se il profilo di AWS non è tramite login SSO
 
     Il file **Capacity_v1.csv** contiene le seguenti geoKey con capacità pari a 7:
       ``` 
@@ -78,8 +78,7 @@ Prima di eseguire un test completo è necessario lanciare lo script `src/test/re
    - **filePath** = percorso del file json contenente la lista di payload dei messaggi della prepare fase 1 che si vogliono utilizzare
 
 **Prerequisiti**:
-- Avviare localstack con [l'init.sh ](https://github.com/pagopa/pn-delayer/blob/develop/src/test/resources/testcontainers/init.sh)
-- Aggiunger il file `.env`:
+- Aggiunger il file `.env` nella root della lambda:
   ```
   AWS_REGION=us-east-1
   REGION=us-east-1
@@ -88,11 +87,7 @@ Prima di eseguire un test completo è necessario lanciare lo script `src/test/re
   AWS_ENDPOINT_URL=http://localhost:4566
   HIGH_PRIORITY_TABLE_NAME=pn-PaperDeliveryHighPriority
   ```
-- Aggiungere il seguente script all'interno del file `package.json`:
-  ```json
-  "integrazione": "nyc --reporter=html --reporter=text mocha './src/test/**/integration.test.js' --recursive --timeout=100000 --exit -r dotenv/config"
-  ``` 
-- Modifica del file integration.test.js rimuovendo `.skip` alla riga x
+- Modifica del file integration.test.js rimuovendo `.skip` alla riga 5
 
 **Installazione delle dipendenze**:
 - Spostarsi nella directory del modulo contenente la Lambda e installare le dipendenze:
@@ -124,16 +119,15 @@ Prima di eseguire un test completo è necessario lanciare lo script `src/test/re
   ```
 #### 2. Esecuzione della lambda `Pn-delayer-submitPaperDeliveryJobLambda`
 
-**//TODO**
+Questa lambda non può essere testata in locale.
 
 #### 3. Avvio del microservizio `Pn-delayer`
 
 N.B.
 - Per poter eseguire questo test in locale è necessaria la presenza di item relativi alla capacità sulla tabella pn-PaperDeliveryDriverCapacities basati sui cap e le province presenti nelle spedizioni della tabella Pn-PaperDeliveryHighPriority.
-- Se si vuole effettuare il test senza cut-off sarà necessario popolare la env PN_DELAYER_PAPERDELIVERYCUTOFFDURATION specificando il valore 0
+- Se si vuole effettuare il test senza cut-off sarà necessario popolare la env `PN_DELAYER_PAPERDELIVERYCUTOFFDURATION` specificando il valore 0
 
 **Prerequisiti**:
-- Avviare localstack con [l'init.sh ](https://github.com/pagopa/pn-delayer/blob/develop/src/test/resources/testcontainers/init.sh)
 - Popolare le seguenti env:
   ```
   AWS_REGIONCODE=us-east-1
@@ -157,13 +151,12 @@ N.B.
 - Le spedizioni presenti nella tabella pn-PaperDeliveryHighPriority per le quali non è presente capacità non dovranno subire modifiche e rimarranno sulla tabella fino a che non sarà possibile schedularle.
 
 #### 4. Esecuzione della lambda `Pn-delayerToPaperChannelLambda`
-N.B. il json event.json contiente un evento vuoto in quanto tale lambda è schedulata e non lavora con eventi specifici
+N.B. il json event.json contiene un evento vuoto in quanto tale lambda è schedulata e non lavora con eventi specifici
 
 Passaggi necessari per eseguire i test di integrazione:
 
 **Prerequisiti**:
-- Avviare localstack con [l'init.sh ](https://github.com/pagopa/pn-delayer/blob/develop/src/test/resources/testcontainers/init.sh)
-- Aggiunger il file `.env`:
+- Aggiungere il file `.env` nella root della lambda:
   ```
   AWS_REGION=us-east-1
   REGION=us-east-1
@@ -174,10 +167,8 @@ Passaggi necessari per eseguire i test di integrazione:
   DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/pn-delayer_to_paperchannel
   ```
 - Aggiungere il seguente script all'interno del file `package.json`:
-  ```json
-  "integrazione": "nyc --reporter=html --reporter=text mocha './src/test/**/integration.test.js' --recursive --timeout=100000 --exit -r dotenv/config"
-  ``` 
-- Modifica del file integration.test.js rimuovendo `.skip` alla riga x
+  
+- Modifica del file integration.test.js rimuovendo `.skip` alla riga 5
 
 **Installazione delle dipendenze**:
 - Spostarsi nella directory del modulo contenente la Lambda e installare le dipendenze:
@@ -201,7 +192,7 @@ Passaggi necessari per eseguire i test di integrazione:
   ```
 
 #### 5. Esecuzione della lambda `Pn-delayerToPaperChannelRecoveryLambda`
-N.B il json event.json contiente un evento vuoto in quanto tale lambda è schedulata e non lavora con eventi specifici
+N.B il json event.json contiene un evento vuoto in quanto tale lambda è schedulata e non lavora con eventi specifici
 Per questa lambda è possibile simulare due scenari:
 - env `PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE` popolata per indicare quali spedizioni recuperare e inviare alla fase due
 - env `PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE` non popolata, per recuperare le spedizioni schedulate un giorno prima della data di esecuzione della lambda non correttamente elaborate dalla lambda `Pn-delayerToPaperChannelLambda`
@@ -209,8 +200,7 @@ Per questa lambda è possibile simulare due scenari:
 Passaggi necessari per eseguire i test di integrazione:
 
 **Prerequisiti**:
-- Avviare localstack con [l'init.sh ](https://github.com/pagopa/pn-delayer/blob/develop/src/test/resources/testcontainers/init.sh)
-- Aggiunger il file `.env`:
+- Aggiungere il file `.env` nella root della lambda:
   ```
   AWS_REGION=us-east-1
   REGION=us-east-1
@@ -222,10 +212,8 @@ Passaggi necessari per eseguire i test di integrazione:
   ?PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE=2025-01-01T00:00:00Z
   ```
 - Aggiungere il seguente script all'interno del file `package.json`:
-  ```json
-  "integrazione": "nyc --reporter=html --reporter=text mocha './src/test/**/integration.test.js' --recursive --timeout=100000 --exit -r dotenv/config"
-  ``` 
-- Modifica del file integration.test.js rimuovendo `.skip` alla riga x
+  
+- Modifica del file integration.test.js rimuovendo `.skip` alla riga 5
 
 **Installazione delle dipendenze**:
 - Spostarsi nella directory del modulo contenente la Lambda e installare le dipendenze:

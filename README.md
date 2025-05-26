@@ -5,11 +5,14 @@ Repository contenente i componenti realizzati per gestire in modo efficiente i p
 Si compone di:
 
 - AWS **Lambda**:
-    - **pn-delayer-kinesisPaperDeliveryLambda**: gestisce la ricezione degli eventi Kinesis relativi alla prepare fase 1 e la scrittura sulla tabella `Pn-PaperDeliveryHighPriority`
+    - **pn-delayer-kinesisPaperDeliveryLambda**: gestisce la ricezione degli eventi Kinesis relativi alla prepare fase 1 e la scrittura sulla tabella `pn-PaperDeliveryHighPriority`
     - **pn-delayer-submitPaperDeliveryJobLambda**: Si occupa della submit dei Job di schedulazione spedizioni
-    - **pn-delayer job**: Job di schedulazione spedizioni sulla base delle capacità dei recapitisti
-    - **pn-delayerToPaperChannelLambda**: responsabile della lettura dalla tabella `Pn-PaperDeliveryReadyToSend` e scrittura sulla coda `pn-delayer_to_paperchannel`.
-    - **pn-delayerToPaperChannelRecoveryLambda**: Ha un comportamento analogo alla lambda precedente ma ha l'opzione di scegliere una data da usare come chiave primaria per la lettura sulla tabella `Pn-PaperDeliveryReadyToSend`.
+    - **pn-delayerToPaperChannelLambda**: responsabile della lettura dalla tabella `pn-PaperDeliveryReadyToSend` e scrittura sulla coda `pn-delayer_to_paperchannel`.
+    - **pn-delayerToPaperChannelRecoveryLambda**: Ha un comportamento analogo alla lambda precedente ma ha l'opzione di scegliere una data da usare come chiave primaria per la lettura sulla tabella `pn-PaperDeliveryReadyToSend`.
+- Microservizio Spring Boot 3
+    - **pn-delayer**: Job di schedulazione spedizioni sulla base delle capacità dei recapitisti. Dati in input `unifiedDeliveryDriver` e `province`, recupera tutti le richieste di spedizioni per quella copia, dalla tabella `pn-PaperDeliveryHighPriority`. \
+                      Per ogni record recuperato, valuta la se il recapitista ha capacità sia per provincia che per CAP (recuperando i record dalle tabelle `pn-PaperDeliveryDriverCapacities` e `pn-PaperDeliveryDriverUsedCapacities`). \
+                      Se vi è capacità sia per provincia che per CAP, allora il microservizio Java sposta il record nella tabella `pn-PaperDeliveryReadyToSend` e lo elimina dalla tabella `pn-PaperDeliveryHighPriority`.
 
 ### Architettura
 ![Architettura.png](Architettura.svg)
@@ -44,7 +47,7 @@ https://excalidraw.com/#json=PAngScUbYCWtPF1bxyJJh,EoCtsGXgj2bPM9hr7rgh3A
 | `JOB_INPUT_PROVINCE_LIST_ENV_NAME` | Nome della env per la lista di province input del job (PN_DELAYER_JOBINPUT_PROVINCELIST)              | Sì           |  
 
 
-## Pn-delayer JOB
+## Pn-delayer
 ### Responsabilità
 - recupero spedizioni dalla tabella pn-PaperDeliveryHighPriority
 - verifica della capacità per le coppie recapitista-provincia e recapitista-cap nella settimana in cui la spedizione dovrebbe essere schedulata
@@ -98,7 +101,12 @@ Lambda, schedulata dalla regola event bridge `pn--DelayerToPaperChannelRecoveryS
 | `PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE` | Data di recupero per le notifiche non inviate                   | No           | ''      |
 
 
-## Test
+## Testing in locale
+
+### Prerequisiti
+1. JDK 21 installato in locale
+2. Docker/Podman avviato con container di Localstack (puoi utilizzare il Docker Compose di [Localdev] https://github.com/pagopa/pn-localdev)
+
 I dettagli sui test di integrazione e le procedure di testing sono disponibili in [README_TEST.md](./README_TEST.md).
 
 
