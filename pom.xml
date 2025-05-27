@@ -88,4 +88,29 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<id>cds</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-maven-plugin</artifactId>
+							<configuration>
+								<image>
+									<env>
+										<BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>
+										<AWS_REGION>eu-south-1</AWS_REGION>
+									</env>
+								</image>
+							</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
