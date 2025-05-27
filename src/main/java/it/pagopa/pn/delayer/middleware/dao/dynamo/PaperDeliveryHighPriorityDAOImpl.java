@@ -13,7 +13,7 @@ import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.StaticTableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
@@ -36,9 +36,12 @@ public class PaperDeliveryHighPriorityDAOImpl implements PaperDeliveryHighPriori
     private final DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient;
 
     public PaperDeliveryHighPriorityDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
+        //todo add addAttribute for both staticTableSchema
+        StaticTableSchema<PaperDeliveryHighPriority> staticTable = StaticTableSchema.builder(PaperDeliveryHighPriority.class).build();
+        StaticTableSchema<PaperDeliveryReadyToSend> staticTableTwo = StaticTableSchema.builder(PaperDeliveryReadyToSend.class).build();
         this.pnDelayerConfigs = pnDelayerConfigs;
-        this.tableHighPriority = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryHighPriorityTableName(), TableSchema.fromBean(PaperDeliveryHighPriority.class));
-        this.tableReadyToSend = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryReadyToSendTableName(), TableSchema.fromBean(PaperDeliveryReadyToSend.class));
+        this.tableHighPriority = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryHighPriorityTableName(), staticTable);
+        this.tableReadyToSend = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryReadyToSendTableName(), staticTableTwo);
         this.dynamoDbEnhancedAsyncClient = dynamoDbEnhancedAsyncClient;
     }
 

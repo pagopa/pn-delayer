@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.StaticTableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.ReadBatch;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
@@ -25,6 +25,8 @@ import java.util.Map;
 
 import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
 import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverUsedCapacities.*;
+import static software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTags.primaryPartitionKey;
+import static software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTags.primarySortKey;
 
 @Component
 @Slf4j
@@ -36,7 +38,32 @@ public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDelive
     private final DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient;
 
     public PaperDeliveryDriverUsedUsedCapacitiesDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbAsyncClient dynamoDbAsyncClient, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
-        this.table = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverUsedCapacitiesTableName(), TableSchema.fromBean(PaperDeliveryDriverUsedCapacities.class));
+        StaticTableSchema<PaperDeliveryDriverUsedCapacities> staticTable = StaticTableSchema.builder(PaperDeliveryDriverUsedCapacities.class)
+                .newItemSupplier(PaperDeliveryDriverUsedCapacities::new)
+                .addAttribute(String.class, a -> a.name(COL_DELIVERY_DRIVER_ID_GEOKEY)
+                        .getter(PaperDeliveryDriverUsedCapacities::getUnifiedDeliveryDriverGeokey)
+                        .setter(PaperDeliveryDriverUsedCapacities::setUnifiedDeliveryDriverGeokey)
+                        .tags(primaryPartitionKey())
+                )
+                .addAttribute(Instant.class, a -> a.name(COL_DELIVERY_DATE)
+                        .getter(PaperDeliveryDriverUsedCapacities::getDeliveryDate)
+                        .setter(PaperDeliveryDriverUsedCapacities::setDeliveryDate)
+                        .tags(primarySortKey())
+                )
+                .addAttribute(String.class, a -> a.name(COL_DELIVERY_DRIVER_ID)
+                        .getter(PaperDeliveryDriverUsedCapacities::getUnifiedDeliveryDriver)
+                        .setter(PaperDeliveryDriverUsedCapacities::setUnifiedDeliveryDriver)
+                )
+                .addAttribute(String.class, a -> a.name(COL_GEO_KEY)
+                        .getter(PaperDeliveryDriverUsedCapacities::getGeoKey)
+                        .setter(PaperDeliveryDriverUsedCapacities::setGeoKey)
+                )
+                .addAttribute(Integer.class, a -> a.name(COL_USED_CAPACITY)
+                        .getter(PaperDeliveryDriverUsedCapacities::getUsedCapacity)
+                        .setter(PaperDeliveryDriverUsedCapacities::setUsedCapacity)
+                )
+                .build();
+        this.table = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverUsedCapacitiesTableName(), staticTable);
         this.dynamoDbAsyncClient = dynamoDbAsyncClient;
         this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
     }
