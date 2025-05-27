@@ -13,18 +13,18 @@ import java.time.Instant;
 @Data
 public class PaperDeliveryDriverUsedCapacities {
 
-    public static final String COL_DELIVERY_DRIVER_ID_GEOKEY = "unifiedDeliveryDriverGeokey";
+    public static final String COL_UNIFIED_DELIVERY_DRIVER_GEOKEY = "unifiedDeliveryDriverGeokey";
     public static final String COL_DELIVERY_DATE = "deliveryDate";
-    public static final String COL_DELIVERY_DRIVER_ID = "unifiedDeliveryDriver";
+    public static final String COL_UNIFIED_DELIVERY_DRIVER = "unifiedDeliveryDriver";
     public static final String COL_GEO_KEY = "geoKey";
     public static final String COL_USED_CAPACITY = "usedCapacity";
 
 
-    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_DELIVERY_DRIVER_ID_GEOKEY)}))
+    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER_GEOKEY)}))
     private String unifiedDeliveryDriverGeokey;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_DELIVERY_DATE)}))
     private Instant deliveryDate;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DRIVER_ID)}))
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER)}))
     private String unifiedDeliveryDriver;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_GEO_KEY)}))
     private String geoKey;

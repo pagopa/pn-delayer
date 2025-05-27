@@ -186,8 +186,7 @@ Passaggi necessari per eseguire i test di integrazione:
   ```
   {
     requestId: <item.requestId>,
-    iun: <item.iun>,
-    attemptRetry: 0
+    iun: <item.iun>
   }
   ```
 
@@ -232,8 +231,7 @@ Passaggi necessari per eseguire i test di integrazione:
   ```
   {
     requestId: <item.requestId>,
-    iun: <item.iun>,
-    attemptRetry: 0
+    iun: <item.iun>
   }
   ```
 

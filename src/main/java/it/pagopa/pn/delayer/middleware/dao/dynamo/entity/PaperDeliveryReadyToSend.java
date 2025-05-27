@@ -16,7 +16,6 @@ public class PaperDeliveryReadyToSend {
     public static final String COL_REQUEST_ID = "requestId";
     public static final String COL_DELIVERY_DATE = "deliveryDate";
     public static final String COL_IUN = "iun";
-    public static final String COL_ATTEMPT_RETRY = "attemptRetry";
 
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_REQUEST_ID)}))
     private String requestId;
@@ -24,6 +23,4 @@ public class PaperDeliveryReadyToSend {
     private Instant deliveryDate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_IUN)}))
     private String iun;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_ATTEMPT_RETRY)}))
-    private String attemptRetry;
 }

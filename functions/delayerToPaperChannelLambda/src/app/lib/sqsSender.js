@@ -43,8 +43,7 @@ async function prepareAndSendSqsMessages(items) {
 function prepareSqsMessages(items) {
   return items.map((item) => ({
       requestId: item.requestId,
-      iun: item.iun,
-      attemptRetry: 0
+      iun: item.iun
   }));
 }
 
