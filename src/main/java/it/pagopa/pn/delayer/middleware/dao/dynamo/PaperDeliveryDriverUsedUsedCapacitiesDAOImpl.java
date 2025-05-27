@@ -74,7 +74,7 @@ public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDelive
         log.info("update pk={} increment={}", pk, increment);
 
         Map<String, AttributeValue> key = new HashMap<>();
-        key.put(PaperDeliveryDriverUsedCapacities.COL_DELIVERY_DRIVER_ID_GEOKEY, AttributeValue.builder().s(pk).build());
+        key.put(PaperDeliveryDriverUsedCapacities.COL_UNIFIED_DELIVERY_DRIVER_GEOKEY, AttributeValue.builder().s(pk).build());
         key.put(PaperDeliveryDriverUsedCapacities.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());
 
         Map<String, AttributeValue> attributeValue = new HashMap<>();
@@ -86,7 +86,7 @@ public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDelive
                 .tableName(table.tableName())
                 .key(key)
                 .updateExpression("ADD " + COL_USED_CAPACITY + " :v" +
-                        " SET " + COL_DELIVERY_DRIVER_ID + " = :deliveryDriver," + COL_GEO_KEY + "= :geoKey")
+                        " SET " + COL_UNIFIED_DELIVERY_DRIVER + " = :deliveryDriver," + COL_GEO_KEY + "= :geoKey")
                 .expressionAttributeValues(attributeValue)
                 .build();
 
