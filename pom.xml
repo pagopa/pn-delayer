@@ -25,6 +25,28 @@
 			<groupId>it.pagopa.pn</groupId>
 			<artifactId>pn-commons</artifactId>
 			<version>2.12.0-SPRINGBOOT3</version>
+			<exclusions>
+				<exclusion>
+					<groupId>it.pagopa.tech.lollipop-consumer-java-sdk</groupId>
+					<artifactId>core</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>it.pagopa.tech.lollipop-consumer-java-sdk</groupId>
+					<artifactId>http-verifier</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>it.pagopa.tech.lollipop-consumer-java-sdk</groupId>
+					<artifactId>assertion-rest-client-native</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>it.pagopa.tech.lollipop-consumer-java-sdk</groupId>
+					<artifactId>identity-service-rest-client-native</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>commons-logging</groupId>
+					<artifactId>commons-logging</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
@@ -37,6 +59,12 @@
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.codehaus.janino</groupId>
+			<artifactId>janino</artifactId>
+			<version>3.1.12</version>
 			<scope>provided</scope>
 		</dependency>
 		
@@ -88,4 +116,58 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<id>native</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+			<build>
+				<pluginManagement>
+					<plugins>
+						<plugin>
+							<groupId>org.apache.maven.plugins</groupId>
+							<artifactId>maven-jar-plugin</artifactId>
+							<configuration>
+								<archive>
+									<manifestEntries>
+										<Spring-Boot-Native-Processed>true</Spring-Boot-Native-Processed>
+									</manifestEntries>
+								</archive>
+							</configuration>
+						</plugin>
+						<plugin>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-maven-plugin</artifactId>
+							<executions>
+								<execution>
+									<id>process-aot</id>
+									<goals>
+										<goal>process-aot</goal>
+									</goals>
+								</execution>
+							</executions>
+						</plugin>
+						<plugin>
+							<groupId>org.graalvm.buildtools</groupId>
+							<artifactId>native-maven-plugin</artifactId>
+							<executions>
+								<execution>
+									<id>add-reachability-metadata</id>
+									<goals>
+										<goal>add-reachability-metadata</goal>
+									</goals>
+								</execution>
+							</executions>
+							<configuration>
+								<classesDirectory>${project.build.outputDirectory}</classesDirectory>
+								<requiredVersion>22.3</requiredVersion>
+							</configuration>
+						</plugin>
+					</plugins>
+				</pluginManagement>
+			</build>
+		</profile>
+	</profiles>
 </project>

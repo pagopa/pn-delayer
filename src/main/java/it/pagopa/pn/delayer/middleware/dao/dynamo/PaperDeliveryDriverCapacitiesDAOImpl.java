@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.*;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.StaticTableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -18,6 +19,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
+import static software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTags.primaryPartitionKey;
+import static software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTags.primarySortKey;
 
 @Component
 @Slf4j
@@ -27,7 +30,49 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
     private final DynamoDbAsyncTable<PaperDeliveryDriverCapacity> table;
 
     public PaperDeliveryDriverCapacitiesDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
-        this.table = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName(), TableSchema.fromBean(PaperDeliveryDriverCapacity.class));
+        //todo add addAttribute for staticTableSchema
+        StaticTableSchema<PaperDeliveryDriverCapacity> schemaTable = StaticTableSchema.builder(PaperDeliveryDriverCapacity.class)
+                .newItemSupplier(PaperDeliveryDriverCapacity::new)
+                .addAttribute(String.class, a -> a.name(PaperDeliveryDriverCapacity.COL_PK)
+                        .getter(PaperDeliveryDriverCapacity::getPk)
+                        .setter(PaperDeliveryDriverCapacity::setPk)
+                        .tags(primaryPartitionKey())
+                )
+                .addAttribute(Instant.class, a -> a.name(PaperDeliveryDriverCapacity.COL_ACTIVATION_DATE_FROM)
+                        .getter(PaperDeliveryDriverCapacity::getActivationDateFrom)
+                        .setter(PaperDeliveryDriverCapacity::setActivationDateFrom)
+                        .tags(primarySortKey())
+                )
+                .addAttribute(Instant.class, a -> a.name(PaperDeliveryDriverCapacity.COL_ACTIVATION_DATE_TO)
+                        .getter(PaperDeliveryDriverCapacity::getActivationDateTo)
+                        .setter(PaperDeliveryDriverCapacity::setActivationDateTo)
+                )
+                .addAttribute(String.class, a -> a.name(PaperDeliveryDriverCapacity.COL_TENDER_ID)
+                        .getter(PaperDeliveryDriverCapacity::getTenderId)
+                        .setter(PaperDeliveryDriverCapacity::setTenderId)
+                )
+                .addAttribute(String.class, a -> a.name(PaperDeliveryDriverCapacity.COL_UNIFIED_DELIVERY_DRIVER)
+                        .getter(PaperDeliveryDriverCapacity::getUnifiedDeliveryDriver)
+                        .setter(PaperDeliveryDriverCapacity::setUnifiedDeliveryDriver)
+                )
+                .addAttribute(String.class, a -> a.name(PaperDeliveryDriverCapacity.COL_GEO_KEY)
+                        .getter(PaperDeliveryDriverCapacity::getGeoKey)
+                        .setter(PaperDeliveryDriverCapacity::setGeoKey)
+                )
+                .addAttribute(Integer.class, a -> a.name(PaperDeliveryDriverCapacity.COL_CAPACITY)
+                        .getter(PaperDeliveryDriverCapacity::getCapacity)
+                        .setter(PaperDeliveryDriverCapacity::setCapacity)
+                )
+                .addAttribute(Integer.class, a -> a.name(PaperDeliveryDriverCapacity.COL_PEAK_CAPACITY)
+                        .getter(PaperDeliveryDriverCapacity::getPeakCapacity)
+                        .setter(PaperDeliveryDriverCapacity::setPeakCapacity)
+                )
+                .addAttribute(Instant.class, a -> a.name(PaperDeliveryDriverCapacity.COL_CREATED_AT)
+                        .getter(PaperDeliveryDriverCapacity::getCreatedAt)
+                        .setter(PaperDeliveryDriverCapacity::setCreatedAt)
+                )
+                .build();
+        this.table = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName(), schemaTable);
     }
 
     @Override
