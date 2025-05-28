@@ -40,7 +40,7 @@ public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDelive
     public PaperDeliveryDriverUsedUsedCapacitiesDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbAsyncClient dynamoDbAsyncClient, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient) {
         StaticTableSchema<PaperDeliveryDriverUsedCapacities> staticTable = StaticTableSchema.builder(PaperDeliveryDriverUsedCapacities.class)
                 .newItemSupplier(PaperDeliveryDriverUsedCapacities::new)
-                .addAttribute(String.class, a -> a.name(COL_DELIVERY_DRIVER_ID_GEOKEY)
+                .addAttribute(String.class, a -> a.name(COL_UNIFIED_DELIVERY_DRIVER_GEOKEY)
                         .getter(PaperDeliveryDriverUsedCapacities::getUnifiedDeliveryDriverGeokey)
                         .setter(PaperDeliveryDriverUsedCapacities::setUnifiedDeliveryDriverGeokey)
                         .tags(primaryPartitionKey())
@@ -50,7 +50,7 @@ public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDelive
                         .setter(PaperDeliveryDriverUsedCapacities::setDeliveryDate)
                         .tags(primarySortKey())
                 )
-                .addAttribute(String.class, a -> a.name(COL_DELIVERY_DRIVER_ID)
+                .addAttribute(String.class, a -> a.name(COL_UNIFIED_DELIVERY_DRIVER)
                         .getter(PaperDeliveryDriverUsedCapacities::getUnifiedDeliveryDriver)
                         .setter(PaperDeliveryDriverUsedCapacities::setUnifiedDeliveryDriver)
                 )

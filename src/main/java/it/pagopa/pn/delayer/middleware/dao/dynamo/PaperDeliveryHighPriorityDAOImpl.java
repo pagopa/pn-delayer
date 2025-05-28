@@ -26,7 +26,6 @@ import java.util.Map;
 
 import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
 import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority.*;
-import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend.COL_ATTEMPT_RETRY;
 import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend.COL_DELIVERY_DATE;
 import static software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTags.primaryPartitionKey;
 import static software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTags.primarySortKey;
@@ -106,10 +105,6 @@ public class PaperDeliveryHighPriorityDAOImpl implements PaperDeliveryHighPriori
                 .addAttribute(String.class, a -> a.name(PaperDeliveryReadyToSend.COL_IUN)
                         .getter(PaperDeliveryReadyToSend::getIun)
                         .setter(PaperDeliveryReadyToSend::setIun)
-                )
-                .addAttribute(String.class, a -> a.name(COL_ATTEMPT_RETRY)
-                        .getter(PaperDeliveryReadyToSend::getAttemptRetry)
-                        .setter(PaperDeliveryReadyToSend::setAttemptRetry)
                 )
                 .build();
         this.pnDelayerConfigs = pnDelayerConfigs;
