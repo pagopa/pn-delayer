@@ -84,7 +84,6 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
                 .flatMap(entry -> processCapGroupAndUpdateCounter(entry.getKey(), entry.getValue(), unifiedDeliveryDriver, tenderId, deliveryWeek, transactionRequest, incrementCapacities))
                 .reduce(0, Integer::sum)
                 .filter(numberOfDeliveries -> numberOfDeliveries > 0)
-//                .flatMap(numberOfDeliveries -> paperDeliveryUsedCapacityDAO.updateCounter(unifiedDeliveryDriver, province, numberOfDeliveries, deliveryWeek))
                 .doOnNext(numberOfDeliveries -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, province, numberOfDeliveries, deliveryWeek)))
                 .then(Mono.just(transactionRequest));
     }
@@ -94,7 +93,6 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
                 .map(registryCapacityAndUsedCapacity -> paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, registryCapacityAndUsedCapacity))
                 .filter(numberOfDeliveries -> numberOfDeliveries > 0)
                 .doOnDiscard(Integer.class, numberOfDeliveries -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
-//                .flatMap(numberOfDeliveries -> paperDeliveryUsedCapacityDAO.updateCounter(unifiedDeliveryDriver, cap, numberOfDeliveries, deliveryWeek));
                 .doOnNext(numberOfDeliveries -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, cap, numberOfDeliveries, deliveryWeek)));
     }
 
