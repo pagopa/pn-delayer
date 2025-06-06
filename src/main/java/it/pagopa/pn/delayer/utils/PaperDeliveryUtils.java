@@ -85,7 +85,8 @@ public class PaperDeliveryUtils {
      */
     private void enrichWithDeliveryDate(List<PaperDeliveryReadyToSend> tempItems, Integer capCapacity, Integer usedCapCapacity) {
         if (pnDelayerConfig.getPaperDeliveryCutOffDuration().isZero()) {
-            tempItems.forEach(shipment -> shipment.setDeliveryDate(Instant.now()));
+            Instant deliveryDate =  LocalDate.now().atStartOfDay().toInstant(ZoneOffset.UTC);
+            tempItems.forEach(shipment -> shipment.setDeliveryDate(deliveryDate));
         }else {
             Map<Instant, Integer> partitionedCapacity = retrieveCapacityInterval(capCapacity, pnDelayerConfig.getDeliveryDateInterval(), usedCapCapacity);
             tempItems.forEach(shipment -> partitionedCapacity.entrySet().stream()
