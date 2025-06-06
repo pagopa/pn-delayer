@@ -140,6 +140,13 @@ Resources:
           KeyType: "HASH"
         - AttributeName: "requestId"
           KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "requestId-index"
+          KeySchema:
+            - AttributeName: "requestId"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true

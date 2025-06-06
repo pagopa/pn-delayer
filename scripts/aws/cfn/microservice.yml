@@ -990,3 +990,17 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt SubmitPaperDeliveryJobLambdaScheduledRule.Arn
+  PermissionForDelayerToPaperChannelLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt DelayerToPaperChannelLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DelayerToPaperChannelScheduleRule.Arn
+  PermissionForDelayerToPaperChannelRecoveryLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt DelayerToPaperChannelRecoveryLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DelayerToPaperChannelRecoveryScheduleRule.Arn
