@@ -7,6 +7,8 @@ const {
 
 describe("Lambda Handler Tests", () => {
   process.env.REGION = "us-east-1";
+  process.env.HIGH_PRIORITY_TABLE_NAME = "HighPriorityTable";
+  process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME = "KinesisPaperDeliveryEventTable";
   const mockDynamoDBClient = mockClient(DynamoDBDocumentClient);
 
   const lambda = proxyquire.noCallThru().load("../app/eventHandler.js", {
@@ -29,10 +31,11 @@ describe("Lambda Handler Tests", () => {
   });
 
   it("should handle a valid Kinesis event", async () => {
-    mockDynamoDBClient.resolvesOnce({ UnprocessedItems: {} }); 
+    mockDynamoDBClient.resolvesOnce({ Responses:{}  }).resolvesOnce({ UnprocessedItems: {} }).resolvesOnce({ UnprocessedItems: {} });
     const event = {
       mockKinesisData: [
         {
+              kinesisSeqNumber: '1234567890',
               unifiedDeliveryDriver: 'driver1',
               recipientNormalizedAddress: { pr: 'address1', cap: '12345'},
               requestId: 'request1',
@@ -42,6 +45,71 @@ describe("Lambda Handler Tests", () => {
               iun: 'iun1'
         },
         {
+              kinesisSeqNumber: '1234567891',
+              unifiedDeliveryDriver: 'driver2',
+              recipientNormalizedAddress: { pr: 'address2', cap: '54321'},
+              requestId: 'request2',
+              productType: 'type2',
+              senderPaId: 'sender2',
+              tenderId: 'tender2',
+              iun: 'iun2'
+        }
+      ],
+    };
+
+    const result = await lambda.handleEvent(event);
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+  });
+
+    it("should skip already processedEvent", async () => {
+    mockDynamoDBClient.resolvesOnce({ Responses: {"KinesisPaperDeliveryEventTable":[{"sequenceNumber":"1234567890"}]} }).resolvesOnce({ UnprocessedItems: {} }).resolvesOnce({ UnprocessedItems: {} })
+    const event = {
+      mockKinesisData: [
+        {
+              kinesisSeqNumber: '1234567890',
+              unifiedDeliveryDriver: 'driver1',
+              recipientNormalizedAddress: { pr: 'address1', cap: '12345'},
+              requestId: 'request1',
+              productType: 'type1',
+              senderPaId: 'sender1',
+              tenderId: 'tender1',
+              iun: 'iun1'
+        },
+        {
+              kinesisSeqNumber: '1234567891',
+              unifiedDeliveryDriver: 'driver2',
+              recipientNormalizedAddress: { pr: 'address2', cap: '54321'},
+              requestId: 'request2',
+              productType: 'type2',
+              senderPaId: 'sender2',
+              tenderId: 'tender2',
+              iun: 'iun2'
+        }
+      ],
+    };
+
+    const result = await lambda.handleEvent(event);
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+  });
+
+  it("should skip all - already processedEvent", async () => {
+    mockDynamoDBClient.resolvesOnce({ Responses: {KinesisPaperDeliveryEventTable:[{"sequenceNumber":"1234567890"}, {"sequenceNumber":"1234567891"}]} })
+    .resolvesOnce({ UnprocessedItems: {} }).resolvesOnce({ UnprocessedItems: {} })
+
+    const event = {
+      mockKinesisData: [
+        {
+              kinesisSeqNumber: '1234567890',
+              unifiedDeliveryDriver: 'driver1',
+              recipientNormalizedAddress: { pr: 'address1', cap: '12345'},
+              requestId: 'request1',
+              productType: 'type1',
+              senderPaId: 'sender1',
+              tenderId: 'tender1',
+              iun: 'iun1'
+        },
+        {
+              kinesisSeqNumber: '1234567891',
               unifiedDeliveryDriver: 'driver2',
               recipientNormalizedAddress: { pr: 'address2', cap: '54321'},
               requestId: 'request2',
@@ -75,7 +143,7 @@ describe("Lambda Handler Tests", () => {
     };
 
     // Simulate a DynamoDB failure
-    mockDynamoDBClient.rejectsOnce("Simulated DynamoDB Error");
+    mockDynamoDBClient.resolvesOnce({ Responses:{}  }).rejectsOnce("Simulated DynamoDB Error").resolvesOnce({ UnprocessedItems: {} });
 
     const result = await lambda.handleEvent(event);
     expect(result.batchItemFailures).to.deep.equal(
@@ -85,11 +153,13 @@ describe("Lambda Handler Tests", () => {
 
   it("should handle a valid Kinesis event with unprocessed item", async () => {
     let tableName = process.env.HIGH_PRIORITY_TABLE_NAME;
-    mockDynamoDBClient.resolvesOnce({ UnprocessedItems: {
+    mockDynamoDBClient.resolvesOnce({ Responses: {} })
+    .resolvesOnce({ UnprocessedItems: {
       [tableName]: [
         { PutRequest: { Item: { requestId: {'S':'request1' } } } }
       ]
-    } }); 
+    } })
+    .resolvesOnce({ UnprocessedItems: {} })
     const event = {
       mockKinesisData: [
         {

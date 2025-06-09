@@ -151,6 +151,26 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
+  KinesisPaperDeliveryEventTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-KinesisPaperDeliveryEvent'
+      AttributeDefinitions:
+        - AttributeName: "sequenceNumber"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "sequenceNumber"
+          KeyType: "HASH"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+
   ### Kinesis Data Stream: kinesis data stream for pn-delayer-inputs
   PnDelayerInputsKinesisDataStream:
     Type: AWS::CloudFormation::Stack
@@ -266,6 +286,13 @@ Outputs:
   PaperDeliveryReadyToSendTableArn:
     Description: ARN of dynamodb table containing ReadyToSend paper deliveries
     Value: !Sub '${PaperDeliveryReadyToSendTable.Arn}'
+
+  KinesisPaperDeliveryEventTableName:
+    Description: Name of dynamodb table containing Kinesis sequenceNumber for paper deliveries
+    Value: !Ref KinesisPaperDeliveryEventTable
+  KinesisPaperDeliveryEventTableArn:
+    Description: ARN of dynamodb table containing Kinesis sequenceNumber for paper deliveries
+    Value: !Sub '${KinesisPaperDeliveryEventTable.Arn}'
 
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn
