@@ -2,7 +2,6 @@ package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
 import org.junit.jupiter.api.Assertions;
@@ -29,14 +28,11 @@ class PaperDeliveryHighPriorityInMemoryDbImplTest{
     @Mock
     PaperDeliveryReadyToSendInMemoryDbImpl paperDeliveryReadyToSendInMemoryDb;
 
-    @Mock
-    PnDelayerConfigs pnDelayerConfigs;
-
     @BeforeEach
     void setUp() throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
-        dao = new PaperDeliveryHighPriorityInMemoryDbImpl(pnDelayerConfigs, paperDeliveryReadyToSendInMemoryDb, objectMapper);
+        dao = new PaperDeliveryHighPriorityInMemoryDbImpl(paperDeliveryReadyToSendInMemoryDb, objectMapper);
     }
 
 
@@ -65,10 +61,9 @@ class PaperDeliveryHighPriorityInMemoryDbImplTest{
 
     @Test
     void getPaperDeliveryHighPriority_returnsLimitedResults() {
-        when(pnDelayerConfigs.getHighPriorityQueryLimit()).thenReturn(5);
         Page<PaperDeliveryHighPriority> result = dao.getPaperDeliveryHighPriority("3", "GR", null).block();
         assert result != null;
-        Assertions.assertEquals(5, result.items().size());
+        Assertions.assertEquals(50, result.items().size());
     }
 
     @Test

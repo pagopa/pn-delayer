@@ -99,11 +99,6 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryReadyToSend'
 
-  HighPriorityQueryLimit:
-    Type: Number
-    Default: 1000
-    Description: 'Max elements quantity for high priority query'
-
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
     Default: 1000
@@ -321,8 +316,6 @@ Resources:
             Value: !Ref PaperDeliveryHighPriorityTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYREADYTOSENDTABLENAME
             Value: !Ref PaperDeliveryReadyToSendTableName
-          - Name: PN_DELAYER_HIGHPRIORITYQUERYLIMIT
-            Value: !Ref HighPriorityQueryLimit
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
           - Name: PN_DELAYER_DELIVERYDATEINTERVAL
