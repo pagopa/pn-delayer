@@ -15,6 +15,7 @@
     "SubmitPaperDeliveryJobInputTuplesParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
     "SubmitPaperDeliveryJobInputDriverEnvName": "PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER",
     "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST",
-    "DelayerToPaperChannelRuleState": "DISABLED"
+    "DelayerToPaperChannelRuleState": "DISABLED",
+    "PaperDeliveryKinesisSequenceNumberTtlSeconds": "86400"
   }
 }

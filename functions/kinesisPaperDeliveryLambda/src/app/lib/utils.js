@@ -23,8 +23,10 @@ function buildPaperDeliveryHighPriorityRecord(payload) {
 };
 
 function buildPaperDeliveryKinesisEventRecord(sequenceNumber) {
+    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_TTL_SECONDS);
   return {
-    sequenceNumber: sequenceNumber
+    sequenceNumber: sequenceNumber,
+    ttl: ttl
   };
 };
 
