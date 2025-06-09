@@ -30,13 +30,12 @@ import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_P
 @ConditionalOnProperty(name = IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.DYNAMO, matchIfMissing = true)
 public class PaperDeliveryHighPriorityDAOImpl implements PaperDeliveryHighPriorityDAO {
 
-    private final PnDelayerConfigs pnDelayerConfigs;
+    private static final Integer QUERY_LIMIT = 50;
     private final DynamoDbAsyncTable<PaperDeliveryHighPriority> tableHighPriority;
     private final DynamoDbAsyncTable<PaperDeliveryReadyToSend> tableReadyToSend;
     private final DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient;
 
     public PaperDeliveryHighPriorityDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
-        this.pnDelayerConfigs = pnDelayerConfigs;
         this.tableHighPriority = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryHighPriorityTableName(), TableSchema.fromBean(PaperDeliveryHighPriority.class));
         this.tableReadyToSend = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryReadyToSendTableName(), TableSchema.fromBean(PaperDeliveryReadyToSend.class));
         this.dynamoDbEnhancedAsyncClient = dynamoDbEnhancedAsyncClient;
@@ -50,7 +49,7 @@ public class PaperDeliveryHighPriorityDAOImpl implements PaperDeliveryHighPriori
 
         QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder()
                 .queryConditional(keyCondition)
-                .limit(pnDelayerConfigs.getHighPriorityQueryLimit());
+                .limit(QUERY_LIMIT);
 
         if (!CollectionUtils.isEmpty(lastEvaluatedKey)) {
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);
