@@ -1,6 +1,7 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   BatchWriteCommand,
+  BatchGetCommand,
   DynamoDBDocumentClient
 } = require("@aws-sdk/lib-dynamodb");
 const client = new DynamoDBClient({});
@@ -68,16 +69,22 @@ async function batchGetKinesisSequenceNumberRecords(keys) {
   const params = {
     RequestItems: {
       [tableName]: {
-        Keys: keys.map(key => ({
+        Keys: keys.map(key => (
             {
               sequenceNumber: key
             }
-        }))
-      }
+        ))
+    }
     }
   };
-  const command = new BatchGetItemCommand(params);
-  return await client.send(command);
+  const command = new BatchGetCommand(params);
+  return await docClient.send(command).then(response => {
+    const items = response.Responses[tableName];
+    if (!items || items.length === 0) {
+      return [];
+    }
+    return items.map(item => item.sequenceNumber);
+  });
 }
 
 module.exports = { batchWriteHighPriorityRecords,

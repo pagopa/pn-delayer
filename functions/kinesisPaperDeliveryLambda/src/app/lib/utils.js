@@ -22,4 +22,10 @@ function buildPaperDeliveryHighPriorityRecord(payload) {
   };
 };
 
-module.exports = { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord };
+function buildPaperDeliveryKinesisEventRecord(sequenceNumber) {
+  return {
+    sequenceNumber: sequenceNumber
+  };
+};
+
+module.exports = { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord, buildPaperDeliveryKinesisEventRecord };

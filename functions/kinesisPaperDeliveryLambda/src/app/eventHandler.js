@@ -1,6 +1,6 @@
 const { extractKinesisData } = require("./lib/kinesis");
 const { batchWriteHighPriorityRecords, batchWriteKinesisSequenceNumberRecords, batchGetKinesisSequenceNumberRecords } = require("./lib/dynamo");
-const { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord } = require("./lib/utils");
+const { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord, buildPaperDeliveryKinesisEventRecord } = require("./lib/utils");
 
 exports.handleEvent = async (event) => {
   console.log("Event received:", JSON.stringify(event));
@@ -8,17 +8,18 @@ exports.handleEvent = async (event) => {
   const kinesisData = extractKinesisData(event);
   console.log(`KinesisData.length: ${kinesisData.length}`);
   let batchItemFailures = [];
+  let alreadyEvaluatedEvents = []
 
   if (!kinesisData || kinesisData.length === 0) {
     console.log("No events to process");
     return { batchItemFailures };
   }
 
-  const paperDeliveryHighPriorityRecords = kinesisData.map(event => ({entity : {...buildPaperDeliveryHighPriorityRecord(event)}, kinesisSeqNumber: event.kinesisSeqNumber}))
+  let paperDeliveryHighPriorityRecords = kinesisData.map(event => ({entity : {...buildPaperDeliveryHighPriorityRecord(event)}, kinesisSeqNumber: event.kinesisSeqNumber}))
   enrichWithCreatedAt(paperDeliveryHighPriorityRecords);
 
-  const alreadyEvaluatedEvents = await batchGetKinesisSequenceNumberRecords(paperDeliveryHighPriorityRecords.map(record => record.kinesisSeqNumber));
-    console.log(`Already evaluated events: ${alreadyEvaluatedEvents}`);
+  alreadyEvaluatedEvents = await batchGetKinesisSequenceNumberRecords(paperDeliveryHighPriorityRecords.map(record => record.kinesisSeqNumber));
+  console.log(`Already evaluated events: ${alreadyEvaluatedEvents}`);
 
   if (alreadyEvaluatedEvents && alreadyEvaluatedEvents.length > 0) {
     console.log("Skipping already evaluated events");
@@ -36,7 +37,14 @@ exports.handleEvent = async (event) => {
     paperDeliveryHighPriorityRecords = paperDeliveryHighPriorityRecords.filter(record => !batchItemFailures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber));
   }
 
-  await batchWriteKinesisSequenceNumberRecords(paperDeliveryHighPriorityRecords)
+  if(paperDeliveryHighPriorityRecords.length === 0) {
+    console.log("No new records to write to Kinesis sequence number table");
+    return { batchItemFailures };
+  }
+
+  const sequenceNumbers = paperDeliveryHighPriorityRecords.map(record => buildPaperDeliveryKinesisEventRecord(record.kinesisSeqNumber));
+  await batchWriteKinesisSequenceNumberRecords(sequenceNumbers);
+  console.log(`Processed ${paperDeliveryHighPriorityRecords.length} records successfully`);
   return { batchItemFailures };
 };
 
