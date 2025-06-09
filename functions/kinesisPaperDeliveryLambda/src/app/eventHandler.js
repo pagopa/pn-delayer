@@ -1,5 +1,5 @@
 const { extractKinesisData } = require("./lib/kinesis");
-const { batchWriteHighPriorityRecords } = require("./lib/dynamo");
+const { batchWriteHighPriorityRecords, batchWriteKinesisSequenceNumberRecords, batchGetKinesisSequenceNumberRecords } = require("./lib/dynamo");
 const { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord } = require("./lib/utils");
 
 exports.handleEvent = async (event) => {
@@ -17,6 +17,14 @@ exports.handleEvent = async (event) => {
   const paperDeliveryHighPriorityRecords = kinesisData.map(event => ({entity : {...buildPaperDeliveryHighPriorityRecord(event)}, kinesisSeqNumber: event.kinesisSeqNumber}))
   enrichWithCreatedAt(paperDeliveryHighPriorityRecords);
 
+  const alreadyEvaluatedEvents = await batchGetKinesisSequenceNumberRecords(paperDeliveryHighPriorityRecords.map(record => record.kinesisSeqNumber));
+    console.log(`Already evaluated events: ${alreadyEvaluatedEvents}`);
+
+  if (alreadyEvaluatedEvents && alreadyEvaluatedEvents.length > 0) {
+    console.log("Skipping already evaluated events");
+    paperDeliveryHighPriorityRecords = paperDeliveryHighPriorityRecords.filter(record => !alreadyEvaluatedEvents.includes(record.kinesisSeqNumber));
+  }
+
   try {
     batchItemFailures = await batchWriteHighPriorityRecords(paperDeliveryHighPriorityRecords);
   } catch (error) {
@@ -25,8 +33,10 @@ exports.handleEvent = async (event) => {
 
   if (batchItemFailures.length > 0) {
     console.log("Process finished with errors!");
+    paperDeliveryHighPriorityRecords = paperDeliveryHighPriorityRecords.filter(record => !batchItemFailures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber));
   }
 
+  await batchWriteKinesisSequenceNumberRecords(paperDeliveryHighPriorityRecords)
   return { batchItemFailures };
 };
 

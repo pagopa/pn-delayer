@@ -50,4 +50,36 @@ async function batchWriteHighPriorityRecords(paperDeliveryHighPriorityRecords) {
   return batchItemFailures;
 }
 
-module.exports = { batchWriteHighPriorityRecords };
+async function batchWriteKinesisSequenceNumberRecords(eventRecords) {
+  const tableName = process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
+  const params = {
+    RequestItems: {
+      [tableName]: eventRecords.map(record => ({
+        PutRequest: { Item: record }
+      }))
+    }
+  };
+  const command = new BatchWriteCommand(params);
+  return await docClient.send(command);
+}
+
+async function batchGetKinesisSequenceNumberRecords(keys) {
+  const tableName = process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
+  const params = {
+    RequestItems: {
+      [tableName]: {
+        Keys: keys.map(key => ({
+            {
+              sequenceNumber: key
+            }
+        }))
+      }
+    }
+  };
+  const command = new BatchGetItemCommand(params);
+  return await client.send(command);
+}
+
+module.exports = { batchWriteHighPriorityRecords,
+                     batchWriteKinesisSequenceNumberRecords,
+                     batchGetKinesisSequenceNumberRecords };
