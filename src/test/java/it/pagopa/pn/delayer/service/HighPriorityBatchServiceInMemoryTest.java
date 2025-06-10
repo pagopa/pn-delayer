@@ -20,7 +20,6 @@ import java.util.Map;
         "pn.delayer.storage.impl=INMEMORY",
         "spring.application.name=PN-DELAYER-MS-BE",
         "pn.delayer.delivery-date-day-of-week=1",
-        "pn.delayer.high-priority-query-limit=1000",
         "pn.delayer.delivery-date-interval=1d",
         "pn.delayer.paper-delivery-cut-off-duration=7d"
 })
@@ -60,17 +59,17 @@ class HighPriorityBatchServiceInMemoryTest {
         });
 
 
-        Assertions.assertEquals(0, highPriorityList.size());
-        Assertions.assertEquals(1000, usedProvinceCapacity);
-        Assertions.assertEquals(500, finalUsedCapCapacity.get("58010"));
-        Assertions.assertEquals(500, finalUsedCapCapacity.get("58100"));
-        Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek).size());
-        Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(1, ChronoUnit.DAYS)).size());
-        Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(2, ChronoUnit.DAYS)).size());
-        Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(3, ChronoUnit.DAYS)).size());
-        Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(4, ChronoUnit.DAYS)).size());
-        Assertions.assertEquals(144, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(5, ChronoUnit.DAYS)).size());
-        Assertions.assertEquals(136, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(6, ChronoUnit.DAYS)).size());
+        Assertions.assertEquals(950, highPriorityList.size());
+        Assertions.assertEquals(50, usedProvinceCapacity);
+        Assertions.assertEquals(50, finalUsedCapCapacity.get("58010"));
+        Assertions.assertEquals(0, finalUsedCapCapacity.get("58100"));
+        Assertions.assertEquals(50, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek).size());
+        Assertions.assertEquals(0, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(1, ChronoUnit.DAYS)).size());
+        Assertions.assertEquals(0, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(2, ChronoUnit.DAYS)).size());
+        Assertions.assertEquals(0, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(3, ChronoUnit.DAYS)).size());
+        Assertions.assertEquals(0, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(4, ChronoUnit.DAYS)).size());
+        Assertions.assertEquals(0, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(5, ChronoUnit.DAYS)).size());
+        Assertions.assertEquals(0, paperDeliveryReadyToSend.getByDeliveryDate(deliveryWeek.plus(6, ChronoUnit.DAYS)).size());
     }
 
 }

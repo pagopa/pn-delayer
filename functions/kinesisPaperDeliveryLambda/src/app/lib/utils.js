@@ -22,4 +22,12 @@ function buildPaperDeliveryHighPriorityRecord(payload) {
   };
 };
 
-module.exports = { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord };
+function buildPaperDeliveryKinesisEventRecord(sequenceNumber) {
+    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_TTL_SECONDS);
+  return {
+    sequenceNumber: sequenceNumber,
+    ttl: ttl
+  };
+};
+
+module.exports = { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord, buildPaperDeliveryKinesisEventRecord };

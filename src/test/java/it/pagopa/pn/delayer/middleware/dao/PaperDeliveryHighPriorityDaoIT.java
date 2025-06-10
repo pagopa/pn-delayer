@@ -56,7 +56,7 @@ class PaperDeliveryHighPriorityDaoIT extends BaseTest.WithLocalStack {
         Page<PaperDeliveryHighPriority> result = paperDeliveryHighPriorityDao.getPaperDeliveryHighPriority(unifiedDeliveryDriver, geokey, null).block();
 
         Assertions.assertNotNull(result);
-        Assertions.assertEquals(5, result.items().size());
+        Assertions.assertEquals(10, result.items().size());
         System.out.println(result.items());
         Assertions.assertEquals("2025-04-07T00:00:00Z", result.items().get(0).getCreatedAt().toString());
 

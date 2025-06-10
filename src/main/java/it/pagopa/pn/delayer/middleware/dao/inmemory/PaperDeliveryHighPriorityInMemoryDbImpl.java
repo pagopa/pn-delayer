@@ -2,7 +2,6 @@ package it.pagopa.pn.delayer.middleware.dao.inmemory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryHighPriorityDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
@@ -28,13 +27,11 @@ import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_P
 @ConditionalOnProperty(name = IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.INMEMORY)
 public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHighPriorityDAO {
 
-    private final PnDelayerConfigs pnDelayerConfigs;
     private final PaperDeliveryReadyToSendInMemoryDbImpl paperDeliveryReadyToSendDAO;
 
     private final ConcurrentHashMap<String, List<PaperDeliveryHighPriority>> data = new ConcurrentHashMap<>();
 
-    public PaperDeliveryHighPriorityInMemoryDbImpl(PnDelayerConfigs pnDelayerConfigs,
-                                                   PaperDeliveryReadyToSendInMemoryDbImpl paperDeliveryReadyToSendDAO,
+    public PaperDeliveryHighPriorityInMemoryDbImpl(PaperDeliveryReadyToSendInMemoryDbImpl paperDeliveryReadyToSendDAO,
                                                    ObjectMapper objectMapper) throws IOException {
         ClassPathResource classPathResource = new ClassPathResource("json/PaperDeliveryHighPriority.json");
         List<PaperDeliveryHighPriority> highPriorityList = objectMapper.readValue(classPathResource.getFile(), new TypeReference<>() {});
@@ -50,7 +47,6 @@ public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHig
                         )
                 )));
         log.info("loaded {} PaperDeliveryHighPriority", highPriorityList.size());
-        this.pnDelayerConfigs = pnDelayerConfigs;
         this.paperDeliveryReadyToSendDAO = paperDeliveryReadyToSendDAO;
     }
 
@@ -83,7 +79,7 @@ public class PaperDeliveryHighPriorityInMemoryDbImpl implements PaperDeliveryHig
         }
         log.info("Found {} PaperDeliveryHighPriority for unifiedDeliveryDriver: {}, geoKey: {}", highPriorities.size(), unifiedDeliveryDriver, geoKey);
         return Mono.just(Page.create(highPriorities
-                .stream().limit(pnDelayerConfigs.getHighPriorityQueryLimit()).toList()));
+                .stream().limit(50).toList()));
     }
 
     @Override

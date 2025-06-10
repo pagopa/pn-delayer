@@ -2,7 +2,6 @@
   "Parameters": {
     "MinTasksNumber": "0",
     "MaxTasksNumber": "0",
-    "HighPriorityQueryLimit": "1000",
     "PaperDeliveryReadyToSendQueryLimit": "1000",
     "DeliveryDateDayOfWeek": "1",
     "DeliveryDateInterval": "1d",
@@ -16,6 +15,7 @@
     "SubmitPaperDeliveryJobInputTuplesParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
     "SubmitPaperDeliveryJobInputDriverEnvName": "PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER",
     "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST",
-    "DelayerToPaperChannelRuleState": "DISABLED"
+    "DelayerToPaperChannelRuleState": "DISABLED",
+    "PaperDeliveryKinesisSequenceNumberTtlSeconds": "86400"
   }
 }

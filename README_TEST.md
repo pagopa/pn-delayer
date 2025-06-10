@@ -86,6 +86,7 @@ Prima di eseguire un test completo è necessario lanciare lo script `src/test/re
   AWS_ACCESS_KEY_ID=PN-TEST
   AWS_ENDPOINT_URL=http://localhost:4566
   HIGH_PRIORITY_TABLE_NAME=pn-PaperDeliveryHighPriority
+  KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME=pn-PaperDeliveryKinesisEvent
   ```
 - Modifica del file integration.test.js rimuovendo `.skip` alla riga 5
 
