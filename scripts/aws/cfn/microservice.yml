@@ -132,6 +132,11 @@ Parameters:
     Description: 'Cut off duration for paper delivery. available value = 7d (weekly cut-off), 0d (no cut-off))'
     Default: 7d
 
+  PaperDeliveryKinesisSequenceNumberTtlSeconds:
+    Type: Number
+    Description: 'Kinesis sequence number TTL duration for paper delivery.'
+    Default: 86400 # 1 day in seconds
+
   VpcCidr:
     Type: String
     Description: 'VPC Cidr default'
@@ -626,6 +631,7 @@ Resources:
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
+          KINESIS_PAPER_DELIVERY_TTL_SECONDS: !Ref PaperDeliveryKinesisSequenceNumberTtlSeconds
       TracingConfig:
         Mode: Active
       Layers:
