@@ -107,6 +107,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
 
+  PaperDeliverySenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit'
+
+  PaperDeliverySenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
+
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
     Default: 1000
