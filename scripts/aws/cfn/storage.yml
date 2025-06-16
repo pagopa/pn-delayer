@@ -235,6 +235,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  PaperDeliveryStartWorkflowLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-paperDeliveryStartWorkflowLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   DelayerToPaperChannelLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -321,3 +332,6 @@ Outputs:
 
   SubmitPaperDeliveryJobLambdaName:
     Value: !Sub "${ProjectName}-delayer-submitPaperDeliveryJobLambda"
+
+  PaperDeliveryStartWorkflowLambdaName:
+    Value: !Sub "${ProjectName}-delayer-paperDeliveryStartWorkflowLambda"
