@@ -165,6 +165,21 @@ Resources:
           KeyType: "HASH"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
+
+  PaperDeliveryPrintCapacity:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveryPrintCapacity'
+      AttributeDefinitions:
+        - AttributeName: "period"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "period"
+          KeyType: "HASH"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
         AttributeName: "ttl"
         Enabled: true
       PointInTimeRecoverySpecification:
@@ -293,6 +308,13 @@ Outputs:
   KinesisPaperDeliveryEventTableArn:
     Description: ARN of dynamodb table containing Kinesis sequenceNumber for paper deliveries
     Value: !Sub '${KinesisPaperDeliveryEventTable.Arn}'
+
+  PaperDeliveryPrintCapacityTableName:
+    Description: Name of dynamodb table containing PaperDeliveryPrintCapacity
+    Value: !Ref PaperDeliveryPrintCapacity
+  PaperDeliveryPrintCapacityTableArn:
+    Description: ARN of dynamodb table containing PaperDeliveryPrintCapacity
+    Value: !Sub '${PaperDeliveryPrintCapacity.Arn}'
 
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn

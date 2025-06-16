@@ -107,6 +107,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
 
+  PaperDeliveryPrintCapacityTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
+
+  PaperDeliveryPrintCapacityTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
+
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
     Default: 1000
@@ -748,6 +756,7 @@ Resources:
           PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
           PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
+          PAPERDELIVERYPRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
       TracingConfig:
         Mode: Active
       Layers:
@@ -787,6 +796,13 @@ Resources:
               - dynamodb:BatchWriteItem
               - dynamodb:DeleteItem
             Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:BatchGetItem
+              - dynamodb:UpdateItem
+              - dynamodb:TransactWriteItems
+            Resource: !Ref PaperDeliveryPrintCapacityTableArn
           - Effect: Allow
             Action:
               - sqs:SendMessage
@@ -839,6 +855,7 @@ Resources:
           PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
           PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE: !Ref PaperDeliveryReadyToSendRecoveryDeliveryDate
+          PAPERDELIVERYPRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
       TracingConfig:
         Mode: Active
       Layers:
@@ -878,6 +895,13 @@ Resources:
               - dynamodb:BatchWriteItem
               - dynamodb:DeleteItem
             Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:BatchGetItem
+              - dynamodb:UpdateItem
+              - dynamodb:TransactWriteItems
+            Resource: !Ref PaperDeliveryPrintCapacityTableArn
           - Effect: Allow
             Action:
               - sqs:SendMessage
