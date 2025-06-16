@@ -107,6 +107,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
 
+  PaperDeliveryPrintCapacityTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
+
+  PaperDeliveryPrintCapacityTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
+
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
     Default: 1000
@@ -279,6 +287,10 @@ Parameters:
   DelayerToPaperChannelRecoveryLambdaName:
     Type: String
     Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
+
+  PaperDeliveryResidualCapacitySlaveLambdaName:
+    Type: String
+    Description: 'PaperDeliveryResidualCapacitySlaveLambda function name'
 
 Resources:
 
@@ -810,6 +822,90 @@ Resources:
       Targets:
         - Arn: !GetAtt DelayerToPaperChannelLambda.Arn
           Id: PnDelayerToPaperChannelLambdaTarget
+
+  #########################################################
+  ###      PaperDeliveryResidualCapacitySlaveLambda     ###
+  #########################################################
+
+  PaperDeliveryResidualCapacitySlaveLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PaperDeliveryResidualCapacitySlaveLambda}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PaperDeliveryResidualCapacitySlaveLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PaperDeliveryResidualCapacitySlaveLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryResidualCapacitySlaveLambda.zip"
+      Role: !GetAtt PaperDeliveryResidualCapacitySlaveLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverCapacitiesTableName
+          PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  PaperDeliveryResidualCapacitySlaveLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PaperDeliveryResidualCapacitySlaveLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PaperDeliveryResidualCapacitySlaveLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryResidualCapacitySlaveLambdaPolicy
+      Roles:
+        - !Ref PaperDeliveryResidualCapacitySlaveLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+            Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+            Resource:
+              - !Ref PaperDeliveryDriverUsedCapacitiesTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+            Resource:
+              - !Ref PaperDeliveryDriverCapacitiesTableArn
+
+  PaperDeliveryResidualCapacitySlaveLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperDeliveryResidualCapacitySlaveLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
 
   #########################################################
   ###         RecoveryLambda                ###
