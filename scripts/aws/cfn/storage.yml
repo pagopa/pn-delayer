@@ -181,19 +181,19 @@ Resources:
           AttributeType: "S"
         - AttributeName: "unifiedDeliveryDriverProvince"
           AttributeType: "S"
-        - AttributeName: "notificationSentAt"
+        - AttributeName: "sk"
           AttributeType: "S"
       KeySchema:
         - AttributeName: "ProductTypeProvince"
           KeyType: "HASH"
-        - AttributeName: "notificationSentAt"
+        - AttributeName: "sk"
           KeyType: "RANGE"
       GlobalSecondaryIndexes:
         - IndexName: "unifiedDeliveryDriverProvince-index"
           KeySchema:
             - AttributeName: "unifiedDeliveryDriverProvince"
               KeyType: "HASH"
-            - AttributeName: "notificationSentAt"
+            - AttributeName: "sk"
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
