@@ -107,6 +107,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
 
+  PaperDeliveryIncomingTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryIncoming'
+
+  PaperDeliveryIncomingTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
+
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
     Default: 1000
@@ -630,6 +638,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
+          PAPER_DELIVERY_INCOMING_TABLE_NAME: !Ref PaperDeliveryIncomingTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_PAPER_DELIVERY_TTL_SECONDS: !Ref PaperDeliveryKinesisSequenceNumberTtlSeconds
       TracingConfig:
@@ -680,7 +689,7 @@ Resources:
             Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
-            Resource: !Ref PaperDeliveryHighPriorityTableArn
+            Resource: !Ref PaperDeliveryIncomingTableArn
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility
