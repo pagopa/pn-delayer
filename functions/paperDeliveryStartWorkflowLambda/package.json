@@ -1,5 +1,5 @@
 {
-  "name": "PaperDeliveryStartWorkflowLambda",
+  "name": "paperDeliveryStartWorkflowLambda",
   "version": "1.0.0",
   "description": "AWS Lambda function to start the Paper Delivery workflow",
   "main": "index.js",
