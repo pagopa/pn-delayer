@@ -288,9 +288,9 @@ Parameters:
     Type: String
     Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
 
-  PaperDeliveryResidualCapacitySlaveLambdaName:
+  PaperDeliveryResidualCapacityLambdaName:
     Type: String
-    Description: 'PaperDeliveryResidualCapacitySlaveLambda function name'
+    Description: 'PaperDeliveryResidualCapacityLambda function name'
 
 Resources:
 
@@ -824,26 +824,26 @@ Resources:
           Id: PnDelayerToPaperChannelLambdaTarget
 
   #########################################################
-  ###      PaperDeliveryResidualCapacitySlaveLambda     ###
+  ###      PaperDeliveryResidualCapacityLambda     ###
   #########################################################
 
-  PaperDeliveryResidualCapacitySlaveLambdaSecGroup:
+  PaperDeliveryResidualCapacityLambdaSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub '${PaperDeliveryResidualCapacitySlaveLambda}-sec-group'
+      GroupDescription: !Sub '${PaperDeliveryResidualCapacityLambda}-sec-group'
       VpcId: !Ref VpcId
 
   # Lambda function
-  PaperDeliveryResidualCapacitySlaveLambda:
+  PaperDeliveryResidualCapacityLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Ref PaperDeliveryResidualCapacitySlaveLambdaName
+      FunctionName: !Ref PaperDeliveryResidualCapacityLambdaName
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
       Code:
         S3Bucket: !Ref MicroserviceBucketName
-        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryResidualCapacitySlaveLambda.zip"
-      Role: !GetAtt PaperDeliveryResidualCapacitySlaveLambdaRole.Arn
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryResidualCapacityLambda.zip"
+      Role: !GetAtt PaperDeliveryResidualCapacityLambdaRole.Arn
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
@@ -857,10 +857,10 @@ Resources:
       Timeout: 15
 
   # Lambda function role
-  PaperDeliveryResidualCapacitySlaveLambdaRole:
+  PaperDeliveryResidualCapacityLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ProjectName}-PaperDeliveryResidualCapacitySlaveLambdaRole
+      RoleName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaRole
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -874,12 +874,12 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   # Lambda function IAM policy
-  PaperDeliveryResidualCapacitySlaveLambdaPolicy:
+  PaperDeliveryResidualCapacityLambdaPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub ${ProjectName}-PaperDeliveryResidualCapacitySlaveLambdaPolicy
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaPolicy
       Roles:
-        - !Ref PaperDeliveryResidualCapacitySlaveLambdaRole
+        - !Ref PaperDeliveryResidualCapacityLambdaRole
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -898,12 +898,12 @@ Resources:
             Resource:
               - !Ref PaperDeliveryDriverCapacitiesTableArn
 
-  PaperDeliveryResidualCapacitySlaveLambdaAlarms:
+  PaperDeliveryResidualCapacityLambdaAlarms:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
-        FunctionName: !Ref PaperDeliveryResidualCapacitySlaveLambda
+        FunctionName: !Ref PaperDeliveryResidualCapacityLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 

@@ -1,6 +1,6 @@
 let options = {
     "sonar.organization": "pagopa",
-    "sonar.projectKey": "pagopa_pn-delayer-PaperDeliveryResidualCapacitySlaveLambda"
+    "sonar.projectKey": "pagopa_pn-delayer-paperDeliveryResidualCapacityLambda"
 }
 
 if (process.env.PR_NUM) {

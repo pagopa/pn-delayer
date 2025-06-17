@@ -1,5 +1,5 @@
 {
-  "name": "paperDeliveryResidualCapacitySlaveLambda",
+  "name": "paperDeliveryResidualCapacityLambda",
   "version": "1.0.0",
   "description": "AWS Lambda function to read the residual capacity.",
   "main": "index.js",
