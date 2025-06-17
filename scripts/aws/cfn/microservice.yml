@@ -99,6 +99,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryReadyToSend'
 
+  PaperDeliveryPrintCapacityTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
+
+  PaperDeliveryPrintCapacityTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
+
   KinesisPaperDeliveryEventTableName:
     Type: String
     Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
