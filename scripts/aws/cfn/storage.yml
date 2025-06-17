@@ -166,17 +166,17 @@ Resources:
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
 
-  PaperDeliveryPrintCapacity:
+  PaperDeliveryPrintCapacityCounter:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryPrintCapacity'
+      TableName: !Sub '${ProjectName}-PaperDeliveryPrintCapacityCounter'
       AttributeDefinitions:
-        - AttributeName: "period"
+        - AttributeName: "pk"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "period"
+        - AttributeName: "pk"
           KeyType: "HASH"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
@@ -309,12 +309,12 @@ Outputs:
     Description: ARN of dynamodb table containing Kinesis sequenceNumber for paper deliveries
     Value: !Sub '${KinesisPaperDeliveryEventTable.Arn}'
 
-  PaperDeliveryPrintCapacityTableName:
-    Description: Name of dynamodb table containing PaperDeliveryPrintCapacity
-    Value: !Ref PaperDeliveryPrintCapacity
-  PaperDeliveryPrintCapacityTableArn:
-    Description: ARN of dynamodb table containing PaperDeliveryPrintCapacity
-    Value: !Sub '${PaperDeliveryPrintCapacity.Arn}'
+  PaperDeliveryPrintCapacityCounterTableName:
+    Description: Name of dynamodb table containing PaperDeliveryPrintCapacityCounter
+    Value: !Ref PaperDeliveryPrintCapacityCounter
+  PaperDeliveryPrintCapacityCounterTableArn:
+    Description: ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter
+    Value: !Sub '${PaperDeliveryPrintCapacityCounter.Arn}'
 
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn

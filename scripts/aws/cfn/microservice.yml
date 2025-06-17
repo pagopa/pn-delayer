@@ -107,13 +107,13 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
 
-  PaperDeliveryPrintCapacityTableName:
+  PaperDeliveryPrintCapacityCounterTableName:
     Type: String
-    Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacityCounter'
 
-  PaperDeliveryPrintCapacityTableArn:
+  PaperDeliveryPrintCapacityCounterTableArn:
     Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter'
 
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
@@ -756,7 +756,7 @@ Resources:
           PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
           PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
-          PAPERDELIVERYPRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
+          PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
       TracingConfig:
         Mode: Active
       Layers:
@@ -802,7 +802,7 @@ Resources:
               - dynamodb:BatchGetItem
               - dynamodb:UpdateItem
               - dynamodb:TransactWriteItems
-            Resource: !Ref PaperDeliveryPrintCapacityTableArn
+            Resource: !Ref PaperDeliveryPrintCapacityCounterTableArn
           - Effect: Allow
             Action:
               - sqs:SendMessage
@@ -855,7 +855,7 @@ Resources:
           PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
           PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE: !Ref PaperDeliveryReadyToSendRecoveryDeliveryDate
-          PAPERDELIVERYPRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
+          PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
       TracingConfig:
         Mode: Active
       Layers:
@@ -901,7 +901,7 @@ Resources:
               - dynamodb:BatchGetItem
               - dynamodb:UpdateItem
               - dynamodb:TransactWriteItems
-            Resource: !Ref PaperDeliveryPrintCapacityTableArn
+            Resource: !Ref PaperDeliveryPrintCapacityCounterTableArn
           - Effect: Allow
             Action:
               - sqs:SendMessage
