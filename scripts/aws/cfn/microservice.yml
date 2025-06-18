@@ -103,6 +103,30 @@ Parameters:
     Type: String
     Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
 
+  PaperDeliverySenderCounterTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderCounter'
+
+  PaperDeliverySenderCounterTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderCounter'
+
+  PaperDeliverySenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit'
+
+  PaperDeliverySenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
+
+  PaperDeliveryIncomingTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryIncoming'
+
+  PaperDeliveryIncomingTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
+
   KinesisPaperDeliveryEventTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
@@ -281,6 +305,159 @@ Parameters:
     Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
 
 Resources:
+
+  SenderLimitComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !Ref BatchServiceRole
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-sender-limit-compute-environment'
+      ComputeResources:
+        MaxvCpus: !Ref MaxvCpus
+        Type: !Ref ComputeResourceType
+        SecurityGroupIds:
+          - !Ref BatchSecurityGroup
+        Subnets: !Split [ ",", !Ref SubnetsIds ]
+      State: ENABLED
+
+  SenderLimitJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      PropagateTags: true
+      JobDefinitionName: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
+      ContainerProperties:
+        Image: !Ref ContainerImageUri
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+        ResourceRequirements:
+          - Value: !Ref VCPU
+            Type: VCPU
+          - Value: !Ref Memory
+            Type: MEMORY
+        JobRoleArn: !GetAtt "SenderLimitTaskExecutionRole.Arn"
+        ExecutionRoleArn: !GetAtt "SenderLimitTaskExecutionRole.Arn"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref "BatchLogGroup"
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-sender-limit-logs'
+        Environment:
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYINCOMINGTABLENAME
+            Value: !Ref PaperDeliveryIncomingTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERCOUNTERTABLENAME
+            Value: !Ref PaperDeliverySenderCounterTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
+            Value: !Ref PaperDeliverySenderLimitTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
+            Value: !Ref PaperDeliveryDriverCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
+            Value: !Ref PaperDeliveryHighPriorityTableName
+
+      PlatformCapabilities:
+        - FARGATE
+      Tags:
+        Service: Batch
+        Name: JobDefinitionTag
+        Expected: MergeTag
+
+  SenderLimitJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref SenderLimitComputeEnvironment
+      State: ENABLED
+      Priority: 1
+      JobQueueName: pn-delayer-sender-limit-job-queue
+
+  SenderLimitServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  SenderLimitTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-delayer-sender-limit-taskexec-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:BatchGetItem
+                  - dynamodb:GetItem
+                Resource:
+                  - !Sub "${PaperDeliveryIncomingTableArn}"
+                  - !Sub "${PaperDeliveryIncomingTableArn}/*"
+                  - !Sub "${PaperDeliverySenderCounterTableArn}"
+                  - !Sub "${PaperDeliverySenderCounterTableArn}/*"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
+                  - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:TransactWriteItems
+                Resource:
+                  - !Sub "${PaperDeliveryIncomingTableArn}"
+                  - !Sub "${PaperDeliveryIncomingTableArn}/*"
+                  - !Sub "${PaperDeliveryHighPriorityTableArn}"
+                  - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub "${PaperDeliverySenderCounterTableArn}"
+                  - !Sub "${PaperDeliverySenderCounterTableArn}/*"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+
+  SenderLimitSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Batch Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
 
   ## Compute Environment
   ComputeEnvironment:
