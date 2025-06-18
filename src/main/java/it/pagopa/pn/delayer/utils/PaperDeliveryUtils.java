@@ -27,6 +27,18 @@ public class PaperDeliveryUtils {
     private final PnDelayerConfigs pnDelayerConfig;
 
 
+    /**
+     *
+     * @param deliveries righe di {@link PaperDeliveryHighPriority} aventi lo stesso CAP
+     *
+     * @param transactionRequest wrapper contenente le righe di PaperDeliveryHighPriority da eliminare e PaperDeliveryReadyToSend da inserire.
+     *                           In input queste liste arrivano vuote. In output questo metodo serve a valorizzarle.
+     *                           Queste liste saranno poi ridotte, prendendo in considerazione il numero della capacità residua della provincia.
+     *
+     * @param tuple tupla contenente capacità_dichiara-capacità_utilizzata per il CAP in input
+     * @return il numero di righe che passeranno dalla PaperDeliveryHighPriority alla PaperDeliveryReadyToSend prima di essere filtrate per capacità residua della provincia.
+     *
+     */
     public Integer filterAndPrepareDeliveries(List<PaperDeliveryHighPriority> deliveries, PaperDeliveryTransactionRequest transactionRequest, Tuple2<Integer, Integer> tuple) {
         List<PaperDeliveryHighPriority> filteredList = checkCapacityAndFilterList(tuple, deliveries);
         if (CollectionUtils.isEmpty(filteredList)) {
@@ -43,6 +55,14 @@ public class PaperDeliveryUtils {
                 Collections.emptyList() : paperDeliveryHighPriorities.stream().limit(Math.min(remainingCapacity, paperDeliveryHighPriorities.size())).toList();
     }
 
+    /**
+     * Questo metodo serve a ridurre la lista di righe della HighPriority e della ToSend in base alla capacità residua della provincia.
+     * Vengono eliminate dalle due tabelle le stesse richieste di PREPARE.
+     *
+     * @param tuple - capacità_dichiarata-capacità_usata
+     * @param transactionRequest - oggetto wrapper che contiene tutte le righe da eliminare nella HighPriority e tutte le righe da inserire nella ToSend
+     * @return transactionRequest con le liste ridotte in base alla capacità residua della provincia
+     */
     public PaperDeliveryTransactionRequest checkProvinceCapacityAndReduceDeliveries(Tuple2<Integer, Integer> tuple, PaperDeliveryTransactionRequest transactionRequest) {
         int remainingCapacity = tuple.getT1() - Math.max(tuple.getT2(), 0);
         if( remainingCapacity == 0) {
@@ -64,6 +84,11 @@ public class PaperDeliveryUtils {
                 transactionRequest.getPaperDeliveryReadyToSendList().size() == transactionRequest.getPaperDeliveryHighPriorityList().size();
     }
 
+    /**
+     * Metodo che raggruppa i CAP di uno stesso chunk di una stessa provincia
+     * @param paperDeliveryHighPriorities chunk di righe recuperate a DB di una stessa provincia
+     * @return una mappa con chiave CAP e valore lista di righe aventi lo stesso CAP della chiave
+     */
     public Map<String, List<PaperDeliveryHighPriority>> groupDeliveryOnCapAndOrderOnCreatedAt(List<PaperDeliveryHighPriority> paperDeliveryHighPriorities) {
         return paperDeliveryHighPriorities.stream()
                 .collect(Collectors.groupingBy(

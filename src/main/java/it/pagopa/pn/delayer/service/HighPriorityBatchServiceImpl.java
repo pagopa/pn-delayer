@@ -34,14 +34,15 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
 
     @Override
     public Mono<Void> initHighPriorityBatch(String pk, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch) {
-        return paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(PaperDeliveryHighPriority.retrieveunifiedDeliveryDriver(pk),
+        String unifiedDeliveryDriver = PaperDeliveryHighPriority.retrieveunifiedDeliveryDriver(pk);
+        return paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(unifiedDeliveryDriver,
                         PaperDeliveryHighPriority.retrieveGeoKey(pk), lastEvaluatedKey)
                 .flatMap(paperDeliveryHighPriorityPage -> {
                     if (CollectionUtils.isEmpty(paperDeliveryHighPriorityPage.items())) {
                         log.warn("No high priority records found for pk={}", pk);
                         return Mono.empty();
                     }
-                    return processChunk(paperDeliveryHighPriorityPage.items(), startExecutionBatch)
+                    return processChunk(paperDeliveryHighPriorityPage.items(), startExecutionBatch, unifiedDeliveryDriver)
                             .flatMap(unused -> {
                                 if (!CollectionUtils.isEmpty(paperDeliveryHighPriorityPage.lastEvaluatedKey())) {
                                     return initHighPriorityBatch(pk, paperDeliveryHighPriorityPage.lastEvaluatedKey(), startExecutionBatch);
@@ -52,29 +53,33 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
                 });
     }
 
-    private Mono<List<PaperDeliveryHighPriority>> processChunk(List<PaperDeliveryHighPriority> chunk, Instant startExecutionBatch) {
+    private Mono<List<PaperDeliveryHighPriority>> processChunk(List<PaperDeliveryHighPriority> chunk, Instant startExecutionBatch, String unifiedDeliveryDriver) {
         PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
         Instant deliveryWeek = paperDeliveryUtils.calculateDeliveryWeek(startExecutionBatch);
         PaperDeliveryHighPriority paperDeliveryHighPriority = chunk.get(0);
         var incrementCapacities = new ArrayList<IncrementUsedCapacityDto>();
-        return retrieveCapacities(paperDeliveryHighPriority.getProvince(), paperDeliveryHighPriority.getUnifiedDeliveryDriver(), paperDeliveryHighPriority.getTenderId(), deliveryWeek)
+        return retrieveCapacities(paperDeliveryHighPriority.getProvince(), unifiedDeliveryDriver, paperDeliveryHighPriority.getTenderId(), deliveryWeek)
                 .doOnNext(tuple -> log.info("Retrieved capacities for [{}] -> availableCapacity={}, usedCapacity={}",
-                        paperDeliveryHighPriority.getUnifiedDeliveryDriverGeoKey(), tuple.getT1(), tuple.getT2()))
-                .flatMap(tuple -> evaluateCapCapacity(chunk, paperDeliveryHighPriority.getUnifiedDeliveryDriver(), paperDeliveryHighPriority.getTenderId(), paperDeliveryHighPriority.getProvince(), deliveryWeek, transactionRequest, incrementCapacities)
+                        unifiedDeliveryDriver, tuple.getT1(), tuple.getT2()))
+                .flatMap(tuple -> evaluateCapCapacity(chunk, unifiedDeliveryDriver, paperDeliveryHighPriority.getTenderId(), deliveryWeek, transactionRequest)
                         .filter(paperDeliveryUtils::checkListsSize)
                         .map(request -> paperDeliveryUtils.checkProvinceCapacityAndReduceDeliveries(tuple, request)))
                 .filter(paperDeliveryUtils::checkListsSize)
-                .doOnNext(request -> request.getPaperDeliveryHighPriorityList().stream()
-                        .collect(Collectors.groupingBy(
-                                PaperDeliveryHighPriority::getCap,
-                                Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
-                        ))
-                        .forEach((key, value) -> incrementCapacities.add(new IncrementUsedCapacityDto(paperDeliveryHighPriority.getUnifiedDeliveryDriver(), key, value, deliveryWeek))))
-                .doOnNext(request -> incrementCapacities.add(new IncrementUsedCapacityDto(paperDeliveryHighPriority.getUnifiedDeliveryDriver(), paperDeliveryHighPriority.getProvince(), request.getPaperDeliveryHighPriorityList().size(), deliveryWeek)))
+                .doOnNext(request -> calculateCapUsedCapacitiesAfterFilterByResidualCapacityOfProvince(transactionRequest, incrementCapacities, unifiedDeliveryDriver,deliveryWeek))
+                .doOnNext(request -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, paperDeliveryHighPriority.getProvince(), request.getPaperDeliveryHighPriorityList().size(), deliveryWeek)))
                 .flatMap(unused -> paperDeliveryHighPriorityDAO.executeTransaction(transactionRequest.getPaperDeliveryHighPriorityList(), transactionRequest.getPaperDeliveryReadyToSendList())
                         .thenReturn(chunk))
                 .flatMap(unused -> updateCounters(incrementCapacities))
                 .thenReturn(chunk);
+    }
+
+    private void calculateCapUsedCapacitiesAfterFilterByResidualCapacityOfProvince(PaperDeliveryTransactionRequest request, List<IncrementUsedCapacityDto> incrementCapacities, String unifiedDeliveryDriver, Instant deliveryWeek) {
+        request.getPaperDeliveryHighPriorityList().stream()
+                .collect(Collectors.groupingBy(
+                        PaperDeliveryHighPriority::getCap,
+                        Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
+                ))
+                .forEach((key, value) -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, key, value, deliveryWeek)));
     }
 
     private Mono<Void> updateCounters(List<IncrementUsedCapacityDto> incrementCapacities) {
@@ -88,14 +93,28 @@ public class HighPriorityBatchServiceImpl implements HighPriorityBatchService {
                 .then();
     }
 
-    private Mono<PaperDeliveryTransactionRequest> evaluateCapCapacity(List<PaperDeliveryHighPriority> paperDeliveryHighPriorities, String unifiedDeliveryDriver, String tenderId, String province, Instant deliveryWeek, PaperDeliveryTransactionRequest transactionRequest, List<IncrementUsedCapacityDto> incrementCapacities) {
+    private Mono<PaperDeliveryTransactionRequest> evaluateCapCapacity(List<PaperDeliveryHighPriority> paperDeliveryHighPriorities, String unifiedDeliveryDriver, String tenderId, Instant deliveryWeek, PaperDeliveryTransactionRequest transactionRequest) {
         Map<String, List<PaperDeliveryHighPriority>> capMap = paperDeliveryUtils.groupDeliveryOnCapAndOrderOnCreatedAt(paperDeliveryHighPriorities);
         return Flux.fromIterable(capMap.entrySet())
-                .flatMap(entry -> processCapGroupAndUpdateCounter(entry.getKey(), entry.getValue(), unifiedDeliveryDriver, tenderId, deliveryWeek, transactionRequest, incrementCapacities))
+                .flatMap(entry -> processCapGroup(entry.getKey(), entry.getValue(), unifiedDeliveryDriver, tenderId, deliveryWeek, transactionRequest))
                 .then(Mono.just(transactionRequest));
     }
 
-    private Mono<Integer> processCapGroupAndUpdateCounter(String cap, List<PaperDeliveryHighPriority> deliveries, String unifiedDeliveryDriver, String tenderId, Instant deliveryWeek, PaperDeliveryTransactionRequest transactionRequest, List<IncrementUsedCapacityDto> incrementCapacities) {
+    /**
+     *
+     * @param cap CAP delle righe PaperDeliveryHighPriority
+     * @param deliveries righe di PaperDeliveryHighPriority aventi lo stesso CAP
+     * @param unifiedDeliveryDriver id del recapitista unificato - serve per recuperare le capacità dichiarate dal recapitista
+     * @param tenderId id della gara - serve per recuperare le capacità dichiarate dal recapitista
+     * @param deliveryWeek - data che indica lo startOfWeek della capacità da prendere in considerazione
+     * @param transactionRequest oggetto wrapper che contiene una prima bozza di righe di PaperDeliveryHighPriority da eliminare e PaperDeliveryReadyToSend da inserire.
+     *                           Questa lista sarà poi ridotta dopo questo processo, prendendo in considerazione il numero della capacità residua della provincia.
+     *                           In input al metodo queste liste sono vuote.
+     *                           In output sono valorizzate mediante il metodo {@link  PaperDeliveryUtils#filterAndPrepareDeliveries(List, PaperDeliveryTransactionRequest, Tuple2)}.
+     *
+     * @return il numero di spedizioni che passeranno da PaperDeliveryHighPriority a PaperDeliveryReadyToSend e le liste di PaperDeliveryTransactionRequest valorizzate.
+     */
+    private Mono<Integer> processCapGroup(String cap, List<PaperDeliveryHighPriority> deliveries, String unifiedDeliveryDriver, String tenderId, Instant deliveryWeek, PaperDeliveryTransactionRequest transactionRequest) {
         return retrieveCapacities(cap, unifiedDeliveryDriver, tenderId, deliveryWeek)
                 .doOnNext(tuple -> log.info("Retrieved capacities for [{}~{}] -> availableCapacity={}, usedCapacity={}",
                         unifiedDeliveryDriver, cap, tuple.getT1(), tuple.getT2()))
