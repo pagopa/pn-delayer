@@ -43,6 +43,21 @@ public class PaperDeliveryUtils {
                 Collections.emptyList() : paperDeliveryHighPriorities.stream().limit(Math.min(remainingCapacity, paperDeliveryHighPriorities.size())).toList();
     }
 
+    public PaperDeliveryTransactionRequest checkProvinceCapacityAndReduceDeliveries(Tuple2<Integer, Integer> tuple, PaperDeliveryTransactionRequest transactionRequest) {
+        int remainingCapacity = tuple.getT1() - Math.max(tuple.getT2(), 0);
+        if( remainingCapacity == 0) {
+            transactionRequest.getPaperDeliveryHighPriorityList().clear();
+            transactionRequest.getPaperDeliveryReadyToSendList().clear();
+        }else{
+            transactionRequest.setPaperDeliveryHighPriorityList(transactionRequest.getPaperDeliveryHighPriorityList().stream().limit(remainingCapacity).toList());
+            transactionRequest.setPaperDeliveryReadyToSendList(transactionRequest.getPaperDeliveryReadyToSendList()
+                    .stream().filter(paperDeliveryReadyToSend -> transactionRequest.getPaperDeliveryHighPriorityList().stream()
+                            .map(PaperDeliveryHighPriority::getRequestId).toList().contains(paperDeliveryReadyToSend.getRequestId()))
+                    .toList());
+        }
+        return transactionRequest;
+    }
+
     public boolean checkListsSize(PaperDeliveryTransactionRequest transactionRequest) {
         return !CollectionUtils.isEmpty(transactionRequest.getPaperDeliveryHighPriorityList()) &&
                 !CollectionUtils.isEmpty(transactionRequest.getPaperDeliveryReadyToSendList()) &&
@@ -62,7 +77,7 @@ public class PaperDeliveryUtils {
                         )
                 ));
     }
-    private List<PaperDeliveryReadyToSend> mapToPaperDeliveryReadyToSend(List<PaperDeliveryHighPriority> items, Integer capCapacity, Integer usedCapCapacity) {
+    public List<PaperDeliveryReadyToSend> mapToPaperDeliveryReadyToSend(List<PaperDeliveryHighPriority> items, Integer capCapacity, Integer usedCapCapacity) {
         List<PaperDeliveryReadyToSend> paperDeliveryReadyToSendList = items.stream()
                 .map(paperDeliveryHighPriority -> {
                     PaperDeliveryReadyToSend paperDeliveryReadyToSend = new PaperDeliveryReadyToSend();
