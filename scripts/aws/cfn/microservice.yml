@@ -103,6 +103,14 @@ Parameters:
     Type: String
     Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
 
+  PaperDeliverySenderCounterTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderCounter'
+
+  PaperDeliverySenderCounterTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderCounter'
+
   KinesisPaperDeliveryEventTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
@@ -114,6 +122,22 @@ Parameters:
   PaperDeliveryPrintCapacityCounterTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter'
+
+  PaperDeliveryIncomingTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryIncoming'
+
+  PaperDeliveryIncomingTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
+
+  PaperDeliverySenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit'
+
+  PaperDeliverySenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
 
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
@@ -638,6 +662,8 @@ Resources:
           REGION: !Sub ${AWS::Region}
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
+          PAPER_DELIVERY_SENDER_COUNTER_TABLE_NAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_INCOMING_TABLE_NAME: !Ref PaperDeliveryIncomingTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_PAPER_DELIVERY_TTL_SECONDS: !Ref PaperDeliveryKinesisSequenceNumberTtlSeconds
       TracingConfig:
@@ -689,6 +715,11 @@ Resources:
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource: !Ref PaperDeliveryHighPriorityTableArn
+          - Effect: Allow
+            Action: dynamodb:BatchWriteItem
+            Resource:
+              - !Ref PaperDeliverySenderCounterTableArn
+              - !Ref PaperDeliveryIncomingTableArn
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility
