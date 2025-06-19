@@ -103,6 +103,14 @@ Parameters:
     Type: String
     Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
 
+  PaperDeliverySenderCounterTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderCounter'
+
+  PaperDeliverySenderCounterTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderCounter'
+
   KinesisPaperDeliveryEventTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
@@ -114,6 +122,14 @@ Parameters:
   PaperDeliveryIncomingTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
+
+  PaperDeliverySenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit'
+
+  PaperDeliverySenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
 
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
@@ -637,6 +653,7 @@ Resources:
         Variables:
           REGION: !Sub ${AWS::Region}
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
+          PAPER_DELIVERY_SENDER_COUNTER_TABLE_NAME: !Ref PaperDeliverySenderCounterTableName
           PAPER_DELIVERY_INCOMING_TABLE_NAME: !Ref PaperDeliveryIncomingTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_PAPER_DELIVERY_TTL_SECONDS: !Ref PaperDeliveryKinesisSequenceNumberTtlSeconds
@@ -688,7 +705,12 @@ Resources:
             Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
-            Resource: !Ref PaperDeliveryIncomingTableArn
+            Resource: !Ref PaperDeliveryHighPriorityTableArn
+          - Effect: Allow
+            Action: dynamodb:BatchWriteItem
+            Resource:
+              - !Ref PaperDeliverySenderCounterTableArn
+              - !Ref PaperDeliveryIncomingTableArn
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility

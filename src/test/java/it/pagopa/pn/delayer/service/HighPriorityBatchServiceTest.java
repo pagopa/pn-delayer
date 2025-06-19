@@ -5,6 +5,8 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryHighPriorityDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
+import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -77,13 +79,17 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(page1))
                 .thenReturn(Mono.just(page2));
-        when(paperDeliveryUtils.checkCapacityAndFilterList(any(), anyList()))
-                .thenReturn(page1.items())
-                .thenReturn(page2.items());
         when(paperDeliveryUtils.groupDeliveryOnCapAndOrderOnCreatedAt(anyList()))
                 .thenReturn(Map.of("00100", page1.items()))
                 .thenReturn(Map.of("00100", page2.items()));
 
+        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
+        PaperDeliveryHighPriority paperDeliveryHighPriority = new PaperDeliveryHighPriority();
+        paperDeliveryHighPriority.setCap("cap");
+        transactionRequest.setPaperDeliveryHighPriorityList(List.of(paperDeliveryHighPriority));
+        transactionRequest.setPaperDeliveryReadyToSendList(List.of(new PaperDeliveryReadyToSend()));
+        when(paperDeliveryUtils.checkProvinceCapacityAndReduceDeliveries(any(), any()))
+                .thenReturn(transactionRequest);
 
         when(paperDeliveryHighPriorityDAO.executeTransaction(anyList(), anyList())).thenReturn(Mono.empty());
 
@@ -114,11 +120,17 @@ class HighPriorityBatchServiceTest {
         when(paperDeliveryUtils.checkListsSize(any())).thenReturn(true);
         when(paperDeliveryHighPriorityDAO.getPaperDeliveryHighPriority(anyString(), anyString(), anyMap()))
                 .thenReturn(Mono.just(page));
-        when(paperDeliveryUtils.checkCapacityAndFilterList(any(), anyList()))
-                .thenReturn(page.items());
         when(paperDeliveryUtils.groupDeliveryOnCapAndOrderOnCreatedAt(anyList()))
                 .thenReturn(Map.of("00100", page.items()));
         when(paperDeliveryHighPriorityDAO.executeTransaction(anyList(), anyList())).thenReturn(Mono.empty());
+
+        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
+        PaperDeliveryHighPriority paperDeliveryHighPriority = new PaperDeliveryHighPriority();
+        paperDeliveryHighPriority.setCap("cap");
+        transactionRequest.setPaperDeliveryHighPriorityList(List.of(paperDeliveryHighPriority));
+        transactionRequest.setPaperDeliveryReadyToSendList(List.of(new PaperDeliveryReadyToSend()));
+        when(paperDeliveryUtils.checkProvinceCapacityAndReduceDeliveries(any(), any()))
+                .thenReturn(transactionRequest);
 
         highPriorityService.initHighPriorityBatch("1~RM", new HashMap<>(), Instant.now()).block();
 
