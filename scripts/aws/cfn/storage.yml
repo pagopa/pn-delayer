@@ -131,14 +131,16 @@ Resources:
     Properties:
       TableName: !Sub '${ProjectName}-PaperDeliveryReadyToSend'
       AttributeDefinitions:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "sk"
           AttributeType: "S"
         - AttributeName: "requestId"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
           KeyType: "HASH"
-        - AttributeName: "requestId"
+        - AttributeName: "sk"
           KeyType: "RANGE"
       GlobalSecondaryIndexes:
         - IndexName: "requestId-index"
