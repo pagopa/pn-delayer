@@ -193,6 +193,29 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
+  PaperDeliverySenderCounterTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliverySenderCounter'
+      AttributeDefinitions:
+        - AttributeName: "deliveryDate"
+          AttributeType: "S"
+        - AttributeName: "sk"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "deliveryDate"
+          KeyType: "HASH"
+        - AttributeName: "sk"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
 
   ### Kinesis Data Stream: kinesis data stream for pn-delayer-inputs
   PnDelayerInputsKinesisDataStream:
@@ -316,6 +339,13 @@ Outputs:
   KinesisPaperDeliveryEventTableArn:
     Description: ARN of dynamodb table containing Kinesis sequenceNumber for paper deliveries
     Value: !Sub '${KinesisPaperDeliveryEventTable.Arn}'
+
+  PaperDeliverySenderCounterTableName:
+    Description: Name of dynamodb table containing PaperDeliverySenderCounter
+    Value: !Ref PaperDeliverySenderCounterTable
+  PaperDeliverySenderCounterTableArn:
+    Description: ARN of dynamodb table containing PaperDeliverySenderCounter
+    Value: !Sub '${PaperDeliverySenderCounterTable.Arn}'
 
   PaperDeliverySenderLimitTableName:
     Description: Name of dynamodb table containing PaperDeliverySenderLimit
