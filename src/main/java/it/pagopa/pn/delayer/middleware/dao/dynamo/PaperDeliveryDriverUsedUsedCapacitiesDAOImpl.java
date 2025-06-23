@@ -78,7 +78,6 @@ public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDelive
                         .build()))
                 .map(PaperDeliveryDriverUsedCapacities::getUsedCapacity)
                 .switchIfEmpty(Mono.just(0))
-                .doOnSuccess(item -> log.info("Retrieved used capacity for pk [{}] and deliveryWeek [{}] = {}",pk, deliveryDate, item))
                 .doOnError(e -> log.error("Error retrieving usedCapacity item with pk {}: {}", pk, e.getMessage()));
     }
 
