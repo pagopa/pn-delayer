@@ -99,6 +99,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryReadyToSend'
 
+  PaperDeliveryPrintCapacityTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
+
+  PaperDeliveryPrintCapacityTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
+
   KinesisPaperDeliveryEventTableName:
     Type: String
     Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
@@ -111,13 +119,17 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliverySenderCounter'
 
-  PaperDeliverySenderLimitTableName:
+  KinesisPaperDeliveryEventTableArn:
     Type: String
-    Description: 'DynamoDB table name for PaperDeliverySenderLimit'
+    Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
 
-  PaperDeliverySenderLimitTableArn:
+  PaperDeliveryPrintCapacityCounterTableName:
     Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacityCounter'
+
+  PaperDeliveryPrintCapacityCounterTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter'
 
   PaperDeliveryIncomingTableName:
     Type: String
@@ -127,9 +139,13 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
 
-  KinesisPaperDeliveryEventTableArn:
+  PaperDeliverySenderLimitTableName:
     Type: String
-    Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit'
+
+  PaperDeliverySenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
 
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
@@ -303,6 +319,14 @@ Parameters:
   DelayerToPaperChannelRecoveryLambdaName:
     Type: String
     Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
+
+  PaperDeliveryResidualCapacityLambdaName:
+    Type: String
+    Description: 'PaperDeliveryResidualCapacityLambda function name'
+
+  PaperDeliveryStartWorkflowLambdaName:
+    Type: String
+    Description: 'PaperDeliveryStartWorkflowLambda function name'
 
 Resources:
 
@@ -807,6 +831,8 @@ Resources:
           REGION: !Sub ${AWS::Region}
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
+          PAPER_DELIVERY_SENDER_COUNTER_TABLE_NAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_INCOMING_TABLE_NAME: !Ref PaperDeliveryIncomingTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_PAPER_DELIVERY_TTL_SECONDS: !Ref PaperDeliveryKinesisSequenceNumberTtlSeconds
       TracingConfig:
@@ -858,6 +884,11 @@ Resources:
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource: !Ref PaperDeliveryHighPriorityTableArn
+          - Effect: Allow
+            Action: dynamodb:BatchWriteItem
+            Resource:
+              - !Ref PaperDeliverySenderCounterTableArn
+              - !Ref PaperDeliveryIncomingTableArn
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility
@@ -925,6 +956,7 @@ Resources:
           PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
           PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
+          PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
       TracingConfig:
         Mode: Active
       Layers:
@@ -966,6 +998,13 @@ Resources:
             Resource: !Ref PaperDeliveryReadyToSendTableArn
           - Effect: Allow
             Action:
+              - dynamodb:GetItem
+              - dynamodb:BatchGetItem
+              - dynamodb:UpdateItem
+              - dynamodb:TransactWriteItems
+            Resource: !Ref PaperDeliveryPrintCapacityCounterTableArn
+          - Effect: Allow
+            Action:
               - sqs:SendMessage
             Resource: !Ref  DelayerToPaperChannelQueueARN
 
@@ -987,6 +1026,162 @@ Resources:
       Targets:
         - Arn: !GetAtt DelayerToPaperChannelLambda.Arn
           Id: PnDelayerToPaperChannelLambdaTarget
+
+  #########################################################
+  ###      PaperDeliveryResidualCapacityLambda     ###
+  #########################################################
+
+  PaperDeliveryResidualCapacityLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PaperDeliveryResidualCapacityLambda}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PaperDeliveryResidualCapacityLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PaperDeliveryResidualCapacityLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryResidualCapacityLambda.zip"
+      Role: !GetAtt PaperDeliveryResidualCapacityLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverCapacitiesTableName
+          PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  PaperDeliveryResidualCapacityLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PaperDeliveryResidualCapacityLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaPolicy
+      Roles:
+        - !Ref PaperDeliveryResidualCapacityLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+            Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+            Resource:
+              - !Ref PaperDeliveryDriverUsedCapacitiesTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+            Resource:
+              - !Ref PaperDeliveryDriverCapacitiesTableArn
+
+  PaperDeliveryResidualCapacityLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperDeliveryResidualCapacityLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+
+  #########################################################
+  ###         PaperDeliveryStartWorkflowLambda          ###
+  #########################################################
+
+  PaperDeliveryStartWorkflowLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PaperDeliveryStartWorkflowLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PaperDeliveryStartWorkflowLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PaperDeliveryStartWorkflowLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryStartWorkflowLambda.zip"
+      Role: !GetAtt PaperDeliveryStartWorkflowLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPER_DELIVERY_SENDER_COUNTER_TABLENAME: !Ref PaperDeliverySenderCounterTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  PaperDeliveryStartWorkflowLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PaperDeliveryStartWorkflowLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PaperDeliveryStartWorkflowLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryStartWorkflowLambdaPolicy
+      Roles:
+        - !Ref PaperDeliveryStartWorkflowLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+            Resource: !Ref PaperDeliverySenderCounterTableArn
+
+  PaperDeliveryStartWorkflowLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperDeliveryStartWorkflowLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
 
   #########################################################
   ###         RecoveryLambda                ###
@@ -1016,6 +1211,7 @@ Resources:
           PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
           PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE: !Ref PaperDeliveryReadyToSendRecoveryDeliveryDate
+          PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
       TracingConfig:
         Mode: Active
       Layers:
@@ -1055,6 +1251,13 @@ Resources:
               - dynamodb:BatchWriteItem
               - dynamodb:DeleteItem
             Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:BatchGetItem
+              - dynamodb:UpdateItem
+              - dynamodb:TransactWriteItems
+            Resource: !Ref PaperDeliveryPrintCapacityCounterTableArn
           - Effect: Allow
             Action:
               - sqs:SendMessage
