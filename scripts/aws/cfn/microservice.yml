@@ -320,6 +320,10 @@ Parameters:
     Type: String
     Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
 
+  PaperDeliveryResidualCapacityLambdaName:
+    Type: String
+    Description: 'PaperDeliveryResidualCapacityLambda function name'
+
 Resources:
 
   ## Compute Environment
@@ -865,6 +869,90 @@ Resources:
       Targets:
         - Arn: !GetAtt DelayerToPaperChannelLambda.Arn
           Id: PnDelayerToPaperChannelLambdaTarget
+
+  #########################################################
+  ###      PaperDeliveryResidualCapacityLambda     ###
+  #########################################################
+
+  PaperDeliveryResidualCapacityLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PaperDeliveryResidualCapacityLambda}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PaperDeliveryResidualCapacityLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PaperDeliveryResidualCapacityLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryResidualCapacityLambda.zip"
+      Role: !GetAtt PaperDeliveryResidualCapacityLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverCapacitiesTableName
+          PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  PaperDeliveryResidualCapacityLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PaperDeliveryResidualCapacityLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaPolicy
+      Roles:
+        - !Ref PaperDeliveryResidualCapacityLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+            Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+            Resource:
+              - !Ref PaperDeliveryDriverUsedCapacitiesTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+            Resource:
+              - !Ref PaperDeliveryDriverCapacitiesTableArn
+
+  PaperDeliveryResidualCapacityLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperDeliveryResidualCapacityLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
 
   #########################################################
   ###         RecoveryLambda                ###
