@@ -324,6 +324,10 @@ Parameters:
     Type: String
     Description: 'PaperDeliveryResidualCapacityLambda function name'
 
+  PaperDeliveryStartWorkflowLambdaName:
+    Type: String
+    Description: 'PaperDeliveryStartWorkflowLambda function name'
+
 Resources:
 
   ## Compute Environment
@@ -951,6 +955,78 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
         FunctionName: !Ref PaperDeliveryResidualCapacityLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+
+  #########################################################
+  ###         PaperDeliveryStartWorkflowLambda          ###
+  #########################################################
+
+  PaperDeliveryStartWorkflowLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PaperDeliveryStartWorkflowLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PaperDeliveryStartWorkflowLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PaperDeliveryStartWorkflowLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryStartWorkflowLambda.zip"
+      Role: !GetAtt PaperDeliveryStartWorkflowLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPER_DELIVERY_SENDER_COUNTER_TABLENAME: !Ref PaperDeliverySenderCounterTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  PaperDeliveryStartWorkflowLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PaperDeliveryStartWorkflowLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PaperDeliveryStartWorkflowLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryStartWorkflowLambdaPolicy
+      Roles:
+        - !Ref PaperDeliveryStartWorkflowLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+            Resource: !Ref PaperDeliverySenderCounterTableArn
+
+  PaperDeliveryStartWorkflowLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperDeliveryStartWorkflowLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 
