@@ -10,8 +10,11 @@ exports.handleEvent = async () => {
     .filter(sk => sk && sk.startsWith('EVAL~'))
     .map(sk => sk.replace('EVAL~', ''));
 
-  return {
+  const response = {
     deliveryWeek,
     provinces
   };
+
+  console.log('Responses:', JSON.stringify(response));
+  return response;
 };

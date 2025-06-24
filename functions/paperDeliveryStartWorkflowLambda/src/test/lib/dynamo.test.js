@@ -24,12 +24,12 @@ describe('retrieveProvinceWithPaperDeliveries', () => {
       }
     });
 
-    process.env.PAPER_DELIVERY_SENDER_COUNTER_TABLENAME = 'testCounterTable';
+    process.env.PAPER_DELIVERY_COUNTER_TABLENAME = 'testCounterTable';
   });
 
   afterEach(() => {
     sinon.restore();
-    delete process.env.PAPER_DELIVERY_SENDER_COUNTER_TABLENAME;
+    delete process.env.PAPER_DELIVERY_COUNTER_TABLENAME;
   });
 
   it('return item founded on CounterTable', async () => {
