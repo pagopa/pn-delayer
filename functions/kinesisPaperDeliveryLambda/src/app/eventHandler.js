@@ -1,52 +1,79 @@
 const { extractKinesisData } = require("./lib/kinesis");
-const { batchWriteHighPriorityRecords, batchWriteKinesisSequenceNumberRecords, batchGetKinesisSequenceNumberRecords } = require("./lib/dynamo");
-const { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord, buildPaperDeliveryKinesisEventRecord } = require("./lib/utils");
+const {
+  batchWriteIncomingRecords,
+  batchWriteEvalCounter,
+  updateExcludeCounter,
+  batchWriteKinesisSequenceNumberRecords,
+  batchGetKinesisSequenceNumberRecords
+} = require("./lib/dynamo");
+const {
+  enrichWithSk,
+  buildPaperDeliveryIncomingRecord,
+  buildPaperDeliveryKinesisEventRecord,
+  groupRecordsByProvince,
+  groupRecordsByProductAndProvince
+} = require("./lib/utils");
 
 exports.handleEvent = async (event) => {
   console.log("Event received:", JSON.stringify(event));
 
   const kinesisData = extractKinesisData(event);
-  console.log(`KinesisData.length: ${kinesisData.length}`);
-  let batchItemFailures = [];
-  let alreadyEvaluatedEvents = []
-
   if (!kinesisData || kinesisData.length === 0) {
     console.log("No events to process");
-    return { batchItemFailures };
+    return { batchItemFailures: [] };
   }
 
-  let paperDeliveryHighPriorityRecords = kinesisData.map(event => ({entity : {...buildPaperDeliveryHighPriorityRecord(event)}, kinesisSeqNumber: event.kinesisSeqNumber}))
-  enrichWithCreatedAt(paperDeliveryHighPriorityRecords);
+  let batchItemFailures = [];
+  let paperDeliveryIncomingRecords = kinesisData.map(event => ({
+    entity: { ...buildPaperDeliveryIncomingRecord(event) },
+    kinesisSeqNumber: event.kinesisSeqNumber
+  }));
+  enrichWithSk(paperDeliveryIncomingRecords);
 
-  alreadyEvaluatedEvents = await batchGetKinesisSequenceNumberRecords(paperDeliveryHighPriorityRecords.map(record => record.kinesisSeqNumber));
-  console.log(`Already evaluated events: ${alreadyEvaluatedEvents}`);
-
-  if (alreadyEvaluatedEvents && alreadyEvaluatedEvents.length > 0) {
+  const alreadyEvaluatedEvents = await batchGetKinesisSequenceNumberRecords(
+    paperDeliveryIncomingRecords.map(record => record.kinesisSeqNumber)
+  );
+  if (alreadyEvaluatedEvents.length > 0) {
     console.log("Skipping already evaluated events");
-    paperDeliveryHighPriorityRecords = paperDeliveryHighPriorityRecords.filter(record => !alreadyEvaluatedEvents.includes(record.kinesisSeqNumber));
+    paperDeliveryIncomingRecords = paperDeliveryIncomingRecords.filter(
+      record => !alreadyEvaluatedEvents.includes(record.kinesisSeqNumber)
+    );
   }
 
-  try {
-    batchItemFailures = await batchWriteHighPriorityRecords(paperDeliveryHighPriorityRecords);
-  } catch (error) {
-    console.error("Error processing event", error);
+  if (paperDeliveryIncomingRecords.length > 0) {
+    try {
+      const groupedProvinceRecords = groupRecordsByProvince(paperDeliveryIncomingRecords);
+      const groupedProductTypeProvinceRecords = groupRecordsByProductAndProvince(paperDeliveryIncomingRecords);
+
+      for (const operation of [
+        { func: batchWriteEvalCounter, data: groupedProvinceRecords },
+        { func: updateExcludeCounter, data: groupedProductTypeProvinceRecords },
+        { func: batchWriteIncomingRecords, data: paperDeliveryIncomingRecords }
+      ]) {
+        batchItemFailures = await operation.func(operation.data, batchItemFailures);
+        paperDeliveryIncomingRecords = filterFailedRecords(paperDeliveryIncomingRecords, batchItemFailures);
+        if (paperDeliveryIncomingRecords.length === 0) break;
+      }
+    } catch (error) {
+      console.error("Error processing event", error);
+    }
   }
 
-  if (batchItemFailures.length > 0) {
-    console.log("Process finished with errors!");
-    paperDeliveryHighPriorityRecords = paperDeliveryHighPriorityRecords.filter(record => !batchItemFailures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber));
-  }
-
-  if(paperDeliveryHighPriorityRecords.length === 0) {
+  if (paperDeliveryIncomingRecords.length > 0) {
+    const sequenceNumbers = paperDeliveryIncomingRecords.map(record =>
+      buildPaperDeliveryKinesisEventRecord(record.kinesisSeqNumber)
+    );
+    await batchWriteKinesisSequenceNumberRecords(sequenceNumbers);
+    console.log(`Processed ${paperDeliveryIncomingRecords.length} records successfully`);
+  } else {
     console.log("No new records to write to Kinesis sequence number table");
-    return { batchItemFailures };
   }
 
-  const sequenceNumbers = paperDeliveryHighPriorityRecords.map(record => buildPaperDeliveryKinesisEventRecord(record.kinesisSeqNumber));
-  await batchWriteKinesisSequenceNumberRecords(sequenceNumbers);
-  console.log(`Processed ${paperDeliveryHighPriorityRecords.length} records successfully`);
   return { batchItemFailures };
 };
 
-
-
+function filterFailedRecords(records, failures) {
+  return records.filter(record =>
+    !failures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber)
+  );
+}

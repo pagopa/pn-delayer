@@ -111,13 +111,13 @@ Parameters:
     Type: String
     Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
 
-  PaperDeliverySenderCounterTableName:
+  PaperDeliveryCounterTableName:
     Type: String
-    Description: 'DynamoDB table name for PaperDeliverySenderCounter'
+    Description: 'DynamoDB table name for PaperDeliveryCounter'
 
-  PaperDeliverySenderCounterTableArn:
+  PaperDeliveryCounterTableArn:
     Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliverySenderCounter'
+    Description: 'ARN of dynamodb table containing PaperDeliveryCounter'
 
   KinesisPaperDeliveryEventTableArn:
     Type: String
@@ -176,6 +176,11 @@ Parameters:
     Type: Number
     Description: 'Kinesis sequence number TTL duration for paper delivery.'
     Default: 86400 # 1 day in seconds
+
+  PaperDeliveryCounterTtlDays:
+    Type: Number
+    Description: 'Kinesis sequence number TTL duration in days for paper delivery.'
+    Default: 14
 
   VpcCidr:
     Type: String
@@ -371,7 +376,7 @@ Resources:
           - Name: PN_DELAYER_DAO_PAPERDELIVERYINCOMINGTABLENAME
             Value: !Ref PaperDeliveryIncomingTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERCOUNTERTABLENAME
-            Value: !Ref PaperDeliverySenderCounterTableName
+            Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
             Value: !Ref PaperDeliverySenderLimitTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
@@ -447,8 +452,8 @@ Resources:
                 Resource:
                   - !Sub "${PaperDeliveryIncomingTableArn}"
                   - !Sub "${PaperDeliveryIncomingTableArn}/*"
-                  - !Sub "${PaperDeliverySenderCounterTableArn}"
-                  - !Sub "${PaperDeliverySenderCounterTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
                   - !Sub "${PaperDeliverySenderLimitTableArn}"
                   - !Sub "${PaperDeliverySenderLimitTableArn}/*"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
@@ -466,8 +471,8 @@ Resources:
                   - dynamodb:PutItem
                   - dynamodb:UpdateItem
                 Resource:
-                  - !Sub "${PaperDeliverySenderCounterTableArn}"
-                  - !Sub "${PaperDeliverySenderCounterTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
                   - !Sub "${PaperDeliverySenderLimitTableArn}"
                   - !Sub "${PaperDeliverySenderLimitTableArn}/*"
 
@@ -831,10 +836,11 @@ Resources:
           REGION: !Sub ${AWS::Region}
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
-          PAPER_DELIVERY_SENDER_COUNTER_TABLE_NAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_COUNTER_TABLE_NAME: !Ref PaperDeliveryCounterTableName
           PAPER_DELIVERY_INCOMING_TABLE_NAME: !Ref PaperDeliveryIncomingTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_PAPER_DELIVERY_TTL_SECONDS: !Ref PaperDeliveryKinesisSequenceNumberTtlSeconds
+          KINESIS_PAPER_DELIVERY_COUNTER_TTL_DAYS: !Ref PaperDeliveryCounterTtlDays
       TracingConfig:
         Mode: Active
       Layers:
@@ -887,7 +893,7 @@ Resources:
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource:
-              - !Ref PaperDeliverySenderCounterTableArn
+              - !Ref PaperDeliveryCounterTableArn
               - !Ref PaperDeliveryIncomingTableArn
           - Effect: Allow
             Action:
@@ -1135,7 +1141,7 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          PAPER_DELIVERY_SENDER_COUNTER_TABLENAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_COUNTER_TABLENAME: !Ref PaperDeliveryCounterTableName
       TracingConfig:
         Mode: Active
       Layers:
@@ -1172,7 +1178,7 @@ Resources:
           - Effect: Allow
             Action:
               - dynamodb:Query
-            Resource: !Ref PaperDeliverySenderCounterTableArn
+            Resource: !Ref PaperDeliveryCounterTableArn
 
   PaperDeliveryStartWorkflowLambdaAlarms:
     Type: AWS::CloudFormation::Stack

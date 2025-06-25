@@ -26,26 +26,85 @@
         }
       });
 
-      process.env.HIGH_PRIORITY_TABLE_NAME = 'TestHighPriorityTable';
-      process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME = 'TestKinesisTable';
+      process.env.PAPER_DELIVERY_INCOMING_TABLE_NAME = 'TestIncomingTable';
+      process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME = "KinesisPaperDeliveryEventTable";
+      process.env.PAPER_DELIVERY_COUNTER_TABLE_NAME = 'TestCounterTable';
       process.env.BATCH_SIZE = '25';
     });
 
-    afterEach(() => {
-      sinon.restore();
-      delete process.env.HIGH_PRIORITY_TABLE_NAME;
-      delete process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
-      delete process.env.BATCH_SIZE;
+    describe('batchWriteEvalCounterRecord', () => {
+      it('handle successful batch write', async () => {
+        const records = {
+          RM: [
+            { entity: { requestId: '1' }, kinesisSeqNumber: 'seq1' }
+          ],
+          NA: [
+            { entity: { requestId: '2' }, kinesisSeqNumber: 'seq2' }
+          ]
+        };
+
+        mockSend.resolves({ UnprocessedItems: {} });
+        const result = await dynamo.batchWriteEvalCounter(records, []);
+        expect(mockSend.calledOnce).to.be.true;
+        expect(result).to.deep.equal([]);
+        expect(mockSend.firstCall.args[0]).to.be.instanceOf(BatchWriteCommand);
+      });
+
+      it('handle UnprocessedItems', async () => {
+        const records = {
+          RM: [
+            { entity: { sk: 'EVAL~RM' }, kinesisSeqNumber: 'seq1' }
+          ],
+          NA: [
+            { entity: { sk: 'EVAL~NA' }, kinesisSeqNumber: 'seq2' }
+          ]
+        };
+
+        mockSend.resolves({
+          UnprocessedItems: {
+            TestCounterTable: [
+              { PutRequest: { Item: { sk: { S: 'EVAL~RM' } } } }
+            ]
+          }
+        });
+        const result = await dynamo.batchWriteEvalCounter(records, []);
+        expect(result).to.deep.equal([{ itemIdentifier: 'seq1' }]);
+      });
+
+      it('handle errors on batch write', async () => {
+        const records = {
+          RM: [
+            { entity: { requestId: '1' }, kinesisSeqNumber: 'seq1' }
+          ],
+          NA: [
+            { entity: { requestId: '2' }, kinesisSeqNumber: 'seq2' }
+          ]
+        };
+        mockSend.rejects(new Error('fail'));
+        const result = await dynamo.batchWriteEvalCounter(records, []);
+        expect(result).to.deep.equal([
+          { itemIdentifier: 'seq1' },
+          { itemIdentifier: 'seq2' }
+        ]);
+      });
+
+      it('handle empty array', async () => {
+        const records = {};
+        mockSend.resolves({ UnprocessedItems: {} });
+        const result = await dynamo.batchWriteEvalCounter(records, []);
+        expect(result).to.deep.equal([]);
+      });
+   
     });
 
-    describe('batchWriteHighPriorityRecords', () => {
+    describe('batchWriteIncomingRecords', () => {
       it('handle successful batch write', async () => {
         const records = [
           { entity: { requestId: '1' }, kinesisSeqNumber: 'seq1' }
         ];
         mockSend.resolves({ UnprocessedItems: {} });
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWriteIncomingRecords(records, []);
 
         expect(mockSend.calledOnce).to.be.true;
         expect(result).to.deep.equal([]);
@@ -58,13 +117,13 @@
         ];
         mockSend.resolves({
           UnprocessedItems: {
-            TestHighPriorityTable: [
+            TestIncomingTable: [
               { PutRequest: { Item: { requestId: { S: '1' } } } }
             ]
           }
         });
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWriteIncomingRecords(records, []);
 
         expect(result).to.deep.equal([{ itemIdentifier: 'seq1' }]);
       });
@@ -75,7 +134,7 @@
         ];
         mockSend.rejects(new Error('fail'));
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWriteIncomingRecords(records, []);
 
         expect(result).to.deep.equal([{ itemIdentifier: 'seq1' }]);
       });
@@ -84,7 +143,7 @@
         const records = [];
         mockSend.resolves({ UnprocessedItems: {} });
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWriteIncomingRecords(records, []);
 
         expect(result).to.deep.equal([]);
       });
@@ -122,7 +181,7 @@
         const keys = ['seq1', 'seq2'];
         mockSend.resolves({
           Responses: {
-            TestKinesisTable: [
+            KinesisPaperDeliveryEventTable: [
               { sequenceNumber: 'seq1' },
               { sequenceNumber: 'seq2' }
             ]
