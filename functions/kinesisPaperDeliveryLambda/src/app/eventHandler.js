@@ -1,7 +1,6 @@
 const { extractKinesisData } = require("./lib/kinesis");
 const {
   batchWriteIncomingRecords,
-  batchWriteEvalCounter,
   updateExcludeCounter,
   batchWriteKinesisSequenceNumberRecords,
   batchGetKinesisSequenceNumberRecords
@@ -10,7 +9,6 @@ const {
   enrichWithSk,
   buildPaperDeliveryIncomingRecord,
   buildPaperDeliveryKinesisEventRecord,
-  groupRecordsByProvince,
   groupRecordsByProductAndProvince
 } = require("./lib/utils");
 
@@ -42,11 +40,9 @@ exports.handleEvent = async (event) => {
 
   if (paperDeliveryIncomingRecords.length > 0) {
     try {
-      const groupedProvinceRecords = groupRecordsByProvince(paperDeliveryIncomingRecords);
       const groupedProductTypeProvinceRecords = groupRecordsByProductAndProvince(paperDeliveryIncomingRecords);
 
       for (const operation of [
-        { func: batchWriteEvalCounter, data: groupedProvinceRecords },
         { func: updateExcludeCounter, data: groupedProductTypeProvinceRecords },
         { func: batchWriteIncomingRecords, data: paperDeliveryIncomingRecords }
       ]) {

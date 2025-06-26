@@ -38,17 +38,6 @@ function buildPaperDeliveryKinesisEventRecord(sequenceNumber) {
   };
 };
 
-const groupRecordsByProvince = (records) => {
-  return records.reduce((acc, record) => {
-    const key = record.entity.province;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(record);
-    return acc;
-  }, {});
-};
-
 const groupRecordsByProductAndProvince = (records) => {
   return records.reduce((acc, record) => {
     const key = `${record.entity.productType}~${record.entity.province}`;
@@ -60,4 +49,4 @@ const groupRecordsByProductAndProvince = (records) => {
   }, {});
 };
 
-module.exports = { enrichWithSk, buildPaperDeliveryIncomingRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProvince, groupRecordsByProductAndProvince };
+module.exports = { enrichWithSk, buildPaperDeliveryIncomingRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince };

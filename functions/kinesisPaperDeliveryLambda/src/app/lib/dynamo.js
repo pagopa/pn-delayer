@@ -76,55 +76,6 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
     return batchItemFailures;
 }
 
-async function batchWriteEvalCounter(groupedRecords, batchItemFailures) {
-     const deliveryDate = getDeliveryWeek();
-    let ttl = calculateTtl();
-    const params = {
-        RequestItems: {
-          [counterTableName]: Object.keys(groupedRecords).map(key => ({
-            PutRequest: {
-              Item: {
-                  deliveryDate: deliveryDate,
-                  sk: `EVAL~${key}`,
-                  ttl: ttl
-              }
-            }
-          }))
-        }
-    }
-
-    try {
-        const command = new BatchWriteCommand(params);
-        const response = await docClient.send(command);
-        console.log(`Batch write successful for ${groupedRecords.length} items.`);
-
-        const writeRequests = response.UnprocessedItems[counterTableName];
-        if (writeRequests) {
-          const failedIDs = [];
-          console.log(`Unprocessed items: ${writeRequests.length}`);
-          for (const writeRequest of writeRequests) {
-            const unprocessedEntity = writeRequest.PutRequest.Item;
-            const failedRecords = groupedRecords[unprocessedEntity.sk.S.split('~')[1]];
-            if (failedRecords) {
-              failedIDs.push(...failedRecords.map(record => record.kinesisSeqNumber));
-            }
-          }
-          batchItemFailures = batchItemFailures.concat(failedIDs.map((i) => {
-            return { itemIdentifier: i };
-          }));
-          console.warn("batchItemFailures:" + JSON.stringify(batchItemFailures));
-        }
-      } catch (error) {
-        console.error('Error in batch write:', error);
-        batchItemFailures = batchItemFailures.concat(
-          Object.values(groupedRecords)
-            .flat()
-            .map(record => ({ itemIdentifier: record.kinesisSeqNumber }))
-        );
-      }
-      return batchItemFailures;
-}
-
 async function batchWriteIncomingRecords(paperDeliveryIncomingRecords, batchItemFailures) {
   const batch_size = process.env.BATCH_SIZE;
   console.log(`Batch size: ${batch_size}`);
@@ -205,7 +156,6 @@ async function batchGetKinesisSequenceNumberRecords(keys) {
 }
 
 module.exports = { batchWriteIncomingRecords,
-                   batchWriteEvalCounter,
                    updateExcludeCounter,
                    batchWriteKinesisSequenceNumberRecords,
                    batchGetKinesisSequenceNumberRecords };
