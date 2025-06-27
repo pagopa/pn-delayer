@@ -63,11 +63,22 @@ Resources:
           AttributeType: "S"
         - AttributeName: "activationDateFrom"
           AttributeType: "S"
+        - AttributeName: "tenderIdGeoKey"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
           KeyType: "HASH"
         - AttributeName: "activationDateFrom"
           KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "tenderIdGeoKey-index"
+          KeySchema:
+            - AttributeName: "tenderIdGeoKey"
+              KeyType: "HASH"
+            - AttributeName: "activationDateFrom"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
