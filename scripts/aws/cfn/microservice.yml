@@ -147,6 +147,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
 
+  PaperDeliveryUsedSenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryUsedSenderLimit'
+
+  PaperDeliveryUsedSenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryUsedSenderLimit'
+
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
     Default: 1000
@@ -374,6 +382,8 @@ Resources:
             Value: !Ref PaperDeliverySenderCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
             Value: !Ref PaperDeliverySenderLimitTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME
+            Value: !Ref PaperDeliveryUsedSenderLimitTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
@@ -451,6 +461,8 @@ Resources:
                   - !Sub "${PaperDeliverySenderCounterTableArn}/*"
                   - !Sub "${PaperDeliverySenderLimitTableArn}"
                   - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
               - Effect: Allow
@@ -470,6 +482,8 @@ Resources:
                   - !Sub "${PaperDeliverySenderCounterTableArn}/*"
                   - !Sub "${PaperDeliverySenderLimitTableArn}"
                   - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
 
   SenderLimitSecurityGroup:
     Type: AWS::EC2::SecurityGroup
