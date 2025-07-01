@@ -178,10 +178,10 @@ Resources:
     Properties:
       TableName: !Sub '${ProjectName}-KinesisPaperDeliveryEvent'
       AttributeDefinitions:
-        - AttributeName: "sequenceNumber"
+        - AttributeName: "requestId"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "sequenceNumber"
+        - AttributeName: "requestId"
           KeyType: "HASH"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:

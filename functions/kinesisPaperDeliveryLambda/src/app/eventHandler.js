@@ -2,8 +2,8 @@ const { extractKinesisData } = require("./lib/kinesis");
 const {
   batchWriteIncomingRecords,
   updateExcludeCounter,
-  batchWriteKinesisSequenceNumberRecords,
-  batchGetKinesisSequenceNumberRecords
+  batchWriteKinesisEventRecords,
+  batchGetKinesisEventRecords
 } = require("./lib/dynamo");
 const {
   enrichWithSk,
@@ -22,14 +22,24 @@ exports.handleEvent = async (event) => {
   }
 
   let batchItemFailures = [];
-  let paperDeliveryIncomingRecords = kinesisData.map(event => ({
-    entity: { ...buildPaperDeliveryIncomingRecord(event) },
-    kinesisSeqNumber: event.kinesisSeqNumber
-  }));
+  // Build records and remove duplicates by entity.requestId
+  let paperDeliveryIncomingRecords = [];
+  const requestIds = new Set();
+
+  for (const eventItem of kinesisData) {
+    const record = {
+      entity: { ...buildPaperDeliveryIncomingRecord(eventItem) },
+      kinesisSeqNumber: eventItem.kinesisSeqNumber
+    };
+    if (!requestIds.has(record.entity.requestId)) {
+      requestIds.add(record.entity.requestId);
+      paperDeliveryIncomingRecords.push(record);
+    }
+  }
   enrichWithSk(paperDeliveryIncomingRecords);
 
-  const alreadyEvaluatedEvents = await batchGetKinesisSequenceNumberRecords(
-    paperDeliveryIncomingRecords.map(record => record.kinesisSeqNumber)
+  const alreadyEvaluatedEvents = await batchGetKinesisEventRecords(
+    paperDeliveryIncomingRecords.map(record => record.entity.requestId)
   );
   if (alreadyEvaluatedEvents.length > 0) {
     console.log("Skipping already evaluated events");
@@ -56,10 +66,10 @@ exports.handleEvent = async (event) => {
   }
 
   if (paperDeliveryIncomingRecords.length > 0) {
-    const sequenceNumbers = paperDeliveryIncomingRecords.map(record =>
-      buildPaperDeliveryKinesisEventRecord(record.kinesisSeqNumber)
+    const requestIds = paperDeliveryIncomingRecords.map(record =>
+      buildPaperDeliveryKinesisEventRecord(record.entity.requestId)
     );
-    await batchWriteKinesisSequenceNumberRecords(sequenceNumbers);
+    await batchWriteKinesisEventRecords(requestIds);
     console.log(`Processed ${paperDeliveryIncomingRecords.length} records successfully`);
   } else {
     console.log("No new records to write to Kinesis sequence number table");

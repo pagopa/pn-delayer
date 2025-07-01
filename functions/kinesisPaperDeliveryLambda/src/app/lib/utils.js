@@ -30,10 +30,10 @@ function buildPaperDeliveryIncomingRecord(payload) {
   };
 };
 
-function buildPaperDeliveryKinesisEventRecord(sequenceNumber) {
-    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_TTL_SECONDS);
+function buildPaperDeliveryKinesisEventRecord(requestId) {
+    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_EVENTS_RECORD_TTL_SECONDS);
   return {
-    sequenceNumber: sequenceNumber,
+    requestId: requestId,
     ttl: ttl
   };
 };

@@ -11,7 +11,7 @@ const counterTableName = process.env.PAPER_DELIVERY_COUNTER_TABLE_NAME;
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require('@js-joda/core');
 
 function calculateTtl(){
-  const ttlDays = parseInt(process.env.KINESIS_PAPER_DELIVERY_COUNTER_TTL_DAYS, 10) || 14;
+  const ttlDays = parseInt(process.env.PAPER_DELIVERY_COUNTER_TTL_DAYS, 10) || 14;
   const expireDate = new Date();
   expireDate.setDate(expireDate.getDate() + ttlDays);
   return Math.floor(expireDate.getTime() / 1000);
@@ -119,7 +119,7 @@ async function batchWriteIncomingRecords(paperDeliveryIncomingRecords, batchItem
   return batchItemFailures;
 }
 
-async function batchWriteKinesisSequenceNumberRecords(eventRecords) {
+async function batchWriteKinesisEventRecords(eventRecords) {
   const tableName = process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
   const params = {
     RequestItems: {
@@ -132,14 +132,14 @@ async function batchWriteKinesisSequenceNumberRecords(eventRecords) {
   return await docClient.send(command);
 }
 
-async function batchGetKinesisSequenceNumberRecords(keys) {
+async function batchGetKinesisEventRecords(keys) {
   const tableName = process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
   const params = {
     RequestItems: {
       [tableName]: {
         Keys: keys.map(key => (
             {
-              sequenceNumber: key
+              requestId: key
             }
         ))
     }
@@ -151,11 +151,11 @@ async function batchGetKinesisSequenceNumberRecords(keys) {
     if (!items || items.length === 0) {
       return [];
     }
-    return items.map(item => item.sequenceNumber);
+    return items.map(item => item.requestId);
   });
 }
 
 module.exports = { batchWriteIncomingRecords,
                    updateExcludeCounter,
-                   batchWriteKinesisSequenceNumberRecords,
-                   batchGetKinesisSequenceNumberRecords };
+                   batchWriteKinesisEventRecords,
+                   batchGetKinesisEventRecords };

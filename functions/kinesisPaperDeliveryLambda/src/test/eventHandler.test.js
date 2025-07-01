@@ -76,7 +76,7 @@ describe("Lambda Handler Tests", () => {
 
   it("should skip already processedEvent", async () => {
     mockDynamoDBClient
-      .resolvesOnce({ Responses: {"KinesisPaperDeliveryEventTable":[{"sequenceNumber":"1234567890"}]} })
+      .resolvesOnce({ Responses: {"KinesisPaperDeliveryEventTable":[{"requestId":"1234567890"}]} })
       .resolvesOnce({ UnprocessedItems: {} })
       .resolvesOnce({ UnprocessedItems: {} })
 
@@ -116,7 +116,7 @@ describe("Lambda Handler Tests", () => {
   });
 
   it("should skip all - already processedEvent", async () => {
-    mockDynamoDBClient.resolvesOnce({ Responses: {KinesisPaperDeliveryEventTable:[{"sequenceNumber":"1234567890"}, {"sequenceNumber":"1234567891"}]} });
+    mockDynamoDBClient.resolvesOnce({ Responses: {KinesisPaperDeliveryEventTable:[{"requestId":"1234567890"}, {"requestId":"1234567891"}]} });
 
     const event = {
       mockKinesisData: [

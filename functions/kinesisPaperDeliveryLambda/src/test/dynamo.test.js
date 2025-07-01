@@ -84,14 +84,14 @@
       });
     });
 
-    describe('batchWriteKinesisSequenceNumberRecords', () => {
+    describe('batchWriteKinesisEventRecords', () => {
       it('write records on PaperDeliveryKinesisEvents', async () => {
         const records = [
-          { sequenceNumber: 'seq1' }
+          { requestId: 'seq1' }
         ];
         mockSend.resolves({ UnprocessedItems: {} });
 
-        const result = await dynamo.batchWriteKinesisSequenceNumberRecords(records);
+        const result = await dynamo.batchWriteKinesisEventRecords(records);
 
         expect(mockSend.calledOnce).to.be.true;
         expect(result).to.deep.equal({ UnprocessedItems: {} });
@@ -99,11 +99,11 @@
       });
 
       it('handle DynamoDB errors', async () => {
-        const records = [{ sequenceNumber: 'seq1' }];
+        const records = [{ requestId: 'seq1' }];
         mockSend.rejects(new Error('DynamoDB error'));
 
         try {
-          await dynamo.batchWriteKinesisSequenceNumberRecords(records);
+          await dynamo.batchWriteKinesisEventRecords(records);
           expect.fail('Doveva lanciare');
         } catch (err) {
           expect(err.message).to.equal('DynamoDB error');
@@ -111,19 +111,19 @@
       });
     });
 
-    describe('batchGetKinesisSequenceNumberRecords', () => {
-      it('return sequenceNumber if present', async () => {
+    describe('batchGetKinesisEventRecords', () => {
+      it('return requestId if present', async () => {
         const keys = ['seq1', 'seq2'];
         mockSend.resolves({
           Responses: {
             KinesisPaperDeliveryEventTable: [
-              { sequenceNumber: 'seq1' },
-              { sequenceNumber: 'seq2' }
+              { requestId: 'seq1' },
+              { requestId: 'seq2' }
             ]
           }
         });
 
-        const result = await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+        const result = await dynamo.batchGetKinesisEventRecords(keys);
 
         expect(result).to.deep.equal(['seq1', 'seq2']);
         expect(mockSend.firstCall.args[0]).to.be.instanceOf(BatchGetCommand);
@@ -135,7 +135,7 @@
           Responses: { TestKinesisTable: [] }
         });
 
-        const result = await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+        const result = await dynamo.batchGetKinesisEventRecords(keys);
 
         expect(result).to.deep.equal([]);
       });
@@ -145,7 +145,7 @@
         mockSend.rejects(new Error('DynamoDB get error'));
 
         try {
-          await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+          await dynamo.batchGetKinesisEventRecords(keys);
           expect.fail('Doveva lanciare');
         } catch (err) {
           expect(err.message).to.equal('DynamoDB get error');
@@ -158,7 +158,7 @@
           Responses: { TestKinesisTable: [] }
         });
 
-        const result = await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+        const result = await dynamo.batchGetKinesisEventRecords(keys);
 
         expect(result).to.deep.equal([]);
       });
