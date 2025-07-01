@@ -170,6 +170,11 @@ Parameters:
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
     Default: 1
 
+  WeeklyWorkingDays:
+    Type: Number
+    Description: 'Number of working days in a week'
+    Default: 7
+
   DeliveryDateInterval:
     Type: String
     Description: 'Interval for deliveryDate setting'
@@ -335,6 +340,15 @@ Parameters:
   PaperDeliveryStartWorkflowLambdaName:
     Type: String
     Description: 'PaperDeliveryStartWorkflowLambda function name'
+
+  PaperDeliveryPriorityParameterName:
+    Type: String
+    Description: 'parameter name for paper delivery priority details'
+
+  PaperDeliveryPrintCapacityCounterTtlDays:
+    Type: Number
+    Default: 60
+    Description: 'TTL in days for PaperDeliveryPrintCapacityCounter'
 
 Resources:
 
@@ -967,10 +981,17 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
-          PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          PAPER_DELIVERY_READYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+          PAPER_DELIVERY_READYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          PAPER_DELIVERY_PRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
+          PAPER_DELIVERY_INCOMING_TABLENAME: !Ref PaperDeliveryIncomingTableName
+          PAPER_DELIVERY_COUNTER_TABLENAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
+          PAPER_DELIVERY_PRIORITY_PARAMETER: !Ref PaperDeliveryPriorityParameterName
+          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TTLDAYS: !Ref PaperDeliveryPrintCapacityCounterTtlDays
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
-          PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
+          PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          PN_DELAYER_WEEKLY_WORKING_DAYS: !Ref WeeklyWorkingDays
       TracingConfig:
         Mode: Active
       Layers:
