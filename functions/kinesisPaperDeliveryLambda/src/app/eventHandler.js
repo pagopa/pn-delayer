@@ -44,7 +44,7 @@ exports.handleEvent = async (event) => {
   if (alreadyEvaluatedEvents.length > 0) {
     console.log("Skipping already evaluated events");
     paperDeliveryIncomingRecords = paperDeliveryIncomingRecords.filter(
-      record => !alreadyEvaluatedEvents.includes(record.kinesisSeqNumber)
+      record => !alreadyEvaluatedEvents.includes(record.entity.requestId)
     );
   }
 
