@@ -51,7 +51,7 @@ public class PaperDeliveryUtils {
 
     public List<PaperDeliveryHighPriority> checkCapacityAndFilterList(Tuple2<Integer, Integer> tuple, List<PaperDeliveryHighPriority> paperDeliveryHighPriorities) {
         int remainingCapacity = tuple.getT1() - Math.max(tuple.getT2(), 0);
-        return remainingCapacity == 0 ?
+        return remainingCapacity <= 0 ?
                 Collections.emptyList() : paperDeliveryHighPriorities.stream().limit(Math.min(remainingCapacity, paperDeliveryHighPriorities.size())).toList();
     }
 
