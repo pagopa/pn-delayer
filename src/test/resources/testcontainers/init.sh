@@ -38,6 +38,18 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
 
 aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
+    --table-name pn-PaperDeliveriesHighPriority  \
+    --attribute-definitions \
+        AttributeName=unifiedDeliveryDriverGeokey,AttributeType=S \
+        AttributeName=sk,AttributeType=S \
+    --key-schema \
+        AttributeName=unifiedDeliveryDriverGeokey,KeyType=HASH \
+        AttributeName=sk,KeyType=RANGE \
+    --provisioned-throughput \
+        ReadCapacityUnits=10,WriteCapacityUnits=5
+
+aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
+    dynamodb create-table \
     --table-name pn-PaperDeliveryReadyToSend  \
     --attribute-definitions \
         AttributeName=deliveryDate,AttributeType=S \

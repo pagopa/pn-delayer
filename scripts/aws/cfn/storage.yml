@@ -100,7 +100,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryHighPriority'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesHighPriority'
       AttributeDefinitions:
         - AttributeName: "unifiedDeliveryDriverGeokey"
           AttributeType: "S"
