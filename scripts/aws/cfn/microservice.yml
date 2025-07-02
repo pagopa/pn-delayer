@@ -375,7 +375,7 @@ Resources:
         Environment:
           - Name: PN_DELAYER_DAO_PAPERDELIVERYINCOMINGTABLENAME
             Value: !Ref PaperDeliveryIncomingTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERCOUNTERTABLENAME
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
             Value: !Ref PaperDeliverySenderLimitTableName

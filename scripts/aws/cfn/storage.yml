@@ -176,7 +176,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-KinesisPaperDeliveryEvent'
+      TableName: !Sub '${ProjectName}-KinesisPaperDeliveriesEvent'
       AttributeDefinitions:
         - AttributeName: "requestId"
           AttributeType: "S"

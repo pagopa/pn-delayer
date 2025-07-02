@@ -16,7 +16,7 @@
     "SubmitPaperDeliveryJobInputDriverEnvName": "PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER",
     "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST",
     "DelayerToPaperChannelRuleState": "DISABLED",
-    "PaperDeliveryKinesisSequenceNumberTtlSeconds": "86400",
+    "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
     "PaperDeliveryCounterTtlDays": "14"
   }
 }
