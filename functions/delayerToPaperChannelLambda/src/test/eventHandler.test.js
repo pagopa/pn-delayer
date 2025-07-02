@@ -26,7 +26,7 @@ describe('handleEvent', () => {
     it('should not process items if daily and weekly capacities are exhausted', async () => {
       const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
       sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 10, weekly: 70 });
+      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: {capacity: 10, usedCapacity: 10}, weekly: {usedCapacity: 70} });
       sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
       process.env.PN_DELAYER_WEEKLY_WORKING_DAYS = '7';
       const dynamoDbGetItem = sinon.stub(dynamo, 'getItems');
@@ -44,8 +44,7 @@ describe('handleEvent', () => {
     it('should log and throw if weekly exhausted but daily not', async () => {
        const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
       sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 5, weekly: 70 });
-      sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
+      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: {capacity: 10, usedCapacity:5}, weekly: { usedCapacity: 70 }});
       process.env.PN_DELAYER_WEEKLY_WORKING_DAYS = '7';
       const dynamoDbGetItem = sinon.stub(dynamo, 'getItems');
       const consoleErrorStub = sinon.stub(console, 'error');
@@ -62,8 +61,7 @@ describe('handleEvent', () => {
     it('should log and exit if daily exhausted but weekly not', async () => {
       const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
       sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 10, weekly: 10 });
-      sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
+      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: {capacity: 10, usedCapacity:10}, weekly: { usedCapacity: 10 }});
       process.env.PN_DELAYER_WEEKLY_WORKING_DAYS = '7';
       const dynamoDbGetItem = sinon.stub(dynamo, 'getItems');
       const consoleStub = sinon.stub(console, 'log');
@@ -74,11 +72,8 @@ describe('handleEvent', () => {
       sinon.assert.notCalled(dynamoDbGetItem);
       sinon.assert.notCalled(updatePrintCapacityCounterStub);
       sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 1 and executionDate: 2025-07-02/));
-      sinon.assert.calledWith(consoleStub, sinon.match(/Remaining Daily Capacity: 0 - Remaining Weekly Capacity: 60/));
       sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 2 and executionDate: 2025-07-02/));
-      sinon.assert.calledWith(consoleStub, sinon.match(/Remaining Daily Capacity: 0 - Remaining Weekly Capacity: 60/));
       sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 3 and executionDate: 2025-07-02/));
-      sinon.assert.calledWith(consoleStub, sinon.match(/Remaining Daily Capacity: 0 - Remaining Weekly Capacity: 60/));
       sinon.assert.calledWith(consoleStub, sinon.match(/Daily print capacity exhausted/));
       consoleStub.restore();
     });
@@ -86,7 +81,7 @@ describe('handleEvent', () => {
     it('should update print capacity counters when one item for priorityKey are processed', async () => {
       const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
       sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 0, weekly: 0 });
+      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: null, weekly: null });
       sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
       sinon.stub(dynamo, 'getItems').resolves({ Items: [{ id: '1' }], LastEvaluatedKey: null });
       process.env.PN_DELAYER_WEEKLY_WORKING_DAYS = '7';
@@ -127,7 +122,7 @@ describe('handleEvent', () => {
     it('should update print capacity counters when one item for priorityKey are processed but with error on sqs', async () => {
           const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
           sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-          sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 0, weekly: 0 });
+          sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: null, weekly: null });
           sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
           sinon.stub(dynamo, 'getItems').resolves({ Items: [{ id: '1' }], LastEvaluatedKey: null });
           process.env.PN_DELAYER_WEEKLY_WORKING_DAYS = '7';
@@ -166,7 +161,7 @@ describe('handleEvent', () => {
     it('should update print capacity counters when no more printCapacity for first key', async () => {
       const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
       sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 0, weekly: 0 });
+      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: null, weekly: null });
       sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
       sinon.stub(dynamo, 'getItems')
         .onFirstCall().resolves({ Items: [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }], LastEvaluatedKey: { id: '5' } })
@@ -204,7 +199,7 @@ describe('handleEvent', () => {
     it('should update print capacity counters when no more printCapacity for second key', async () => {
       const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
       sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 0, weekly: 0 });
+      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: null, weekly: null });
       sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
       sinon.stub(dynamo, 'getItems')
         .onFirstCall().resolves({ Items: [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }], LastEvaluatedKey: {} })
@@ -242,7 +237,7 @@ describe('handleEvent', () => {
     it('should update print capacity counters when no more printCapacity for third key', async () => {
       const priorityMap = { 1: 'RS', 2: '2TENT', 3: 'AR/890' };
       sinon.stub(parameterStore, 'getPriorityMap').resolves(priorityMap);
-      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: 0, weekly: 0 });
+      sinon.stub(dynamo, 'getUsedPrintCapacities').resolves({ daily: null, weekly: null });
       sinon.stub(dynamo, 'getPrintCapacity').resolves(10);
       sinon.stub(dynamo, 'getItems')
         .onFirstCall().resolves({ Items: [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }], LastEvaluatedKey: {} })

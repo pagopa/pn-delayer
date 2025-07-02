@@ -9,13 +9,20 @@ exports.handleEvent = async () => {
     const orderedPriorityKeys = Object.keys(priorityMap).sort((a, b) => Number(a) - Number(b));
 
     const capacityMap = await dynamo.getUsedPrintCapacities();
-    let usedDailyCapacity = capacityMap.daily;
-    let usedWeeklyCapacity = capacityMap.weekly;
+    let usedDailyCapacity = capacityMap.daily?.usedCapacity;
+    let usedWeeklyCapacity = capacityMap.weekly?.usedCapacity;
+    let dailyPrintCapacity = capacityMap.daily?.capacity;
+    let weeklyPrintCapacity;
 
-    const dailyPrintCapacity = await dynamo.getPrintCapacity();
-    const weeklyPrintCapacity = dailyPrintCapacity * parseInt(process.env.PN_DELAYER_WEEKLY_WORKING_DAYS);
+    if(!dailyPrintCapacity){
+        dailyPrintCapacity = await dynamo.getPrintCapacity();
+        usedDailyCapacity = 0;
+        usedWeeklyCapacity = 0;
+    }
 
-    const executionDate = LocalDate.now().plusDays(1).toString();
+    weeklyPrintCapacity = dailyPrintCapacity * parseInt(process.env.PN_DELAYER_WEEKLY_WORKING_DAYS);
+
+    const executionDate = LocalDate.now().toString();
 
     let processedCount = 0;
     let remainingDailyCapacity = dailyPrintCapacity - usedDailyCapacity;
@@ -30,13 +37,7 @@ exports.handleEvent = async () => {
                 processedCount += result.processed;
                 remainingDailyCapacity -= result.processed;
                 remainingWeeklyCapacity -= result.processed;
-            } while (
-                remainingDailyCapacity > 0 &&
-                remainingWeeklyCapacity > 0 &&
-                processedCount < 4000 &&
-                result.processed > 0 &&
-                (result.lastEvaluatedKey && Object.keys(result.lastEvaluatedKey).length !== 0)
-            );
+            } while (canProcessMore(remainingDailyCapacity, remainingWeeklyCapacity, processedCount, result));
         }
         if (result.processed === 0) {
             console.log(`No items processed for priority ${priorityKey} and executionDate: ${executionDate}`);
@@ -59,6 +60,14 @@ exports.handleEvent = async () => {
     if (processedCount > 0) {
         await updatePrintCapacityCounters(executionDate, processedCount);
     }
+}
+
+function canProcessMore(remainingDailyCapacity, remainingWeeklyCapacity, processedCount, result) {
+    return remainingDailyCapacity > 0 &&
+           remainingWeeklyCapacity > 0 &&
+           processedCount < 4000 &&
+           result.processed > 0 &&
+           (result.lastEvaluatedKey && Object.keys(result.lastEvaluatedKey).length !== 0)
 }
 
 async function updatePrintCapacityCounters(executionDate, processedCount) {

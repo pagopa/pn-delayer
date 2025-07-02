@@ -17,7 +17,7 @@ async function getItems(priorityKey, executionDate, LastEvaluatedKey, limit) {
 
   const params = {
     TableName: readyToSendTableName,
-    KeyConditionExpression: "priorityKey = :priorityKey AND deliveryDate < :executionDate",
+    KeyConditionExpression: "priorityKey = :priorityKey AND deliveryDate <= :executionDate",
     ExpressionAttributeValues: {
       ":priorityKey": priorityKey,
       ":executionDate": executionDate,
