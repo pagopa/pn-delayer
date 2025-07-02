@@ -129,7 +129,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryReadyToSend'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesReadyToSend'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
