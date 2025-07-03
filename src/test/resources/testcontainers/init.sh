@@ -62,6 +62,18 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
 
 aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
+    --table-name pn-PaperDeliveriesReadyToSend  \
+    --attribute-definitions \
+        AttributeName=pk,AttributeType=S \
+        AttributeName=sk,AttributeType=S \
+    --key-schema \
+        AttributeName=pk,KeyType=HASH \
+        AttributeName=sk,KeyType=RANGE \
+    --provisioned-throughput \
+        ReadCapacityUnits=10,WriteCapacityUnits=5
+
+aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
+    dynamodb create-table \
     --table-name pn-PaperDeliveryKinesisEvent  \
     --attribute-definitions \
         AttributeName=sequenceNumber,AttributeType=S \
