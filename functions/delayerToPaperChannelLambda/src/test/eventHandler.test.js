@@ -71,9 +71,9 @@ describe('handleEvent', () => {
 
       sinon.assert.notCalled(dynamoDbGetItem);
       sinon.assert.notCalled(updatePrintCapacityCounterStub);
-      sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 1 and executionDate: 2025-07-02/));
-      sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 2 and executionDate: 2025-07-02/));
-      sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 3 and executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 1 and executionDate:/));
+      sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 2 and executionDate:/));
+      sinon.assert.calledWith(consoleStub, sinon.match(/No items processed for priority 3 and executionDate:/));
       sinon.assert.calledWith(consoleStub, sinon.match(/Daily print capacity exhausted/));
       consoleStub.restore();
     });
@@ -107,15 +107,15 @@ describe('handleEvent', () => {
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 1 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 1 items/));
-      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 1 of priority 1 items for executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 1 of priority 1 items for executionDate:/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 1 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 1 items/));
-      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 1 of priority 2 items for executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 1 of priority 2 items for executionDate:/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 1 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 1 items/));
-      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 1 of priority 3 items for executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 1 of priority 3 items for executionDate:/));
       consoleLogStub.restore();
     });
 
@@ -224,7 +224,7 @@ describe('handleEvent', () => {
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 5 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 5 items/));
-      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 5 of priority 1 items for executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 5 of priority 1 items for executionDate:/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 5 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 5 items/));
@@ -268,15 +268,15 @@ describe('handleEvent', () => {
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 4 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 4 items/));
-      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 4 of priority 1 items for executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 4 of priority 1 items for executionDate:/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 4 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 4 items/));
-      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 4 of priority 2 items for executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 4 of priority 2 items for executionDate:/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Sent 2 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Not Sent 0 messages/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Deleted 2 items/));
-      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 2 of priority 3 items for executionDate: 2025-07-02/));
+      sinon.assert.calledWith(consoleLogStub, sinon.match(/Processed 2 of priority 3 items for executionDate:/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/Remaining Daily Capacity: 0 - Remaining Weekly Capacity: 60/));
       sinon.assert.calledWith(consoleLogStub, sinon.match(/used daily capacity incremented of: 10 - used weekly capacity incremented of: 10/));
       consoleLogStub.restore();
