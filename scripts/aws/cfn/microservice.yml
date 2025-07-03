@@ -278,27 +278,6 @@ Parameters:
     Default: 20
     Description: 'Maximum batching window in seconds for KinesisPaperDeliveryLambda'
 
-  SubmitPaperDeliveryJobLambdaName:
-    Type: String
-    Description: Name of the PnDelayerSubmitPaperDeliveryJob Lambda.
-
-  SubmitPaperDeliveryJobLambdaCron:
-    Type: String
-    Default: '*/2 * * * ? *'
-    Description: 'Cron expression for SubmitPaperDeliveryJobLambda'
-
-  SubmitPaperDeliveryJobInputTuplesParameter:
-    Type: String
-    Description: 'SSM parameter name for SubmitPaperDeliveryJob input tuples'
-
-  SubmitPaperDeliveryJobInputDriverEnvName:
-    Type: String
-    Description: 'env name for SubmitPaperDeliveryJob input driver'
-
-  SubmitPaperDeliveryJobInputProvincesEnvName:
-    Type: String
-    Description: 'env name for SubmitPaperDeliveryJob input provinces '
-
   DelayerToPaperChannelLambdaCron:
     Type: String
     Default: '0/15 * * * ? *'
@@ -324,14 +303,6 @@ Parameters:
       - DISABLED
     Description: 'State of the DelayerToPaperChannelRule'
 
-  DelayerToPaperChannelRecoveryLambdaCron:
-    Type: String
-    Default: '0 0 * * ? *'
-    Description: 'Cron expression for DelayerToPaperChanneRecoverylLambda'
-
-  DelayerToPaperChannelRecoveryLambdaName:
-    Type: String
-    Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
 
   PaperDeliveryResidualCapacityLambdaName:
     Type: String
@@ -1426,10 +1397,3 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt DelayerToPaperChannelScheduleRule.Arn
-  PermissionForDelayerToPaperChannelRecoveryLambda:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt DelayerToPaperChannelRecoveryLambda.Arn
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt DelayerToPaperChannelRecoveryScheduleRule.Arn

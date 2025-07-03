@@ -376,17 +376,6 @@ Resources:
         HasDLQ: "false"
         QueueHasAlarm: "true"
 
-  SubmitPaperDeliveryJobLambdaLogGroup:
-    Type: AWS::CloudFormation::Stack
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
-      Parameters:
-        LogGroupName: !Sub ${ProjectName}-delayer-submitPaperDeliveryJobLambda
-        LogGroupRetention: !Ref LogRetention
-        LogGroupPrefix: /aws/lambda
-
   PaperDeliveryResidualCapacityLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -417,17 +406,6 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Sub ${ProjectName}-delayerToPaperChannelLambda
-        LogGroupRetention: !Ref LogRetention
-        LogGroupPrefix: /aws/lambda
-
-  DelayerToPaperChannelRecoveryLambdaLogGroup:
-    Type: AWS::CloudFormation::Stack
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
-      Parameters:
-        LogGroupName: !Sub ${ProjectName}-delayerToPaperChannelRecoveryLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
@@ -529,16 +507,9 @@ Outputs:
   DelayerToPaperChannelLambdaName:
     Value: !Sub "${ProjectName}-delayerToPaperChannelLambda"
 
-  DelayerToPaperChannelRecoveryLambdaName:
-    Value: !Sub "${ProjectName}-delayerToPaperChannelRecoveryLambda"
-
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
     Description: pn-delayer_kinesis_paper_delivery_DLQ' queue ARN
-
-  SubmitPaperDeliveryJobLambdaName:
-    Value: !Sub "${ProjectName}-delayer-submitPaperDeliveryJobLambda"
-
   PaperDeliveryResidualCapacityLambdaName:
     Value: !Sub "${ProjectName}-delayer-paperDeliveryResidualCapacityLambda"
 
