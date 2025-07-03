@@ -63,11 +63,22 @@ Resources:
           AttributeType: "S"
         - AttributeName: "activationDateFrom"
           AttributeType: "S"
+        - AttributeName: "tenderIdGeoKey"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
           KeyType: "HASH"
         - AttributeName: "activationDateFrom"
           KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "tenderIdGeoKey-index"
+          KeySchema:
+            - AttributeName: "tenderIdGeoKey"
+              KeyType: "HASH"
+            - AttributeName: "activationDateFrom"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -100,18 +111,18 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryHighPriority'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesHighPriority'
       AttributeDefinitions:
         - AttributeName: "unifiedDeliveryDriverGeokey"
           AttributeType: "S"
-        - AttributeName: "createdAt"
+        - AttributeName: "sk"
           AttributeType: "S"
         - AttributeName: "requestId"
           AttributeType: "S"
       KeySchema:
         - AttributeName: "unifiedDeliveryDriverGeokey"
           KeyType: "HASH"
-        - AttributeName: "createdAt"
+        - AttributeName: "sk"
           KeyType: "RANGE"
       GlobalSecondaryIndexes:
         - IndexName: "requestId-index"
@@ -129,16 +140,18 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryReadyToSend'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesReadyToSend'
       AttributeDefinitions:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "sk"
           AttributeType: "S"
         - AttributeName: "requestId"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
           KeyType: "HASH"
-        - AttributeName: "requestId"
+        - AttributeName: "sk"
           KeyType: "RANGE"
       GlobalSecondaryIndexes:
         - IndexName: "requestId-index"
@@ -147,6 +160,26 @@ Resources:
               KeyType: "HASH"
           Projection:
             ProjectionType: "ALL"
+      BillingMode: "PAY_PER_REQUEST"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliveryPrintCapacityTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveriesPrintCapacity'
+      AttributeDefinitions:
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "startDate"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "startDate"
+          KeyType: "RANGE"
       BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -165,8 +198,127 @@ Resources:
           KeyType: "HASH"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
+
+  PaperDeliveryPrintCapacityCounter:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveriesPrintCapacityCounter'
+      AttributeDefinitions:
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "sk"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "sk"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
         AttributeName: "ttl"
         Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliverySenderLimitTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveriesSenderLimit'
+      AttributeDefinitions:
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "deliveryDate"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "deliveryDate"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliveryUsedSenderLimitTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveriesUsedSenderLimit'
+      AttributeDefinitions:
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "deliveryDate"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "deliveryDate"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliverySenderCounterTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveriesSenderCounter'
+      AttributeDefinitions:
+        - AttributeName: "deliveryDate"
+          AttributeType: "S"
+        - AttributeName: "sk"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "deliveryDate"
+          KeyType: "HASH"
+        - AttributeName: "sk"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  PaperDeliveryIncomingTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliveriesIncoming'
+      AttributeDefinitions:
+        - AttributeName: "ProductTypeProvince"
+          AttributeType: "S"
+        - AttributeName: "unifiedDeliveryDriverProvince"
+          AttributeType: "S"
+        - AttributeName: "sk"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "ProductTypeProvince"
+          KeyType: "HASH"
+        - AttributeName: "sk"
+          KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "unifiedDeliveryDriverProvince-index"
+          KeySchema:
+            - AttributeName: "unifiedDeliveryDriverProvince"
+              KeyType: "HASH"
+            - AttributeName: "sk"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+      BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
@@ -224,6 +376,28 @@ Resources:
         HasDLQ: "false"
         QueueHasAlarm: "true"
 
+  PaperDeliveryResidualCapacityLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-paperDeliveryResidualCapacityLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  PaperDeliveryStartWorkflowLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-paperDeliveryStartWorkflowLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   DelayerToPaperChannelLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -265,12 +439,55 @@ Outputs:
     Description: ARN of dynamodb table containing ReadyToSend paper deliveries
     Value: !Sub '${PaperDeliveryReadyToSendTable.Arn}'
 
+  PaperDeliveryPrintCapacityTableName:
+    Description: Name of dynamodb table containing print capacity
+    Value: !Ref PaperDeliveryPrintCapacityTable
+
+  PaperDeliveryPrintCapacityTableArn:
+    Description: ARN of dynamodb table containing print capacity
+    Value: !Sub '${PaperDeliveryPrintCapacityTable.Arn}'
+
   KinesisPaperDeliveryEventTableName:
     Description: Name of dynamodb table containing Kinesis sequenceNumber for paper deliveries
     Value: !Ref KinesisPaperDeliveryEventTable
   KinesisPaperDeliveryEventTableArn:
     Description: ARN of dynamodb table containing Kinesis sequenceNumber for paper deliveries
     Value: !Sub '${KinesisPaperDeliveryEventTable.Arn}'
+
+  PaperDeliveryIncomingTableName:
+    Description: Name of dynamodb table containing incoming paper deliveries
+    Value: !Ref PaperDeliveryIncomingTable
+  PaperDeliveryIncomingTableArn:
+    Description: ARN of dynamodb table containing incoming paper deliveries
+    Value: !Sub '${PaperDeliveryIncomingTable.Arn}'
+
+  PaperDeliverySenderCounterTableName:
+    Description: Name of dynamodb table containing PaperDeliverySenderCounter
+    Value: !Ref PaperDeliverySenderCounterTable
+  PaperDeliverySenderCounterTableArn:
+    Description: ARN of dynamodb table containing PaperDeliverySenderCounter
+    Value: !Sub '${PaperDeliverySenderCounterTable.Arn}'
+
+  PaperDeliverySenderLimitTableName:
+    Description: Name of dynamodb table containing PaperDeliverySenderLimit
+    Value: !Ref PaperDeliverySenderLimitTable
+  PaperDeliverySenderLimitTableArn:
+    Description: ARN of dynamodb table containing PaperDeliverySenderLimit
+    Value: !Sub '${PaperDeliverySenderLimit.Arn}'
+
+  PaperDeliveryUsedSenderLimitTableName:
+    Description: Name of dynamodb table containing PaperDeliveryUsedSenderLimit
+    Value: !Ref PaperDeliveryUsedSenderLimitTable
+  PaperDeliveryUsedSenderLimitTableArn:
+    Description: ARN of dynamodb table containing PaperDeliveryUsedSenderLimit
+    Value: !Sub '${PaperDeliveryUsedSenderLimit.Arn}'
+
+  PaperDeliveryPrintCapacityCounterTableName:
+    Description: Name of dynamodb table containing PaperDeliveryPrintCapacityCounter
+    Value: !Ref PaperDeliveryPrintCapacityCounter
+  PaperDeliveryPrintCapacityCounterTableArn:
+    Description: ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter
+    Value: !Sub '${PaperDeliveryPrintCapacityCounter.Arn}'
 
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn
@@ -293,3 +510,8 @@ Outputs:
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
     Description: pn-delayer_kinesis_paper_delivery_DLQ' queue ARN
+  PaperDeliveryResidualCapacityLambdaName:
+    Value: !Sub "${ProjectName}-delayer-paperDeliveryResidualCapacityLambda"
+
+  PaperDeliveryStartWorkflowLambdaName:
+    Value: !Sub "${ProjectName}-delayer-paperDeliveryStartWorkflowLambda"

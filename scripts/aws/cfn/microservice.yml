@@ -99,13 +99,61 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryReadyToSend'
 
+  PaperDeliveryPrintCapacityTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
+
+  PaperDeliveryPrintCapacityTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
+
   KinesisPaperDeliveryEventTableName:
     Type: String
     Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
 
+  PaperDeliverySenderCounterTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderCounter'
+
+  PaperDeliverySenderCounterTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderCounter'
+
   KinesisPaperDeliveryEventTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
+
+  PaperDeliveryPrintCapacityCounterTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryPrintCapacityCounter'
+
+  PaperDeliveryPrintCapacityCounterTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter'
+
+  PaperDeliveryIncomingTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryIncoming'
+
+  PaperDeliveryIncomingTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
+
+  PaperDeliverySenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit'
+
+  PaperDeliverySenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
+
+  PaperDeliveryUsedSenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryUsedSenderLimit'
+
+  PaperDeliveryUsedSenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryUsedSenderLimit'
 
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
@@ -121,6 +169,11 @@ Parameters:
     Type: Number
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
     Default: 1
+
+  WeeklyWorkingDays:
+    Type: Number
+    Description: 'Number of working days in a week'
+    Default: 7
 
   DeliveryDateInterval:
     Type: String
@@ -251,7 +304,183 @@ Parameters:
     Description: 'State of the DelayerToPaperChannelRule'
 
 
+  PaperDeliveryResidualCapacityLambdaName:
+    Type: String
+    Description: 'PaperDeliveryResidualCapacityLambda function name'
+
+  PaperDeliveryStartWorkflowLambdaName:
+    Type: String
+    Description: 'PaperDeliveryStartWorkflowLambda function name'
+
+  PaperDeliveryPriorityParameterName:
+    Type: String
+    Description: 'parameter name for paper delivery priority details'
+
+  PaperDeliveryPrintCapacityCounterTtlDays:
+    Type: Number
+    Default: 60
+    Description: 'TTL in days for PaperDeliveryPrintCapacityCounter'
+
 Resources:
+
+  SenderLimitComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !Ref BatchServiceRole
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-sender-limit-compute-environment'
+      ComputeResources:
+        MaxvCpus: !Ref MaxvCpus
+        Type: !Ref ComputeResourceType
+        SecurityGroupIds:
+          - !Ref BatchSecurityGroup
+        Subnets: !Split [ ",", !Ref SubnetsIds ]
+      State: ENABLED
+
+  SenderLimitJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      PropagateTags: true
+      JobDefinitionName: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
+      ContainerProperties:
+        Image: !Ref ContainerImageUri
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+        ResourceRequirements:
+          - Value: !Ref VCPU
+            Type: VCPU
+          - Value: !Ref Memory
+            Type: MEMORY
+        JobRoleArn: !GetAtt "SenderLimitTaskExecutionRole.Arn"
+        ExecutionRoleArn: !GetAtt "SenderLimitTaskExecutionRole.Arn"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref "BatchLogGroup"
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-sender-limit-logs'
+        Environment:
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYINCOMINGTABLENAME
+            Value: !Ref PaperDeliveryIncomingTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERCOUNTERTABLENAME
+            Value: !Ref PaperDeliverySenderCounterTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
+            Value: !Ref PaperDeliverySenderLimitTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME
+            Value: !Ref PaperDeliveryUsedSenderLimitTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
+            Value: !Ref PaperDeliveryDriverCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
+            Value: !Ref PaperDeliveryHighPriorityTableName
+
+      PlatformCapabilities:
+        - FARGATE
+      Tags:
+        Service: Batch
+        Name: JobDefinitionTag
+        Expected: MergeTag
+
+  SenderLimitJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref SenderLimitComputeEnvironment
+      State: ENABLED
+      Priority: 1
+      JobQueueName: pn-delayer-sender-limit-job-queue
+
+  SenderLimitServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  SenderLimitTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-delayer-sender-limit-taskexec-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:BatchGetItem
+                  - dynamodb:GetItem
+                Resource:
+                  - !Sub "${PaperDeliveryIncomingTableArn}"
+                  - !Sub "${PaperDeliveryIncomingTableArn}/*"
+                  - !Sub "${PaperDeliverySenderCounterTableArn}"
+                  - !Sub "${PaperDeliverySenderCounterTableArn}/*"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
+                  - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:TransactWriteItems
+                Resource:
+                  - !Sub "${PaperDeliveryIncomingTableArn}"
+                  - !Sub "${PaperDeliveryIncomingTableArn}/*"
+                  - !Sub "${PaperDeliveryHighPriorityTableArn}"
+                  - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub "${PaperDeliverySenderCounterTableArn}"
+                  - !Sub "${PaperDeliverySenderCounterTableArn}/*"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+
+  SenderLimitSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Batch Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
 
   ## Compute Environment
   ComputeEnvironment:
@@ -259,7 +488,7 @@ Resources:
     Properties:
       Type: MANAGED
       ServiceRole: !Ref BatchServiceRole
-      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-compute-environment'
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-high-priority-compute-environment'
       ComputeResources:
         MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
@@ -273,7 +502,7 @@ Resources:
     Properties:
       Type: container
       PropagateTags: true
-      JobDefinitionName: !Sub '${ProjectName}-delayer-job-definition'
+      JobDefinitionName: !Sub '${ProjectName}-delayer-high-priority-job-definition'
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -329,7 +558,7 @@ Resources:
           ComputeEnvironment: !Ref ComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: !Sub '${ProjectName}-delayer-job-queue'
+      JobQueueName: !Sub '${ProjectName}-delayer-high-priority-job-queue'
 
   BatchServiceRole:
     Type: AWS::IAM::Role
@@ -601,6 +830,8 @@ Resources:
           REGION: !Sub ${AWS::Region}
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
+          PAPER_DELIVERY_SENDER_COUNTER_TABLE_NAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_INCOMING_TABLE_NAME: !Ref PaperDeliveryIncomingTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_PAPER_DELIVERY_TTL_SECONDS: !Ref PaperDeliveryKinesisSequenceNumberTtlSeconds
       TracingConfig:
@@ -652,6 +883,11 @@ Resources:
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource: !Ref PaperDeliveryHighPriorityTableArn
+          - Effect: Allow
+            Action: dynamodb:BatchWriteItem
+            Resource:
+              - !Ref PaperDeliverySenderCounterTableArn
+              - !Ref PaperDeliveryIncomingTableArn
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility
@@ -716,9 +952,17 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
-          PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          PAPER_DELIVERY_READYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+          PAPER_DELIVERY_READYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          PAPER_DELIVERY_PRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
+          PAPER_DELIVERY_INCOMING_TABLENAME: !Ref PaperDeliveryIncomingTableName
+          PAPER_DELIVERY_COUNTER_TABLENAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
+          PAPER_DELIVERY_PRIORITY_PARAMETER: !Ref PaperDeliveryPriorityParameterName
+          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TTLDAYS: !Ref PaperDeliveryPrintCapacityCounterTtlDays
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
+          PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          PN_DELAYER_WEEKLY_WORKING_DAYS: !Ref WeeklyWorkingDays
       TracingConfig:
         Mode: Active
       Layers:
@@ -760,6 +1004,13 @@ Resources:
             Resource: !Ref PaperDeliveryReadyToSendTableArn
           - Effect: Allow
             Action:
+              - dynamodb:GetItem
+              - dynamodb:BatchGetItem
+              - dynamodb:UpdateItem
+              - dynamodb:TransactWriteItems
+            Resource: !Ref PaperDeliveryPrintCapacityCounterTableArn
+          - Effect: Allow
+            Action:
               - sqs:SendMessage
             Resource: !Ref  DelayerToPaperChannelQueueARN
 
@@ -782,6 +1033,363 @@ Resources:
         - Arn: !GetAtt DelayerToPaperChannelLambda.Arn
           Id: PnDelayerToPaperChannelLambdaTarget
 
+  #########################################################
+  ###      PaperDeliveryResidualCapacityLambda     ###
+  #########################################################
+
+  PaperDeliveryResidualCapacityLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PaperDeliveryResidualCapacityLambda}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PaperDeliveryResidualCapacityLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PaperDeliveryResidualCapacityLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryResidualCapacityLambda.zip"
+      Role: !GetAtt PaperDeliveryResidualCapacityLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverCapacitiesTableName
+          PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  PaperDeliveryResidualCapacityLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PaperDeliveryResidualCapacityLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaPolicy
+      Roles:
+        - !Ref PaperDeliveryResidualCapacityLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+            Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+            Resource:
+              - !Ref PaperDeliveryDriverUsedCapacitiesTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+            Resource:
+              - !Ref PaperDeliveryDriverCapacitiesTableArn
+
+  PaperDeliveryResidualCapacityLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperDeliveryResidualCapacityLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+
+  #########################################################
+  ###         PaperDeliveryStartWorkflowLambda          ###
+  #########################################################
+
+  PaperDeliveryStartWorkflowLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PaperDeliveryStartWorkflowLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PaperDeliveryStartWorkflowLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PaperDeliveryStartWorkflowLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryStartWorkflowLambda.zip"
+      Role: !GetAtt PaperDeliveryStartWorkflowLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPER_DELIVERY_SENDER_COUNTER_TABLENAME: !Ref PaperDeliverySenderCounterTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  PaperDeliveryStartWorkflowLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PaperDeliveryStartWorkflowLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PaperDeliveryStartWorkflowLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PaperDeliveryStartWorkflowLambdaPolicy
+      Roles:
+        - !Ref PaperDeliveryStartWorkflowLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+            Resource: !Ref PaperDeliverySenderCounterTableArn
+
+  PaperDeliveryStartWorkflowLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperDeliveryStartWorkflowLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+
+  #########################################################
+  ###         RecoveryLambda                ###
+  #########################################################
+
+  DelayerToPaperChannelRecoveryLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${DelayerToPaperChannelRecoveryLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  DelayerToPaperChannelRecoveryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref DelayerToPaperChannelRecoveryLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerToPaperChannelRecoveryLambda.zip"
+      Role: !GetAtt DelayerToPaperChannelRecoveryLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+          PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
+          PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE: !Ref PaperDeliveryReadyToSendRecoveryDeliveryDate
+          PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  DelayerToPaperChannelRecoveryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-DelayerToPaperChannelRecoveryLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  DelayerToPaperChannelRecoveryLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DelayerToPaperChannelRecoveryLambdaPolicy
+      Roles:
+        - !Ref DelayerToPaperChannelRecoveryLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:BatchWriteItem
+              - dynamodb:DeleteItem
+            Resource: !Ref PaperDeliveryReadyToSendTableArn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:BatchGetItem
+              - dynamodb:UpdateItem
+              - dynamodb:TransactWriteItems
+            Resource: !Ref PaperDeliveryPrintCapacityCounterTableArn
+          - Effect: Allow
+            Action:
+              - sqs:SendMessage
+            Resource: !Ref  DelayerToPaperChannelQueueARN
+
+  DelayerToPaperChannelRecoveryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DelayerToPaperChannelRecoveryLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  # EventBridge Rule for scheduling the Lambda
+  DelayerToPaperChannelRecoveryScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-DelayerToPaperChannelRecoveryScheduleRule'
+      ScheduleExpression: !Sub cron(${DelayerToPaperChannelRecoveryLambdaCron})
+      State: !Ref DelayerToPaperChannelRuleState
+      Targets:
+        - Arn: !GetAtt DelayerToPaperChannelRecoveryLambda.Arn
+          Id: PnDelayerToPaperChannelRecoveryLambdaTarget
+
+  SubmitPaperDeliveryJobLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${SubmitPaperDeliveryJobLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  SubmitPaperDeliveryJobLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref SubmitPaperDeliveryJobLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/submitPaperDeliveryJobLambda.zip"
+      Role: !GetAtt SubmitPaperDeliveryJobLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          JOB_QUEUE: !Ref JobQueue
+          JOB_DEFINITION: !Ref BatchProcessingJobDefinition
+          JOB_INPUT_PARAMETER: !Ref SubmitPaperDeliveryJobInputTuplesParameter
+          JOB_INPUT_DRIVER_ENV_NAME: !Ref SubmitPaperDeliveryJobInputDriverEnvName
+          JOB_INPUT_PROVINCE_LIST_ENV_NAME: !Ref SubmitPaperDeliveryJobInputProvincesEnvName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  SubmitPaperDeliveryJobLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-SubmitPaperDeliveryJobLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  SubmitPaperDeliveryJobLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-submitPaperDeliveryJobLambdaPolicy
+      Roles:
+        - !Ref SubmitPaperDeliveryJobLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - batch:SubmitJob
+              - batch:DescribeJobs
+            Resource:
+              - !Ref BatchProcessingJobDefinition
+              - !Ref JobQueue
+          - Effect: Allow
+            Action:
+              - batch:ListJobs
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - ssm:GetParameter
+            Resource:
+              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SubmitPaperDeliveryJobInputTuplesParameter}
+
+  SubmitPaperDeliveryJobLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SubmitPaperDeliveryJobLambdaName
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+
+  #Scheduled Event Bridge Rule that send event to target lambda
+  SubmitPaperDeliveryJobLambdaScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-delayer-SubmitPaperDeliveryJobLambdaScheduledRule'
+      ScheduleExpression: !Sub cron(${SubmitPaperDeliveryJobLambdaCron})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SubmitPaperDeliveryJobLambda.Arn
+          Id: PnDelayerSubmitPaperDeliveryJobLambdaTarget
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SubmitPaperDeliveryJobLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SubmitPaperDeliveryJobLambdaScheduledRule.Arn
   PermissionForDelayerToPaperChannelLambda:
     Type: AWS::Lambda::Permission
     Properties:
