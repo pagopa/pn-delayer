@@ -62,14 +62,14 @@ describe("Lambda Handler Tests", () => {
   });
 
     it("should skip already processedEvent", async () => {
-    mockDynamoDBClient.resolvesOnce({ Responses: {"KinesisPaperDeliveryEventTable":[{"sequenceNumber":"1234567890"}]} }).resolvesOnce({ UnprocessedItems: {} }).resolvesOnce({ UnprocessedItems: {} })
+    mockDynamoDBClient.resolvesOnce({ Responses: {"KinesisPaperDeliveryEventTable":[{"requestId":"1234567890"}]} }).resolvesOnce({ UnprocessedItems: {} }).resolvesOnce({ UnprocessedItems: {} })
     const event = {
       mockKinesisData: [
         {
               kinesisSeqNumber: '1234567890',
               unifiedDeliveryDriver: 'driver1',
               recipientNormalizedAddress: { pr: 'address1', cap: '12345'},
-              requestId: 'request1',
+              requestId: '1234567890',
               productType: 'type1',
               senderPaId: 'sender1',
               tenderId: 'tender1',
@@ -93,7 +93,7 @@ describe("Lambda Handler Tests", () => {
   });
 
   it("should skip all - already processedEvent", async () => {
-    mockDynamoDBClient.resolvesOnce({ Responses: {KinesisPaperDeliveryEventTable:[{"sequenceNumber":"1234567890"}, {"sequenceNumber":"1234567891"}]} })
+    mockDynamoDBClient.resolvesOnce({ Responses: {KinesisPaperDeliveryEventTable:[{"requestId":"1234567890"}, {"requestId":"1234567891"}]} })
     .resolvesOnce({ UnprocessedItems: {} }).resolvesOnce({ UnprocessedItems: {} })
 
     const event = {
@@ -102,7 +102,7 @@ describe("Lambda Handler Tests", () => {
               kinesisSeqNumber: '1234567890',
               unifiedDeliveryDriver: 'driver1',
               recipientNormalizedAddress: { pr: 'address1', cap: '12345'},
-              requestId: 'request1',
+              requestId: '1234567890',
               productType: 'type1',
               senderPaId: 'sender1',
               tenderId: 'tender1',
@@ -112,7 +112,7 @@ describe("Lambda Handler Tests", () => {
               kinesisSeqNumber: '1234567891',
               unifiedDeliveryDriver: 'driver2',
               recipientNormalizedAddress: { pr: 'address2', cap: '54321'},
-              requestId: 'request2',
+              requestId: '1234567891',
               productType: 'type2',
               senderPaId: 'sender2',
               tenderId: 'tender2',

@@ -1,5 +1,5 @@
 const { extractKinesisData } = require("./lib/kinesis");
-const { batchWriteHighPriorityRecords, batchWriteKinesisSequenceNumberRecords, batchGetKinesisSequenceNumberRecords } = require("./lib/dynamo");
+const { batchWriteHighPriorityRecords, batchWriteKinesisEventRecords, batchGetKinesisEventRecords } = require("./lib/dynamo");
 const { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord, buildPaperDeliveryKinesisEventRecord } = require("./lib/utils");
 
 exports.handleEvent = async (event) => {
@@ -15,15 +15,29 @@ exports.handleEvent = async (event) => {
     return { batchItemFailures };
   }
 
-  let paperDeliveryHighPriorityRecords = kinesisData.map(event => ({entity : {...buildPaperDeliveryHighPriorityRecord(event)}, kinesisSeqNumber: event.kinesisSeqNumber}))
+  let paperDeliveryHighPriorityRecords = [];
+  let requestIdsSet = new Set();
+
+  for (const eventItem of kinesisData) {
+    const record = {
+        entity: { ...buildPaperDeliveryHighPriorityRecord(eventItem) },
+        kinesisSeqNumber: eventItem.kinesisSeqNumber
+    };
+  if (!requestIdsSet.has(record.entity.requestId)) {
+    requestIdsSet.add(record.entity.requestId);
+    paperDeliveryHighPriorityRecords.push(record);
+  }
+}
+
   enrichWithCreatedAt(paperDeliveryHighPriorityRecords);
 
-  alreadyEvaluatedEvents = await batchGetKinesisSequenceNumberRecords(paperDeliveryHighPriorityRecords.map(record => record.kinesisSeqNumber));
-  console.log(`Already evaluated events: ${alreadyEvaluatedEvents}`);
+  alreadyEvaluatedEvents = await batchGetKinesisEventRecords(
+      paperDeliveryHighPriorityRecords.map(record => record.entity.requestId)
+    );
 
   if (alreadyEvaluatedEvents && alreadyEvaluatedEvents.length > 0) {
     console.log("Skipping already evaluated events");
-    paperDeliveryHighPriorityRecords = paperDeliveryHighPriorityRecords.filter(record => !alreadyEvaluatedEvents.includes(record.kinesisSeqNumber));
+    paperDeliveryHighPriorityRecords = paperDeliveryHighPriorityRecords.filter(record => !alreadyEvaluatedEvents.includes(record.entity.requestId));
   }
 
   try {
@@ -42,8 +56,8 @@ exports.handleEvent = async (event) => {
     return { batchItemFailures };
   }
 
-  const sequenceNumbers = paperDeliveryHighPriorityRecords.map(record => buildPaperDeliveryKinesisEventRecord(record.kinesisSeqNumber));
-  await batchWriteKinesisSequenceNumberRecords(sequenceNumbers);
+  const kinesisEventRecords = paperDeliveryHighPriorityRecords.map(record =>buildPaperDeliveryKinesisEventRecord(record.entity.requestId));
+  await batchWriteKinesisEventRecords(kinesisEventRecords);
   console.log(`Processed ${paperDeliveryHighPriorityRecords.length} records successfully`);
   return { batchItemFailures };
 };
