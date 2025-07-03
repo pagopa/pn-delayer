@@ -111,18 +111,18 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryHighPriority'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesHighPriority'
       AttributeDefinitions:
         - AttributeName: "unifiedDeliveryDriverGeokey"
           AttributeType: "S"
-        - AttributeName: "createdAt"
+        - AttributeName: "sk"
           AttributeType: "S"
         - AttributeName: "requestId"
           AttributeType: "S"
       KeySchema:
         - AttributeName: "unifiedDeliveryDriverGeokey"
           KeyType: "HASH"
-        - AttributeName: "createdAt"
+        - AttributeName: "sk"
           KeyType: "RANGE"
       GlobalSecondaryIndexes:
         - IndexName: "requestId-index"
