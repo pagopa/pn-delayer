@@ -503,7 +503,7 @@ Resources:
     Properties:
       Type: MANAGED
       ServiceRole: !Ref BatchServiceRole
-      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-compute-environment'
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-high-priority-compute-environment'
       ComputeResources:
         MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
@@ -517,7 +517,7 @@ Resources:
     Properties:
       Type: container
       PropagateTags: true
-      JobDefinitionName: !Sub '${ProjectName}-delayer-job-definition'
+      JobDefinitionName: !Sub '${ProjectName}-delayer-high-priority-job-definition'
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -573,7 +573,7 @@ Resources:
           ComputeEnvironment: !Ref ComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: !Sub '${ProjectName}-delayer-job-queue'
+      JobQueueName: !Sub '${ProjectName}-delayer-high-priority-job-queue'
 
   BatchServiceRole:
     Type: AWS::IAM::Role
