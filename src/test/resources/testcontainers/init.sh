@@ -2,6 +2,46 @@ echo " - Create pn-delayer TABLES"
 
 aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
+    --table-name pn-PaperDeliveriesCounter  \
+    --attribute-definitions \
+        AttributeName=deliveryDate,AttributeType=S \
+        AttributeName=sk,AttributeType=S \
+    --key-schema \
+        AttributeName=deliveryDate,KeyType=HASH \
+        AttributeName=sk,KeyType=RANGE \
+    --provisioned-throughput \
+        ReadCapacityUnits=10,WriteCapacityUnits=5
+
+aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
+    dynamodb create-table \
+    --table-name pn-PaperDeliveriesIncoming  \
+    --attribute-definitions \
+        AttributeName=province,AttributeType=S \
+        AttributeName=sk,AttributeType=S \
+        AttributeName=unifiedDeliveryDriverProvince,AttributeType=S \
+    --key-schema \
+        AttributeName=province,KeyType=HASH \
+        AttributeName=sk,KeyType=RANGE \
+    --provisioned-throughput \
+        ReadCapacityUnits=10,WriteCapacityUnits=5 \
+    --global-secondary-indexes \
+                "[
+                    {
+                        \"IndexName\": \"unifiedDeliveryDriverProvince-index\",
+                        \"KeySchema\": [{\"AttributeName\":\"unifiedDeliveryDriverProvince\",\"KeyType\":\"HASH\"},{\"AttributeName\":\"sk\",\"KeyType\":\"RANGE\"}],
+                        \"Projection\":{
+                            \"ProjectionType\":\"ALL\"
+                        },
+                         \"ProvisionedThroughput\": {
+                             \"ReadCapacityUnits\": 10,
+                             \"WriteCapacityUnits\": 5
+                         }
+                    }
+                ]"
+
+
+aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
+    dynamodb create-table \
     --table-name pn-PaperDeliveryDriverCapacities  \
     --attribute-definitions \
         AttributeName=pk,AttributeType=S \
@@ -79,6 +119,16 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
         AttributeName=sequenceNumber,AttributeType=S \
     --key-schema \
         AttributeName=sequenceNumber,KeyType=HASH \
+    --provisioned-throughput \
+        ReadCapacityUnits=10,WriteCapacityUnits=5
+
+aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
+    dynamodb create-table \
+    --table-name pn-PaperDeliveriesKinesisEvent  \
+    --attribute-definitions \
+        AttributeName=requestId,AttributeType=S \
+    --key-schema \
+        AttributeName=requestId,KeyType=HASH \
     --provisioned-throughput \
         ReadCapacityUnits=10,WriteCapacityUnits=5
 

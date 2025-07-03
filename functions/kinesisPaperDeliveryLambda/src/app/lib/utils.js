@@ -1,33 +1,52 @@
-function enrichWithCreatedAt(paperDeliveryHighPriorityRecords) {
-  let millis = 1;
-  return paperDeliveryHighPriorityRecords.map(item => {
-    const now = new Date();
-    item.entity.createdAt = new Date(now.getTime() + millis).toISOString();
-    millis++;
-    return item;
+function enrichWithSk(paperDeliveryIncomingRecords) {
+  return paperDeliveryIncomingRecords.map(item => {
+    if(item.entity.productType === "RS" || (item.entity.attempt && parseInt(item.entity.attempt, 10) === 1)) {
+      item.entity.sk = `${item.entity.prepareRequestDate}~${item.entity.requestId}`;
+      return item;
+    }else{
+      item.entity.sk = `${item.entity.notificationSentAt}~${item.entity.requestId}`;
+      return item;
+    }
   });
 }
 
-function buildPaperDeliveryHighPriorityRecord(payload) {
+function buildPaperDeliveryIncomingRecord(payload) {
   return {
-    unifiedDeliveryDriverGeokey: `${payload.unifiedDeliveryDriver}~${payload.recipientNormalizedAddress.pr}`,
+    province: payload.recipientNormalizedAddress.pr,
+    unifiedDeliveryDriverProvince: `${payload.unifiedDeliveryDriver}~${payload.recipientNormalizedAddress.pr}`,
+    createdAt: new Date().toISOString(),
     requestId: payload.requestId,
     productType: payload.productType,
     cap: payload.recipientNormalizedAddress.cap,
     province: payload.recipientNormalizedAddress.pr,
+    region: payload.recipientNormalizedAddress.region,
     senderPaId: payload.senderPaId,
     unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
     tenderId: payload.tenderId,
-    iun: payload.iun
+    iun: payload.iun,
+    notificationSentAt: payload.notificationSentAt,
+    prepareRequestDate: payload.prepareRequestDate,
+    attempt: payload.attempt
   };
 };
 
-function buildPaperDeliveryKinesisEventRecord(sequenceNumber) {
-    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_TTL_SECONDS);
+function buildPaperDeliveryKinesisEventRecord(requestId) {
+    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_EVENTS_RECORD_TTL_SECONDS);
   return {
-    sequenceNumber: sequenceNumber,
+    requestId: requestId,
     ttl: ttl
   };
 };
 
-module.exports = { enrichWithCreatedAt, buildPaperDeliveryHighPriorityRecord, buildPaperDeliveryKinesisEventRecord };
+const groupRecordsByProductAndProvince = (records) => {
+  return records.reduce((acc, record) => {
+    const key = `${record.entity.productType}~${record.entity.province}`;
+    if (!acc[key]) {    
+      acc[key] = [];
+    }
+    acc[key].push(record);
+    return acc;
+  }, {});
+};
+
+module.exports = { enrichWithSk, buildPaperDeliveryIncomingRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince };
