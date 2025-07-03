@@ -169,7 +169,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryPrintCapacity'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesPrintCapacity'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
@@ -204,7 +204,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryPrintCapacityCounter'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesPrintCapacityCounter'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
@@ -227,7 +227,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliverySenderLimit'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesSenderLimit'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
@@ -250,7 +250,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryUsedSenderLimit'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesUsedSenderLimit'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
@@ -273,7 +273,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliverySenderCounter'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesSenderCounter'
       AttributeDefinitions:
         - AttributeName: "deliveryDate"
           AttributeType: "S"
@@ -296,7 +296,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryIncoming'
+      TableName: !Sub '${ProjectName}-PaperDeliveriesIncoming'
       AttributeDefinitions:
         - AttributeName: "ProductTypeProvince"
           AttributeType: "S"
