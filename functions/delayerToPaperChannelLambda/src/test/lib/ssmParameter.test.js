@@ -1,6 +1,6 @@
 const sinon = require('sinon');
 const { expect } = require('chai');
-const { retrieveUnifiedDeliveryDriverProvince } = require('../../app/lib/ssmParameter');
+const { getPriorityMap } = require('../../app/lib/ssmParameter');
 const { SSMClient, GetParameterCommand } = require("@aws-sdk/client-ssm");
 
 let mockSend;
@@ -15,16 +15,14 @@ afterEach(() => {
 });
 
 
-describe('retrieveUnifiedDeliveryDriverProvince', () => {
-  const parameterName = "JOB_INPUT_PARAMETER";
-  process.env.JOB_INPUT_PARAMETER = parameterName;
+describe('retrievePriorityMap', () => {
+  process.env.PAPER_DELIVERY_PRIORITY_PARAMETER = "/config/pn-delayer/paper-delivery-priority";
   process.env.AWS_REGION = "us-east-1";
 
   it('returns the parameter value when retrieval is successful', async () => {
-    const mockValue = '{"driver1":["province1","province2"],"driver2":["province3"]}';
+    const mockValue = '{"1":["PRODUCT_RS.ATTEMPT_0"],"2":["PRODUCT_AR.ATTEMPT_1","PRODUCT_890.ATTEMPT_1"],"3":["PRODUCT_AR.ATTEMPT_0","PRODUCT_890.ATTEMPT_0"]}';
     mockSend.resolves({ Parameter: { Value: mockValue } });
-
-    const result = await retrieveUnifiedDeliveryDriverProvince();
+    const result = await getPriorityMap();
 
     expect(result).equal(mockValue);
     sinon.assert.calledOnce(mockSend);
@@ -32,10 +30,10 @@ describe('retrieveUnifiedDeliveryDriverProvince', () => {
   });
 
   it('returns the empty map when retrieval is successful with empry object', async () => {
-    const mockValue = '{}';
+    const mockValue = {};
     mockSend.resolves({ Parameter: { Value: mockValue } });
 
-    const result = await retrieveUnifiedDeliveryDriverProvince();
+    const result = await getPriorityMap();
 
     expect(result).equal(mockValue);
     sinon.assert.calledOnce(mockSend);
@@ -46,7 +44,7 @@ describe('retrieveUnifiedDeliveryDriverProvince', () => {
     const mockValue = null;
     mockSend.resolves({ Parameter: { Value: mockValue } });
 
-    const result = await retrieveUnifiedDeliveryDriverProvince();
+    const result = await getPriorityMap();
 
     expect(result).to.deep.equal({});
     sinon.assert.calledOnce(mockSend);
@@ -56,7 +54,7 @@ describe('retrieveUnifiedDeliveryDriverProvince', () => {
   it('throws an error when the parameter does not exist', async () => {
     mockSend.rejects(new Error('ParameterNotFound'));
 
-    await expect(retrieveUnifiedDeliveryDriverProvince()).to.be.rejectedWith('ParameterNotFound');
+    await expect(getPriorityMap()).to.be.rejectedWith('ParameterNotFound');
     sinon.assert.calledOnce(mockSend);
     sinon.assert.calledWith(mockSend, sinon.match.instanceOf(GetParameterCommand));
   
@@ -65,7 +63,7 @@ describe('retrieveUnifiedDeliveryDriverProvince', () => {
   it('throws an error when the SSM client fails', async () => {
     mockSend.rejects(new Error('SSMClientError'));
 
-    await expect(retrieveUnifiedDeliveryDriverProvince()).to.be.rejectedWith('SSMClientError');
+    await expect(getPriorityMap()).to.be.rejectedWith('SSMClientError');
     sinon.assert.calledOnce(mockSend);
     sinon.assert.calledWith(mockSend, sinon.match.instanceOf(GetParameterCommand));
   });

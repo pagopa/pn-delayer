@@ -147,6 +147,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
 
+  PaperDeliveryUsedSenderLimitTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryUsedSenderLimit'
+
+  PaperDeliveryUsedSenderLimitTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryUsedSenderLimit'
+
   PaperDeliveryReadyToSendQueryLimit:
     Type: Number
     Default: 1000
@@ -161,6 +169,11 @@ Parameters:
     Type: Number
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
     Default: 1
+
+  WeeklyWorkingDays:
+    Type: Number
+    Description: 'Number of working days in a week'
+    Default: 7
 
   DeliveryDateInterval:
     Type: String
@@ -270,27 +283,6 @@ Parameters:
     Default: 20
     Description: 'Maximum batching window in seconds for KinesisPaperDeliveryLambda'
 
-  SubmitPaperDeliveryJobLambdaName:
-    Type: String
-    Description: Name of the PnDelayerSubmitPaperDeliveryJob Lambda.
-
-  SubmitPaperDeliveryJobLambdaCron:
-    Type: String
-    Default: '*/2 * * * ? *'
-    Description: 'Cron expression for SubmitPaperDeliveryJobLambda'
-
-  SubmitPaperDeliveryJobInputTuplesParameter:
-    Type: String
-    Description: 'SSM parameter name for SubmitPaperDeliveryJob input tuples'
-
-  SubmitPaperDeliveryJobInputDriverEnvName:
-    Type: String
-    Description: 'env name for SubmitPaperDeliveryJob input driver'
-
-  SubmitPaperDeliveryJobInputProvincesEnvName:
-    Type: String
-    Description: 'env name for SubmitPaperDeliveryJob input provinces '
-
   DelayerToPaperChannelLambdaCron:
     Type: String
     Default: '0/15 * * * ? *'
@@ -316,14 +308,6 @@ Parameters:
       - DISABLED
     Description: 'State of the DelayerToPaperChannelRule'
 
-  DelayerToPaperChannelRecoveryLambdaCron:
-    Type: String
-    Default: '0 0 * * ? *'
-    Description: 'Cron expression for DelayerToPaperChanneRecoverylLambda'
-
-  DelayerToPaperChannelRecoveryLambdaName:
-    Type: String
-    Description: 'DelayerToPaperChannelRecoveryLambdaName function name'
 
   PaperDeliveryResidualCapacityLambdaName:
     Type: String
@@ -332,6 +316,15 @@ Parameters:
   PaperDeliveryStartWorkflowLambdaName:
     Type: String
     Description: 'PaperDeliveryStartWorkflowLambda function name'
+
+  PaperDeliveryPriorityParameterName:
+    Type: String
+    Description: 'parameter name for paper delivery priority details'
+
+  PaperDeliveryPrintCapacityCounterTtlDays:
+    Type: Number
+    Default: 60
+    Description: 'TTL in days for PaperDeliveryPrintCapacityCounter'
 
 Resources:
 
@@ -379,6 +372,8 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
             Value: !Ref PaperDeliverySenderLimitTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME
+            Value: !Ref PaperDeliveryUsedSenderLimitTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
@@ -456,6 +451,8 @@ Resources:
                   - !Sub "${PaperDeliveryCounterTableArn}/*"
                   - !Sub "${PaperDeliverySenderLimitTableArn}"
                   - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
               - Effect: Allow
@@ -475,6 +472,8 @@ Resources:
                   - !Sub "${PaperDeliveryCounterTableArn}/*"
                   - !Sub "${PaperDeliverySenderLimitTableArn}"
                   - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
 
   SenderLimitSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -494,7 +493,7 @@ Resources:
     Properties:
       Type: MANAGED
       ServiceRole: !Ref BatchServiceRole
-      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-compute-environment'
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-high-priority-compute-environment'
       ComputeResources:
         MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
@@ -508,7 +507,7 @@ Resources:
     Properties:
       Type: container
       PropagateTags: true
-      JobDefinitionName: !Sub '${ProjectName}-delayer-job-definition'
+      JobDefinitionName: !Sub '${ProjectName}-delayer-high-priority-job-definition'
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -564,7 +563,7 @@ Resources:
           ComputeEnvironment: !Ref ComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: !Sub '${ProjectName}-delayer-job-queue'
+      JobQueueName: !Sub '${ProjectName}-delayer-high-priority-job-queue'
 
   BatchServiceRole:
     Type: AWS::IAM::Role
@@ -959,10 +958,17 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
-          PAPERDELIVERYREADYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          PAPER_DELIVERY_READYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
+          PAPER_DELIVERY_READYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
+          PAPER_DELIVERY_PRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
+          PAPER_DELIVERY_INCOMING_TABLENAME: !Ref PaperDeliveryIncomingTableName
+          PAPER_DELIVERY_COUNTER_TABLENAME: !Ref PaperDeliverySenderCounterTableName
+          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
+          PAPER_DELIVERY_PRIORITY_PARAMETER: !Ref PaperDeliveryPriorityParameterName
+          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TTLDAYS: !Ref PaperDeliveryPrintCapacityCounterTtlDays
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
-          PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
+          PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          PN_DELAYER_WEEKLY_WORKING_DAYS: !Ref WeeklyWorkingDays
       TracingConfig:
         Mode: Active
       Layers:
@@ -1397,10 +1403,3 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt DelayerToPaperChannelScheduleRule.Arn
-  PermissionForDelayerToPaperChannelRecoveryLambda:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt DelayerToPaperChannelRecoveryLambda.Arn
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt DelayerToPaperChannelRecoveryScheduleRule.Arn

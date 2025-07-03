@@ -17,6 +17,9 @@
     "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST",
     "DelayerToPaperChannelRuleState": "DISABLED",
     "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
-    "PaperDeliveryCounterTtlDays": "14"
+    "PaperDeliveryPrintCapacityCounterTtlDays": 60,
+    "WeeklyWorkingDays": 7,
+    "PaperDeliveryCounterTtlDays": "14",
+    "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority"
   }
 }
