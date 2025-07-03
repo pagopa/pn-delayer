@@ -3,4 +3,16 @@ function chunkArray(messages, size) {
     (_, i) => messages.slice(i * size, i * size + size));
 }
 
-module.exports = { chunkArray };
+const groupRecordsByProductAndProvince = (items) => {
+  return items.reduce((acc, item) => {
+    const { productType, province } = item.paperDeliveryIncoming;
+    const key = `${productType}~${province}`;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(item);
+    return acc;
+  }, {});
+};
+
+module.exports = { chunkArray, groupRecordsByProductAndProvince };

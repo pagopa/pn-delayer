@@ -16,6 +16,9 @@
     "SubmitPaperDeliveryJobInputDriverEnvName": "PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER",
     "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST",
     "DelayerToPaperChannelRuleState": "DISABLED",
-    "PaperDeliveryKinesisSequenceNumberTtlSeconds": "86400"
+    "PaperDeliveryKinesisSequenceNumberTtlSeconds": "86400",
+    "PaperDeliveryPrintCapacityCounterTtlDays": 60,
+    "WeeklyWorkingDays": 7,
+    "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority"
   }
 }
