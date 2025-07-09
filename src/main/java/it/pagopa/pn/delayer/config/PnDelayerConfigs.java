@@ -39,5 +39,6 @@ public class PnDelayerConfigs {
         private String paperDeliveryReadyToSendTableName;
         private String paperDeliveryTableName;
         private Integer paperDeliveryQueryLimit;
+        private String paperDeliverySenderLimitTableName;
     }
 }
