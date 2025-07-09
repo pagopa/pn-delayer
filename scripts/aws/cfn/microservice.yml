@@ -139,6 +139,19 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
 
+  PaperDeliveryTableName:
+    Type: String
+    Description: Name of dynamodb table containing paper deliveries workflow
+
+  PaperDeliveryTableArn:
+    Type: String
+    Description: ARN of dynamodb table containing paper deliveries workflow
+
+  PaperDeliveryQueryLimit:
+    Type: Number
+    Default: 1000
+    Description: 'Query limit for paper delivery table'
+
   PaperDeliverySenderLimitTableName:
     Type: String
     Description: 'DynamoDB table name for PaperDeliverySenderLimit'
@@ -378,6 +391,8 @@ Resources:
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
             Value: !Ref PaperDeliveryHighPriorityTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
+            Value: !Ref PaperDeliveryTableName
 
       PlatformCapabilities:
         - FARGATE
@@ -534,6 +549,8 @@ Resources:
             Value: !Ref PaperDeliveryHighPriorityTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYREADYTOSENDTABLENAME
             Value: !Ref PaperDeliveryReadyToSendTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
+            Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
           - Name: PN_DELAYER_DELIVERYDATEINTERVAL
@@ -661,6 +678,7 @@ Resources:
             - !Ref PaperDeliveryDriverUsedCapacitiesTableName
             - !Ref PaperDeliveryHighPriorityTableName
             - !Ref PaperDeliveryReadyToSendTableName
+            - !Ref PaperDeliveryTableName
         LogGroupsNames: !Join
           - ','
           - - !Sub '/aws/ecs/${ProjectName}-delayer'
@@ -833,6 +851,7 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
+          PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
           PAPER_DELIVERY_COUNTER_TABLE_NAME: !Ref PaperDeliveryCounterTableName
@@ -888,7 +907,9 @@ Resources:
             Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
-            Resource: !Ref PaperDeliveryHighPriorityTableArn
+            Resource:
+              - !Ref PaperDeliveryHighPriorityTableArn
+              - !Ref PaperDeliveryTableArn
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource:
@@ -958,6 +979,8 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
+          PAPER_DELIVERY_TABLENAME: !Ref PaperDeliveryTableName
+          PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PAPER_DELIVERY_READYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
           PAPER_DELIVERY_READYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           PAPER_DELIVERY_PRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
@@ -1007,7 +1030,9 @@ Resources:
               - dynamodb:Query
               - dynamodb:BatchWriteItem
               - dynamodb:DeleteItem
-            Resource: !Ref PaperDeliveryReadyToSendTableArn
+            Resource:
+              - !Ref PaperDeliveryReadyToSendTableArn
+              - !Ref PaperDeliveryTableArn
           - Effect: Allow
             Action:
               - dynamodb:GetItem
@@ -1065,6 +1090,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverCapacitiesTableName
           PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          PAPER_DELIVERY_TABLENAME: !Ref PaperDeliveryTableName
           PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
       TracingConfig:
         Mode: Active
@@ -1102,7 +1128,9 @@ Resources:
           - Effect: Allow
             Action:
               - dynamodb:BatchWriteItem
-            Resource: !Ref PaperDeliveryReadyToSendTableArn
+            Resource:
+              - !Ref PaperDeliveryReadyToSendTableArn
+              - !Ref PaperDeliveryTableArn
           - Effect: Allow
             Action:
               - dynamodb:GetItem

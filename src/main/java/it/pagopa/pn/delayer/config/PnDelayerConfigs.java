@@ -37,5 +37,7 @@ public class PnDelayerConfigs {
         private String paperDeliveryDriverUsedCapacitiesTableName;
         private String paperDeliveryHighPriorityTableName;
         private String paperDeliveryReadyToSendTableName;
+        private String paperDeliveryTableName;
+        private Integer paperDeliveryQueryLimit;
     }
 }
