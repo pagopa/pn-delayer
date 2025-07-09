@@ -1,34 +1,39 @@
-function enrichWithSk(paperDeliveryIncomingRecords) {
-  return paperDeliveryIncomingRecords.map(item => {
-    if(item.entity.productType === "RS" || (item.entity.attempt && parseInt(item.entity.attempt, 10) === 1)) {
-      item.entity.sk = `${item.entity.prepareRequestDate}~${item.entity.requestId}`;
-      return item;
-    }else{
-      item.entity.sk = `${item.entity.notificationSentAt}~${item.entity.requestId}`;
-      return item;
-    }
-  });
-}
-
-function buildPaperDeliveryIncomingRecord(payload) {
+function buildPaperDeliveryRecord(payload, deliveryWeek) {
+  let date = retrieveDate(payload);
   return {
-    province: payload.recipientNormalizedAddress.pr,
-    unifiedDeliveryDriverProvince: `${payload.unifiedDeliveryDriver}~${payload.recipientNormalizedAddress.pr}`,
-    createdAt: new Date().toISOString(),
+    pk: buildPk(deliveryWeek),
+    sk: buildSk(payload.recipientNormalizedAddress.pr, date, payload.requestId),
     requestId: payload.requestId,
-    productType: payload.productType,
-    cap: payload.recipientNormalizedAddress.cap,
-    province: payload.recipientNormalizedAddress.pr,
-    region: payload.recipientNormalizedAddress.region,
-    senderPaId: payload.senderPaId,
-    unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
-    tenderId: payload.tenderId,
-    iun: payload.iun,
+    createdAt: new Date().toISOString(),
     notificationSentAt: payload.notificationSentAt,
     prepareRequestDate: payload.prepareRequestDate,
-    attempt: payload.attempt
+    productType: payload.productType,
+    senderPaId: payload.senderPaId,
+    province: payload.recipientNormalizedAddress.pr,
+    cap: payload.recipientNormalizedAddress.cap,
+    attempt: payload.attempt,
+    iun: payload.iun,
+    unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
+    tenderId: payload.tenderId,
+    recipientId: payload.recipientId,
   };
 };
+
+function retrieveDate(payload) {
+    if(payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
+      return payload.prepareRequestDate;
+    }else{
+      return payload.notificationSentAt;
+    }
+}
+
+function buildPk(deliveryWeek) {
+    return `${deliveryWeek}~EVALUATE_SENDER_LIMIT`;
+}
+
+function buildSk(province, date, requestId) {
+    return `${province}~${date}~${requestId}`;
+}
 
 function buildPaperDeliveryKinesisEventRecord(requestId) {
     const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_EVENTS_RECORD_TTL_SECONDS);
@@ -49,4 +54,4 @@ const groupRecordsByProductAndProvince = (records) => {
   }, {});
 };
 
-module.exports = { enrichWithSk, buildPaperDeliveryIncomingRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince };
+module.exports = { buildPaperDeliveryRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince };

@@ -1,16 +1,16 @@
 const { extractKinesisData } = require("./lib/kinesis");
 const {
-  batchWriteIncomingRecords,
+  batchWritePaperDeliveryRecords,
   updateExcludeCounter,
   batchWriteKinesisEventRecords,
   batchGetKinesisEventRecords
 } = require("./lib/dynamo");
 const {
-  enrichWithSk,
-  buildPaperDeliveryIncomingRecord,
+  buildPaperDeliveryRecord,
   buildPaperDeliveryKinesisEventRecord,
   groupRecordsByProductAndProvince
 } = require("./lib/utils");
+const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
 exports.handleEvent = async (event) => {
   console.log("Event received:", JSON.stringify(event));
@@ -22,55 +22,55 @@ exports.handleEvent = async (event) => {
   }
 
   let batchItemFailures = [];
-  // Build records and remove duplicates by entity.requestId
-  let paperDeliveryIncomingRecords = [];
+  let paperDeliveryRecords = [];
   const requestIds = new Set();
+  const dayOfWeek = parseInt(process.env.PN_DELAYER_DELIVERYDATEDAYOFWEEK, 10) || 1;
+  const deliveryWeek = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
 
   for (const eventItem of kinesisData) {
     const record = {
-      entity: { ...buildPaperDeliveryIncomingRecord(eventItem) },
+      entity: { ...buildPaperDeliveryRecord(eventItem, deliveryWeek) },
       kinesisSeqNumber: eventItem.kinesisSeqNumber
     };
     if (!requestIds.has(record.entity.requestId)) {
       requestIds.add(record.entity.requestId);
-      paperDeliveryIncomingRecords.push(record);
+      paperDeliveryRecords.push(record);
     }
   }
-  enrichWithSk(paperDeliveryIncomingRecords);
 
   const alreadyEvaluatedEvents = await batchGetKinesisEventRecords(
-    paperDeliveryIncomingRecords.map(record => record.entity.requestId)
+    paperDeliveryRecords.map(record => record.entity.requestId)
   );
   if (alreadyEvaluatedEvents.length > 0) {
     console.log("Skipping already evaluated events");
-    paperDeliveryIncomingRecords = paperDeliveryIncomingRecords.filter(
+    paperDeliveryRecords = paperDeliveryRecords.filter(
       record => !alreadyEvaluatedEvents.includes(record.entity.requestId)
     );
   }
 
-  if (paperDeliveryIncomingRecords.length > 0) {
+  if (paperDeliveryRecords.length > 0) {
     try {
-      const groupedProductTypeProvinceRecords = groupRecordsByProductAndProvince(paperDeliveryIncomingRecords);
+      const groupedProductTypeProvinceRecords = groupRecordsByProductAndProvince(paperDeliveryRecords);
 
       for (const operation of [
         { func: updateExcludeCounter, data: groupedProductTypeProvinceRecords },
-        { func: batchWriteIncomingRecords, data: paperDeliveryIncomingRecords }
+        { func: batchWritePaperDeliveryRecords, data: paperDeliveryRecords }
       ]) {
         batchItemFailures = await operation.func(operation.data, batchItemFailures);
-        paperDeliveryIncomingRecords = filterFailedRecords(paperDeliveryIncomingRecords, batchItemFailures);
-        if (paperDeliveryIncomingRecords.length === 0) break;
+        paperDeliveryRecords = filterFailedRecords(paperDeliveryRecords, batchItemFailures);
+        if (paperDeliveryRecords.length === 0) break;
       }
     } catch (error) {
       console.error("Error processing event", error);
     }
   }
 
-  if (paperDeliveryIncomingRecords.length > 0) {
-    const requestIds = paperDeliveryIncomingRecords.map(record =>
+  if (paperDeliveryRecords.length > 0) {
+    const requestIds = paperDeliveryRecords.map(record =>
       buildPaperDeliveryKinesisEventRecord(record.entity.requestId)
     );
     await batchWriteKinesisEventRecords(requestIds);
-    console.log(`Processed ${paperDeliveryIncomingRecords.length} records successfully`);
+    console.log(`Processed ${paperDeliveryRecords.length} records successfully`);
   } else {
     console.log("No new records to write to Kinesis sequence number table");
   }

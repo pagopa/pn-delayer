@@ -76,14 +76,14 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
     return batchItemFailures;
 }
 
-async function batchWriteIncomingRecords(paperDeliveryIncomingRecords, batchItemFailures) {
+async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFailures) {
   const batch_size = process.env.BATCH_SIZE;
   console.log(`Batch size: ${batch_size}`);
-  const tableName = process.env.PAPER_DELIVERY_INCOMING_TABLE_NAME;
+  const tableName = process.env.PAPER_DELIVERY_TABLE_NAME;
 
   const params = {
         RequestItems: {
-          [tableName]: paperDeliveryIncomingRecords.map(record => ({
+          [tableName]: paperDeliveryRecords.map(record => ({
             PutRequest: {
               Item: record.entity
             }
@@ -94,7 +94,7 @@ async function batchWriteIncomingRecords(paperDeliveryIncomingRecords, batchItem
   try {
     const command = new BatchWriteCommand(params);
     const response = await docClient.send(command);
-    console.log(`Batch write successful for ${paperDeliveryIncomingRecords.length} items.`);
+    console.log(`Batch write successful for ${paperDeliveryRecords.length} items.`);
 
     const writeRequests = response.UnprocessedItems[tableName];
     if (writeRequests) {
@@ -102,7 +102,7 @@ async function batchWriteIncomingRecords(paperDeliveryIncomingRecords, batchItem
       console.log(`Unprocessed items: ${writeRequests.length}`);
       for (const writeRequest of writeRequests) {
         const unprocessedEntity = writeRequest.PutRequest.Item;
-        const failedRecord = paperDeliveryIncomingRecords.find(record => record.entity.requestId === unprocessedEntity.requestId.S);
+        const failedRecord = paperDeliveryRecords.find(record => record.entity.sk === unprocessedEntity.sk.S);
         if (failedRecord) {
           failedIDs.push(failedRecord.kinesisSeqNumber);
         }
@@ -114,7 +114,7 @@ async function batchWriteIncomingRecords(paperDeliveryIncomingRecords, batchItem
     }
   } catch (error) {
     console.error('Error in batch write:', error);
-    batchItemFailures = batchItemFailures.concat(paperDeliveryIncomingRecords.map((i) => { return { itemIdentifier: i.kinesisSeqNumber }; }));
+    batchItemFailures = batchItemFailures.concat(paperDeliveryRecords.map((i) => { return { itemIdentifier: i.kinesisSeqNumber }; }));
   }
   return batchItemFailures;
 }
@@ -155,7 +155,7 @@ async function batchGetKinesisEventRecords(keys) {
   });
 }
 
-module.exports = { batchWriteIncomingRecords,
+module.exports = { batchWritePaperDeliveryRecords,
                    updateExcludeCounter,
                    batchWriteKinesisEventRecords,
                    batchGetKinesisEventRecords };

@@ -7,7 +7,7 @@ const {
 
 describe("Lambda Handler Tests", () => {
   process.env.REGION = "us-east-1";
-  process.env.PAPER_DELIVERY_INCOMING_TABLE_NAME = 'TestIncomingTable';
+  process.env.PAPER_DELIVERY_TABLE_NAME = 'TestIncomingTable';
   process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME = "KinesisPaperDeliveryEventTable";
   process.env.PAPER_DELIVERY_COUNTER_TABLE_NAME = 'TestCounterTable';
   
@@ -268,11 +268,11 @@ describe("Lambda Handler Tests", () => {
   });
 
   it("should handle a valid Kinesis event with unprocessed item in incoming batch write", async () => {
-    let tableName = process.env.PAPER_DELIVERY_INCOMING_TABLE_NAME;
+    let tableName = process.env.PAPER_DELIVERY_TABLE_NAME;
     mockDynamoDBClient.resolvesOnce({ Responses: {} })
     .resolvesOnce({ UnprocessedItems: {
       [tableName]: [
-        { PutRequest: { Item: { requestId: {'S':'request1' } } } }
+        { PutRequest: { Item: { sk: {'S':'RM~2023-10-01T00:00:00Z~request1' } } } }
       ]
     } })
     .resolvesOnce({ UnprocessedItems: {} });
@@ -306,7 +306,7 @@ describe("Lambda Handler Tests", () => {
               attempt: '0'
         },
         {
-              kinesisSeqNumber: '1234567891',
+              kinesisSeqNumber: '1234567892',
               unifiedDeliveryDriver: 'driver3',
               recipientNormalizedAddress: { pr: 'NA', cap: '67890', region: 'region3' },
               requestId: 'request3',
