@@ -855,10 +855,10 @@ Resources:
           HIGH_PRIORITY_TABLE_NAME: !Ref PaperDeliveryHighPriorityTableName
           KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
           PAPER_DELIVERY_COUNTER_TABLE_NAME: !Ref PaperDeliveryCounterTableName
-          PAPER_DELIVERY_INCOMING_TABLE_NAME: !Ref PaperDeliveryIncomingTableName
           BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_PAPER_DELIVERY_EVENTS_RECORD_TTL_SECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
           PAPER_DELIVERY_COUNTER_TTL_DAYS: !Ref PaperDeliveryCounterTtlDays
+          PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
       TracingConfig:
         Mode: Active
       Layers:
@@ -908,13 +908,11 @@ Resources:
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource:
-              - !Ref PaperDeliveryHighPriorityTableArn
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
             Action: dynamodb:BatchWriteItem
             Resource:
               - !Ref PaperDeliveryCounterTableArn
-              - !Ref PaperDeliveryIncomingTableArn
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility
