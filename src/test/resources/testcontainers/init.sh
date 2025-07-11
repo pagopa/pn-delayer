@@ -2,7 +2,7 @@ echo " - Create pn-delayer TABLES"
 
 aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
-    --table-name pn-PaperDeliveriesCounter  \
+    --table-name pn-PaperDeliveryCounter  \
     --attribute-definitions \
         AttributeName=deliveryDate,AttributeType=S \
         AttributeName=sk,AttributeType=S \
