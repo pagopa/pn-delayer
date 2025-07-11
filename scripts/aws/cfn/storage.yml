@@ -227,7 +227,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveriesSenderLimit'
+      TableName: !Sub '${ProjectName}-PaperDeliverySenderLimit'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
@@ -250,7 +250,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveriesUsedSenderLimit'
+      TableName: !Sub '${ProjectName}-PaperDeliveryUsedSenderLimit'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
