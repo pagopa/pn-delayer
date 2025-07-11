@@ -18,13 +18,12 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 .
 ├── index.js               # Entrypoint Lambda
 ├── package.json           # Dipendenze e script
-├── jest.config.js         # Config Jest
 ├── src/
 │   └── app/
 │       ├── eventHandler.js  # Dispatcher delle operazioni
 │       ├── importData.js  # Implementazione operazione IMPORT_DATA
 │   └── test/
-│       ├── lambda.test.js # Test unitari (Jest + aws-sdk-client-mock)
+│       ├── lambda.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
 └── README.md
 ```

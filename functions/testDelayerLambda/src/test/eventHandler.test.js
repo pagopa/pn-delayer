@@ -1,3 +1,4 @@
+const assert = require('assert');
 const { Readable } = require("stream");
 const { handler } = require("../../index");
 const fs = require("fs");
@@ -31,8 +32,7 @@ describe("Lambda CSV import", () => {
         ddbMock.on(BatchWriteCommand).resolves({});
 
         const result = await handler({ operationType: "IMPORT_DATA", parameters: [] });
-
-        expect(result.statusCode).toBe(200);
-        expect(ddbMock.commandCalls(BatchWriteCommand).length).toBeGreaterThan(0);
+        assert.strictEqual(result.statusCode, 200);
+        assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
 });
