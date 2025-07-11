@@ -2,7 +2,7 @@ package it.pagopa.pn.delayer.middleware.dao;
 
 import it.pagopa.pn.delayer.BaseTest;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveriesSenderLimit;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverUsedCapacities;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -25,10 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
-public class PaperDeliveriesSenderLimitDaoIT extends BaseTest.WithLocalStack {
+public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
 
     @Autowired
-    PaperDeliveriesSenderLimitDAO paperDeliveriesSenderLimitDAO;
+    PaperDeliverySenderLimitDAO paperDeliveriesSenderLimitDAO;
 
     @Autowired
     DynamoDbAsyncClient dynamoDbAsyncClient;
@@ -37,12 +37,12 @@ public class PaperDeliveriesSenderLimitDaoIT extends BaseTest.WithLocalStack {
     PnDelayerConfigs pnDelayerConfigs;
 
     @Test
-    void testBatchGetItem() {
+    void testRetrieveSendersLimit() {
         List<String> pks = List.of("0~RS~RM", "1~RS~RM", "2~RS~RM");
         Instant deliveryDate = Instant.parse("2025-04-07T00:00:00Z");
 
         IntStream.range(0, 3).forEach(i -> {
-            PaperDeliveriesSenderLimit paperDeliveriesSenderLimit = new PaperDeliveriesSenderLimit();
+            PaperDeliverySenderLimit paperDeliveriesSenderLimit = new PaperDeliverySenderLimit();
             paperDeliveriesSenderLimit.setPk(i + "~RS~RM");
             paperDeliveriesSenderLimit.setDeliveryDate("2025-04-07T00:00:00Z");
             Map<String, AttributeValue> itemMap = new HashMap<>();
@@ -52,7 +52,7 @@ public class PaperDeliveriesSenderLimitDaoIT extends BaseTest.WithLocalStack {
         });
 
 
-        StepVerifier.create(paperDeliveriesSenderLimitDAO.batchGetItem(pks, deliveryDate))
+        StepVerifier.create(paperDeliveriesSenderLimitDAO.retrieveSendersLimit(pks, deliveryDate))
                 .expectNextCount(3)
                 .expectComplete()
                 .verify();
@@ -67,13 +67,13 @@ public class PaperDeliveriesSenderLimitDaoIT extends BaseTest.WithLocalStack {
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
         entity.setDeliveryDate(deliveryDate);
 
-        paperDeliveriesSenderLimitDAO.updatePercentageLimit("1~RS~RM", 5, deliveryDate).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
 
         int response = get(deliveryDate);
         assert response != 0;
         Assertions.assertEquals(5, response);
 
-        paperDeliveriesSenderLimitDAO.updatePercentageLimit("1~RS~RM", 5, deliveryDate).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
 
         int response2 = get(deliveryDate);
         assert response2 != 0;
@@ -87,13 +87,14 @@ public class PaperDeliveriesSenderLimitDaoIT extends BaseTest.WithLocalStack {
         key.put("deliveryDate", AttributeValue.builder().s(String.valueOf(deliveryDate)).build());
 
         GetItemRequest request = GetItemRequest.builder()
-                .tableName(pnDelayerConfigs.getDao().getPaperDeliverySenderLimitTableName())
+                .tableName(pnDelayerConfigs.getDao().getPaperDeliveryUsedSenderLimitTableName())
                 .key(key)
                 .build();
 
         GetItemResponse response = Mono.fromFuture(dynamoDbAsyncClient.getItem(request)).block();
-        return response.item().containsKey("percentageLimit")
-                ? Integer.parseInt(response.item().get("percentageLimit").n())
+        Assertions.assertNotNull(response);
+        return response.item().containsKey("numberOfShipment")
+                ? Integer.parseInt(response.item().get("numberOfShipment").n())
                 : 0;
     }
 }
