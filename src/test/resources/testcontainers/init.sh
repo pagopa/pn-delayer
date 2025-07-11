@@ -182,7 +182,7 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
 
 aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     dynamodb create-table \
-    --table-name pn-PaperDeliveriesUsedSenderLimit  \
+    --table-name pn-PaperDeliveryUsedSenderLimit  \
     --attribute-definitions \
         AttributeName=pk,AttributeType=S \
         AttributeName=deliveryDate,AttributeType=S \

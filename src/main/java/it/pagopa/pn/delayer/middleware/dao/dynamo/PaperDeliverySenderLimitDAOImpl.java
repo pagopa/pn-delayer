@@ -1,8 +1,9 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveriesSenderLimitDAO;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveriesSenderLimit;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -22,25 +23,25 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveriesSenderLimit.COL_PERCENTAGE_LIMIT;
-
 @Component
 @Slf4j
-public class PaperDeliveriesSenderLimitDAOImpl implements PaperDeliveriesSenderLimitDAO {
+public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimitDAO {
 
-    private final DynamoDbAsyncTable<PaperDeliveriesSenderLimit> table;
+    private final DynamoDbAsyncTable<PaperDeliverySenderLimit> senderLimitTable;
+    private final DynamoDbAsyncTable<PaperDeliveryUsedSenderLimit> usedSenderLimitTable;
     private final DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient;
     private final DynamoDbAsyncClient dynamoDbAsyncClient;
 
-    public PaperDeliveriesSenderLimitDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient, DynamoDbAsyncClient dynamoDbAsyncClient) {
+    public PaperDeliverySenderLimitDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedClient, DynamoDbAsyncClient dynamoDbAsyncClient) {
         this.dynamoDbAsyncClient = dynamoDbAsyncClient;
-        this.table = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliverySenderLimitTableName(), TableSchema.fromBean(PaperDeliveriesSenderLimit.class));
+        this.senderLimitTable = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliverySenderLimitTableName(), TableSchema.fromBean(PaperDeliverySenderLimit.class));
+        this.usedSenderLimitTable = dynamoDbEnhancedClient.table(pnDelayerConfigs.getDao().getPaperDeliveryUsedSenderLimitTableName(), TableSchema.fromBean(PaperDeliveryUsedSenderLimit.class));
         this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
     }
 
     @Override
-    public Flux<PaperDeliveriesSenderLimit> batchGetItem(List<String> pks, Instant deliveryDate) {
-        log.info("batchGetItem for senderLimits pks={} deliveryDate={}", pks, deliveryDate);
+    public Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, Instant deliveryDate) {
+        log.info("retrieve sender Limit for tuples={} on deliveryDate={}", pks, deliveryDate);
 
         List<Key> keys = pks.stream()
                 .map(pk -> Key.builder()
@@ -49,9 +50,9 @@ public class PaperDeliveriesSenderLimitDAOImpl implements PaperDeliveriesSenderL
                         .build())
                 .toList();
 
-        ReadBatch.Builder<PaperDeliveriesSenderLimit> readBatchBuilder = ReadBatch
-                .builder(PaperDeliveriesSenderLimit.class)
-                .mappedTableResource(table);
+        ReadBatch.Builder<PaperDeliverySenderLimit> readBatchBuilder = ReadBatch
+                .builder(PaperDeliverySenderLimit.class)
+                .mappedTableResource(senderLimitTable);
 
         keys.forEach(readBatchBuilder::addGetItem);
         ReadBatch readBatch = readBatchBuilder.build();
@@ -61,25 +62,27 @@ public class PaperDeliveriesSenderLimitDAOImpl implements PaperDeliveriesSenderL
                 .build();
 
         return Mono.from(dynamoDbEnhancedClient.batchGetItem(request))
-                .map(batchGetResultPage -> batchGetResultPage.resultsForTable(table))
-                .doOnNext(items -> log.info("Retrieved senderLimits items: {}", items.size()))
+                .map(batchGetResultPage -> batchGetResultPage.resultsForTable(senderLimitTable))
+                .doOnNext(items -> log.info("Retrieved senderLimits [{}] items", items.size()))
                 .flatMapMany(Flux::fromIterable)
                 .doOnError(e -> log.error("Error retrieving senderLimits items with pks {}: {}", pks, e.getMessage()));
     }
 
     @Override
-    public Mono<Integer> updatePercentageLimit(String pk, Integer increment, Instant deliveryDate) {
+    public Mono<Integer> updateUsedSenderLimit(String pk, Integer increment, Instant deliveryDate, Integer senderLimit) {
         Map<String, AttributeValue> key = new HashMap<>();
-        key.put(PaperDeliveriesSenderLimit.COL_PK, AttributeValue.builder().s(pk).build());
-        key.put(PaperDeliveriesSenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());
+        key.put(PaperDeliverySenderLimit.COL_PK, AttributeValue.builder().s(pk).build());
+        key.put(PaperDeliverySenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());
 
         Map<String, AttributeValue> attributeValue = new HashMap<>();
         attributeValue.put(":v", AttributeValue.builder().n(String.valueOf(increment)).build());
+        attributeValue.put(":senderLimit", AttributeValue.builder().n(String.valueOf(senderLimit)).build());
 
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
-                .tableName(table.tableName())
+                .tableName(usedSenderLimitTable.tableName())
                 .key(key)
-                .updateExpression("ADD " + COL_PERCENTAGE_LIMIT + " :v")
+                .updateExpression("ADD " + PaperDeliveryUsedSenderLimit.COL_NUMBER_OF_SHIPMENT + " :v"+
+                        " SET " + PaperDeliveryUsedSenderLimit.COL_SENDER_LIMIT + " = :senderLimit")
                 .expressionAttributeValues(attributeValue)
                 .build();
 
