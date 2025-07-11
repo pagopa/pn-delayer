@@ -339,6 +339,19 @@ Parameters:
     Default: 60
     Description: 'TTL in days for PaperDeliveryPrintCapacityCounter'
 
+  TestDelayerBucketName:
+    Type: String
+    Description: 'TestDelayerLambda bucket name'
+    Default: 'test-bucket-name'
+  TestDelayerBucketArn:
+    Type: String
+    Description: 'TestDelayerLambda bucket arn'
+    Default: 'test-bucket-arn'
+  TestDelayerObjectKeyBucketArn:
+    Type: String
+    Description: 'TestDelayerLambda object key of bucket'
+    Default: 'test-object-key'
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -1155,3 +1168,73 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt DelayerToPaperChannelScheduleRule.Arn
+
+  #########################################################
+  ###         TestDelayerLambda                ###
+  #########################################################
+
+  TestDelayerLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${TestDelayerLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  TestDelayerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref TestDelayerLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/testDelayerLambda.zip"
+      Role: !GetAtt KinesisPaperDeliveryLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          BUCKET_NAME: !Ref TestDelayerBucketName
+          OBJECT_KEY: !Ref TestDelayerObjectKeyBucketArn
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  TestDelayerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-testDelayerLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  TestDelayerLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-testDelayerLambdaPolicy
+      Roles:
+        - !Ref TestDelayerLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: dynamodb:BatchWriteItem
+            Resource:
+              - !Ref PaperDeliveryTableArn
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Ref TestDelayerBucketNameArn
