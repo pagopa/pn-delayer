@@ -18,6 +18,7 @@ public class PaperDelivery {
     public static final String COL_PRODUCT_TYPE = "productType";
     public static final String COL_SENDER_PA_ID = "senderPaId";
     public static final String COL_PROVINCE = "province";
+    public static final String COL_CAP = "requestId~";
     public static final String COL_ATTEMPT = "attempt";
     public static final String COL_IUN = "iun";
     public static final String COL_UNIFIED_DELIVERY_DRIVER = "unifiedDeliveryDriver";
@@ -44,6 +45,8 @@ public class PaperDelivery {
     private String senderPaId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PROVINCE)}))
     private String province;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_CAP)}))
+    private String cap;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_ATTEMPT)}))
     private Integer attempt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_IUN)}))
@@ -64,8 +67,14 @@ public class PaperDelivery {
         return String.join("~", fields);
     }
 
+
     @DynamoDbIgnore
     public static String buildPk(WorkflowStepEnum workflowStepEnum, String deliveryWeek) {
         return String.join( "~", deliveryWeek, workflowStepEnum.name());
+    }
+
+    @DynamoDbIgnore
+    public static String retrieveSentWeek(String pk) {
+        return pk.split("~")[0];
     }
 }

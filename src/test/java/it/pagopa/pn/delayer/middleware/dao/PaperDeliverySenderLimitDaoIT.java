@@ -2,8 +2,8 @@ package it.pagopa.pn.delayer.middleware.dao;
 
 import it.pagopa.pn.delayer.BaseTest;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverUsedCapacities;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,12 +39,11 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
     @Test
     void testRetrieveSendersLimit() {
         List<String> pks = List.of("0~RS~RM", "1~RS~RM", "2~RS~RM");
-        Instant deliveryDate = Instant.parse("2025-04-07T00:00:00Z");
 
         IntStream.range(0, 3).forEach(i -> {
             PaperDeliverySenderLimit paperDeliveriesSenderLimit = new PaperDeliverySenderLimit();
             paperDeliveriesSenderLimit.setPk(i + "~RS~RM");
-            paperDeliveriesSenderLimit.setDeliveryDate("2025-04-07T00:00:00Z");
+            paperDeliveriesSenderLimit.setDeliveryDate("2025-04-07");
             Map<String, AttributeValue> itemMap = new HashMap<>();
             itemMap.put("pk", AttributeValue.builder().s(paperDeliveriesSenderLimit.getPk()).build());
             itemMap.put("deliveryDate", AttributeValue.builder().s(paperDeliveriesSenderLimit.getDeliveryDate()).build());
@@ -52,7 +51,7 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         });
 
 
-        StepVerifier.create(paperDeliveriesSenderLimitDAO.retrieveSendersLimit(pks, deliveryDate))
+        StepVerifier.create(paperDeliveriesSenderLimitDAO.retrieveSendersLimit(pks, "2025-04-07"))
                 .expectNextCount(3)
                 .expectComplete()
                 .verify();
@@ -63,25 +62,24 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         PaperDeliveryDriverUsedCapacities entity = new PaperDeliveryDriverUsedCapacities();
         LocalDate dateTime = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(1)));
-        Instant deliveryDate = nextWeek.atStartOfDay().toInstant(ZoneOffset.UTC);
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
-        entity.setDeliveryDate(deliveryDate);
+        entity.setDeliveryDate(nextWeek.toString());
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, nextWeek.toString(), 1000).block();
 
-        int response = get(deliveryDate);
+        int response = get(nextWeek.toString());
         assert response != 0;
         Assertions.assertEquals(5, response);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, nextWeek.toString(), 1000).block();
 
-        int response2 = get(deliveryDate);
+        int response2 = get(nextWeek.toString());
         assert response2 != 0;
         Assertions.assertEquals(10, response2);
 
     }
 
-    private int get(Instant deliveryDate) {
+    private int get(String deliveryDate) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put("pk", AttributeValue.builder().s("1~RS~RM").build());
         key.put("deliveryDate", AttributeValue.builder().s(String.valueOf(deliveryDate)).build());

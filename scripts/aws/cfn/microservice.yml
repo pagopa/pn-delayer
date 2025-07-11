@@ -250,12 +250,22 @@ Parameters:
   JobInputUnifiedDeliveryDriver:
     Type: String
     Default: ' '
-    Description: 'Input unifiedDeliveryDriver for the job'
+    Description: 'Input unifiedDeliveryDriver for the driver capacity job'
 
   JobInputProvinceList:
     Type: String
     Default: ' '
-    Description: 'Input Province list for the job'
+    Description: 'Input Province list for the driver capacity job'
+
+  ActualTenderId:
+    Type: String
+    Default: ' '
+    Description: 'TenderId for the driver capacity job'
+
+  JobInputProvince:
+    Type: String
+    Default: ' '
+    Description: 'Input Province for the sender limit job'
 
   # OpenApi Bucket params
   MicroserviceBucketName:
@@ -379,8 +389,6 @@ Resources:
             awslogs-region: !Ref AWS::Region
             awslogs-stream-prefix: !Sub '${ProjectName}-delayer-sender-limit-logs'
         Environment:
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYINCOMINGTABLENAME
-            Value: !Ref PaperDeliveryIncomingTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
@@ -389,10 +397,10 @@ Resources:
             Value: !Ref PaperDeliveryUsedSenderLimitTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
-            Value: !Ref PaperDeliveryHighPriorityTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
+          - Name: PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCELIST
+            Value: !Ref JobInputProvince
 
       PlatformCapabilities:
         - FARGATE
@@ -557,12 +565,14 @@ Resources:
             Value: !Ref DeliveryDateInterval
           - Name: AWS_REGIONCODE
             Value: !Ref AWS::Region
-          - Name: PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER
+          - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
             Value: !Ref JobInputUnifiedDeliveryDriver
-          - Name: PN_DELAYER_JOBINPUT_PROVINCELIST
+          - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
             Value: !Ref JobInputProvinceList
           - Name: PN_DELAYER_PAPERDELIVERYCUTOFFDURATION
             Value: !Ref PaperDeliveryCutOffDuration
+          - Name: PN_DELAYER_ACTUALTENDERID
+            Value: !Ref ActualTenderId
 
       PlatformCapabilities:
         - FARGATE

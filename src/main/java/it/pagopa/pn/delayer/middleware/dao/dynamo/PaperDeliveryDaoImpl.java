@@ -4,7 +4,6 @@ import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,25 +26,23 @@ import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_I
 public class PaperDeliveryDaoImpl implements PaperDeliveryDAO {
 
     private final DynamoDbAsyncTable<PaperDelivery> table;
-    private final PnDelayerConfigs delayerConfigs;
     private final DynamoDbEnhancedAsyncClient enhancedAsyncClient;
 
     public PaperDeliveryDaoImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
         this.table = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryTableName(), TableSchema.fromBean(PaperDelivery.class));
-        this.delayerConfigs = pnDelayerConfigs;
         this.enhancedAsyncClient = dynamoDbEnhancedAsyncClient;
     }
 
     @Override
-    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey) {
+    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
         QueryConditional keyCondition = QueryConditional.sortBeginsWith(Key.builder()
-                .partitionValue(PaperDeliveryHighPriority.buildKey(deliveryWeek, workflowStepEnum.name()))
+                .partitionValue(String.join("~", deliveryWeek, workflowStepEnum.name()))
                 .sortValue(sortKeyPrefix)
                 .build());
 
         QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder()
                 .queryConditional(keyCondition)
-                .limit(delayerConfigs.getDao().getPaperDeliveryQueryLimit());
+                .limit(queryLimit);
 
         if (!CollectionUtils.isEmpty(lastEvaluatedKey)) {
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);

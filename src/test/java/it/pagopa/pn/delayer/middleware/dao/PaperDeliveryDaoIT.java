@@ -53,7 +53,7 @@ public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
 
         paperDeliveryDAO.insertPaperDeliveries(paperDeliveryList).block();
 
-        Page<PaperDelivery> result = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, "2025-04-07", "RM", null).block();
+        Page<PaperDelivery> result = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, "2025-04-07", "RM", null, 5).block();
         log.info("result: {}", result);
         Assertions.assertNotNull(result);
         Assertions.assertEquals(5, result.items().size());
@@ -61,7 +61,7 @@ public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
          && paperDelivery.getSk().startsWith("RM~")));
         Assertions.assertNotNull(result.lastEvaluatedKey());
 
-        Page<PaperDelivery> resultWithLastEvaluated = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, "2025-04-07", "RM", result.lastEvaluatedKey()).block();
+        Page<PaperDelivery> resultWithLastEvaluated = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, "2025-04-07", "RM", result.lastEvaluatedKey(), 5).block();
         log.info("resultWithLastEvaluated: {}", resultWithLastEvaluated);
         Assertions.assertNotNull(resultWithLastEvaluated);
         Assertions.assertEquals(4, resultWithLastEvaluated.items().size());
@@ -69,7 +69,7 @@ public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
                 && paperDelivery.getSk().startsWith("RM~")));
         Assertions.assertNull(resultWithLastEvaluated.lastEvaluatedKey());
 
-        Page<PaperDelivery> resultForDriveCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, "2025-04-07", "RM", null).block();
+        Page<PaperDelivery> resultForDriveCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, "2025-04-07", "RM", null, 5).block();
         log.info("resultForDriveCapacityStep: {}", resultForDriveCapacityStep);
         Assertions.assertNotNull(resultForDriveCapacityStep);
         Assertions.assertEquals(1, resultForDriveCapacityStep.items().size());
@@ -77,12 +77,12 @@ public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
                 && paperDelivery.getSk().startsWith("RM~")));
         Assertions.assertNull(resultForDriveCapacityStep.lastEvaluatedKey());
 
-        Page<PaperDelivery> resultForPrintCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_PRINT_CAPACITY, "2025-04-07", "RM", null).block();
+        Page<PaperDelivery> resultForPrintCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_PRINT_CAPACITY, "2025-04-07", "RM", null, 5).block();
         log.info("resultForPrintCapacityStep: {}", resultForPrintCapacityStep);
         Assertions.assertNotNull(resultForPrintCapacityStep);
         Assertions.assertEquals(0, resultForPrintCapacityStep.items().size());
 
-        Page<PaperDelivery> resultForOtherProvince = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, "2025-04-07", "NA", null).block();
+        Page<PaperDelivery> resultForOtherProvince = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, "2025-04-07", "NA", null, 5).block();
         log.info("resultForOtherProvince: {}", resultForOtherProvince);
         Assertions.assertNotNull(resultForOtherProvince);
         Assertions.assertEquals(1, resultForOtherProvince.items().size());
