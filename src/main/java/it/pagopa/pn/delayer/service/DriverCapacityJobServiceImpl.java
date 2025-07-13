@@ -21,10 +21,8 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Component
@@ -46,22 +44,26 @@ public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
                 .doOnNext(tuple -> log.info("Retrieved capacities for province: [{}], unifiedDeliveryDriver: [{}] -> availableCapacity={}, usedCapacity={}", province, unifiedDeliveryDriver, tuple.getT1(), tuple.getT2()))
                 .filter(tuple -> tuple.getT1() - tuple.getT2() > 0)
                 .doOnDiscard(Integer.class, residualCapacity -> log.warn("No capacity for province={} and unifiedDeliveryDriver={}, no records will be processed", province, unifiedDeliveryDriver))
-                .flatMap(tuple -> paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, sentWeek.toString(), String.join("~", unifiedDeliveryDriver, province), new HashMap<>(), Math.min((tuple.getT1() - tuple.getT2()), pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
-                        .flatMap(paperDeliveryPage -> {
-                            if (CollectionUtils.isEmpty(paperDeliveryPage.items())) {
-                                log.warn("No records found for unifiedDeliveryDriver={} and province:{}", unifiedDeliveryDriver, province);
-                                return Mono.empty();
-                            }
-                            AtomicInteger residualCapacityWrapper = new AtomicInteger(tuple.getT1() - tuple.getT2());
-                            return processChunk(paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, province, deliveryWeek, tuple.getT1())
-                                    .flatMap(sentToNextStep -> {
-                                        if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()) && residualCapacityWrapper.addAndGet(-sentToNextStep) > 0) {
-                                            return startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, paperDeliveryPage.lastEvaluatedKey(), startExecutionBatch, tenderId);
-                                        } else {
-                                            return Mono.empty();
-                                        }
-                                    });
-                        }));
+                .flatMap(tuple -> retrievePaperDeliveriesAndProcess(unifiedDeliveryDriver, province, lastEvaluatedKey, sentWeek, tenderId, deliveryWeek, tuple.getT1() - tuple.getT2(), tuple.getT1()))
+                .then();
+    }
+
+    private Mono<Integer> retrievePaperDeliveriesAndProcess(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, LocalDate sentWeek, String tenderId, LocalDate deliveryWeek, Integer residualCapacity, Integer declaredCapacity) {
+        return paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, sentWeek.toString(), String.join("~", unifiedDeliveryDriver, province), lastEvaluatedKey, Math.min(residualCapacity, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
+                .flatMap(paperDeliveryPage -> {
+                    if (CollectionUtils.isEmpty(paperDeliveryPage.items())) {
+                        log.warn("No records found for unifiedDeliveryDriver={} and province:{}", unifiedDeliveryDriver, province);
+                        return Mono.empty();
+                    }
+                    return processChunk(paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, province, deliveryWeek, declaredCapacity)
+                            .flatMap(sentToNextStep -> {
+                                if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()) && (residualCapacity - sentToNextStep) > 0) {
+                                    return retrievePaperDeliveriesAndProcess(unifiedDeliveryDriver, province, paperDeliveryPage.lastEvaluatedKey(), sentWeek, tenderId, deliveryWeek, residualCapacity - sentToNextStep, declaredCapacity);
+                                } else {
+                                    return Mono.empty();
+                                }
+                            });
+                });
     }
 
     private Mono<Integer> processChunk(List<PaperDelivery> chunk, String unifiedDeliveryDriver, String tenderId, String province, LocalDate deliveryWeek, Integer provinceDeclaredCapacity) {
@@ -70,9 +72,10 @@ public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
 
         return evaluateCapCapacity(chunk, unifiedDeliveryDriver, tenderId, deliveryWeek, deliveriesToSend, incrementCapacities)
                 .doOnNext(unused -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, province, deliveriesToSend.size(), deliveryWeek, provinceDeclaredCapacity)))
-                .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(deliveriesToSend))
-                .then(updateCounters(incrementCapacities))
-                .thenReturn(deliveriesToSend.size());
+                .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(deliveriesToSend)
+                        .thenReturn(deliveriesToSend.size())
+                        .flatMap(integer -> updateCounters(incrementCapacities)
+                                .thenReturn(integer)));
     }
 
     private Mono<Void> updateCounters(List<IncrementUsedCapacityDto> incrementCapacities) {

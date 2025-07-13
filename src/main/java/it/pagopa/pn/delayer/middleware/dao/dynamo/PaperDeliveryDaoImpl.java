@@ -8,6 +8,7 @@ import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
@@ -52,8 +53,10 @@ public class PaperDeliveryDaoImpl implements PaperDeliveryDAO {
     }
 
     @Override
-    public Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveriesChunk) {
-        return insertWithRetry(paperDeliveriesChunk, 3);
+    public Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveries) {
+        return Flux.fromIterable(paperDeliveries).buffer(25)
+                .flatMap(chunk -> insertWithRetry(chunk, 3))
+                .then();
     }
 
     private Mono<Void> insertWithRetry(List<PaperDelivery> paperDeliveriesChunk, int retriesLeft) {

@@ -22,7 +22,7 @@ public class PnDelayerConfigs {
     private EvaluateDriverCapacityJobInput evaluateDriverCapacityJobInput;
     private EvaluateSenderLimitJobInput evaluateSenderLimitJobInput;
     private WorkflowStepEnum workflowStep;
-    private int deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
+    private Integer deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
     private Duration deliveryDateInterval;
     private String actualTenderId;
 
