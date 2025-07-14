@@ -728,7 +728,7 @@ Resources:
   DriverCapacityTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${ProjectName}-delayer-taskexec-role'
+      RoleName: !Sub '${ProjectName}-delayer-driver-capacity-job-taskexec-role'
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -776,8 +776,8 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:TransactWriteItems
               Resource:
-                - !Sub "${PaperDeliveryHighPriorityTableArn}"
-                - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
+                - !Sub "${PaperDeliveryTableArn}"
+                - !Sub "${PaperDeliveryTableArn}/*"
                 - !Sub "${PaperDeliveryReadyToSendTableArn}"
                 - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
 
