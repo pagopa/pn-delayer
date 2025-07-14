@@ -36,7 +36,7 @@ function buildSk(province, date, requestId) {
 }
 
 function buildPaperDeliveryKinesisEventRecord(requestId) {
-    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_PAPER_DELIVERY_EVENTS_RECORD_TTL_SECONDS);
+    const ttl = Math.floor(Date.now() / 1000) + Number(process.env.KINESIS_EVENTSRECORDTTLSECONDS);
   return {
     requestId: requestId,
     ttl: ttl

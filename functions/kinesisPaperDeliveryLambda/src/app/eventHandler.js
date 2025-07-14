@@ -24,7 +24,7 @@ exports.handleEvent = async (event) => {
   let batchItemFailures = [];
   let paperDeliveryRecords = [];
   const requestIds = new Set();
-  const dayOfWeek = parseInt(process.env.PN_DELAYER_DELIVERYDATEDAYOFWEEK, 10) || 1;
+  const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
   const deliveryWeek = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
 
   for (const eventItem of kinesisData) {
