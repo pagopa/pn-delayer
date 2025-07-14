@@ -286,16 +286,39 @@ Resources:
         StandardAlarmThresholdsMs: !Ref PnDelayerInputsStandardAlarmThresholdsMs
         OnCallAlarmThresholdsMs: !Ref PnDelayerInputsnOnCallAlarmThresholdsMs
         
-  PnDelayerLogGroup:
+  PnDelayerSenderLimitJobLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
       Parameters:
-        LogGroupName: !Sub '${ProjectName}-delayer'
+        LogGroupName: !Sub '${ProjectName}-delayer-sender-limit-job'
+        LogGroupRetention: !Ref LogRetention
+        LogsKinesisSourceStreamArn: !Ref
+
+  PnDelayerDriverCapacityJobLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-delayer-driver-capacity-job'
         LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
+
+  PnDelayerResidualCapacityJobLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-delayer-residual-capacity-job'
+        LogGroupRetention: !Ref LogRetention
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
+
 
   KinesisPaperDeliveryLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -330,6 +353,17 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Sub ${ProjectName}-delayerToPaperChannelLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  TestDelayerLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-testDelayerLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
@@ -406,15 +440,23 @@ Outputs:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamKeyArn
     Description: "PnDelayerInputs Kinesis stream KMS ARN"
     
-  # Log group exports
-  BatchLogGroup:
-    Value: !GetAtt PnDelayerLogGroup.Outputs.LogGroupName
+  SenderLimitJobLogGroup:
+    Value: !GetAtt PnDelayerSenderLimitJobLogGroup.Outputs.LogGroupName
+
+  DriverCapacityJobLogGroup:
+    Value: !GetAtt PnDelayerDriverCapacityJobLogGroup.Outputs.LogGroupName
+
+  ResidualCapacityJobLogGroup:
+    Value: !GetAtt PnDelayerResidualCapacityJobLogGroup.Outputs.LogGroupName
 
   KinesisPaperDeliveryLambdaName:
     Value: !Sub "${ProjectName}-delayer-kinesisPaperDeliveryLambda"
 
   DelayerToPaperChannelLambdaName:
     Value: !Sub "${ProjectName}-delayerToPaperChannelLambda"
+
+  TestDelayerLambdaName:
+    Value: !Sub "${ProjectName}-testDelayerLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN

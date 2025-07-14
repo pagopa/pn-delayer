@@ -178,9 +178,17 @@ Parameters:
     Type: String
     Description: 'VPC Cidr default'
 
-  BatchLogGroup:
+  SenderLimitJobLogGroup:
     Type: String
-    Description: 'Batch log group name'
+    Description: 'SenderLimit job log group name'
+
+  DriverCapacityJobLogGroup:
+    Type: String
+    Description: 'DriverCapacity job log group name'
+
+  ResidualCapacityJobLogGroup:
+    Type: String
+    Description: 'ResidualCapacity job log group name'
 
   MaxvCpus:   ##TODEFINE in order to set the max number of parallel jobs
     Type: String
@@ -366,9 +374,9 @@ Resources:
         LogConfiguration:
           LogDriver: awslogs
           Options:
-            awslogs-group: !Ref "BatchLogGroup"
+            awslogs-group: !Ref "SenderLimitJobLogGroup"
             awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-sender-limit-logs'
+            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-sender-limit-job-logs'
         Environment:
           - Name: AWS_REGIONCODE
             Value: !Ref AWS::Region
@@ -515,7 +523,7 @@ Resources:
         LogConfiguration:
           LogDriver: awslogs
           Options:
-            awslogs-group: !Ref "BatchLogGroup"
+            awslogs-group: !Ref "ResidualCapacityJobLogGroup"
             awslogs-region: !Ref AWS::Region
             awslogs-stream-prefix: !Sub '${ProjectName}-delayer-residual-capacity-logs'
         Environment:
@@ -549,7 +557,7 @@ Resources:
           ComputeEnvironment: !Ref ResidualCapacityComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: pn-delayer-sender-limit-job-queue
+      JobQueueName: pn-delayer-residual-capacity-job-queue
 
   ResidualCapacityServiceRole:
     Type: AWS::IAM::Role
@@ -660,7 +668,7 @@ Resources:
         LogConfiguration:
           LogDriver: awslogs
           Options:
-            awslogs-group: !Ref "BatchLogGroup"
+            awslogs-group: !Ref "DriverCapacityJobLogGroup"
             awslogs-region: !Ref AWS::Region
             awslogs-stream-prefix: !Sub '${ProjectName}-delayer-driver-capacity-logs'
         Environment:
@@ -796,9 +804,16 @@ Resources:
           - - !Ref PaperDeliveryDriverCapacitiesTableName
             - !Ref PaperDeliveryDriverUsedCapacitiesTableName
             - !Ref PaperDeliveryTableName
+            - !Ref PaperDeliveryCounterTableName
+            - !Ref PaperDeliverySenderLimitTableName
+            - !Ref PaperDeliveryUsedSenderLimitTableName
+            - !Ref PaperDeliveryPrintCapacityTableName
+            - !Ref PaperDeliveryPrintCapacityCounterTableName
         LogGroupsNames: !Join
           - ','
-          - - !Sub '/aws/ecs/${ProjectName}-delayer'
+          - - !Sub '/aws/ecs/${ProjectName}-delayer-sender-limit-job'
+            - !Sub '/aws/ecs/${ProjectName}-delayer-residual-capacity-job'
+            - !Sub '/aws/ecs/${ProjectName}-delayer-driver-capacity-job'
 
   PnDelayerAlarmTopicPublisherRole:
     Type: AWS::IAM::Role
@@ -823,7 +838,7 @@ Resources:
                   - "sns:Publish"
                 Resource: !Ref AlarmSNSTopicArn
 
-    ### Enable sending notifications to SNS topic when the job is in failed status.
+  ### Enable sending notifications to SNS topic when the job is in failed status.
   BatchBridgeStateRule:
    Type: AWS::Events::Rule
    Properties:
@@ -869,21 +884,21 @@ Resources:
       Statistic: Sum
       Threshold: 1
 
-  ErrorFatalLogsMetricFilter:
+  SenderLimitJobErrorFatalLogsMetricFilter:
     Type: AWS::Logs::MetricFilter
     Properties:
-      LogGroupName: !Ref BatchLogGroup
+      LogGroupName: !Ref SenderLimitJobLogGroup
       FilterPattern: '?ERROR ?FATAL ?CRITICAL'
       MetricTransformations:
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
-          MetricName: !Sub "${ProjectName}-delayer-ErrorFatalMetric"
+          MetricName: !Sub "${ProjectName}-delayer-sender-limit-job-ErrorFatalMetric"
 
-  ErrorFatalLogsMetricAlarm:
+  SenderLimitErrorFatalLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
-    DependsOn: ErrorFatalLogsMetricFilter
+    DependsOn: SenderLimitJobErrorFatalLogsMetricFilter
     Properties:
-      AlarmName: !Sub "${ProjectName}-delayer-ErrorFatalLogs-Alarm"
+      AlarmName: !Sub "${ProjectName}-delayer-sender-limit-job-ErrorFatalLogs-Alarm"
       AlarmDescription: "CloudWatch alarm for when LogSaver LogGroup has ERROR or FATAL line."
       TreatMissingData: notBreaching
       AlarmActions:
@@ -891,7 +906,67 @@ Resources:
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
-      MetricName: !Sub "${ProjectName}-delayer-ErrorFatalMetric"
+      MetricName: !Sub "${ProjectName}-delayer-sender-limit-job-ErrorFatalMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
+  ResidualCapacityJobErrorFatalLogsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ResidualCapacityJobLogGroup
+      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${ProjectName}-delayer-residual-capacity-job-ErrorFatalMetric"
+
+  ResidualCapacityJobErrorFatalLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: ResidualCapacityJobErrorFatalLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-delayer-residual-capacity-ErrorFatalLogs-Alarm"
+      AlarmDescription: "CloudWatch alarm for when LogSaver LogGroup has ERROR or FATAL line."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-delayer-residual-capacity-job-ErrorFatalMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
+  DriverCapacityErrorFatalLogsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref DriverCapacityJobLogGroup
+      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${ProjectName}-delayer-ErrorFatalMetric"
+
+  DriverCapacityErrorFatalLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: DriverCapacityErrorFatalLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-delayer-driver-capacity-job-ErrorFatalLogs-Alarm"
+      AlarmDescription: "CloudWatch alarm for when LogSaver LogGroup has ERROR or FATAL line."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-delayer-driver-capacity-job-ErrorFatalMetric"
       Namespace: "ErrorFatalLogs"
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 60
@@ -1252,4 +1327,4 @@ Resources:
               - s3:GetObject
               - s3:ListBucket
             Resource:
-              - !Ref TestDelayerBucketNameArn
+              - !Ref TestDelayerBucketArn
