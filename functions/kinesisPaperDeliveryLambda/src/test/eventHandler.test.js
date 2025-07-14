@@ -8,7 +8,7 @@ const {
 describe("Lambda Handler Tests", () => {
   process.env.REGION = "us-east-1";
   process.env.KINESIS_PAPERDELIVERY_TABLE = 'TestIncomingTable';
-  process.env.KINESIS_PAPERDELIVERY_EVENTTABLE = "KinesisPaperDeliveryEventTable";
+  process.env.KINESIS_PAPERDELIVERY_EVENTTABLE = "PaperDeliveryKinesisEventTable";
   process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE = 'TestCounterTable';
   
   const mockDynamoDBClient = mockClient(DynamoDBDocumentClient);
@@ -76,7 +76,7 @@ describe("Lambda Handler Tests", () => {
 
   it("should skip already processedEvent", async () => {
     mockDynamoDBClient
-      .resolvesOnce({ Responses: {"KinesisPaperDeliveryEventTable":[{"requestId":"1234567890"}]} })
+      .resolvesOnce({ Responses: {"PaperDeliveryKinesisEventTable":[{"requestId":"1234567890"}]} })
       .resolvesOnce({ UnprocessedItems: {} })
       .resolvesOnce({ UnprocessedItems: {} })
 
@@ -116,7 +116,7 @@ describe("Lambda Handler Tests", () => {
   });
 
   it("should skip all - already processedEvent", async () => {
-    mockDynamoDBClient.resolvesOnce({ Responses: {KinesisPaperDeliveryEventTable:[{"requestId":"1234567890"}, {"requestId":"1234567891"}]} });
+    mockDynamoDBClient.resolvesOnce({ Responses: {PaperDeliveryKinesisEventTable:[{"requestId":"1234567890"}, {"requestId":"1234567891"}]} });
 
     const event = {
       mockKinesisData: [

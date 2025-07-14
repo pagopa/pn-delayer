@@ -91,9 +91,9 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
 
-  KinesisPaperDeliveryEventTableName:
+  PaperDeliveryKinesisEventTableName:
     Type: String
-    Description: 'DynamoDB table name for KinesisPaperDeliveryEvent'
+    Description: 'DynamoDB table name for PaperDeliveryKinesisEvent'
 
   PaperDeliveryCounterTableName:
     Type: String
@@ -103,9 +103,9 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryCounter'
 
-  KinesisPaperDeliveryEventTableArn:
+  PaperDeliveryKinesisEventTableArn:
     Type: String
-    Description: 'ARN of dynamodb table containing KinesisPaperDeliveryEvent'
+    Description: 'ARN of dynamodb table containing PaperDeliveryKinesisEvent'
 
   PaperDeliveryPrintCapacityCounterTableName:
     Type: String
@@ -1046,7 +1046,7 @@ Resources:
         Variables:
           REGION: !Sub ${AWS::Region}
           KINESIS_PAPERDELIVERY_TABLE: !Ref PaperDeliveryTableName
-          KINESIS_PAPERDELIVERY_EVENTTABLE: !Ref KinesisPaperDeliveryEventTableName
+          KINESIS_PAPERDELIVERY_EVENTTABLE: !Ref PaperDeliveryKinesisEventTableName
           KINESIS_PAPERDELIVERY_COUNTERTABLE: !Ref PaperDeliveryCounterTableName
           KINESIS_BATCHSIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
@@ -1118,7 +1118,7 @@ Resources:
             Action:
               - dynamodb:BatchGetItem
               - dynamodb:BatchWriteItem
-            Resource: !Ref KinesisPaperDeliveryEventTableArn
+            Resource: !Ref PaperDeliveryKinesisEventTableArn
 
 
   PaperDeliveryLambdaKinesisSource:
