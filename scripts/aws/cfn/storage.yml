@@ -34,7 +34,7 @@ Parameters:
     Default: 2000000
     Description: Threshold for standard alarms in milliseconds
 
-  PnDelayerInputsnOnCallAlarmThresholdsMs:
+  PnDelayerInputsOnCallAlarmThresholdsMs:
     Type: Number
     Default: 2000000
     Description: Threshold for oncall alarms in milliseconds 
@@ -288,7 +288,7 @@ Resources:
         # USES SNSTopic used for all Kinesis alarms
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StandardAlarmThresholdsMs: !Ref PnDelayerInputsStandardAlarmThresholdsMs
-        OnCallAlarmThresholdsMs: !Ref PnDelayerInputsnOnCallAlarmThresholdsMs
+        OnCallAlarmThresholdsMs: !Ref PnDelayerInputsOnCallAlarmThresholdsMs
         
   PnDelayerSenderLimitJobLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -299,7 +299,7 @@ Resources:
       Parameters:
         LogGroupName: !Sub '${ProjectName}-delayer-sender-limit-job'
         LogGroupRetention: !Ref LogRetention
-        LogsKinesisSourceStreamArn: !Ref
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
 
   PnDelayerDriverCapacityJobLogGroup:
     Type: AWS::CloudFormation::Stack
