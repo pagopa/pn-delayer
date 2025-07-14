@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import reactor.test.StepVerifier;
+import reactor.util.function.Tuple2;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -21,9 +22,9 @@ class PaperDeliveryDriverUsedCapacitiesDaoIT extends BaseTest.WithLocalStack {
     PaperDeliveryDriverUsedCapacitiesDAO paperDeliveryDriverUsedCapacitiesDAO;
 
     @Test
-    void testGet(){
-        Integer response = paperDeliveryDriverUsedCapacitiesDAO.get("testEmpty", "RM", Instant.now()).block();
-        Assertions.assertEquals(0, response);
+    void testGet() {
+        Tuple2<Integer, Integer> response = paperDeliveryDriverUsedCapacitiesDAO.get("testEmpty", "RM", LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC)).block();
+        Assertions.assertNull(response);
     }
 
     @Test
@@ -31,21 +32,22 @@ class PaperDeliveryDriverUsedCapacitiesDaoIT extends BaseTest.WithLocalStack {
         PaperDeliveryDriverUsedCapacities entity = new PaperDeliveryDriverUsedCapacities();
         LocalDate dateTime = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(1)));
-        Instant deliveryDate = nextWeek.atStartOfDay().toInstant(ZoneOffset.UTC);
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
-        entity.setDeliveryDate(deliveryDate);
+        entity.setDeliveryDate(nextWeek.toString());
 
-        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("1", "RM",  5, deliveryDate).block();
+        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("1", "RM",  5, nextWeek, 10).block();
 
-        Integer response = paperDeliveryDriverUsedCapacitiesDAO.get("1", "RM", deliveryDate).block();
+        Tuple2<Integer, Integer> response = paperDeliveryDriverUsedCapacitiesDAO.get("1", "RM", nextWeek).block();
         assert response != null;
-        Assertions.assertEquals(5, response);
+        Assertions.assertEquals(5, response.getT2());
+        Assertions.assertEquals(10, response.getT1());
 
-        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("1", "RM",   5, deliveryDate).block();
+        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("1", "RM",   5, nextWeek, 10).block();
 
-        Integer response2 = paperDeliveryDriverUsedCapacitiesDAO.get("1", "RM", deliveryDate).block();
+        Tuple2<Integer, Integer> response2 = paperDeliveryDriverUsedCapacitiesDAO.get("1", "RM", nextWeek).block();
         assert response2 != null;
-        Assertions.assertEquals(10, response2);
+        Assertions.assertEquals(10, response2.getT2());
+        Assertions.assertEquals(10, response2.getT1());
     }
 
     @Test
@@ -54,11 +56,13 @@ class PaperDeliveryDriverUsedCapacitiesDaoIT extends BaseTest.WithLocalStack {
         LocalDate dateTime = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(1)));
         Instant deliveryDate = nextWeek.atStartOfDay().toInstant(ZoneOffset.UTC);
+        LocalDate date = deliveryDate.atZone(ZoneOffset.UTC).toLocalDate();
 
-        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("test","pk1", 5, deliveryDate).block();
-        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("test","pk2", 5, deliveryDate).block();
 
-        StepVerifier.create(paperDeliveryDriverUsedCapacitiesDAO.batchGetItem(pks, deliveryDate))
+        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("test","pk1", 5, date, 10).block();
+        paperDeliveryDriverUsedCapacitiesDAO.updateCounter("test","pk2", 5, date, 10).block();
+
+        StepVerifier.create(paperDeliveryDriverUsedCapacitiesDAO.batchGetItem(pks, date))
                 .expectNextCount(2)
                 .expectComplete()
                 .verify();

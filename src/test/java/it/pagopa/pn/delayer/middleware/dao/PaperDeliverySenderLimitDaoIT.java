@@ -65,7 +65,7 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(1)));
         Instant deliveryDate = nextWeek.atStartOfDay().toInstant(ZoneOffset.UTC);
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
-        entity.setDeliveryDate(deliveryDate);
+        entity.setDeliveryDate(deliveryDate.toString());
 
         paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
 

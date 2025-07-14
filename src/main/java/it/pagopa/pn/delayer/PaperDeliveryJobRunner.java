@@ -2,7 +2,9 @@ package it.pagopa.pn.delayer;
 
 import it.pagopa.pn.commons.utils.MDCUtils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.service.HighPriorityBatchService;
+import it.pagopa.pn.delayer.model.WorkflowStepEnum;
+import it.pagopa.pn.delayer.service.DriverCapacityJobService;
+import it.pagopa.pn.delayer.service.SenderLimitJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -25,40 +27,69 @@ import java.util.UUID;
 @Profile("!test")
 public class PaperDeliveryJobRunner implements CommandLineRunner {
 
-    private final HighPriorityBatchService highPriorityBatchService;
+    private final DriverCapacityJobService driverCapacityJobService;
+    private final SenderLimitJobService senderLimitJobService;
     private final ApplicationContext applicationContext;
     private final PnDelayerConfigs pnDelayerConfigs;
 
     @Override
     public void run(String... args) {
         int exitCode;
-        String unifiedDeliveryDriver = pnDelayerConfigs.getJobInput().getUnifiedDeliveryDriver();
+        WorkflowStepEnum workflowStep = pnDelayerConfigs.getWorkflowStep();
+        switch (workflowStep) {
+            case EVALUATE_SENDER_LIMIT:
+                log.info("Starting Evaluate Sender Limit step");
+                exitCode = executeEvaluateSendLimitStep();
+                break;
+            case EVALUATE_DRIVER_CAPACITY:
+                log.info("Starting Evaluate Driver Capacity step");
+                exitCode = executeEvaluateDriverCapacityStep();
+                break;
+            default:
+                log.error("Unknown workflow step: {}", workflowStep);
+                exitCode = SpringApplication.exit(applicationContext, () -> 1);
+                System.exit(exitCode);
+                return;
+        }
+        log.info("Batch finished with exit code: {}", exitCode);
+        System.exit(exitCode);
+    }
+
+    private int executeEvaluateDriverCapacityStep() {
+        String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getUnifiedDeliveryDriver();
         String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
         if (StringUtils.hasText(jobIndex)) {
-            exitCode = Optional.of(jobIndex)
+            return Optional.of(jobIndex)
                     .map(Integer::parseInt)
-                    .map(index -> pnDelayerConfigs.getJobInput().getProvinceList().get(index))
+                    .map(index -> pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getProvinceList().get(index))
                     .map(province -> {
-                        String unifiedDeliveryDriverProvince = String.join("~", unifiedDeliveryDriver, province);
-                        log.info("Starting batch for pk: {}", unifiedDeliveryDriverProvince);
-                        addMDC(unifiedDeliveryDriverProvince);
-                        return doExecute(unifiedDeliveryDriverProvince);
+                        log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
+                        addMDC( String.join("~", unifiedDeliveryDriver,  province), jobIndex);
+                        try {
+                            var startExecutionBatch = Instant.now();
+                            Mono<Void> monoExcecution = driverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, new HashMap<>(), startExecutionBatch, pnDelayerConfigs.getActualTenderId());
+                            MDCUtils.addMDCToContextAndExecute(monoExcecution).block();return 0;
+                        } catch (Exception e) {
+                            log.error("Error while executing batch", e);
+                            return 1;
+                        }
                     }).orElseGet(() -> {
                         log.error("Province on index [{}] not found, cannot start batch", jobIndex);
                         return SpringApplication.exit(applicationContext, () -> 1);
                     });
         } else {
             log.error("No job index found, cannot start batch");
-            exitCode = SpringApplication.exit(applicationContext, () -> 1);
+            return SpringApplication.exit(applicationContext, () -> 1);
         }
-        log.info("Batch finished with exit code: {}", exitCode);
-        System.exit(exitCode);
     }
 
-    private int doExecute(String unifiedDeliveryDriverProvince) {
+    private int executeEvaluateSendLimitStep() {
+        String province = pnDelayerConfigs.getEvaluateSenderLimitJobInput().getProvince();
+        log.info("Starting batch for province: {}", province);
+        addMDC(province, null);
         try {
             var startExecutionBatch = Instant.now();
-            Mono<Void> monoExcecution = highPriorityBatchService.initHighPriorityBatch(unifiedDeliveryDriverProvince, new HashMap<>(), startExecutionBatch);
+            Mono<Void> monoExcecution = senderLimitJobService.startSenderLimitJob(province, new HashMap<>(), startExecutionBatch);
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
         } catch (Exception e) {
@@ -67,11 +98,13 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         }
     }
 
-    private void addMDC(String unifiedDeliveryDriverProvince) {
+
+    private void addMDC(String requestId, String jobIndex) {
         MDCUtils.clearMDCKeys();
         MDC.put(MDCUtils.MDC_TRACE_ID_KEY, StringUtils.hasText(System.getenv("AWS_BATCH_JOB_ID"))
-                ? System.getenv("AWS_BATCH_JOB_ID") : UUID.randomUUID().toString());
-        MDC.put(MDCUtils.MDC_PN_CTX_REQUEST_ID, unifiedDeliveryDriverProvince);
+                ? System.getenv("AWS_BATCH_JOB_ID") + (StringUtils.hasText(jobIndex) ? ":" + jobIndex : "")
+                : UUID.randomUUID().toString());
+        MDC.put(MDCUtils.MDC_PN_CTX_REQUEST_ID, requestId);
     }
 }
 
