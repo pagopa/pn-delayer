@@ -1,5 +1,6 @@
 "use strict";
 const { importData } = require('./importData.js');
+const { getUsedCapacity } = require("./getUsedCapacity.js");
 
 
 /***************************************
@@ -8,7 +9,7 @@ const { importData } = require('./importData.js');
 
 const OPERATIONS = {
     IMPORT_DATA: importData,
-    // In futuro: OTHER_OP: otherFunction
+    GET_USED_CAPACITY: getUsedCapacity,
 };
 
 /**

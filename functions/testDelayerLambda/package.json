@@ -1,7 +1,7 @@
 {
   "name": "testDelayerLambda",
   "version": "1.0.0",
-  "description": "AWS Lambda to load CSV from S3 and put items into DynamoDB",
+  "description": "AWS Lambda dispatcher: IMPORT_DATA (CSV→Dynamo) + GET_USED_CAPACITY (read used capacity)",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
