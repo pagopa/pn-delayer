@@ -26,10 +26,10 @@
         }
       });
 
-      process.env.PAPER_DELIVERY_TABLE_NAME = 'TestIncomingTable';
-      process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME = "KinesisPaperDeliveryEventTable";
-      process.env.PAPER_DELIVERY_COUNTER_TABLE_NAME = 'TestCounterTable';
-      process.env.BATCH_SIZE = '25';
+      process.env.KINESIS_PAPERDELIVERY_TABLE = 'paperDeliveryTable';
+      process.env.KINESIS_PAPERDELIVERY_EVENTTABLE = "KinesisPaperDeliveryEventTable";
+      process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE = 'TestCounterTable';
+      process.env.KINESIS_BATCHSIZE = '25';
     });
 
     describe('batchWritePaperDeliveryRecords', () => {
@@ -52,7 +52,7 @@
         ];
         mockSend.resolves({
           UnprocessedItems: {
-            TestIncomingTable: [
+            paperDeliveryTable: [
               { PutRequest: { Item: { requestId: { S: '1' } } } }
             ]
           }
