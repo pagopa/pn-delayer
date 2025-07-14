@@ -26,26 +26,20 @@
         }
       });
 
-      process.env.HIGH_PRIORITY_TABLE_NAME = 'TestHighPriorityTable';
-      process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME = 'TestKinesisTable';
-      process.env.BATCH_SIZE = '25';
+      process.env.KINESIS_PAPERDELIVERY_TABLE = 'paperDeliveryTable';
+      process.env.KINESIS_PAPERDELIVERY_EVENTTABLE = "KinesisPaperDeliveryEventTable";
+      process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE = 'TestCounterTable';
+      process.env.KINESIS_BATCHSIZE = '25';
     });
 
-    afterEach(() => {
-      sinon.restore();
-      delete process.env.HIGH_PRIORITY_TABLE_NAME;
-      delete process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
-      delete process.env.BATCH_SIZE;
-    });
-
-    describe('batchWriteHighPriorityRecords', () => {
+    describe('batchWritePaperDeliveryRecords', () => {
       it('handle successful batch write', async () => {
         const records = [
           { entity: { requestId: '1' }, kinesisSeqNumber: 'seq1' }
         ];
         mockSend.resolves({ UnprocessedItems: {} });
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWritePaperDeliveryRecords(records, []);
 
         expect(mockSend.calledOnce).to.be.true;
         expect(result).to.deep.equal([]);
@@ -58,13 +52,13 @@
         ];
         mockSend.resolves({
           UnprocessedItems: {
-            TestHighPriorityTable: [
+            paperDeliveryTable: [
               { PutRequest: { Item: { requestId: { S: '1' } } } }
             ]
           }
         });
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWritePaperDeliveryRecords(records, []);
 
         expect(result).to.deep.equal([{ itemIdentifier: 'seq1' }]);
       });
@@ -75,7 +69,7 @@
         ];
         mockSend.rejects(new Error('fail'));
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWritePaperDeliveryRecords(records, []);
 
         expect(result).to.deep.equal([{ itemIdentifier: 'seq1' }]);
       });
@@ -84,20 +78,20 @@
         const records = [];
         mockSend.resolves({ UnprocessedItems: {} });
 
-        const result = await dynamo.batchWriteHighPriorityRecords(records);
+        const result = await dynamo.batchWritePaperDeliveryRecords(records, []);
 
         expect(result).to.deep.equal([]);
       });
     });
 
-    describe('batchWriteKinesisSequenceNumberRecords', () => {
+    describe('batchWriteKinesisEventRecords', () => {
       it('write records on PaperDeliveryKinesisEvents', async () => {
         const records = [
-          { sequenceNumber: 'seq1' }
+          { requestId: 'seq1' }
         ];
         mockSend.resolves({ UnprocessedItems: {} });
 
-        const result = await dynamo.batchWriteKinesisSequenceNumberRecords(records);
+        const result = await dynamo.batchWriteKinesisEventRecords(records);
 
         expect(mockSend.calledOnce).to.be.true;
         expect(result).to.deep.equal({ UnprocessedItems: {} });
@@ -105,11 +99,11 @@
       });
 
       it('handle DynamoDB errors', async () => {
-        const records = [{ sequenceNumber: 'seq1' }];
+        const records = [{ requestId: 'seq1' }];
         mockSend.rejects(new Error('DynamoDB error'));
 
         try {
-          await dynamo.batchWriteKinesisSequenceNumberRecords(records);
+          await dynamo.batchWriteKinesisEventRecords(records);
           expect.fail('Doveva lanciare');
         } catch (err) {
           expect(err.message).to.equal('DynamoDB error');
@@ -117,19 +111,19 @@
       });
     });
 
-    describe('batchGetKinesisSequenceNumberRecords', () => {
-      it('return sequenceNumber if present', async () => {
+    describe('batchGetKinesisEventRecords', () => {
+      it('return requestId if present', async () => {
         const keys = ['seq1', 'seq2'];
         mockSend.resolves({
           Responses: {
-            TestKinesisTable: [
-              { sequenceNumber: 'seq1' },
-              { sequenceNumber: 'seq2' }
+            KinesisPaperDeliveryEventTable: [
+              { requestId: 'seq1' },
+              { requestId: 'seq2' }
             ]
           }
         });
 
-        const result = await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+        const result = await dynamo.batchGetKinesisEventRecords(keys);
 
         expect(result).to.deep.equal(['seq1', 'seq2']);
         expect(mockSend.firstCall.args[0]).to.be.instanceOf(BatchGetCommand);
@@ -141,7 +135,7 @@
           Responses: { TestKinesisTable: [] }
         });
 
-        const result = await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+        const result = await dynamo.batchGetKinesisEventRecords(keys);
 
         expect(result).to.deep.equal([]);
       });
@@ -151,7 +145,7 @@
         mockSend.rejects(new Error('DynamoDB get error'));
 
         try {
-          await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+          await dynamo.batchGetKinesisEventRecords(keys);
           expect.fail('Doveva lanciare');
         } catch (err) {
           expect(err.message).to.equal('DynamoDB get error');
@@ -164,7 +158,7 @@
           Responses: { TestKinesisTable: [] }
         });
 
-        const result = await dynamo.batchGetKinesisSequenceNumberRecords(keys);
+        const result = await dynamo.batchGetKinesisEventRecords(keys);
 
         expect(result).to.deep.equal([]);
       });
