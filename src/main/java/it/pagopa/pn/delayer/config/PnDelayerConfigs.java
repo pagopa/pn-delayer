@@ -43,8 +43,6 @@ public class PnDelayerConfigs {
     public static class Dao {
         private String paperDeliveryDriverCapacitiesTableName;
         private String paperDeliveryDriverUsedCapacitiesTableName;
-        private String paperDeliveryHighPriorityTableName;
-        private String paperDeliveryReadyToSendTableName;
         private String paperDeliveryTableName;
         private Integer paperDeliveryQueryLimit;
         private String paperDeliverySenderLimitTableName;

@@ -83,22 +83,6 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing  PaperDeliveryDriverUsedCapacities'
 
-  PaperDeliveryHighPriorityTableName:
-    Type: String
-    Description: 'DynamoDB table name for PaperDeliveryHighPriority'
-
-  PaperDeliveryHighPriorityTableArn:
-    Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliveryHighPriority'
-
-  PaperDeliveryReadyToSendTableName:
-    Type: String
-    Description: 'DynamoDB table name for PaperDeliveryReadyToSend'
-
-  PaperDeliveryReadyToSendTableArn:
-    Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliveryReadyToSend'
-
   PaperDeliveryPrintCapacityTableName:
     Type: String
     Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
@@ -131,14 +115,6 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter'
 
-  PaperDeliveryIncomingTableName:
-    Type: String
-    Description: 'DynamoDB table name for PaperDeliveryIncoming'
-
-  PaperDeliveryIncomingTableArn:
-    Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliveryIncoming'
-
   PaperDeliveryTableName:
     Type: String
     Description: Name of dynamodb table containing paper deliveries workflow
@@ -167,16 +143,6 @@ Parameters:
   PaperDeliveryUsedSenderLimitTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryUsedSenderLimit'
-
-  PaperDeliveryReadyToSendQueryLimit:
-    Type: Number
-    Default: 1000
-    Description: 'Max elements quantity for ready to send query'
-
-  PaperDeliveryReadyToSendRecoveryDeliveryDate:
-    Type: String
-    Default: ''
-    Description: 'Delivery date for readyToSend table query. (format yyyy-MM-ddThh:mm:ssZ)'
 
   DeliveryDateDayOfWeek:
     Type: Number
@@ -250,12 +216,27 @@ Parameters:
   JobInputUnifiedDeliveryDriver:
     Type: String
     Default: ' '
-    Description: 'Input unifiedDeliveryDriver for the job'
+    Description: 'Input unifiedDeliveryDriver for the driver capacity job'
+
+  WorflowStep:
+    Type: String
+    Default: ' '
+    Description: 'Workflow step for delayer jobs - one of: EVALUATE_SENDER_LIMIT,EVALUATE_RESIDUAL_CAPACITY,EVALUATE_DRIVER_CAPACITY'
 
   JobInputProvinceList:
     Type: String
     Default: ' '
-    Description: 'Input Province list for the job'
+    Description: 'Input Province list for the driver capacity job'
+
+  ActualTenderId:
+    Type: String
+    Default: ' '
+    Description: 'TenderId for the driver capacity job'
+
+  JobInputProvince:
+    Type: String
+    Default: ' '
+    Description: 'Input Province for the sender limit job'
 
   # OpenApi Bucket params
   MicroserviceBucketName:
@@ -321,15 +302,6 @@ Parameters:
       - DISABLED
     Description: 'State of the DelayerToPaperChannelRule'
 
-
-  PaperDeliveryResidualCapacityLambdaName:
-    Type: String
-    Description: 'PaperDeliveryResidualCapacityLambda function name'
-
-  PaperDeliveryStartWorkflowLambdaName:
-    Type: String
-    Description: 'PaperDeliveryStartWorkflowLambda function name'
-
   PaperDeliveryPriorityParameterName:
     Type: String
     Description: 'parameter name for paper delivery priority details'
@@ -343,14 +315,20 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda bucket name'
     Default: 'test-bucket-name'
+
   TestDelayerBucketArn:
     Type: String
     Description: 'TestDelayerLambda bucket arn'
     Default: 'test-bucket-arn'
+
   TestDelayerObjectKeyBucketArn:
     Type: String
     Description: 'TestDelayerLambda object key of bucket'
     Default: 'test-object-key'
+
+  TestDelayerLambdaName:
+    Type: String
+    Description: 'TestDelayerLambda function name'
 
 Resources:
 
@@ -358,13 +336,13 @@ Resources:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
       Type: MANAGED
-      ServiceRole: !Ref BatchServiceRole
+      ServiceRole: !Ref SenderLimitServiceRole
       ComputeEnvironmentName: !Sub '${ProjectName}-delayer-sender-limit-compute-environment'
       ComputeResources:
         MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
         SecurityGroupIds:
-          - !Ref BatchSecurityGroup
+          - !Ref SenderLimitSecurityGroup
         Subnets: !Split [ ",", !Ref SubnetsIds ]
       State: ENABLED
 
@@ -392,8 +370,8 @@ Resources:
             awslogs-region: !Ref AWS::Region
             awslogs-stream-prefix: !Sub '${ProjectName}-delayer-sender-limit-logs'
         Environment:
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYINCOMINGTABLENAME
-            Value: !Ref PaperDeliveryIncomingTableName
+          - Name: AWS_REGIONCODE
+            Value: !Ref AWS::Region
           - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
@@ -402,10 +380,14 @@ Resources:
             Value: !Ref PaperDeliveryUsedSenderLimitTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
-            Value: !Ref PaperDeliveryHighPriorityTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
+          - Name: PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCE
+            Value: !Ref JobInputProvince
+          - Name: PN_DELAYER_ACTUALTENDERID
+            Value: !Ref ActualTenderId
+          - Name: PN_DELAYER_WORKFLOWSTEP
+            Value: !Ref WorflowStep
 
       PlatformCapabilities:
         - FARGATE
@@ -472,9 +454,10 @@ Resources:
                   - dynamodb:Query
                   - dynamodb:BatchGetItem
                   - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:BatchWriteItem
                 Resource:
-                  - !Sub "${PaperDeliveryIncomingTableArn}"
-                  - !Sub "${PaperDeliveryIncomingTableArn}/*"
                   - !Sub "${PaperDeliveryCounterTableArn}"
                   - !Sub "${PaperDeliveryCounterTableArn}/*"
                   - !Sub "${PaperDeliverySenderLimitTableArn}"
@@ -483,25 +466,8 @@ Resources:
                   - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
-              - Effect: Allow
-                Action:
-                  - dynamodb:TransactWriteItems
-                Resource:
-                  - !Sub "${PaperDeliveryIncomingTableArn}"
-                  - !Sub "${PaperDeliveryIncomingTableArn}/*"
-                  - !Sub "${PaperDeliveryHighPriorityTableArn}"
-                  - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
-              - Effect: Allow
-                Action:
-                  - dynamodb:PutItem
-                  - dynamodb:UpdateItem
-                Resource:
-                  - !Sub "${PaperDeliveryCounterTableArn}"
-                  - !Sub "${PaperDeliveryCounterTableArn}/*"
-                  - !Sub "${PaperDeliverySenderLimitTableArn}"
-                  - !Sub "${PaperDeliverySenderLimitTableArn}/*"
-                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
-                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryTableArn}"
+                  - !Sub "${PaperDeliveryTableArn}/*"
 
   SenderLimitSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -515,27 +481,26 @@ Resources:
         - IpProtocol: -1
           CidrIp: "0.0.0.0/0"
 
-  ## Compute Environment
-  ComputeEnvironment:
+  ResidualCapacityComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
       Type: MANAGED
-      ServiceRole: !Ref BatchServiceRole
-      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-high-priority-compute-environment'
+      ServiceRole: !Ref ResidualCapacityServiceRole
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-residual-capacity-compute-environment'
       ComputeResources:
         MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
         SecurityGroupIds:
-          - !Ref BatchSecurityGroup
-        Subnets: !Split [",", !Ref SubnetsIds]
+          - !Ref ResidualCapacitySecurityGroup
+        Subnets: !Split [ ",", !Ref SubnetsIds ]
       State: ENABLED
 
-  BatchProcessingJobDefinition:
+  ResidualCapacityJobDefinition:
     Type: AWS::Batch::JobDefinition
     Properties:
       Type: container
       PropagateTags: true
-      JobDefinitionName: !Sub '${ProjectName}-delayer-high-priority-job-definition'
+      JobDefinitionName: !Sub '${ProjectName}-delayer-residual-capacity-job-definition'
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -545,37 +510,29 @@ Resources:
             Type: VCPU
           - Value: !Ref Memory
             Type: MEMORY
-        JobRoleArn: !GetAtt "BatchTaskExecutionRole.Arn"
-        ExecutionRoleArn: !GetAtt "BatchTaskExecutionRole.Arn"
+        JobRoleArn: !GetAtt "ResidualCapacityTaskExecutionRole.Arn"
+        ExecutionRoleArn: !GetAtt "ResidualCapacityTaskExecutionRole.Arn"
         LogConfiguration:
           LogDriver: awslogs
           Options:
             awslogs-group: !Ref "BatchLogGroup"
             awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-logs'
+            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-residual-capacity-logs'
         Environment:
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
-            Value: !Ref PaperDeliveryHighPriorityTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYREADYTOSENDTABLENAME
-            Value: !Ref PaperDeliveryReadyToSendTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
-          - Name: PN_DELAYER_DELIVERYDATEINTERVAL
-            Value: !Ref DeliveryDateInterval
           - Name: AWS_REGIONCODE
             Value: !Ref AWS::Region
-          - Name: PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER
-            Value: !Ref JobInputUnifiedDeliveryDriver
-          - Name: PN_DELAYER_JOBINPUT_PROVINCELIST
-            Value: !Ref JobInputProvinceList
-          - Name: PN_DELAYER_PAPERDELIVERYCUTOFFDURATION
-            Value: !Ref PaperDeliveryCutOffDuration
+          - Name: PN_DELAYER_ACTUALTENDERID
+            Value: !Ref ActualTenderId
+          - Name: PN_DELAYER_WORKFLOWSTEP
+            Value: !Ref WorflowStep
 
       PlatformCapabilities:
         - FARGATE
@@ -584,18 +541,17 @@ Resources:
         Name: JobDefinitionTag
         Expected: MergeTag
 
-  ## JobQueue
-  JobQueue:
+  ResidualCapacityJobQueue:
     Type: AWS::Batch::JobQueue
     Properties:
       ComputeEnvironmentOrder:
         - Order: 1
-          ComputeEnvironment: !Ref ComputeEnvironment
+          ComputeEnvironment: !Ref ResidualCapacityComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: !Sub '${ProjectName}-delayer-high-priority-job-queue'
+      JobQueueName: pn-delayer-sender-limit-job-queue
 
-  BatchServiceRole:
+  ResidualCapacityServiceRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -611,7 +567,157 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
 
-  BatchTaskExecutionRole:
+  ResidualCapacityTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-delayer-residual-capacity-taskexec-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:BatchGetItem
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}"
+                  - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
+                  - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
+                  - !Sub "${PaperDeliveryTableArn}"
+                  - !Sub "${PaperDeliveryTableArn}/*"
+
+  ResidualCapacitySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Batch Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
+
+  DriverCapacityComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !Ref DriverCapacityServiceRole
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-driver-capacity-compute-environment'
+      ComputeResources:
+        MaxvCpus: !Ref MaxvCpus
+        Type: !Ref ComputeResourceType
+        SecurityGroupIds:
+          - !Ref DriverCapacitySecurityGroup
+        Subnets: !Split [",", !Ref SubnetsIds]
+      State: ENABLED
+
+  DriverCapacityJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      PropagateTags: true
+      JobDefinitionName: !Sub '${ProjectName}-delayer-driver-capacity-job-definition'
+      ContainerProperties:
+        Image: !Ref ContainerImageUri
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+        ResourceRequirements:
+          - Value: !Ref VCPU
+            Type: VCPU
+          - Value: !Ref Memory
+            Type: MEMORY
+        JobRoleArn: !GetAtt "DriverCapacityTaskExecutionRole.Arn"
+        ExecutionRoleArn: !GetAtt "DriverCapacityTaskExecutionRole.Arn"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref "BatchLogGroup"
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-driver-capacity-logs'
+        Environment:
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
+            Value: !Ref PaperDeliveryDriverCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
+            Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
+            Value: !Ref PaperDeliveryTableName
+          - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
+            Value: !Ref DeliveryDateDayOfWeek
+          - Name: AWS_REGIONCODE
+            Value: !Ref AWS::Region
+          - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
+            Value: !Ref JobInputUnifiedDeliveryDriver
+          - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
+            Value: !Ref JobInputProvinceList
+          - Name: PN_DELAYER_ACTUALTENDERID
+            Value: !Ref ActualTenderId
+          - Name: PN_DELAYER_WORKFLOWSTEP
+            Value: !Ref WorflowStep
+
+      PlatformCapabilities:
+        - FARGATE
+      Tags:
+        Service: Batch
+        Name: JobDefinitionTag
+        Expected: MergeTag
+
+  ## JobQueue
+  DriverCapacityJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref DriverCapacityComputeEnvironment
+      State: ENABLED
+      Priority: 1
+      JobQueueName: !Sub '${ProjectName}-delayer-driver-capacity-job-queue'
+
+  DriverCapacityServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  DriverCapacityTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub '${ProjectName}-delayer-taskexec-role'
@@ -667,7 +773,7 @@ Resources:
                 - !Sub "${PaperDeliveryReadyToSendTableArn}"
                 - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
 
-  BatchSecurityGroup:
+  DriverCapacitySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Batch Security Group
@@ -689,8 +795,6 @@ Resources:
           - ','
           - - !Ref PaperDeliveryDriverCapacitiesTableName
             - !Ref PaperDeliveryDriverUsedCapacitiesTableName
-            - !Ref PaperDeliveryHighPriorityTableName
-            - !Ref PaperDeliveryReadyToSendTableName
             - !Ref PaperDeliveryTableName
         LogGroupsNames: !Join
           - ','
@@ -734,7 +838,9 @@ Resources:
          status:
            - FAILED
          jobDefinition:
-          - !Ref BatchProcessingJobDefinition
+          - !Ref DriverCapacityJobDefinition
+          - !Ref ResidualCapacityJobDefinition
+          - !Ref SenderLimitJobDefinition
      State: ENABLED
      Targets:
        - Arn: !Ref AlarmSNSTopicArn
@@ -991,10 +1097,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           PAPER_DELIVERY_TABLENAME: !Ref PaperDeliveryTableName
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
-          PAPER_DELIVERY_READYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
-          PAPER_DELIVERY_READYTOSEND_QUERYLIMIT: !Ref PaperDeliveryReadyToSendQueryLimit
           PAPER_DELIVERY_PRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
-          PAPER_DELIVERY_INCOMING_TABLENAME: !Ref PaperDeliveryIncomingTableName
           PAPER_DELIVERY_COUNTER_TABLENAME: !Ref PaperDeliveryCounterTableName
           PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
           PAPER_DELIVERY_PRIORITY_PARAMETER: !Ref PaperDeliveryPriorityParameterName
@@ -1041,7 +1144,6 @@ Resources:
               - dynamodb:BatchWriteItem
               - dynamodb:DeleteItem
             Resource:
-              - !Ref PaperDeliveryReadyToSendTableArn
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
             Action:
@@ -1073,92 +1175,6 @@ Resources:
       Targets:
         - Arn: !GetAtt DelayerToPaperChannelLambda.Arn
           Id: PnDelayerToPaperChannelLambdaTarget
-
-  #########################################################
-  ###      PaperDeliveryResidualCapacityLambda     ###
-  #########################################################
-
-  PaperDeliveryResidualCapacityLambdaSecGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Sub '${PaperDeliveryResidualCapacityLambda}-sec-group'
-      VpcId: !Ref VpcId
-
-  # Lambda function
-  PaperDeliveryResidualCapacityLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Ref PaperDeliveryResidualCapacityLambdaName
-      Runtime: !Ref LambdaRuntime
-      Handler: "index.handler"
-      Code:
-        S3Bucket: !Ref MicroserviceBucketName
-        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/paperDeliveryResidualCapacityLambda.zip"
-      Role: !GetAtt PaperDeliveryResidualCapacityLambdaRole.Arn
-      Environment:
-        Variables:
-          REGION: !Sub ${AWS::Region}
-          PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverCapacitiesTableName
-          PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
-          PAPER_DELIVERY_TABLENAME: !Ref PaperDeliveryTableName
-          PAPERDELIVERYREADYTOSEND_TABLENAME: !Ref PaperDeliveryReadyToSendTableName
-      TracingConfig:
-        Mode: Active
-      Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 15
-
-  # Lambda function role
-  PaperDeliveryResidualCapacityLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaRole
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-
-  # Lambda function IAM policy
-  PaperDeliveryResidualCapacityLambdaPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${ProjectName}-PaperDeliveryResidualCapacityLambdaPolicy
-      Roles:
-        - !Ref PaperDeliveryResidualCapacityLambdaRole
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - dynamodb:BatchWriteItem
-            Resource:
-              - !Ref PaperDeliveryReadyToSendTableArn
-              - !Ref PaperDeliveryTableArn
-          - Effect: Allow
-            Action:
-              - dynamodb:GetItem
-            Resource:
-              - !Ref PaperDeliveryDriverUsedCapacitiesTableArn
-          - Effect: Allow
-            Action:
-              - dynamodb:Query
-            Resource:
-              - !Ref PaperDeliveryDriverCapacitiesTableArn
-
-  PaperDeliveryResidualCapacityLambdaAlarms:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
-      Parameters:
-        FunctionName: !Ref PaperDeliveryResidualCapacityLambda
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PermissionForDelayerToPaperChannelLambda:
     Type: AWS::Lambda::Permission
