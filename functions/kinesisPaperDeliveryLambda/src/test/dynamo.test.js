@@ -27,7 +27,7 @@
       });
 
       process.env.KINESIS_PAPERDELIVERY_TABLE = 'paperDeliveryTable';
-      process.env.KINESIS_PAPERDELIVERY_EVENTTABLE = "KinesisPaperDeliveryEventTable";
+      process.env.KINESIS_PAPERDELIVERY_EVENTTABLE = "PaperDeliveryKinesisEventTable";
       process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE = 'TestCounterTable';
       process.env.KINESIS_BATCHSIZE = '25';
     });
@@ -116,7 +116,7 @@
         const keys = ['seq1', 'seq2'];
         mockSend.resolves({
           Responses: {
-            KinesisPaperDeliveryEventTable: [
+            PaperDeliveryKinesisEventTable: [
               { requestId: 'seq1' },
               { requestId: 'seq2' }
             ]

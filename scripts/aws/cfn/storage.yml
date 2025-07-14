@@ -126,12 +126,12 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  KinesisPaperDeliveryEventTable:
+  PaperDeliveryKinesisEventTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-KinesisPaperDeliveryEvent'
+      TableName: !Sub '${ProjectName}-PaperDeliveryKinesisEvent'
       AttributeDefinitions:
         - AttributeName: "requestId"
           AttributeType: "S"
@@ -394,12 +394,12 @@ Outputs:
     Description: ARN of dynamodb table containing print capacity
     Value: !Sub '${PaperDeliveryPrintCapacityTable.Arn}'
 
-  KinesisPaperDeliveryEventTableName:
+  PaperDeliveryKinesisEventTableName:
     Description: Name of dynamodb table containing Kinesis sequenceNumber for paper deliveries
-    Value: !Ref KinesisPaperDeliveryEventTable
-  KinesisPaperDeliveryEventTableArn:
+    Value: !Ref PaperDeliveryKinesisEventTable
+  PaperDeliveryKinesisEventTableArn:
     Description: ARN of dynamodb table containing Kinesis sequenceNumber for paper deliveries
-    Value: !Sub '${KinesisPaperDeliveryEventTable.Arn}'
+    Value: !Sub '${PaperDeliveryKinesisEventTable.Arn}'
 
   PaperDeliveryTableName:
     Description: Name of dynamodb table containing paper deliveries workflow
