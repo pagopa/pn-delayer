@@ -145,7 +145,7 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  PaperDeliveryPrintCapacityCounter:
+  PaperDeliveryPrintCapacityCounterTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
@@ -420,21 +420,21 @@ Outputs:
     Value: !Ref PaperDeliverySenderLimitTable
   PaperDeliverySenderLimitTableArn:
     Description: ARN of dynamodb table containing PaperDeliverySenderLimit
-    Value: !Sub '${PaperDeliverySenderLimit.Arn}'
+    Value: !Sub '${PaperDeliverySenderLimitTable.Arn}'
 
   PaperDeliveryUsedSenderLimitTableName:
     Description: Name of dynamodb table containing PaperDeliveryUsedSenderLimit
     Value: !Ref PaperDeliveryUsedSenderLimitTable
   PaperDeliveryUsedSenderLimitTableArn:
     Description: ARN of dynamodb table containing PaperDeliveryUsedSenderLimit
-    Value: !Sub '${PaperDeliveryUsedSenderLimit.Arn}'
+    Value: !Sub '${PaperDeliveryUsedSenderLimitTable.Arn}'
 
   PaperDeliveryPrintCapacityCounterTableName:
     Description: Name of dynamodb table containing PaperDeliveryPrintCapacityCounter
-    Value: !Ref PaperDeliveryPrintCapacityCounter
+    Value: !Ref PaperDeliveryPrintCapacityCounterTable
   PaperDeliveryPrintCapacityCounterTableArn:
     Description: ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter
-    Value: !Sub '${PaperDeliveryPrintCapacityCounter.Arn}'
+    Value: !Sub '${PaperDeliveryPrintCapacityCounterTable.Arn}'
 
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn
