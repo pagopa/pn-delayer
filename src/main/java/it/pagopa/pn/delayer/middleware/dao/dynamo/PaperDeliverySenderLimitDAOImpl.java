@@ -19,6 +19,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,7 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, Instant deliveryDate) {
+    public Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, LocalDate deliveryDate) {
         log.info("retrieve sender Limit for tuples={} on deliveryDate={}", pks, deliveryDate);
 
         List<Key> keys = pks.stream()
@@ -69,7 +70,7 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Mono<Integer> updateUsedSenderLimit(String pk, Integer increment, Instant deliveryDate, Integer senderLimit) {
+    public Mono<Integer> updateUsedSenderLimit(String pk, Integer increment, LocalDate deliveryDate, Integer senderLimit) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put(PaperDeliverySenderLimit.COL_PK, AttributeValue.builder().s(pk).build());
         key.put(PaperDeliverySenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());

@@ -4,11 +4,11 @@ import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
@@ -27,25 +27,23 @@ import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_I
 public class PaperDeliveryDaoImpl implements PaperDeliveryDAO {
 
     private final DynamoDbAsyncTable<PaperDelivery> table;
-    private final PnDelayerConfigs delayerConfigs;
     private final DynamoDbEnhancedAsyncClient enhancedAsyncClient;
 
     public PaperDeliveryDaoImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
         this.table = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryTableName(), TableSchema.fromBean(PaperDelivery.class));
-        this.delayerConfigs = pnDelayerConfigs;
         this.enhancedAsyncClient = dynamoDbEnhancedAsyncClient;
     }
 
     @Override
-    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey) {
+    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
         QueryConditional keyCondition = QueryConditional.sortBeginsWith(Key.builder()
-                .partitionValue(PaperDeliveryHighPriority.buildKey(deliveryWeek, workflowStepEnum.name()))
+                .partitionValue(String.join("~", deliveryWeek, workflowStepEnum.name()))
                 .sortValue(sortKeyPrefix)
                 .build());
 
         QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder()
                 .queryConditional(keyCondition)
-                .limit(delayerConfigs.getDao().getPaperDeliveryQueryLimit());
+                .limit(queryLimit);
 
         if (!CollectionUtils.isEmpty(lastEvaluatedKey)) {
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);
@@ -55,8 +53,10 @@ public class PaperDeliveryDaoImpl implements PaperDeliveryDAO {
     }
 
     @Override
-    public Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveriesChunk) {
-        return insertWithRetry(paperDeliveriesChunk, 3);
+    public Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveries) {
+        return Flux.fromIterable(paperDeliveries).buffer(25)
+                .flatMap(chunk -> insertWithRetry(chunk, 3))
+                .then();
     }
 
     private Mono<Void> insertWithRetry(List<PaperDelivery> paperDeliveriesChunk, int retriesLeft) {

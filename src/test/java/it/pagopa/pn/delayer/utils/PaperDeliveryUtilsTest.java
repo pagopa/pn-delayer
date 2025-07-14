@@ -1,275 +1,156 @@
 package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryHighPriority;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryReadyToSend;
-import it.pagopa.pn.delayer.model.PaperDeliveryTransactionRequest;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
-import java.time.*;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.IntStream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static it.pagopa.pn.delayer.model.WorkflowStepEnum.EVALUATE_SENDER_LIMIT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
 class PaperDeliveryUtilsTest {
 
-    @Mock
-    private PnDelayerConfigs pnDelayerConfig;
 
-    @InjectMocks
     private PaperDeliveryUtils paperDeliveryUtils;
 
-    @Test
-    void filterAndPrepareDeliveriesNoCapacity() {
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
+    @BeforeEach
+    void setUp() {
+        PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
+        pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
+        pnDelayerConfigs.setDeliveryDateInterval(Duration.ofDays(7));
+        paperDeliveryUtils = new PaperDeliveryUtils(pnDelayerConfigs);
+    }
 
-        int result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, Tuples.of(100, 100));
+    @Test
+    void filterAndPrepareDeliveries_returnsCorrectSize_whenDeliveriesFitCapacity() {
+        PaperDelivery paperDelivery1 = new PaperDelivery();
+        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
+        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
+        paperDelivery1.setPriority(1);
+        paperDelivery1.setRequestId("requestId1");
+        PaperDelivery paperDelivery2 = new PaperDelivery();
+        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
+        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
+        paperDelivery2.setPriority(1);
+        paperDelivery2.setRequestId("requestId2");
+        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2);
+        Tuple2<Integer, Integer> capacityTuple = Tuples.of(5, 2);
+        List<PaperDelivery> deliveriesToSend = new ArrayList<>();
+
+        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
+
+        assertEquals(2, result);
+        assertEquals(2, deliveriesToSend.size());
+    }
+
+    @Test
+    void filterAndPrepareDeliveries_returnsZero_whenNoRemainingCapacity() {
+        PaperDelivery paperDelivery1 = new PaperDelivery();
+        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
+        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
+        PaperDelivery paperDelivery2 = new PaperDelivery();
+        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
+        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
+        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2);
+        Tuple2<Integer, Integer> capacityTuple = Tuples.of(2, 2);
+        List<PaperDelivery> deliveriesToSend = new ArrayList<>();
+
+        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
 
         assertEquals(0, result);
-        assertEquals(0, transactionRequest.getPaperDeliveryHighPriorityList().size());
-        assertEquals(0, transactionRequest.getPaperDeliveryReadyToSendList().size());
+        assertTrue(deliveriesToSend.isEmpty());
     }
-
-    @Test
-    void filterAndPrepareDeliveriesLessCapacityThanDeliveries() {
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
-        when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(1));
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
-
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
-
-        int result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, Tuples.of(100, 95));
-
-        assertEquals(5, result);
-        assertEquals(5, transactionRequest.getPaperDeliveryHighPriorityList().size());
-        assertEquals(5, transactionRequest.getPaperDeliveryReadyToSendList().size());
-    }
-
-    @Test
-    void filterAndPrepareDeliveriesAllCapacity() {
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
-        when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(1));
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
-
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
-
-        int result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, Tuples.of(100, 0));
-
-        assertEquals(10, result);
-        assertEquals(10, transactionRequest.getPaperDeliveryHighPriorityList().size());
-        assertEquals(10, transactionRequest.getPaperDeliveryReadyToSendList().size());
-    }
-
-    @Test
-    void filterAndPrepareDeliveriesAllCapacityVerifyPartitionOnDay() {
-        when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(1));
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1); //Lunedì
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
-
-        Instant weekDayStart = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(1)))
-                .atStartOfDay().toInstant(ZoneOffset.UTC);
-
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
-
-        int result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, Tuples.of(12, 0));
-
-        assertEquals(10, result);
-        assertEquals(10, transactionRequest.getPaperDeliveryHighPriorityList().size());
-        assertEquals(10, transactionRequest.getPaperDeliveryReadyToSendList().size());
-
-        assertEquals(2, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart)).count());
-        assertEquals(2, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(1, ChronoUnit.DAYS))).count());
-        assertEquals(2, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(2, ChronoUnit.DAYS))).count());
-        assertEquals(2, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(3, ChronoUnit.DAYS))).count());
-        assertEquals(2, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(4, ChronoUnit.DAYS))).count());
-    }
-
-    @Test
-    void filterAndPrepareDeliveriesAllCapacityVerifyPartitionOnHours() {
-        when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofHours(12));
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
-
-        Instant weekDayStart = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(1)))
-                .atStartOfDay().toInstant(ZoneOffset.UTC);
-
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
-
-        paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, Tuples.of(10, 2));
-
-        assertEquals(0, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart)).count());
-        assertEquals(0, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(12, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(24, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(36, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(48, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(60, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(72, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(84, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(96, ChronoUnit.HOURS))).count());
-        assertEquals(1, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart.plus(108, ChronoUnit.HOURS))).count());
-
-
-    }
-
-    @Test
-    void enrichWithDeliveryDateOnWeek() {
-        when(pnDelayerConfig.getDeliveryDateInterval()).thenReturn(Duration.ofDays(7));
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1); //Lunedì
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
-
-        Instant weekDayStart = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(1)))
-                .atStartOfDay().toInstant(ZoneOffset.UTC);
-
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
-
-        paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, transactionRequest, Tuples.of(12, 2));
-
-        assertEquals(10, transactionRequest.getPaperDeliveryReadyToSendList().stream().filter(item -> item.getDeliveryDate().equals(weekDayStart)).count());
-    }
-
-
-    @Test
-    void checkCapacityAndFilterList_returnsFilteredList() {
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
-        List<PaperDeliveryHighPriority> result = paperDeliveryUtils.checkCapacityAndFilterList(Tuples.of(10,5), deliveries);
-
-        assertEquals(5, result.size());
-    }
-
-    @Test
-    void checkCapacityAndFilterList_returnsGivenLists() {
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
-        List<PaperDeliveryHighPriority> result = paperDeliveryUtils.checkCapacityAndFilterList(Tuples.of(10,0), deliveries);
-
-        assertEquals(10, result.size());
-    }
-
-    @Test
-    void checkListsSizeOk() {
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        transactionRequest.setPaperDeliveryHighPriorityList(getHighPriorityDeliveries());
-        transactionRequest.setPaperDeliveryReadyToSendList(getReadyToSendDeliveries());
-        assertTrue(paperDeliveryUtils.checkListsSize(transactionRequest));
-    }
-
-    @Test
-    void checkListsSizeEmptyHighPriorities() {
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        transactionRequest.setPaperDeliveryReadyToSendList(getReadyToSendDeliveries());
-
-        assertFalse(paperDeliveryUtils.checkListsSize(transactionRequest));
-    }
-
-    @Test
-    void checkListsSizeEmptyReadyToSend() {
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        transactionRequest.setPaperDeliveryHighPriorityList(getHighPriorityDeliveries());
-
-        assertFalse(paperDeliveryUtils.checkListsSize(transactionRequest));
-    }
-
-    @Test
-    void checkListsSizeAllListsEmpty() {
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        assertFalse(paperDeliveryUtils.checkListsSize(transactionRequest));
-    }
-
-    @Test
-    void checkListsSizeListsHaveDifferentSize() {
-        PaperDeliveryTransactionRequest transactionRequest = new PaperDeliveryTransactionRequest();
-        List<PaperDeliveryHighPriority> highPriorityDeliveries = getHighPriorityDeliveries();
-        highPriorityDeliveries.remove(0);
-        transactionRequest.setPaperDeliveryHighPriorityList(highPriorityDeliveries);
-        transactionRequest.setPaperDeliveryReadyToSendList(getReadyToSendDeliveries());
-
-        assertFalse(paperDeliveryUtils.checkListsSize(transactionRequest));
-    }
-
 
     @Test
     void groupDeliveryOnCapAndOrderOnCreatedAt_groupsAndSortsCorrectly() {
-        List<PaperDeliveryHighPriority> deliveries = getHighPriorityDeliveries();
+        PaperDelivery paperDelivery1 = new PaperDelivery();
+        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
+        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
+        paperDelivery1.setCap("12345");
+        paperDelivery1.setCreatedAt(Instant.now().toString());
+        PaperDelivery paperDelivery2 = new PaperDelivery();
+        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
+        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
+        paperDelivery2.setCap("12345");
+        paperDelivery2.setCreatedAt(Instant.now().toString());
+        PaperDelivery paperDelivery3 = new PaperDelivery();
+        paperDelivery3.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
+        paperDelivery3.setSk("RM~2025-01-01t00:00:00Z~requestId2");
+        paperDelivery3.setCap("67890");
+        paperDelivery3.setCreatedAt(Instant.now().toString());
+        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2, paperDelivery3);
 
-        Map<String, List<PaperDeliveryHighPriority>> result = paperDeliveryUtils.groupDeliveryOnCapAndOrderOnCreatedAt(deliveries);
+        Map<String, List<PaperDelivery>> result = paperDeliveryUtils.groupDeliveryOnCapAndOrderOnCreatedAt(deliveries);
 
-        assertEquals(2, result.keySet().size());
-        assertEquals(5, result.get("00100").size());
-        assertEquals(5, result.get("00200").size());
+        assertEquals(2, result.size());
+        assertEquals(List.of(paperDelivery1, paperDelivery2), result.get("12345"));
+        assertEquals(List.of(paperDelivery3), result.get("67890"));
     }
 
     @Test
-    void calculateDeliveryWeekWithCutOff1() {
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
-        Instant createdAt = Instant.parse("2025-04-01T10:00:00Z");
-        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
-        assertEquals(Instant.parse("2025-04-07T00:00:00Z"), result);
+    void calculateDeliveryWeek_returnsCorrectStartOfWeek() {
+        Instant startExecutionBatch = Instant.parse("2023-10-04T10:00:00Z");
+
+        LocalDate result = paperDeliveryUtils.calculateDeliveryWeek(startExecutionBatch);
+
+        assertEquals(LocalDate.parse("2023-10-02"), result);
     }
 
     @Test
-    void calculateDeliveryWeekWithCutOff2() {
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(7));
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(3);
-        Instant createdAt = Instant.parse("2025-04-07T00:00:00Z");
-        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
-        assertEquals(Instant.parse("2025-04-09T00:00:00Z"), result);
+    void toNextWeek_correctlyUpdatesPkAndSk() {
+        PaperDelivery paperDelivery = new PaperDelivery();
+        paperDelivery.setProvince("RM");
+        paperDelivery.setRequestId("requestId1");
+        paperDelivery.setProductType("RS");
+        paperDelivery.setPrepareRequestDate("2023-10-01");
+        List<PaperDelivery> deliveries = List.of(paperDelivery);
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+
+        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
+
+        assertEquals(1, result.size());
+        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
+        assertEquals("RM~2023-10-01~requestId1", result.getFirst().getSk());
     }
 
     @Test
-    void calculateDeliveryWeekNoCutOff1() {
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(0));
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(1);
-        Instant createdAt = Instant.parse("2025-04-01T10:00:00Z");
-        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
-        assertEquals(Instant.parse("2025-03-31T00:00:00Z"), result);
+    void toNextWeek_handlesEmptyDeliveriesList() {
+        List<PaperDelivery> deliveries = List.of();
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+
+        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
+
+        assertTrue(result.isEmpty());
     }
 
     @Test
-    void calculateDeliveryWeekNoCutOff2() {
-        when(pnDelayerConfig.getPaperDeliveryCutOffDuration()).thenReturn(Duration.ofDays(0));
-        when(pnDelayerConfig.getDeliveryDateDayOfWeek()).thenReturn(3);
-        Instant createdAt = Instant.parse("2025-04-07T00:00:00Z");
-        Instant result = paperDeliveryUtils.calculateDeliveryWeek(createdAt);
-        assertEquals(Instant.parse("2025-04-02T00:00:00Z"), result);
-    }
+    void toNextWeek_usesNotificationSentAtForNonRSAndNonFirstAttempt() {
+        PaperDelivery paperDelivery = new PaperDelivery();
+        paperDelivery.setProvince("RM");
+        paperDelivery.setRequestId("requestId2");
+        paperDelivery.setProductType("Non-RS");
+        paperDelivery.setAttempt(2);
+        paperDelivery.setNotificationSentAt("2023-10-03");
+        List<PaperDelivery> deliveries = List.of(paperDelivery);
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
 
-    private static List<PaperDeliveryHighPriority> getHighPriorityDeliveries() {
-        List<PaperDeliveryHighPriority> deliveries = new ArrayList<>();
-        IntStream.range(0,10).forEach(i -> {
-            PaperDeliveryHighPriority item = new PaperDeliveryHighPriority();
-            item.setRequestId("item" + i);
-            item.setCap(i % 2 == 0 ? "00100" : "00200");
-            item.setCreatedAt(Instant.now().plus(Duration.ofSeconds(i)));
-            deliveries.add(item);
-        });
-        return deliveries;
-    }
+        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
 
-    private static List<PaperDeliveryReadyToSend> getReadyToSendDeliveries() {
-        List<PaperDeliveryReadyToSend> deliveries = new ArrayList<>();
-        IntStream.range(0,10).forEach(i -> {
-            PaperDeliveryReadyToSend item = new PaperDeliveryReadyToSend();
-            item.setRequestId("item" + i);
-            deliveries.add(item);
-        });
-        return deliveries;
+        assertEquals(1, result.size());
+        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
+        assertEquals("RM~2023-10-03~requestId2", result.getFirst().getSk());
     }
 }

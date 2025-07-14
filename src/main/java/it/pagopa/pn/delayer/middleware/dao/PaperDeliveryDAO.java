@@ -11,7 +11,7 @@ import java.util.Map;
 
 public interface PaperDeliveryDAO {
 
-    Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey);
+    Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit);
 
     Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveriesChunk);
 }
