@@ -970,13 +970,13 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
-          KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME: !Ref KinesisPaperDeliveryEventTableName
-          PAPER_DELIVERY_COUNTER_TABLE_NAME: !Ref PaperDeliveryCounterTableName
-          BATCH_SIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
-          KINESIS_PAPER_DELIVERY_EVENTS_RECORD_TTL_SECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
-          PAPER_DELIVERY_COUNTER_TTL_DAYS: !Ref PaperDeliveryCounterTtlDays
-          PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          KINESIS_PAPERDELIVERY_TABLE: !Ref PaperDeliveryTableName
+          KINESIS_PAPERDELIVERY_EVENTTABLE: !Ref KinesisPaperDeliveryEventTableName
+          KINESIS_PAPERDELIVERY_COUNTERTABLE: !Ref PaperDeliveryCounterTableName
+          KINESIS_BATCHSIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
+          KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
+          KINESIS_PAPERDELIVERY_COUNTERTTLDAYS: !Ref PaperDeliveryCounterTtlDays
+          KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
       TracingConfig:
         Mode: Active
       Layers:

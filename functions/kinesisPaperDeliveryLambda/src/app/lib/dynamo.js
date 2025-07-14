@@ -7,11 +7,11 @@ const {
 } = require("@aws-sdk/lib-dynamodb");
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
-const counterTableName = process.env.PAPER_DELIVERY_COUNTER_TABLE_NAME;
+const counterTableName = process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE;
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require('@js-joda/core');
 
 function calculateTtl(){
-  const ttlDays = parseInt(process.env.PAPER_DELIVERY_COUNTER_TTL_DAYS, 10) || 14;
+  const ttlDays = parseInt(process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS, 10) || 14;
   const expireDate = new Date();
   expireDate.setDate(expireDate.getDate() + ttlDays);
   return Math.floor(expireDate.getTime() / 1000);
@@ -31,7 +31,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
 }
 
 function getDeliveryWeek() {
-  const dayOfWeek = parseInt(process.env.DELIVERY_DATE_DAY_OF_WEEK, 10) || 1;
+  const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
   return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
 }
 
@@ -77,9 +77,9 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
 }
 
 async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFailures) {
-  const batch_size = process.env.BATCH_SIZE;
+  const batch_size = process.env.KINESIS_BATCHSIZE;
   console.log(`Batch size: ${batch_size}`);
-  const tableName = process.env.PAPER_DELIVERY_TABLE_NAME;
+  const tableName = process.env.KINESIS_PAPERDELIVERY_TABLE;
 
   const params = {
         RequestItems: {
@@ -120,7 +120,7 @@ async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFai
 }
 
 async function batchWriteKinesisEventRecords(eventRecords) {
-  const tableName = process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
+  const tableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
   const params = {
     RequestItems: {
       [tableName]: eventRecords.map(record => ({
@@ -133,7 +133,7 @@ async function batchWriteKinesisEventRecords(eventRecords) {
 }
 
 async function batchGetKinesisEventRecords(keys) {
-  const tableName = process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME;
+  const tableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
   const params = {
     RequestItems: {
       [tableName]: {

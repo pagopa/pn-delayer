@@ -7,9 +7,9 @@ const {
 
 describe("Lambda Handler Tests", () => {
   process.env.REGION = "us-east-1";
-  process.env.PAPER_DELIVERY_TABLE_NAME = 'TestIncomingTable';
-  process.env.KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME = "KinesisPaperDeliveryEventTable";
-  process.env.PAPER_DELIVERY_COUNTER_TABLE_NAME = 'TestCounterTable';
+  process.env.KINESIS_PAPERDELIVERY_TABLE = 'TestIncomingTable';
+  process.env.KINESIS_PAPERDELIVERY_EVENTTABLE = "KinesisPaperDeliveryEventTable";
+  process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE = 'TestCounterTable';
   
   const mockDynamoDBClient = mockClient(DynamoDBDocumentClient);
 
@@ -268,7 +268,7 @@ describe("Lambda Handler Tests", () => {
   });
 
   it("should handle a valid Kinesis event with unprocessed item in incoming batch write", async () => {
-    let tableName = process.env.PAPER_DELIVERY_TABLE_NAME;
+    let tableName = process.env.KINESIS_PAPERDELIVERY_TABLE;
     mockDynamoDBClient.resolvesOnce({ Responses: {} })
     .resolvesOnce({ UnprocessedItems: {
       [tableName]: [
