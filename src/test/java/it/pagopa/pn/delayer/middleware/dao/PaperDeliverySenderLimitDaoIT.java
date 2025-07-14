@@ -52,7 +52,7 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         });
 
 
-        StepVerifier.create(paperDeliveriesSenderLimitDAO.retrieveSendersLimit(pks, deliveryDate))
+        StepVerifier.create(paperDeliveriesSenderLimitDAO.retrieveSendersLimit(pks, deliveryDate.toString()))
                 .expectNextCount(3)
                 .expectComplete()
                 .verify();
@@ -65,15 +65,15 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(1)));
         Instant deliveryDate = nextWeek.atStartOfDay().toInstant(ZoneOffset.UTC);
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
-        entity.setDeliveryDate(deliveryDate);
+        entity.setDeliveryDate(deliveryDate.toString());
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate.toString(), 1000).block();
 
         int response = get(deliveryDate);
         assert response != 0;
         Assertions.assertEquals(5, response);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate.toString(), 1000).block();
 
         int response2 = get(deliveryDate);
         assert response2 != 0;

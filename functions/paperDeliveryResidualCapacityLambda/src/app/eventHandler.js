@@ -1,3 +1,0 @@
-exports.handleEvent = async (event) => {
-
-};

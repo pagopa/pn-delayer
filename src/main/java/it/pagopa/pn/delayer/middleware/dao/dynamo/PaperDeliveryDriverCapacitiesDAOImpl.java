@@ -3,9 +3,7 @@ package it.pagopa.pn.delayer.middleware.dao.dynamo;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
-import it.pagopa.pn.delayer.model.ImplementationType;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.*;
@@ -13,15 +11,12 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
-import static it.pagopa.pn.delayer.config.PnDelayerConfigs.IMPLEMENTATION_TYPE_PROPERTY_NAME;
-
 @Component
 @Slf4j
-@ConditionalOnProperty(name = IMPLEMENTATION_TYPE_PROPERTY_NAME, havingValue = ImplementationType.DYNAMO, matchIfMissing = true)
 public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriverCapacitiesDAO {
 
     private final DynamoDbAsyncTable<PaperDeliveryDriverCapacity> table;
@@ -31,7 +26,7 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
     }
 
     @Override
-    public Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String unifiedDeliveryDriver, String geoKey, Instant deliveryDate) {
+    public Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String unifiedDeliveryDriver, String geoKey, LocalDate deliveryDate) {
 
         QueryConditional keyCondition = QueryConditional.sortLessThanOrEqualTo(Key.builder()
                 .partitionValue(PaperDeliveryDriverCapacity.buildKey(tenderId, unifiedDeliveryDriver, geoKey))
