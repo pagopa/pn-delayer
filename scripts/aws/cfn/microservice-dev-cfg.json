@@ -10,8 +10,8 @@
     "DelayerToPaperChannelLambdaCron": "*/15 * * * ? *",
     "DelayerToPaperChannelRuleState": "DISABLED",
     "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
-    "PaperDeliveryPrintCapacityCounterTtlDays": 60,
-    "WeeklyWorkingDays": 7,
+    "PaperDeliveryPrintCapacityCounterTtlDays": "60",
+    "WeeklyWorkingDays": "7",
     "PaperDeliveryCounterTtlDays": "14",
     "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority"
   }
