@@ -305,10 +305,6 @@ class DriverCapacityJobServiceTest {
         Assertions.assertTrue(capturedDeliveries.getLast().getLast().getPk().endsWith("2025-01-13~" + EVALUATE_SENDER_LIMIT));
         Assertions.assertTrue(capturedDeliveries.getLast().getLast().getSk().startsWith(String.join("~", province, "2025-01-01T00:00:00Z")));
 
-
-
-
-
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(3));
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(2));
         verify(paperDeliveryUsedCapacityDAO, times(1)).get(eq(unifiedDeliveryDriver), eq(province), any());

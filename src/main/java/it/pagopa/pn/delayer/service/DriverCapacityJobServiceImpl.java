@@ -38,7 +38,7 @@ public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
 
 
     /**
-     * Starts the job to evaluate driver capacity for paper deliveries, This method evaluate residual province capacity.
+     * Starts the job to evaluate driver capacity for paper deliveries, This method evaluates residual province capacity.
      * If the residual capacity is greater than zero, it retrieves paper deliveries and processes them.
      * If the residual capacity is zero or less, it sends the deliveries to the next week.
      *
@@ -53,7 +53,7 @@ public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
         LocalDate deliveryWeek = paperDeliveryUtils.calculateDeliveryWeek(startExecutionBatch);
 
         return retrieveDeclaredAndUsedCapacity(province, unifiedDeliveryDriver, tenderId, deliveryWeek)
-                .doOnNext(tuple -> log.info("Retrieved capacities for province: [{}], unifiedDeliveryDriver: [{}] -> availableCapacity={}, usedCapacity={}", province, unifiedDeliveryDriver, tuple.getT1(), tuple.getT2()))
+                .doOnNext(tuple -> log.info("Retrieved capacities for province: [{}], unifiedDeliveryDriver: [{}] -> declared capacity={}, used capacity={}", province, unifiedDeliveryDriver, tuple.getT1(), tuple.getT2()))
                 .flatMap(tuple -> {
                     String sortKeyPrefix = String.join("~", unifiedDeliveryDriver, province);
                     int residualCapacity = tuple.getT1() - tuple.getT2();

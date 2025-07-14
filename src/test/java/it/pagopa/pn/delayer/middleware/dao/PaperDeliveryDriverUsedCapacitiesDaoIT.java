@@ -33,7 +33,7 @@ class PaperDeliveryDriverUsedCapacitiesDaoIT extends BaseTest.WithLocalStack {
         LocalDate dateTime = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(1)));
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
-        entity.setDeliveryDate(nextWeek.toString());
+        entity.setDeliveryDate(nextWeek);
 
         paperDeliveryDriverUsedCapacitiesDAO.updateCounter("1", "RM",  5, nextWeek, 10).block();
 

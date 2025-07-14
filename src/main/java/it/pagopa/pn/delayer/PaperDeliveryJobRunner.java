@@ -64,7 +64,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
                     .map(index -> pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getProvinceList().get(index))
                     .map(province -> {
                         log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
-                        addMDC( String.join("~", unifiedDeliveryDriver,  province), jobIndex);
+                        addMDC( String.join("~", unifiedDeliveryDriver,  province));
                         try {
                             var startExecutionBatch = Instant.now();
                             Mono<Void> monoExcecution = driverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, new HashMap<>(), startExecutionBatch, pnDelayerConfigs.getActualTenderId());
@@ -86,7 +86,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     private int executeEvaluateSendLimitStep() {
         String province = pnDelayerConfigs.getEvaluateSenderLimitJobInput().getProvince();
         log.info("Starting batch for province: {}", province);
-        addMDC(province, null);
+        addMDC(province);
         try {
             var startExecutionBatch = Instant.now();
             Mono<Void> monoExcecution = senderLimitJobService.startSenderLimitJob(province, new HashMap<>(), startExecutionBatch);
@@ -99,10 +99,10 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     }
 
 
-    private void addMDC(String requestId, String jobIndex) {
+    private void addMDC(String requestId) {
         MDCUtils.clearMDCKeys();
         MDC.put(MDCUtils.MDC_TRACE_ID_KEY, StringUtils.hasText(System.getenv("AWS_BATCH_JOB_ID"))
-                ? System.getenv("AWS_BATCH_JOB_ID") + (StringUtils.hasText(jobIndex) ? ":" + jobIndex : "")
+                ? System.getenv("AWS_BATCH_JOB_ID")
                 : UUID.randomUUID().toString());
         MDC.put(MDCUtils.MDC_PN_CTX_REQUEST_ID, requestId);
     }
