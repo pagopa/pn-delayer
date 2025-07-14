@@ -39,12 +39,11 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
     @Test
     void testRetrieveSendersLimit() {
         List<String> pks = List.of("0~RS~RM", "1~RS~RM", "2~RS~RM");
-        Instant deliveryDate = Instant.parse("2025-04-07T00:00:00Z");
 
         IntStream.range(0, 3).forEach(i -> {
             PaperDeliverySenderLimit paperDeliveriesSenderLimit = new PaperDeliverySenderLimit();
             paperDeliveriesSenderLimit.setPk(i + "~RS~RM");
-            paperDeliveriesSenderLimit.setDeliveryDate("2025-04-07T00:00:00Z");
+            paperDeliveriesSenderLimit.setDeliveryDate("2025-04-07");
             Map<String, AttributeValue> itemMap = new HashMap<>();
             itemMap.put("pk", AttributeValue.builder().s(paperDeliveriesSenderLimit.getPk()).build());
             itemMap.put("deliveryDate", AttributeValue.builder().s(paperDeliveriesSenderLimit.getDeliveryDate()).build());
@@ -52,7 +51,7 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         });
 
 
-        StepVerifier.create(paperDeliveriesSenderLimitDAO.retrieveSendersLimit(pks, deliveryDate))
+        StepVerifier.create(paperDeliveriesSenderLimitDAO.retrieveSendersLimit(pks, LocalDate.parse("2025-04-07")))
                 .expectNextCount(3)
                 .expectComplete()
                 .verify();
@@ -63,25 +62,24 @@ public class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         PaperDeliveryDriverUsedCapacities entity = new PaperDeliveryDriverUsedCapacities();
         LocalDate dateTime = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         LocalDate nextWeek = dateTime.with(TemporalAdjusters.next(DayOfWeek.of(1)));
-        Instant deliveryDate = nextWeek.atStartOfDay().toInstant(ZoneOffset.UTC);
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
-        entity.setDeliveryDate(deliveryDate.toString());
+        entity.setDeliveryDate(nextWeek);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, nextWeek, 1000).block();
 
-        int response = get(deliveryDate);
+        int response = get(nextWeek);
         assert response != 0;
         Assertions.assertEquals(5, response);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, deliveryDate, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5, nextWeek, 1000).block();
 
-        int response2 = get(deliveryDate);
+        int response2 = get(nextWeek);
         assert response2 != 0;
         Assertions.assertEquals(10, response2);
 
     }
 
-    private int get(Instant deliveryDate) {
+    private int get(LocalDate deliveryDate) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put("pk", AttributeValue.builder().s("1~RS~RM").build());
         key.put("deliveryDate", AttributeValue.builder().s(String.valueOf(deliveryDate)).build());

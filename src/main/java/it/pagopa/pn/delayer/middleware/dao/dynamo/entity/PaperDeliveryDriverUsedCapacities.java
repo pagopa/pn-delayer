@@ -7,6 +7,8 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
+import java.time.LocalDate;
+
 @DynamoDbBean
 @Data
 public class PaperDeliveryDriverUsedCapacities {
@@ -21,7 +23,7 @@ public class PaperDeliveryDriverUsedCapacities {
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER_GEOKEY)}))
     private String unifiedDeliveryDriverGeokey;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_DELIVERY_DATE)}))
-    private String deliveryDate;
+    private LocalDate deliveryDate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER)}))
     private String unifiedDeliveryDriver;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_GEO_KEY)}))

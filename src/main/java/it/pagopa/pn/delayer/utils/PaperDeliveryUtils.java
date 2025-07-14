@@ -29,13 +29,13 @@ public class PaperDeliveryUtils {
      * It also handles the case where there are more deliveries than the remaining capacity, moving excess deliveries to the next week.
      *
      * @param deliveries       List of PaperDelivery items to filter
-     * @param tuple            Tuple containing total capacity and used capacity
+     * @param capCapacities            Tuple containing total capacity and used capacity
      * @param deliveriesToSend List to add filtered deliveries that will be sent
      * @param toNextWeek       List to add deliveries that will be moved to next week
      * @return The number of deliveries that were filtered and prepared
      */
-    public Integer filterAndPrepareDeliveries(List<PaperDelivery> deliveries, Tuple2<Integer, Integer> tuple, List<PaperDelivery> deliveriesToSend, List<PaperDelivery> toNextWeek, LocalDate deliveryWeek) {
-        int remainingCapacity = Math.max(tuple.getT1() - tuple.getT2(), 0);
+    public Integer filterAndPrepareDeliveries(List<PaperDelivery> deliveries, Tuple2<Integer, Integer> capCapacities, List<PaperDelivery> deliveriesToSend, List<PaperDelivery> toNextWeek, LocalDate deliveryWeek) {
+        int remainingCapacity = Math.max(capCapacities.getT1() - capCapacities.getT2(), 0);
         List<PaperDelivery> filteredList = deliveries.stream().limit(remainingCapacity).toList();
 
         if (!CollectionUtils.isEmpty(filteredList)) {
@@ -52,31 +52,23 @@ public class PaperDeliveryUtils {
     /**
      * Metodo che raggruppa i CAP di uno stesso chunk di una stessa provincia
      *
-     * @param paperDelivery chunk di righe recuperate a DB di una stessa provincia
+     * @param paperDeliveries chunk di righe recuperate a DB di una stessa provincia
      * @return una mappa con chiave CAP e valore lista di righe aventi lo stesso CAP della chiave
      */
-    public Map<String, List<PaperDelivery>> groupDeliveryOnCapAndOrderOnCreatedAt(List<PaperDelivery> paperDelivery) {
-        return paperDelivery.stream()
+    public Map<String, List<PaperDelivery>> groupDeliveryOnCapAndOrderOnCreatedAt(List<PaperDelivery> paperDeliveries) {
+        return paperDeliveries.stream()
                 .collect(Collectors.groupingBy(
                         PaperDelivery::getCap,
-                        Collectors.collectingAndThen(
-                                Collectors.toList(),
-                                list -> {
-                                    list.sort(Comparator.comparing(PaperDelivery::getCreatedAt));
-                                    return list;
-                                }
-                        )
-                ));
+                        Collectors.toList()));
     }
 
     public List<PaperDelivery> mapItemForEvaluatePrintCapacityStep(List<PaperDelivery> items, LocalDate deliveryWeek) {
-        return items.stream()
-                .peek(paperDelivery -> {
+        items.forEach(paperDelivery -> {
                     paperDelivery.setPk(deliveryWeek + "~" + WorkflowStepEnum.EVALUATE_PRINT_CAPACITY);
                     paperDelivery.setDeliveryDate(deliveryWeek.toString());
                     paperDelivery.setSk(String.join("~", String.valueOf(paperDelivery.getPriority()), paperDelivery.getRequestId()));
-                })
-                .toList();
+                });
+        return items;
     }
 
     /**
@@ -95,10 +87,11 @@ public class PaperDeliveryUtils {
     }
 
     public List<PaperDelivery> toNextWeek(List<PaperDelivery> deliveries, LocalDate deliveryWeek) {
-        return deliveries.stream().peek(paperDelivery -> {
+        deliveries.forEach(paperDelivery -> {
             paperDelivery.setPk(calculateNextWeek(deliveryWeek) + "~" + WorkflowStepEnum.EVALUATE_SENDER_LIMIT);
             paperDelivery.setSk(paperDelivery.getProvince() + "~" + retrieveDateForSk(paperDelivery) + "~" + paperDelivery.getRequestId());
-        }).toList();
+        });
+        return deliveries;
     }
 
     private String retrieveDateForSk(PaperDelivery paperDelivery) {
