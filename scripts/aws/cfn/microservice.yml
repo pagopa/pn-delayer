@@ -252,6 +252,11 @@ Parameters:
     Default: ' '
     Description: 'Input unifiedDeliveryDriver for the driver capacity job'
 
+  WorflowStep:
+    Type: String
+    Default: ' '
+    Description: 'Workflow step for delayer jobs - one of: EVALUATE_SENDER_LIMIT,EVALUATE_RESIDUAL_CAPACITY,EVALUATE_DRIVER_CAPACITY'
+
   JobInputProvinceList:
     Type: String
     Default: ' '
@@ -516,7 +521,7 @@ Resources:
     Properties:
       Type: MANAGED
       ServiceRole: !Ref BatchServiceRole
-      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-high-priority-compute-environment'
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-evaluate-driver-capacity-compute-environment'
       ComputeResources:
         MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
@@ -525,12 +530,12 @@ Resources:
         Subnets: !Split [",", !Ref SubnetsIds]
       State: ENABLED
 
-  BatchProcessingJobDefinition:
+  EvaluateDriverCapacityJobDefinition:
     Type: AWS::Batch::JobDefinition
     Properties:
       Type: container
       PropagateTags: true
-      JobDefinitionName: !Sub '${ProjectName}-delayer-high-priority-job-definition'
+      JobDefinitionName: !Sub '${ProjectName}-evaluate-driver-capacity-job-definition'
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -553,10 +558,6 @@ Resources:
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME
-            Value: !Ref PaperDeliveryHighPriorityTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYREADYTOSENDTABLENAME
-            Value: !Ref PaperDeliveryReadyToSendTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -573,6 +574,8 @@ Resources:
             Value: !Ref PaperDeliveryCutOffDuration
           - Name: PN_DELAYER_ACTUALTENDERID
             Value: !Ref ActualTenderId
+          - Name: PN_DELAYER_WORKFLOWSTEP
+            Value: !Ref WorflowStep
 
       PlatformCapabilities:
         - FARGATE
@@ -590,7 +593,7 @@ Resources:
           ComputeEnvironment: !Ref ComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: !Sub '${ProjectName}-delayer-high-priority-job-queue'
+      JobQueueName: !Sub '${ProjectName}-evaluate-driver-capacity-job-queue'
 
   BatchServiceRole:
     Type: AWS::IAM::Role
@@ -655,14 +658,11 @@ Resources:
               Action:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
-                - dynamodb:DeleteItem
                 - dynamodb:Query
-                - dynamodb:TransactWriteItems
+                - dynamodb:BatchWriteItem
               Resource:
-                - !Sub "${PaperDeliveryHighPriorityTableArn}"
-                - !Sub "${PaperDeliveryHighPriorityTableArn}/*"
-                - !Sub "${PaperDeliveryReadyToSendTableArn}"
-                - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
+                - !Sub "${PaperDeliveryTableArn}"
+                - !Sub "${PaperDeliveryTableArn}/*"
 
   BatchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -686,8 +686,6 @@ Resources:
           - ','
           - - !Ref PaperDeliveryDriverCapacitiesTableName
             - !Ref PaperDeliveryDriverUsedCapacitiesTableName
-            - !Ref PaperDeliveryHighPriorityTableName
-            - !Ref PaperDeliveryReadyToSendTableName
             - !Ref PaperDeliveryTableName
         LogGroupsNames: !Join
           - ','
@@ -731,7 +729,7 @@ Resources:
          status:
            - FAILED
          jobDefinition:
-          - !Ref BatchProcessingJobDefinition
+          - !Ref EvaluateDriverCapacityJobDefinition
      State: ENABLED
      Targets:
        - Arn: !Ref AlarmSNSTopicArn

@@ -50,7 +50,7 @@ class PaperDeliveryUtilsTest {
         Tuple2<Integer, Integer> capacityTuple = Tuples.of(5, 2);
         List<PaperDelivery> deliveriesToSend = new ArrayList<>();
 
-        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend);
+        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
 
         assertEquals(2, result);
         assertEquals(2, deliveriesToSend.size());
@@ -68,7 +68,7 @@ class PaperDeliveryUtilsTest {
         Tuple2<Integer, Integer> capacityTuple = Tuples.of(2, 2);
         List<PaperDelivery> deliveriesToSend = new ArrayList<>();
 
-        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend);
+        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
 
         assertEquals(0, result);
         assertTrue(deliveriesToSend.isEmpty());
@@ -110,9 +110,47 @@ class PaperDeliveryUtilsTest {
     }
 
     @Test
-    void calculateSentWeek_returnsCorrectPreviousWeek() {
+    void toNextWeek_correctlyUpdatesPkAndSk() {
+        PaperDelivery paperDelivery = new PaperDelivery();
+        paperDelivery.setProvince("RM");
+        paperDelivery.setRequestId("requestId1");
+        paperDelivery.setProductType("RS");
+        paperDelivery.setPrepareRequestDate("2023-10-01");
+        List<PaperDelivery> deliveries = List.of(paperDelivery);
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-        LocalDate result = paperDeliveryUtils.calculateSentWeek(deliveryWeek);
-        assertEquals(LocalDate.parse("2023-09-25"), result);
+
+        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
+
+        assertEquals(1, result.size());
+        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
+        assertEquals("RM~2023-10-01~requestId1", result.getFirst().getSk());
+    }
+
+    @Test
+    void toNextWeek_handlesEmptyDeliveriesList() {
+        List<PaperDelivery> deliveries = List.of();
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+
+        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void toNextWeek_usesNotificationSentAtForNonRSAndNonFirstAttempt() {
+        PaperDelivery paperDelivery = new PaperDelivery();
+        paperDelivery.setProvince("RM");
+        paperDelivery.setRequestId("requestId2");
+        paperDelivery.setProductType("Non-RS");
+        paperDelivery.setAttempt(2);
+        paperDelivery.setNotificationSentAt("2023-10-03");
+        List<PaperDelivery> deliveries = List.of(paperDelivery);
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+
+        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
+
+        assertEquals(1, result.size());
+        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
+        assertEquals("RM~2023-10-03~requestId2", result.getFirst().getSk());
     }
 }
