@@ -772,14 +772,11 @@ Resources:
               Action:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
-                - dynamodb:DeleteItem
                 - dynamodb:Query
-                - dynamodb:TransactWriteItems
+                - dynamodb:BatchWriteItem
               Resource:
                 - !Sub "${PaperDeliveryTableArn}"
                 - !Sub "${PaperDeliveryTableArn}/*"
-                - !Sub "${PaperDeliveryReadyToSendTableArn}"
-                - !Sub "${PaperDeliveryReadyToSendTableArn}/*"
 
   DriverCapacitySecurityGroup:
     Type: AWS::EC2::SecurityGroup
