@@ -140,6 +140,10 @@ Resources:
           KeyType: "HASH"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
   PaperDeliveryPrintCapacityCounter:
     Type: AWS::DynamoDB::Table
