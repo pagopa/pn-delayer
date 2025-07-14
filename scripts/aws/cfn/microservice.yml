@@ -728,7 +728,7 @@ Resources:
   DriverCapacityTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${ProjectName}-delayer-taskexec-role'
+      RoleName: !Sub '${ProjectName}-delayer-driver-capacity-job-taskexec-role'
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
