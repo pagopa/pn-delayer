@@ -321,18 +321,16 @@ Parameters:
 
   TestDelayerBucketName:
     Type: String
-    Description: 'TestDelayerLambda bucket name'
-    Default: 'test-bucket-name'
+    Description: 'Name of bucket for delayer tests automation'
 
   TestDelayerBucketArn:
     Type: String
-    Description: 'TestDelayerLambda bucket arn'
-    Default: 'test-bucket-arn'
+    Description: 'Arn of bucket for delayer tests automation'
 
-  TestDelayerObjectKeyBucketArn:
+  TestDelayerObjectKeyBucket:
     Type: String
     Description: 'TestDelayerLambda object key of bucket'
-    Default: 'test-object-key'
+    Default: 'example.csv'
 
   TestDelayerLambdaName:
     Type: String
@@ -1281,7 +1279,7 @@ Resources:
         Variables:
           REGION: !Sub ${AWS::Region}
           BUCKET_NAME: !Ref TestDelayerBucketName
-          OBJECT_KEY: !Ref TestDelayerObjectKeyBucketArn
+          OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
       TracingConfig:
         Mode: Active
       Layers:
@@ -1322,6 +1320,16 @@ Resources:
           - Effect: Allow
             Action:
               - s3:GetObject
+              - s3:HeadObject
               - s3:ListBucket
+              - s3:GetObjectTagging
             Resource:
-              - !Ref TestDelayerBucketArn
+              - !Sub "${TestDelayerBucketArn}"
+              - !Sub "${TestDelayerBucketArn}/*"
+          - Sid: DecryptObjects
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+            Resource:
+              - !Sub "${TestDelayerBucketArn}"
