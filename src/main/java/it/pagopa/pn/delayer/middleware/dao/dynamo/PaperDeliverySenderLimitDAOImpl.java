@@ -78,12 +78,18 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
         Map<String, AttributeValue> attributeValue = new HashMap<>();
         attributeValue.put(":v", AttributeValue.builder().n(String.valueOf(increment)).build());
         attributeValue.put(":senderLimit", AttributeValue.builder().n(String.valueOf(senderLimit)).build());
+        attributeValue.put(":paId", AttributeValue.builder().s(pk.split("~")[0]).build());
+        attributeValue.put(":province", AttributeValue.builder().s(pk.split("~")[2]).build());
+        attributeValue.put(":productType", AttributeValue.builder().s(pk.split("~")[1]).build());
 
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                 .tableName(usedSenderLimitTable.tableName())
                 .key(key)
                 .updateExpression("ADD " + PaperDeliveryUsedSenderLimit.COL_NUMBER_OF_SHIPMENT + " :v"+
-                        " SET " + PaperDeliveryUsedSenderLimit.COL_SENDER_LIMIT + " = :senderLimit")
+                        " SET " + PaperDeliveryUsedSenderLimit.COL_SENDER_LIMIT + " = :senderLimit, "
+                        + PaperDeliveryUsedSenderLimit.COL_PAID + " = :paId, "
+                        + PaperDeliveryUsedSenderLimit.COL_PROVINCE + " = :province, "
+                        + PaperDeliveryUsedSenderLimit.COL_PRODUCT_TYPE + " = :productType")
                 .expressionAttributeValues(attributeValue)
                 .build();
 
