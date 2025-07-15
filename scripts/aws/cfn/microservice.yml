@@ -1333,7 +1333,7 @@ Resources:
               - dynamodb:BatchWriteItem
               - dynamodb:Query
             Resource:
-              - !Sub "$PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
           - Effect: Allow
             Action:
