@@ -2,8 +2,6 @@ package it.pagopa.pn.delayer.service;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.IncrementUsedCapacityDto;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
@@ -14,64 +12,57 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@Slf4j
 @Component
+@Slf4j
 @RequiredArgsConstructor
-public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
+public class PaperDeliveryService {
 
-    private final PaperDeliveryDriverUsedCapacitiesDAO paperDeliveryUsedCapacityDAO;
-    private final PaperDeliveryDriverCapacitiesDAO paperDeliveryCapacityDAO;
     private final PaperDeliveryDAO paperDeliveryDAO;
-    private final PaperDeliveryUtils paperDeliveryUtils;
     private final PnDelayerConfigs pnDelayerConfigs;
-
+    private final PaperDeliveryUtils paperDeliveryUtils;
+    private final DeliveryDriverCapacityService deliveryDriverCapacityService;
 
     /**
      * Starts the job to evaluate driver capacity for paper deliveries, This method evaluates residual province capacity.
      * If the residual capacity is greater than zero, it retrieves paper deliveries and processes them.
      * If the residual capacity is zero or less, it sends the deliveries to the next week.
      *
+     * @param workflowStepEnum      the workflow step enum indicating the current processing step (EVALUATE_DRIVER_CAPACITY, EVALUATE_RESIDUAL_CAPACITY)
      * @param unifiedDeliveryDriver the unified delivery driver identifier
      * @param province              the province for which the capacity is evaluated
      * @param lastEvaluatedKey      the last evaluated key for pagination
-     * @param startExecutionBatch   the start execution batch time
+     * @param deliveryWeek          the initial day of delivery week (e.g., Monday of current week)
      * @param tenderId              the tender identifier
      */
-    @Override
-    public Mono<Void> startEvaluateDriverCapacityJob(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch, String tenderId) {
-        LocalDate deliveryWeek = paperDeliveryUtils.calculateDeliveryWeek(startExecutionBatch);
-
-        return retrieveDeclaredAndUsedCapacity(province, unifiedDeliveryDriver, tenderId, deliveryWeek)
+    public Mono<Void> evaluateCapacitiesAndProcessDeliveries(WorkflowStepEnum workflowStepEnum, String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, LocalDate deliveryWeek, String tenderId) {
+        return deliveryDriverCapacityService.retrieveDeclaredAndUsedCapacity(province, unifiedDeliveryDriver, tenderId, deliveryWeek)
                 .doOnNext(tuple -> log.info("Retrieved capacities for province: [{}], unifiedDeliveryDriver: [{}] -> declared capacity={}, used capacity={}", province, unifiedDeliveryDriver, tuple.getT1(), tuple.getT2()))
                 .flatMap(tuple -> {
                     String sortKeyPrefix = String.join("~", unifiedDeliveryDriver, province);
                     int residualCapacity = tuple.getT1() - tuple.getT2();
                     if (residualCapacity <= 0) {
                         log.warn("No capacity for province={} and unifiedDeliveryDriver={}, no records will be processed", province, unifiedDeliveryDriver);
-                        return sendToNextWeek(sortKeyPrefix, lastEvaluatedKey, deliveryWeek);
+                        return sendToNextWeek(workflowStepEnum, sortKeyPrefix, lastEvaluatedKey, deliveryWeek);
                     } else {
-                        return sendToNextStep(sortKeyPrefix, lastEvaluatedKey, tenderId, deliveryWeek, residualCapacity, tuple.getT1());
+                        return sendToNextStep(workflowStepEnum, sortKeyPrefix, lastEvaluatedKey, tenderId, deliveryWeek, residualCapacity, tuple.getT1());
                     }
                 })
                 .then();
     }
 
-    private Mono<Void> sendToNextWeek(String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, LocalDate deliveryWeek) {
-        return retrievePaperDeliveries(deliveryWeek.toString(), sortKeyPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
+    private Mono<Void> sendToNextWeek(WorkflowStepEnum workflowStepEnum, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, LocalDate deliveryWeek) {
+        return retrievePaperDeliveries(workflowStepEnum, deliveryWeek.toString(), sortKeyPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
                 .flatMap(paperDeliveryPage -> processChunkToSendToNextWeek(paperDeliveryPage.items(), deliveryWeek)
                         .flatMap(unused -> !CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()) ?
-                                sendToNextWeek(sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek) : Mono.empty()));
+                                sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek) : Mono.empty()));
     }
 
 
@@ -102,15 +93,15 @@ public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
      * @param declaredCapacity the declared capacity for the province
      * @return a Mono containing the number of deliveries sent to the next step
      */
-    private Mono<Integer> sendToNextStep(String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, String tenderId, LocalDate deliveryWeek, Integer residualCapacity, Integer declaredCapacity) {
-        return retrievePaperDeliveries(deliveryWeek.toString(), sortKeyPrefix, lastEvaluatedKey, Math.min(residualCapacity, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
+    private Mono<Integer> sendToNextStep(WorkflowStepEnum workflowStepEnum, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, String tenderId, LocalDate deliveryWeek, Integer residualCapacity, Integer declaredCapacity) {
+        return retrievePaperDeliveries(workflowStepEnum, deliveryWeek.toString(), sortKeyPrefix, lastEvaluatedKey, Math.min(residualCapacity, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
                 .flatMap(paperDeliveryPage -> processChunkToSendToNextStep(paperDeliveryPage.items(), sortKeyPrefix, tenderId, deliveryWeek, declaredCapacity)
                         .flatMap(sentToNextStep -> {
                             int residualCapacityAfterSending = residualCapacity - sentToNextStep;
                             if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {
                                 return residualCapacityAfterSending <= 0 ?
-                                        sendToNextWeek(sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek).thenReturn(sentToNextStep) :
-                                        sendToNextStep(sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacity - sentToNextStep, declaredCapacity);
+                                        sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek).thenReturn(sentToNextStep) :
+                                        sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacity - sentToNextStep, declaredCapacity);
                             }
                             return Mono.empty();
                         }));
@@ -125,7 +116,18 @@ public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
         return evaluateCapCapacity(chunk, unifiedDeliveryDriver, tenderId, deliveryWeek, deliveriesToSend, incrementCapacities)
                 .doOnNext(unused -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, province, deliveriesToSend.size(), deliveryWeek, provinceDeclaredCapacity)))
                 .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(deliveriesToSend).thenReturn(deliveriesToSend.size())
-                        .flatMap(integer -> updateCounters(incrementCapacities).thenReturn(integer)));
+                        .flatMap(integer -> deliveryDriverCapacityService.updateCounters(incrementCapacities).thenReturn(integer)));
+    }
+
+    private Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String sentWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
+        return paperDeliveryDAO.retrievePaperDeliveries(workflowStepEnum, sentWeek, sortKeyPrefix, lastEvaluatedKey, queryLimit)
+                .flatMap(paperDeliveryPage -> {
+                    if (CollectionUtils.isEmpty(paperDeliveryPage.items())) {
+                        log.warn("No records found for unifiedDeliveryDriver-province = [{}]", sortKeyPrefix);
+                        return Mono.empty();
+                    }
+                    return Mono.just(paperDeliveryPage);
+                });
     }
 
     private Mono<Integer> evaluateCapCapacity(List<PaperDelivery> paperDeliveries, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek, List<PaperDelivery> deliveriesToSend, List<IncrementUsedCapacityDto> incrementUsedCapacityDtos) {
@@ -151,46 +153,13 @@ public class DriverCapacityJobServiceImpl implements DriverCapacityJobService {
      */
     private Mono<Integer> processCapGroup(String cap, List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek, List<PaperDelivery> deliveriesToSend, List<IncrementUsedCapacityDto> incrementUsedCapacityDtos) {
         List<PaperDelivery> toNextWeek = new ArrayList<>();
-        return retrieveDeclaredAndUsedCapacity(cap, unifiedDeliveryDriver, tenderId, deliveryWeek)
+        return deliveryDriverCapacityService.retrieveDeclaredAndUsedCapacity(cap, unifiedDeliveryDriver, tenderId, deliveryWeek)
                 .doOnNext(tuple -> log.info("Retrieved capacities for [{}~{}] -> availableCapacity={}, usedCapacity={}", unifiedDeliveryDriver, cap, tuple.getT1(), tuple.getT2()))
                 .flatMap(capCapacityAndUsedCapacity -> Mono.just(paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capCapacityAndUsedCapacity, deliveriesToSend, toNextWeek, deliveryWeek))
                         .filter(deliveriesCount -> deliveriesCount > 0)
-                        .doOnDiscard(Integer.class, discardedCount -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
+                        .doOnDiscard(Integer.class, unused -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
                         .doOnNext(deliveriesCount -> incrementUsedCapacityDtos.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, cap, deliveriesCount, deliveryWeek, capCapacityAndUsedCapacity.getT1()))))
                 .thenReturn(toNextWeek)
-                .flatMap(toNextWeekList -> processChunkToSendToNextWeek(toNextWeek, deliveryWeek));
+                .flatMap(toNextWeekList -> processChunkToSendToNextWeek(toNextWeekList, deliveryWeek));
     }
-
-    private Mono<Page<PaperDelivery>> retrievePaperDeliveries(String sentWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
-        return paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, sentWeek, sortKeyPrefix, lastEvaluatedKey, queryLimit)
-                .flatMap(paperDeliveryPage -> {
-                    if (CollectionUtils.isEmpty(paperDeliveryPage.items())) {
-                        log.warn("No records found for unifiedDeliveryDriver-province = [{}]", sortKeyPrefix);
-                        return Mono.empty();
-                    }
-                    return Mono.just(paperDeliveryPage);
-                });
-    }
-
-    private Mono<Void> updateCounters(List<IncrementUsedCapacityDto> incrementCapacities) {
-        return Flux.fromIterable(incrementCapacities)
-                .flatMap(incrementUsedCapacityDto ->
-                        paperDeliveryUsedCapacityDAO.updateCounter(
-                                incrementUsedCapacityDto.unifiedDeliveryDriver(),
-                                incrementUsedCapacityDto.geoKey(),
-                                incrementUsedCapacityDto.numberOfDeliveries(),
-                                incrementUsedCapacityDto.deliveryWeek(),
-                                incrementUsedCapacityDto.declaredCapacity()))
-                .then();
-    }
-
-    private Mono<Tuple2<Integer, Integer>> retrieveDeclaredAndUsedCapacity(String geoKey, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {
-        return paperDeliveryUsedCapacityDAO.get(unifiedDeliveryDriver, geoKey, deliveryWeek)
-                .switchIfEmpty(Mono.defer(() -> {
-                    log.info("No used capacities found for unifiedDeliveryDriver={}, geoKey={}, deliveryWeek={}, retrieving declared capacity", unifiedDeliveryDriver, geoKey, deliveryWeek);
-                    return paperDeliveryCapacityDAO.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryWeek)
-                            .map(capacity -> Tuples.of(capacity, 0));
-                }));
-    }
-
 }

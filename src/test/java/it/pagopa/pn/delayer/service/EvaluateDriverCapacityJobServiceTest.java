@@ -32,7 +32,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DriverCapacityJobServiceTest {
+class EvaluateDriverCapacityJobServiceTest {
 
     @Mock
     private PaperDeliveryDriverUsedCapacitiesDAO paperDeliveryUsedCapacityDAO;
@@ -43,7 +43,7 @@ class DriverCapacityJobServiceTest {
     @Mock
     private PaperDeliveryDAO paperDeliveryDAO;
 
-    private DriverCapacityJobServiceImpl driverCapacityJobService;
+    private EvaluateDriverCapacityJobServiceImpl driverCapacityJobService;
 
     @BeforeEach
     void setUp() {
@@ -54,13 +54,9 @@ class DriverCapacityJobServiceTest {
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
         pnDelayerConfigs.setDao(dao);
 
-        driverCapacityJobService = new DriverCapacityJobServiceImpl(
-                paperDeliveryUsedCapacityDAO,
-                paperDeliveryCapacityDAO,
-                paperDeliveryDAO,
-                new PaperDeliveryUtils(pnDelayerConfigs),
-                pnDelayerConfigs
-        );
+        PaperDeliveryUtils paperDeliveryUtils = new PaperDeliveryUtils(pnDelayerConfigs);
+        DeliveryDriverCapacityService deliveryDriverCapacityService = new DeliveryDriverCapacityService(paperDeliveryUsedCapacityDAO, paperDeliveryCapacityDAO);
+        driverCapacityJobService = new EvaluateDriverCapacityJobServiceImpl(new PaperDeliveryService(paperDeliveryDAO, pnDelayerConfigs, paperDeliveryUtils,deliveryDriverCapacityService), new PaperDeliveryUtils(pnDelayerConfigs));
     }
 
     @Test

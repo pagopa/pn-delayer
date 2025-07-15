@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.Map;
 
 @Component
-public class SenderLimitJobServiceImpl implements SenderLimitJobService {
+public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJobService {
 
     @Override
     public Mono<Void> startSenderLimitJob(String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecution) {

@@ -3,8 +3,10 @@ package it.pagopa.pn.delayer;
 import it.pagopa.pn.commons.utils.MDCUtils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
-import it.pagopa.pn.delayer.service.DriverCapacityJobService;
-import it.pagopa.pn.delayer.service.SenderLimitJobService;
+import it.pagopa.pn.delayer.service.EvaluateDriverCapacityJobService;
+import it.pagopa.pn.delayer.service.EvaluateResidualCapacityJobService;
+import it.pagopa.pn.delayer.service.EvaluateSenderLimitJobService;
+import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -27,8 +29,9 @@ import java.util.UUID;
 @Profile("!test")
 public class PaperDeliveryJobRunner implements CommandLineRunner {
 
-    private final DriverCapacityJobService driverCapacityJobService;
-    private final SenderLimitJobService senderLimitJobService;
+    private final EvaluateDriverCapacityJobService evaluateDriverCapacityJobService;
+    private final EvaluateSenderLimitJobService evaluateSenderLimitJobService;
+    private final EvaluateResidualCapacityJobService evaluateResidualCapacityJobService;
     private final ApplicationContext applicationContext;
     private final PnDelayerConfigs pnDelayerConfigs;
 
@@ -45,6 +48,10 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
                 log.info("Starting Evaluate Driver Capacity step");
                 exitCode = executeEvaluateDriverCapacityStep();
                 break;
+            case EVALUATE_RESIDUAL_CAPACITY:
+                log.info("Starting Evaluate Residual Capacity step");
+                exitCode = executeEvaluateResidualCapacityStep();
+                break;
             default:
                 log.error("Unknown workflow step: {}", workflowStep);
                 exitCode = SpringApplication.exit(applicationContext, () -> 1);
@@ -53,6 +60,34 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         }
         log.info("Batch finished with exit code: {}", exitCode);
         System.exit(exitCode);
+    }
+
+    private int executeEvaluateResidualCapacityStep() {
+        String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getUnifiedDeliveryDriver();
+        String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
+        if (StringUtils.hasText(jobIndex)) {
+            return Optional.of(jobIndex)
+                    .map(Integer::parseInt)
+                    .map(index -> pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getProvinceList().get(index))
+                    .map(province -> {
+                        log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
+                        addMDC(String.join("~", unifiedDeliveryDriver, province));
+                        try {
+                            var startExecutionBatch = Instant.now();
+                            Mono<Void> monoExcecution = evaluateResidualCapacityJobService.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, new HashMap<>(), startExecutionBatch, pnDelayerConfigs.getActualTenderId());
+                            MDCUtils.addMDCToContextAndExecute(monoExcecution).block();return 0;
+                        } catch (Exception e) {
+                            log.error("Error while executing batch", e);
+                            return 1;
+                        }
+                    }).orElseGet(() -> {
+                        log.error("Province on index [{}] not found, cannot start batch", jobIndex);
+                        return SpringApplication.exit(applicationContext, () -> 1);
+                    });
+        } else {
+            log.error("No job index found, cannot start batch");
+            return SpringApplication.exit(applicationContext, () -> 1);
+        }
     }
 
     private int executeEvaluateDriverCapacityStep() {
@@ -67,7 +102,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
                         addMDC( String.join("~", unifiedDeliveryDriver,  province));
                         try {
                             var startExecutionBatch = Instant.now();
-                            Mono<Void> monoExcecution = driverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, new HashMap<>(), startExecutionBatch, pnDelayerConfigs.getActualTenderId());
+                            Mono<Void> monoExcecution = evaluateDriverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, new HashMap<>(), startExecutionBatch, pnDelayerConfigs.getActualTenderId());
                             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();return 0;
                         } catch (Exception e) {
                             log.error("Error while executing batch", e);
@@ -89,7 +124,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         addMDC(province);
         try {
             var startExecutionBatch = Instant.now();
-            Mono<Void> monoExcecution = senderLimitJobService.startSenderLimitJob(province, new HashMap<>(), startExecutionBatch);
+            Mono<Void> monoExcecution = evaluateSenderLimitJobService.startSenderLimitJob(province, new HashMap<>(), startExecutionBatch);
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
         } catch (Exception e) {
