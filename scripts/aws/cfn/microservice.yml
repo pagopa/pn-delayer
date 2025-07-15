@@ -231,7 +231,7 @@ Parameters:
     Default: ' '
     Description: 'Input unifiedDeliveryDriver for the driver capacity job'
 
-  WorflowStep:
+  WorkflowStep:
     Type: String
     Default: ' '
     Description: 'Workflow step for delayer jobs - one of: EVALUATE_SENDER_LIMIT,EVALUATE_RESIDUAL_CAPACITY,EVALUATE_DRIVER_CAPACITY'
@@ -402,7 +402,7 @@ Resources:
           - Name: PN_DELAYER_ACTUALTENDERID
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
-            Value: !Ref WorflowStep
+            Value: !Ref WorkflowStep
 
       PlatformCapabilities:
         - FARGATE
@@ -551,7 +551,7 @@ Resources:
           - Name: PN_DELAYER_ACTUALTENDERID
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
-            Value: !Ref WorflowStep
+            Value: !Ref WorkflowStep
           - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
             Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
           - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
@@ -708,7 +708,7 @@ Resources:
           - Name: PN_DELAYER_ACTUALTENDERID
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
-            Value: !Ref WorflowStep
+            Value: !Ref WorkflowStep
           - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
             Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
           - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
