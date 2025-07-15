@@ -6,7 +6,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import java.time.Instant;
 import java.util.Map;
 
-public interface DriverCapacityJobService {
+public interface EvaluateDriverCapacityJobService {
 
     Mono<Void> startEvaluateDriverCapacityJob(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch, String tenderId);
 }
