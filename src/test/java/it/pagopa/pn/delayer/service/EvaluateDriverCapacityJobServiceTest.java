@@ -1,6 +1,7 @@
 package it.pagopa.pn.delayer.service;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
@@ -43,6 +44,9 @@ class EvaluateDriverCapacityJobServiceTest {
     @Mock
     private PaperDeliveryDAO paperDeliveryDAO;
 
+    @Mock
+    private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
+
     private EvaluateDriverCapacityJobServiceImpl driverCapacityJobService;
 
     @BeforeEach
@@ -55,7 +59,7 @@ class EvaluateDriverCapacityJobServiceTest {
         pnDelayerConfigs.setDao(dao);
 
         PaperDeliveryUtils paperDeliveryUtils = new PaperDeliveryUtils(pnDelayerConfigs);
-        DeliveryDriverCapacityService deliveryDriverCapacityService = new DeliveryDriverCapacityService(paperDeliveryUsedCapacityDAO, paperDeliveryCapacityDAO);
+        DeliveryDriverCapacityService deliveryDriverCapacityService = new DeliveryDriverCapacityService(paperDeliveryUsedCapacityDAO, paperDeliveryCapacityDAO, paperDeliveryCounterDAO);
         driverCapacityJobService = new EvaluateDriverCapacityJobServiceImpl(new PaperDeliveryService(paperDeliveryDAO, pnDelayerConfigs, paperDeliveryUtils,deliveryDriverCapacityService), new PaperDeliveryUtils(pnDelayerConfigs));
     }
 
