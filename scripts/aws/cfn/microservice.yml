@@ -111,6 +111,11 @@ Parameters:
     Type: String
     Description: 'DynamoDB table name for PaperDeliveryPrintCapacityCounter'
 
+  PaperDeliveryPrintCapacityCounterTtlDuration:
+    Type: String
+    Default: 60d
+    Description: 'DynamoDB PaperDeliveryPrintCapacityCounter ttl duration'
+
   PaperDeliveryPrintCapacityCounterTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter'
@@ -533,6 +538,10 @@ Resources:
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
+            Value: !Ref PaperDeliveryPrintCapacityTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTABLENAME
+            Value: !Ref PaperDeliveryPrintCapacityCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -543,6 +552,8 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorflowStep
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
+            Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
 
       PlatformCapabilities:
         - FARGATE
@@ -613,14 +624,14 @@ Resources:
                   - dynamodb:UpdateItem
                   - dynamodb:BatchWriteItem
                 Resource:
-                  - !Sub "${PaperDeliveryCounterTableArn}"
-                  - !Sub "${PaperDeliveryCounterTableArn}/*"
-                  - !Sub "${PaperDeliverySenderLimitTableArn}"
-                  - !Sub "${PaperDeliverySenderLimitTableArn}/*"
-                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
-                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+                  - !Sub "${PaperDeliveryPrintCapacityTableArn}"
+                  - !Sub "${PaperDeliveryPrintCapacityTableArn}/*"
+                  - !Sub "${PaperDeliveryPrintCapacityCounterTableArn}"
+                  - !Sub "${PaperDeliveryPrintCapacityCounterTableArn}/*"
                   - !Sub "${PaperDeliveryTableArn}"
                   - !Sub "${PaperDeliveryTableArn}/*"
 
@@ -678,6 +689,10 @@ Resources:
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
+            Value: !Ref PaperDeliveryPrintCapacityTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTABLENAME
+            Value: !Ref PaperDeliveryPrintCapacityCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -692,6 +707,8 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorflowStep
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
+            Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
 
       PlatformCapabilities:
         - FARGATE
@@ -756,27 +773,21 @@ Resources:
               Resource: "*"
             - Effect: Allow
               Action:
-                - dynamodb:GetItem
-                - dynamodb:UpdateItem
                 - dynamodb:Query
                 - dynamodb:BatchGetItem
-              Resource:
-                - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
-                - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
-            - Effect: Allow
-              Action:
                 - dynamodb:GetItem
-                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:BatchWriteItem
               Resource:
                 - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
                 - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
-            - Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:Query
-                - dynamodb:BatchWriteItem
-              Resource:
+                - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+                - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+                - !Sub "${PaperDeliveryPrintCapacityTableArn}"
+                - !Sub "${PaperDeliveryPrintCapacityTableArn}/*"
+                - !Sub "${PaperDeliveryPrintCapacityCounterTableArn}"
+                - !Sub "${PaperDeliveryPrintCapacityCounterTableArn}/*"
                 - !Sub "${PaperDeliveryTableArn}"
                 - !Sub "${PaperDeliveryTableArn}/*"
 

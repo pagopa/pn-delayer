@@ -13,6 +13,7 @@
     "PaperDeliveryPrintCapacityCounterTtlDays": "60",
     "WeeklyWorkingDays": "7",
     "PaperDeliveryCounterTtlDays": "14",
-    "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority"
+    "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority",
+    "PaperDeliveryPrintCapacityCounterTtlDuration": "60d"
   }
 }
