@@ -11,7 +11,7 @@
     "DelayerToPaperChannelRuleState": "DISABLED",
     "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
     "PaperDeliveryPrintCapacityCounterTtlDays": "60",
-    "WeeklyWorkingDays": "7",
+    "PrintCapacityWeeklyWorkingDays": "7",
     "PaperDeliveryCounterTtlDays": "14",
     "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority",
     "PaperDeliveryPrintCapacityCounterTtlDuration": "60d"
