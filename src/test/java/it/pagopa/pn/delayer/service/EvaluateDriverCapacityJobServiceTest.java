@@ -1,10 +1,7 @@
 package it.pagopa.pn.delayer.service;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
+import it.pagopa.pn.delayer.middleware.dao.*;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
@@ -47,6 +44,9 @@ class EvaluateDriverCapacityJobServiceTest {
     @Mock
     private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
 
+    @Mock
+    private PaperDeliveryPrintCapacityDAO paperDeliveryPrintCapacityDAO;
+
     private EvaluateDriverCapacityJobServiceImpl driverCapacityJobService;
 
     @BeforeEach
@@ -57,10 +57,11 @@ class EvaluateDriverCapacityJobServiceTest {
         pnDelayerConfigs.setDeliveryDateInterval(Duration.ofDays(7));
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
         pnDelayerConfigs.setDao(dao);
+        pnDelayerConfigs.setPrintCapacityWeeklyWorkingDays(7);
 
         PaperDeliveryUtils paperDeliveryUtils = new PaperDeliveryUtils(pnDelayerConfigs);
         DeliveryDriverCapacityService deliveryDriverCapacityService = new DeliveryDriverCapacityService(paperDeliveryUsedCapacityDAO, paperDeliveryCapacityDAO, paperDeliveryCounterDAO);
-        driverCapacityJobService = new EvaluateDriverCapacityJobServiceImpl(new PaperDeliveryService(paperDeliveryDAO, pnDelayerConfigs, paperDeliveryUtils,deliveryDriverCapacityService), new PaperDeliveryUtils(pnDelayerConfigs));
+        driverCapacityJobService = new EvaluateDriverCapacityJobServiceImpl(new PaperDeliveryService(paperDeliveryDAO, pnDelayerConfigs, paperDeliveryUtils,deliveryDriverCapacityService, paperDeliveryCounterDAO, paperDeliveryPrintCapacityDAO), new PaperDeliveryUtils(pnDelayerConfigs));
     }
 
     @Test
@@ -103,6 +104,8 @@ class EvaluateDriverCapacityJobServiceTest {
         Instant startExecutionBatch = Instant.parse("2023-10-04T10:00:00Z");
         String tenderId = "tender123";
         Tuple2<Integer, Integer> capacityTuple = Tuples.of(10, 0);
+        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
+
         when(paperDeliveryUsedCapacityDAO.get(eq(unifiedDeliveryDriver), eq(province), any())).thenReturn(Mono.just(capacityTuple));
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY),
@@ -143,7 +146,8 @@ class EvaluateDriverCapacityJobServiceTest {
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryUsedCapacityDAO.updateCounter(any(), any(), anyInt(), any(), anyInt())).thenReturn(Mono.just(1));
-
+        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
         StepVerifier.create(driverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();
 
@@ -204,6 +208,8 @@ class EvaluateDriverCapacityJobServiceTest {
                 .thenReturn(Mono.just(Page.create(deliveries2)));
 
         when(paperDeliveryUsedCapacityDAO.updateCounter(any(), any(), anyInt(), any(), anyInt())).thenReturn(Mono.just(1));
+        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
 
         StepVerifier.create(driverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();
@@ -280,6 +286,8 @@ class EvaluateDriverCapacityJobServiceTest {
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryUsedCapacityDAO.updateCounter(any(), any(), anyInt(), any(), anyInt())).thenReturn(Mono.just(1));
+        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
 
         StepVerifier.create(driverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();

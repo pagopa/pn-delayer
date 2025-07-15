@@ -154,7 +154,7 @@ Parameters:
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
     Default: 1
 
-  WeeklyWorkingDays:
+  PrintCapacityWeeklyWorkingDays:
     Type: Number
     Description: 'Number of working days in a week'
     Default: 7
@@ -231,7 +231,7 @@ Parameters:
     Default: ' '
     Description: 'Input unifiedDeliveryDriver for the driver capacity job'
 
-  WorflowStep:
+  WorkflowStep:
     Type: String
     Default: ' '
     Description: 'Workflow step for delayer jobs - one of: EVALUATE_SENDER_LIMIT,EVALUATE_RESIDUAL_CAPACITY,EVALUATE_DRIVER_CAPACITY'
@@ -402,7 +402,7 @@ Resources:
           - Name: PN_DELAYER_ACTUALTENDERID
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
-            Value: !Ref WorflowStep
+            Value: !Ref WorkflowStep
 
       PlatformCapabilities:
         - FARGATE
@@ -551,9 +551,11 @@ Resources:
           - Name: PN_DELAYER_ACTUALTENDERID
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
-            Value: !Ref WorflowStep
+            Value: !Ref WorkflowStep
           - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
             Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
+          - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
+            Value: !Ref PrintCapacityWeeklyWorkingDays
 
       PlatformCapabilities:
         - FARGATE
@@ -706,9 +708,11 @@ Resources:
           - Name: PN_DELAYER_ACTUALTENDERID
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
-            Value: !Ref WorflowStep
+            Value: !Ref WorkflowStep
           - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
             Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
+          - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
+            Value: !Ref PrintCapacityWeeklyWorkingDays
 
       PlatformCapabilities:
         - FARGATE
@@ -1189,7 +1193,7 @@ Resources:
           PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TTLDAYS: !Ref PaperDeliveryPrintCapacityCounterTtlDays
           DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
           PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
-          PN_DELAYER_WEEKLY_WORKING_DAYS: !Ref WeeklyWorkingDays
+          PN_DELAYER_WEEKLY_WORKING_DAYS: !Ref PrintCapacityWeeklyWorkingDays
       TracingConfig:
         Mode: Active
       Layers:
