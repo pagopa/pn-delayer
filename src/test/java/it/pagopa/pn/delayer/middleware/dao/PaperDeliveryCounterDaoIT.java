@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -50,26 +51,26 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
                         .build())
                 .join();
 
-        PaperDeliveryCounter result = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~RM").block();
+        PaperDeliveryCounter result = paperDeliveryCounterDAO.getPaperDeliveryCounter(LocalDate.parse("2025-04-07"), "EXCLUDE~RM").block();
         Assertions.assertNotNull(result);
         Assertions.assertEquals(5, result.getCounter());
-        Assertions.assertEquals("2025-04-07", result.getDeliveryDate());
+        Assertions.assertEquals(LocalDate.parse("2025-04-07"), result.getDeliveryDate());
         Assertions.assertEquals("EXCLUDE~RM", result.getSk());
 
-        PaperDeliveryCounter result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~NA").block();
+        PaperDeliveryCounter result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter(LocalDate.parse("2025-04-07"), "EXCLUDE~NA").block();
         Assertions.assertNotNull(result2);
         Assertions.assertEquals(10, result2.getCounter());
-        Assertions.assertEquals("2025-04-07", result2.getDeliveryDate());
+        Assertions.assertEquals(LocalDate.parse("2025-04-07"), result2.getDeliveryDate());
         Assertions.assertEquals("EXCLUDE~NA", result2.getSk());
 
-        PaperDeliveryCounter result3 = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~MI").block();
+        PaperDeliveryCounter result3 = paperDeliveryCounterDAO.getPaperDeliveryCounter(LocalDate.parse("2025-04-07"), "EXCLUDE~MI").block();
         Assertions.assertNull(result3);
 
     }
 
     @Test
     void updatePrintCapacityCounterTest() {
-        String deliveryDate = "2025-04-07";
+        LocalDate deliveryDate = LocalDate.parse("2025-04-07");
 
         paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000, null).block();
         PaperDeliveryCounter result = paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "PRINT").block();

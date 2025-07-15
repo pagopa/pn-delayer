@@ -7,6 +7,8 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
+import java.time.LocalDate;
+
 @DynamoDbBean
 @Data
 public class PaperDeliveryCounter {
@@ -18,7 +20,7 @@ public class PaperDeliveryCounter {
     public static final String COL_COUNTER_EXCLUDED_DELIVERY_COUNTER = "excludedDeliveryCounter";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_DELIVERY_DATE)}))
-    private String deliveryDate;
+    private LocalDate deliveryDate;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_SK)}))
     private String sk;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_COUNTER)}))

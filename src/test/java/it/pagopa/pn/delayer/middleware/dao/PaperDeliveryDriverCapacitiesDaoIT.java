@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
@@ -99,5 +100,54 @@ class PaperDeliveryDriverCapacitiesDaoIT extends BaseTest.WithLocalStack {
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(30, result);
+    }
+
+    @Test
+    void retrieveUnifiedDeliveryDriversOnProvinceTest() {
+        String tenderId = "tenderId";
+        String geokey = "geokey2";
+        Instant now = Instant.now();
+        LocalDate date = now.atZone(ZoneOffset.UTC).toLocalDate();
+        String pk = String.join("~", tenderId, "unifiedDeliveryDriver2", geokey);
+        String pk2 = String.join("~", tenderId, "unifiedDeliveryDriver3", geokey);
+
+        Map<String, AttributeValue> itemMap = new HashMap<>();
+        itemMap.put("pk", AttributeValue.builder().s(pk).build());
+        itemMap.put("activationDateFrom", AttributeValue.builder().s(now.minus(90, ChronoUnit.DAYS).toString()).build());
+        itemMap.put("activationDateTo", AttributeValue.builder().s(now.minus(60, ChronoUnit.DAYS).toString()).build());
+        itemMap.put("capacity", AttributeValue.builder().s("10").build());
+        itemMap.put("tenderIdGeoKey", AttributeValue.builder().s(String.join("~", tenderId, geokey)).build());
+        itemMap.put("unifiedDeliveryDriver", AttributeValue.builder().s("unifiedDeliveryDriver2").build());
+        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build()).join();
+
+        Map<String, AttributeValue> itemMap2 = new HashMap<>();
+        itemMap2.put("pk", AttributeValue.builder().s(pk2).build());
+        itemMap2.put("activationDateFrom", AttributeValue.builder().s("2025-01-01T00:00:00Z").build());
+        itemMap2.put("capacity", AttributeValue.builder().s("30").build());
+        itemMap2.put("tenderIdGeoKey", AttributeValue.builder().s(String.join("~", tenderId, geokey)).build());
+        itemMap2.put("unifiedDeliveryDriver", AttributeValue.builder().s("unifiedDeliveryDriver3").build());
+        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap2).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build()).join();
+
+        Map<String, AttributeValue> itemMap3 = new HashMap<>();
+        itemMap3.put("pk", AttributeValue.builder().s(pk).build());
+        itemMap3.put("activationDateFrom", AttributeValue.builder().s(now.minus(60, ChronoUnit.DAYS).toString()).build());
+        itemMap3.put("activationDateTo", AttributeValue.builder().s(now.minus(30, ChronoUnit.DAYS).toString()).build());
+        itemMap3.put("capacity", AttributeValue.builder().s("20").build());
+        itemMap3.put("tenderIdGeoKey", AttributeValue.builder().s(String.join("~", tenderId, geokey)).build());
+        itemMap3.put("unifiedDeliveryDriver", AttributeValue.builder().s("unifiedDeliveryDriver2").build());
+        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap3).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build()).join();
+
+        Map<String, AttributeValue> itemMap4 = new HashMap<>();
+        itemMap4.put("pk", AttributeValue.builder().s(pk).build());
+        itemMap4.put("activationDateFrom", AttributeValue.builder().s(now.minus(30, ChronoUnit.DAYS).toString()).build());
+        itemMap4.put("capacity", AttributeValue.builder().s("20").build());
+        itemMap4.put("tenderIdGeoKey", AttributeValue.builder().s(String.join("~", tenderId, geokey)).build());
+        itemMap4.put("unifiedDeliveryDriver", AttributeValue.builder().s("unifiedDeliveryDriver2").build());
+        dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap4).tableName(pnDelayerConfigs.getDao().getPaperDeliveryDriverCapacitiesTableName()).build()).join();
+
+        List<PaperDeliveryDriverCapacity> result = paperDeliveryDriverCapacitiesDao.retrieveUnifiedDeliveryDriversOnProvince(tenderId, geokey, date).block();
+
+        Assertions.assertNotNull(result);
+        Assertions.assertEquals(2, result.size());
     }
 }
