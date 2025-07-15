@@ -9,7 +9,7 @@ process.env.OBJECT_KEY = "test-key.csv";
 
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
-const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
@@ -64,6 +64,46 @@ describe("Lambda CSV import", () => {
 
         const result = await handler({ operationType: "GET_USED_CAPACITY", parameters: params });
         assert.strictEqual(JSON.parse(result.body).message, "Item not found");
+    });
+
+    it("returns matching rows array", async () => {
+        const rows = [
+            { requestId: "RID123", pk: "a", createdAt: "2025-01-01T00:00:00Z" },
+            { requestId: "RID123", pk: "b", createdAt: "2025-01-02T00:00:00Z" },
+        ];
+        ddbMock.on(QueryCommand).resolves({ Items: rows });
+
+        const res = await handler({
+            operationType: "GET_BY_REQUEST_ID",
+            parameters: ["RID123"],
+        });
+
+        assert.strictEqual(res.statusCode, 200);
+        assert.deepStrictEqual(JSON.parse(res.body), rows);
+    });
+
+    it("returns empty array when no items", async () => {
+        ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+        const res = await handler({
+            operationType: "GET_BY_REQUEST_ID",
+            parameters: ["NOT_EXISTS"],
+        });
+
+        assert.strictEqual(res.statusCode, 200);
+        assert.deepStrictEqual(JSON.parse(res.body), []);
+
+    });
+
+    it("error when no requestId provided", async () => {
+        ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+        const res = await handler({
+            operationType: "GET_BY_REQUEST_ID",
+            parameters: [],
+        });
+
+        assert.strictEqual(res.statusCode, 500);
     });
 
 });
