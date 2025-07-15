@@ -1274,7 +1274,7 @@ Resources:
       Code:
         S3Bucket: !Ref MicroserviceBucketName
         S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/testDelayerLambda.zip"
-      Role: !GetAtt KinesisPaperDeliveryLambdaRole.Arn
+      Role: !GetAtt TestDelayerLambdaRole.Arn
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
