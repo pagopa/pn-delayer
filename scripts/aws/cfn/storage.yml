@@ -371,6 +371,37 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  TestDelayerKmsBucket:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "Symmetric Encryption KMS for TestDelayer's Buckets"
+      KeySpec: SYMMETRIC_DEFAULT
+      KeyUsage: ENCRYPT_DECRYPT
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Statement:
+          - Sid: Enable Permissions on all user and roles
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
+  TestDelayerBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-${ProjectName}-test-delayer-bucket"
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'aws:kms'
+              KMSMasterKeyID: !GetAtt TestDelayerKmsBucket.Arn
+
 Outputs:
   # Dynamo tables
   PaperDeliveryDriverCapacitiesTableName:
@@ -436,6 +467,7 @@ Outputs:
     Description: ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter
     Value: !Sub '${PaperDeliveryPrintCapacityCounterTable.Arn}'
 
+  # Kinesis data stream
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn
     Description: "PnDelayerInputs Kinesis source stream ARN"
@@ -443,7 +475,8 @@ Outputs:
   PnDelayerInputsKinesisDataStreamKMSArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamKeyArn
     Description: "PnDelayerInputs Kinesis stream KMS ARN"
-    
+
+  # Log groups
   SenderLimitJobLogGroup:
     Value: !GetAtt PnDelayerSenderLimitJobLogGroup.Outputs.LogGroupName
 
@@ -453,6 +486,7 @@ Outputs:
   ResidualCapacityJobLogGroup:
     Value: !GetAtt PnDelayerResidualCapacityJobLogGroup.Outputs.LogGroupName
 
+  # Lambda names
   KinesisPaperDeliveryLambdaName:
     Value: !Sub "${ProjectName}-delayer-kinesisPaperDeliveryLambda"
 
@@ -465,3 +499,11 @@ Outputs:
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
     Description: pn-delayer_kinesis_paper_delivery_DLQ' queue ARN
+
+  # Buckets
+  TestDelayerBucketName:
+    Description: Name of bucket for delayer tests automation
+    Value: !Ref TestDelayerBucket
+  TestDelayerBucketArn:
+    Description: Arn of bucket for delayer tests automation
+    Value: !Sub '${TestDelayerBucket.Arn}'
