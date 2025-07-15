@@ -48,5 +48,8 @@ public class PnDelayerConfigs {
         private String paperDeliverySenderLimitTableName;
         private String paperDeliveryUsedSenderLimitTableName;
         private String paperDeliveryCounterTableName;
+        private String paperDeliveryPrintCapacityTableName;
+        private String paperDeliveryPrintCapacityCounterTableName;
+        private Duration paperDeliveryPrintCapacityCounterTtlDuration;
     }
 }

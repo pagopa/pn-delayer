@@ -24,12 +24,12 @@ import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_I
 
 @Component
 @Slf4j
-public class PaperDeliveryDaoImpl implements PaperDeliveryDAO {
+public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
 
     private final DynamoDbAsyncTable<PaperDelivery> table;
     private final DynamoDbEnhancedAsyncClient enhancedAsyncClient;
 
-    public PaperDeliveryDaoImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
+    public PaperDeliveryDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient) {
         this.table = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryTableName(), TableSchema.fromBean(PaperDelivery.class));
         this.enhancedAsyncClient = dynamoDbEnhancedAsyncClient;
     }
