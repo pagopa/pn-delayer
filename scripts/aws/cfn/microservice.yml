@@ -1318,7 +1318,9 @@ Resources:
         Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action: dynamodb:BatchWriteItem
+            Action:
+              - dynamodb:BatchWriteItem
+              - dynamodb:Query
             Resource:
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
