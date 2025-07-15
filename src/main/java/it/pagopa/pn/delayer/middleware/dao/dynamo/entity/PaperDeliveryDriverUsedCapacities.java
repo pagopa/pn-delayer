@@ -7,7 +7,7 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
-import java.time.Instant;
+import java.time.LocalDate;
 
 @DynamoDbBean
 @Data
@@ -18,18 +18,20 @@ public class PaperDeliveryDriverUsedCapacities {
     public static final String COL_UNIFIED_DELIVERY_DRIVER = "unifiedDeliveryDriver";
     public static final String COL_GEO_KEY = "geoKey";
     public static final String COL_USED_CAPACITY = "usedCapacity";
-
+    public static final String COL_DECLARED_CAPACITY = "declaredCapacity";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER_GEOKEY)}))
     private String unifiedDeliveryDriverGeokey;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_DELIVERY_DATE)}))
-    private Instant deliveryDate;
+    private LocalDate deliveryDate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_UNIFIED_DELIVERY_DRIVER)}))
     private String unifiedDeliveryDriver;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_GEO_KEY)}))
     private String geoKey;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_USED_CAPACITY)}))
     private int usedCapacity;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_DECLARED_CAPACITY)}))
+    private int declaredCapacity;
 
     public static String buildPk(String unifiedDeliveryDriver, String geoKey) {
         return String.join("~", unifiedDeliveryDriver, geoKey);

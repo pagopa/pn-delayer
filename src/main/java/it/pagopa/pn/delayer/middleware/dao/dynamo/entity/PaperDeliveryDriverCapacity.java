@@ -19,10 +19,13 @@ public class PaperDeliveryDriverCapacity {
     public static final String COL_CAPACITY = "capacity";
     public static final String COL_PEAK_CAPACITY = "peakCapacity";
     public static final String COL_CREATED_AT = "createdAt";
+    public static final String COL_TENDER_ID_GEO_KEY = "tenderIdGeoKey";
+
+    public static final String TENDER_ID_GEO_KEY_INDEX = "tenderIdGeoKey-index";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
-    @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_ACTIVATION_DATE_FROM)}))
+    @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_ACTIVATION_DATE_FROM),@DynamoDbSecondarySortKey(indexNames = TENDER_ID_GEO_KEY_INDEX)}))
     private Instant activationDateFrom;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_ACTIVATION_DATE_TO)}))
     private Instant activationDateTo;
@@ -38,9 +41,15 @@ public class PaperDeliveryDriverCapacity {
     private int peakCapacity;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_CREATED_AT)}))
     private Instant createdAt;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_TENDER_ID_GEO_KEY), @DynamoDbSecondaryPartitionKey(indexNames = TENDER_ID_GEO_KEY_INDEX)}))
+    private String tenderIdGeoKey;
 
     @DynamoDbIgnore
     public static String buildKey(String tenderId, String deliveryDriver, String geokey) {
         return String.join("~", tenderId, deliveryDriver, geokey);
+    }
+    @DynamoDbIgnore
+    public static String buildGsiKey(String tenderId, String geokey) {
+        return String.join("~", tenderId, geokey);
     }
 }

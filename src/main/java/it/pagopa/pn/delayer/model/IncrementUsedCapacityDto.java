@@ -1,8 +1,9 @@
 package it.pagopa.pn.delayer.model;
 
-import java.time.Instant;
+import java.time.LocalDate;
 
 public record IncrementUsedCapacityDto(String unifiedDeliveryDriver,
                                        String geoKey,
                                        Integer numberOfDeliveries,
-                                       Instant deliveryWeek) {}
+                                       LocalDate deliveryWeek,
+                                       Integer declaredCapacity) {}
