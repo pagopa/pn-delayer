@@ -1,7 +1,11 @@
 package it.pagopa.pn.delayer.service;
 
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
+import it.pagopa.pn.delayer.model.DriversTotalCapacity;
 import it.pagopa.pn.delayer.model.IncrementUsedCapacityDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +25,7 @@ public class DeliveryDriverCapacityService {
 
     private final PaperDeliveryDriverUsedCapacitiesDAO paperDeliveryUsedCapacityDAO;
     private final PaperDeliveryDriverCapacitiesDAO paperDeliveryDriverCapacitiesDAO;
-
+    private final PaperDeliveryCounterDAO paperDeliveryCounterDAO;
 
     public Mono<Tuple2<Integer, Integer>> retrieveDeclaredAndUsedCapacity(String geoKey, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {
         return paperDeliveryUsedCapacityDAO.get(unifiedDeliveryDriver, geoKey, deliveryWeek)
@@ -43,4 +47,23 @@ public class DeliveryDriverCapacityService {
                                 incrementUsedCapacityDto.declaredCapacity()))
                 .then();
     }
+
+    public Mono<DriversTotalCapacity> retrieveDriversCapacityOnProvince(LocalDate deliveryDate, String tenderId, String province) {
+        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province)
+                .map(PaperDeliveryCounter::getCounter)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("No paper delivery counter found for tenderId: {}, province: {}, deliveryDate: {}", tenderId, province, deliveryDate);
+                    return Mono.just(0);
+                }))
+                .flatMap(counter ->
+                        paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate)
+                                .map(driverCapacitiesList -> {
+                                    int totalCapacity = driverCapacitiesList.stream().mapToInt(PaperDeliveryDriverCapacity::getCapacity).sum();
+                                    int availableCapacity = totalCapacity - counter;
+                                    List<String> unifiedDeliveryDrivers = driverCapacitiesList.stream().map(PaperDeliveryDriverCapacity::getUnifiedDeliveryDriver).toList();
+                                    return new DriversTotalCapacity(availableCapacity, unifiedDeliveryDrivers);
+                                })
+                );
+    }
+
 }

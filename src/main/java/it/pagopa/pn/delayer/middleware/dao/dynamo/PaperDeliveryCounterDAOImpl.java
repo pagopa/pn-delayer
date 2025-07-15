@@ -14,6 +14,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.Objects;
 
@@ -29,21 +30,22 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
         this.tableCounter = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryCounterTableName(), TableSchema.fromBean(PaperDeliveryCounter.class));
     }
 
-    public Mono<PaperDeliveryCounter> getPaperDeliveryCounter(String pk, String sk) {
+    public Mono<PaperDeliveryCounter> getPaperDeliveryCounter(LocalDate deliveryDate, String sk) {
         Key key = Key.builder()
-                .partitionValue(pk)
+                .partitionValue(deliveryDate.toString())
                 .sortValue(sk)
                 .build();
-        return Mono.fromFuture(tableCounter.getItem(key));
+        return Mono.fromFuture(tableCounter.getItem(key))
+                .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", deliveryDate, sk, error));
     }
 
-    public Mono<Void> updatePrintCapacityCounter(String deliveryDate, Integer counter, Integer weeklyPrintCapacity, Integer excludedDeliveryCounter) {
+    public Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer weeklyPrintCapacity, Integer excludedDeliveryCounter) {
         log.info("update print capacity counter for deliveryDate={} with weeklyPrintCapacity={} and field {} to increment of={}",
                 deliveryDate, weeklyPrintCapacity, Objects.isNull(counter) ? "excludedDeliveryCounter" : "counter",
                 Objects.isNull(counter) ? excludedDeliveryCounter : counter);
 
         Map<String, AttributeValue> key = Map.of(
-                PaperDeliveryCounter.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate).build(),
+                PaperDeliveryCounter.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build(),
                 PaperDeliveryCounter.COL_SK, AttributeValue.builder().s("PRINT").build()
         );
 
