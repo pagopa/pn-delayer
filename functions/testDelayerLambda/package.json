@@ -1,7 +1,7 @@
 {
   "name": "testDelayerLambda",
   "version": "1.0.0",
-  "description": "AWS Lambda dispatcher: IMPORT_DATA (CSV→Dynamo) + GET_USED_CAPACITY (read used capacity)",
+  "description": "AWS Lambda dispatcher: IMPORT_DATA (CSV→Dynamo) + GET_USED_CAPACITY (read used capacity), GET_BY_REQUEST_ID (read paper deliveries)",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {

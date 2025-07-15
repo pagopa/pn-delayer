@@ -327,6 +327,10 @@ Parameters:
     Type: String
     Description: 'Arn of bucket for delayer tests automation'
 
+  TestDelayerKmsBucketArn:
+    Type: String
+    Description: 'Arn of kms bucket for delayer tests automation'
+
   TestDelayerObjectKeyBucket:
     Type: String
     Description: 'TestDelayerLambda object key of bucket'
@@ -1274,7 +1278,7 @@ Resources:
       Code:
         S3Bucket: !Ref MicroserviceBucketName
         S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/testDelayerLambda.zip"
-      Role: !GetAtt KinesisPaperDeliveryLambdaRole.Arn
+      Role: !GetAtt TestDelayerLambdaRole.Arn
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
@@ -1332,4 +1336,4 @@ Resources:
               - kms:Decrypt
               - kms:DescribeKey
             Resource:
-              - !Sub "${TestDelayerBucketArn}"
+              - !Sub "${TestDelayerKmsBucketArn}"
