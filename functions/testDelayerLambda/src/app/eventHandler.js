@@ -1,6 +1,7 @@
 "use strict";
 const { importData } = require('./importData.js');
 const { getUsedCapacity } = require("./getUsedCapacity.js");
+const { getDelayerPaperDeliveriesByRequestId } = require("./getDelayerPaperDeliveriesByRequestId.js");
 
 
 /***************************************
@@ -10,6 +11,7 @@ const { getUsedCapacity } = require("./getUsedCapacity.js");
 const OPERATIONS = {
     IMPORT_DATA: importData,
     GET_USED_CAPACITY: getUsedCapacity,
+    GET_BY_REQUEST_ID: getDelayerPaperDeliveriesByRequestId,
 };
 
 /**
