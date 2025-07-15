@@ -86,9 +86,9 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
                 .tableName(usedSenderLimitTable.tableName())
                 .key(key)
                 .updateExpression("ADD " + PaperDeliveryUsedSenderLimit.COL_NUMBER_OF_SHIPMENT + " :v"+
-                        " SET " + PaperDeliveryUsedSenderLimit.COL_SENDER_LIMIT + " = :senderLimit "
-                        + PaperDeliveryUsedSenderLimit.COL_PAID + " = :paId "
-                        + PaperDeliveryUsedSenderLimit.COL_PROVINCE + " = :province "
+                        " SET " + PaperDeliveryUsedSenderLimit.COL_SENDER_LIMIT + " = :senderLimit, "
+                        + PaperDeliveryUsedSenderLimit.COL_PAID + " = :paId, "
+                        + PaperDeliveryUsedSenderLimit.COL_PROVINCE + " = :province, "
                         + PaperDeliveryUsedSenderLimit.COL_PRODUCT_TYPE + " = :productType")
                 .expressionAttributeValues(attributeValue)
                 .build();
