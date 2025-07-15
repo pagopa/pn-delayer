@@ -328,6 +328,7 @@ Parameters:
     Description: 'Arn of bucket for delayer tests automation'
 
   TestDelayerKmsBucketArn:
+    Type: String
     Description: 'Arn of kms bucket for delayer tests automation'
 
   TestDelayerObjectKeyBucket:
