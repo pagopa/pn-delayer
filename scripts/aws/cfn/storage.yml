@@ -507,3 +507,6 @@ Outputs:
   TestDelayerBucketArn:
     Description: Arn of bucket for delayer tests automation
     Value: !Sub '${TestDelayerBucket.Arn}'
+  TestDelayerKmsBucketArn:
+    Description: Arn of kms bucket for delayer tests automation
+    Value: !Sub '${TestDelayerKmsBucket.Arn}'

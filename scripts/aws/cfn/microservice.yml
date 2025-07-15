@@ -327,6 +327,9 @@ Parameters:
     Type: String
     Description: 'Arn of bucket for delayer tests automation'
 
+  TestDelayerKmsBucketArn:
+    Description: 'Arn of kms bucket for delayer tests automation'
+
   TestDelayerObjectKeyBucket:
     Type: String
     Description: 'TestDelayerLambda object key of bucket'
@@ -1332,4 +1335,4 @@ Resources:
               - kms:Decrypt
               - kms:DescribeKey
             Resource:
-              - !Sub "${TestDelayerBucketArn}"
+              - !Sub "${TestDelayerKmsBucketArn}"
