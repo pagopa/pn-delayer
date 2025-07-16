@@ -345,6 +345,10 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  UnifiedDeliveryDriverProvinceParameter:
+    Type: String
+    Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -1355,3 +1359,81 @@ Resources:
               - kms:DescribeKey
             Resource:
               - !Sub "${TestDelayerKmsBucketArn}"
+
+  PaperDeliveryStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: BatchWorkflowStateMachine
+      RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Paper Delivery State Machine",
+          "StartAt": "GetUnifiedDeliveryDriverProvinceParameter",
+          "States": {
+            "Fail": {
+              "Type": "Fail"
+            },
+            "GetUnifiedDeliveryDriverProvinceParameter": {
+              "Type": "Task",
+              "QueryLanguage": "JSONata",
+              "Arguments": {
+                "Name": "/config/pn-delayer/unifiedDeliveryDriver-province"
+              },
+              "Resource": "arn:aws:states:::aws-sdk:ssm:getParameter",
+              "Next": "Success",
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "BackoffRate": 2,
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "Next": "Fail"
+                }
+              ]
+            },
+            "Success": {
+              "Type": "Succeed"
+            }
+          }
+        }
+
+  PaperDeliveryStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-paperDeliveryStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+    # Lambda function IAM policy
+  PaperDeliveryStateMachinePolicy:
+      Type: AWS::IAM::Policy
+      Properties:
+        PolicyName: !Sub ${ProjectName}-paperDeliveryStateMachinePolicy
+        Roles:
+          - !Ref PaperDeliveryStateMachineRole
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${UnifiedDeliveryDriverProvinceParameter}
