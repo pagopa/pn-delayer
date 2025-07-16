@@ -2,20 +2,18 @@
   "Parameters": {
     "MinTasksNumber": "0",
     "MaxTasksNumber": "0",
-    "PaperDeliveryReadyToSendQueryLimit": "1000",
+    "PaperDeliveryQueryLimit": "1000",
     "DeliveryDateDayOfWeek": "1",
-    "DeliveryDateInterval": "1d",
-    "PaperDeliveryCutOffDuration": "7d",
     "KinesisPaperDeliveryLambdaMaxRetry": "3",
     "KinesisPaperDeliveryLambdaBatchSize": "25",
     "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60",
-    "SubmitPaperDeliveryJobLambdaCron": "*/15 * * * ? *",
     "DelayerToPaperChannelLambdaCron": "*/15 * * * ? *",
-    "DelayerToPaperChannelRecoveryLambdaCron": "0 0 * * ? *",
-    "SubmitPaperDeliveryJobInputTuplesParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
-    "SubmitPaperDeliveryJobInputDriverEnvName": "PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER",
-    "SubmitPaperDeliveryJobInputProvincesEnvName": "PN_DELAYER_JOBINPUT_PROVINCELIST",
     "DelayerToPaperChannelRuleState": "DISABLED",
-    "PaperDeliveryKinesisSequenceNumberTtlSeconds": "86400"
+    "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
+    "PaperDeliveryPrintCapacityCounterTtlDays": "60",
+    "PrintCapacityWeeklyWorkingDays": "7",
+    "PaperDeliveryCounterTtlDays": "14",
+    "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority",
+    "PaperDeliveryPrintCapacityCounterTtlDuration": "60d"
   }
 }
