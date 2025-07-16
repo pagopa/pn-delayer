@@ -345,6 +345,10 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  UnifiedDeliveryDriverProvinceParameter:
+    Type: String
+    Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -1355,7 +1359,6 @@ Resources:
               - kms:DescribeKey
             Resource:
               - !Sub "${TestDelayerKmsBucketArn}"
-              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SubmitPaperDeliveryJobInputTuplesParameter}
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
@@ -1433,4 +1436,4 @@ Resources:
               Action:
                 - ssm:GetParameter
               Resource:
-                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SubmitPaperDeliveryJobInputTuplesParameter}
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${UnifiedDeliveryDriverProvinceParameter}
