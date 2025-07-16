@@ -8,5 +8,5 @@ import java.util.Map;
 
 public interface EvaluateSenderLimitJobService {
 
-    Mono<Void> startSenderLimitJob(String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecution);
+    Mono<Void> startSenderLimitJob(String province, String tenderId, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecution);
 }

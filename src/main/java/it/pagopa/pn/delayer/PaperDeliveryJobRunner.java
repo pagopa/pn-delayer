@@ -6,7 +6,6 @@ import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.service.EvaluateDriverCapacityJobService;
 import it.pagopa.pn.delayer.service.EvaluateResidualCapacityJobService;
 import it.pagopa.pn.delayer.service.EvaluateSenderLimitJobService;
-import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -42,7 +41,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         switch (workflowStep) {
             case EVALUATE_SENDER_LIMIT:
                 log.info("Starting Evaluate Sender Limit step");
-                exitCode = executeEvaluateSendLimitStep();
+                exitCode = executeEvaluateSenderLimitStep();
                 break;
             case EVALUATE_DRIVER_CAPACITY:
                 log.info("Starting Evaluate Driver Capacity step");
@@ -118,13 +117,14 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         }
     }
 
-    private int executeEvaluateSendLimitStep() {
+    private int executeEvaluateSenderLimitStep() {
         String province = pnDelayerConfigs.getEvaluateSenderLimitJobInput().getProvince();
+        String tenderId = pnDelayerConfigs.getActualTenderId();
         log.info("Starting batch for province: {}", province);
         addMDC(province);
         try {
             var startExecutionBatch = Instant.now();
-            Mono<Void> monoExcecution = evaluateSenderLimitJobService.startSenderLimitJob(province, new HashMap<>(), startExecutionBatch);
+            Mono<Void> monoExcecution = evaluateSenderLimitJobService.startSenderLimitJob(province, tenderId, new HashMap<>(), startExecutionBatch);
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
         } catch (Exception e) {

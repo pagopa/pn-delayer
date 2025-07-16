@@ -13,7 +13,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -97,5 +96,12 @@ public class PaperDeliveryUtils {
     private String retrieveDateForSk(PaperDelivery paperDelivery) {
         return paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
                 paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
+    }
+
+    public Map<String, List<PaperDelivery>> groupPaperDeliveriesByProductTypePaId(List<PaperDelivery> paperDeliveries) {
+        return paperDeliveries.stream()
+                .collect(Collectors.groupingBy(
+                        paperDelivery -> paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType(),
+                        Collectors.toList()));
     }
 }

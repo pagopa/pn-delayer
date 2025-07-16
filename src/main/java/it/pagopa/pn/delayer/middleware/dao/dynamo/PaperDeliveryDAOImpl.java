@@ -17,6 +17,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.*;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -35,9 +36,9 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     }
 
     @Override
-    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, String deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
+    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
         QueryConditional keyCondition = QueryConditional.sortBeginsWith(Key.builder()
-                .partitionValue(String.join("~", deliveryWeek, workflowStepEnum.name()))
+                .partitionValue(String.join("~", deliveryWeek.toString(), workflowStepEnum.name()))
                 .sortValue(sortKeyPrefix)
                 .build());
 
