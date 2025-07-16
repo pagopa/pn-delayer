@@ -349,6 +349,14 @@ Parameters:
     Type: String
     Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
 
+  DelayerStartWorkflowRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the DelayerStartWorkflowRule'
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -1359,6 +1367,56 @@ Resources:
               - kms:DescribeKey
             Resource:
               - !Sub "${TestDelayerKmsBucketArn}"
+
+  DelayerStartWorkflowScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-delayerStartWorkflowScheduleRule'
+      ScheduleExpression: !Sub cron(${DelayerStartWorkflowCron})
+      State: !Ref DelayerStartWorkflowRuleState
+      Targets:
+        - Id: StepFunctionTarget
+          Arn: !Ref PaperDeliveryStateMachine
+          Input: !Sub |
+            {
+              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryHighPriorityTableName}",
+              "PAPERDELIVERYDRIVERCAPACITIES_TABLENAME": "${PaperDeliveryDriverCapacitiesTableName}",
+              "PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME": "${PaperDeliveryDriverUsedCapacitiesTableName}"
+              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliverySenderCounterTableName}",
+              "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
+              "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
+              "PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME": "${PaperDeliveryPrintCapacityCounterTableName}"
+            }
+  DelayerStartWorkflowScheduleRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayerStartWorkflowScheduleRuleRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  DelayerStartWorkflowScheduleRulePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayerStartWorkflowScheduleRulePolicy
+      Roles:
+        - !Ref PaperDeliveryStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+             - !Ref PaperDeliveryStateMachine
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
