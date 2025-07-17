@@ -214,6 +214,26 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
+  ProvinceTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-Provinces'
+      AttributeDefinitions:
+        - AttributeName: "province"
+          AttributeType: "S"
+        - AttributeName: "region"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "province"
+          KeyType: "HASH"
+        - AttributeName: "region"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
   PaperDeliveryCounterTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
@@ -466,6 +486,13 @@ Outputs:
   PaperDeliveryPrintCapacityCounterTableArn:
     Description: ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter
     Value: !Sub '${PaperDeliveryPrintCapacityCounterTable.Arn}'
+
+  ProvinceTableName:
+    Description: Name of dynamodb table containing Province
+    Value: !Ref ProvinceTable
+  ProvinceTableArn:
+    Description: ARN of dynamodb table containing Province
+    Value: !Sub '${ProvinceTable.Arn}'
 
   # Kinesis data stream
   PnDelayerInputsKinesisDataStreamArn:
