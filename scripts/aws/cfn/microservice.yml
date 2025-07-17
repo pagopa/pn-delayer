@@ -1400,6 +1400,8 @@ Resources:
               "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
               "PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME": "${PaperDeliveryPrintCapacityCounterTableName}"
             }
+      RoleArn: !GetAtt DelayerStartWorkflowScheduleRuleRole.Arn
+
   DelayerStartWorkflowScheduleRuleRole:
     Type: AWS::IAM::Role
     Properties:
