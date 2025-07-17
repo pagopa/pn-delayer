@@ -1390,6 +1390,7 @@ Resources:
       Targets:
         - Id: StepFunctionTarget
           Arn: !Ref PaperDeliveryStateMachine
+          RoleArn: !GetAtt DelayerStartWorkflowScheduleRuleRole.Arn
           Input: !Sub |
             {
               "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
@@ -1400,7 +1401,6 @@ Resources:
               "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
               "PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME": "${PaperDeliveryPrintCapacityCounterTableName}"
             }
-      RoleArn: !GetAtt DelayerStartWorkflowScheduleRuleRole.Arn
 
   DelayerStartWorkflowScheduleRuleRole:
     Type: AWS::IAM::Role
@@ -1411,27 +1411,17 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-
-  DelayerStartWorkflowScheduleRulePolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${ProjectName}-delayerStartWorkflowScheduleRulePolicy
-      Roles:
-        - !Ref PaperDeliveryStateMachineRole
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - states:StartExecution
-            Resource:
-             - !Ref PaperDeliveryStateMachine
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StepFunctionInvokePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: !Ref PaperDeliveryStateMachine
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
