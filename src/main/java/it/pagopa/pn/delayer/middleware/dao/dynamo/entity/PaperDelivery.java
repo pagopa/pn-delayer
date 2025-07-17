@@ -1,9 +1,13 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
+
+import java.awt.print.Paper;
+import java.time.LocalDate;
 
 @DynamoDbBean
 @Data
@@ -62,13 +66,48 @@ public class PaperDelivery {
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DATE)}))
     private String deliveryDate;
 
-    @DynamoDbIgnore
-    public static String buildSortKey(String... fields) {
-        return String.join("~", fields);
+    public PaperDelivery(){}
+
+    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek){
+        this.pk = buildPk(workflowStepEnum, deliveryWeek);
+        this.sk = buildSortKey(workflowStepEnum, paperDelivery);
+        this.requestId = paperDelivery.getRequestId();
+        this.createdAt = paperDelivery.getCreatedAt();
+        this.notificationSentAt = paperDelivery.getNotificationSentAt();
+        this.prepareRequestDate = paperDelivery.getPrepareRequestDate();
+        this.productType = paperDelivery.getProductType();
+        this.senderPaId = paperDelivery.getSenderPaId();
+        this.province = paperDelivery.getProvince();
+        this.cap = paperDelivery.getCap();
+        this.attempt = paperDelivery.getAttempt();
+        this.iun = paperDelivery.getIun();
+        this.unifiedDeliveryDriver = paperDelivery.getUnifiedDeliveryDriver();
+        this.tenderId = paperDelivery.getTenderId();
+        this.priority = paperDelivery.getPriority();
+        this.recipientId = paperDelivery.getRecipientId();
+        this.deliveryDate = paperDelivery.getDeliveryDate();
     }
 
     @DynamoDbIgnore
-    public static String buildPk(WorkflowStepEnum workflowStepEnum, String deliveryWeek) {
-        return String.join( "~", deliveryWeek, workflowStepEnum.name());
+    public static String buildSortKey(WorkflowStepEnum workflowStepEnum, PaperDelivery paperDelivery) {
+        String date =  paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
+                paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
+        return switch (workflowStepEnum) {
+            case EVALUATE_SENDER_LIMIT ->
+                    String.join("~", paperDelivery.getProvince(), date, paperDelivery.getRequestId());
+            case EVALUATE_DRIVER_CAPACITY ->
+                    String.join("~", paperDelivery.getUnifiedDeliveryDriver(), paperDelivery.getProvince(), String.valueOf(paperDelivery.getPriority()), date, paperDelivery.getRequestId());
+            case EVALUATE_RESIDUAL_CAPACITY ->
+                    String.join("~", paperDelivery.getUnifiedDeliveryDriver(), paperDelivery.getProvince(), date, paperDelivery.getRequestId());
+            case EVALUATE_PRINT_CAPACITY ->
+                    String.join("~", String.valueOf(paperDelivery.getPriority()), paperDelivery.getDeliveryDate(), paperDelivery.getRequestId());
+            case SENT_TO_PREPARE_PHASE_2 ->
+                    String.join("~", paperDelivery.getDeliveryDate(), paperDelivery.getRequestId());
+        };
+    }
+
+    @DynamoDbIgnore
+    public static String buildPk(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek) {
+        return String.join( "~", deliveryWeek.toString(), workflowStepEnum.name());
     }
 }

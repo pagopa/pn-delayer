@@ -4,7 +4,7 @@ import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.*;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
-import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
+import it.pagopa.pn.delayer.utils.PaperDeliveryService;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
