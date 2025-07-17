@@ -349,6 +349,11 @@ Parameters:
     Type: String
     Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
 
+  DelayerStartWorkflowCron:
+    Type: String
+    Default: '0 3 * * ? 1'
+    Description: 'Cron expression for DelayerStartWorkflowRule'
+
   DelayerStartWorkflowRuleState:
     Type: String
     Default: DISABLED
@@ -1379,10 +1384,10 @@ Resources:
           Arn: !Ref PaperDeliveryStateMachine
           Input: !Sub |
             {
-              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryHighPriorityTableName}",
+              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
               "PAPERDELIVERYDRIVERCAPACITIES_TABLENAME": "${PaperDeliveryDriverCapacitiesTableName}",
               "PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME": "${PaperDeliveryDriverUsedCapacitiesTableName}"
-              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliverySenderCounterTableName}",
+              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
               "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
               "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
               "PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME": "${PaperDeliveryPrintCapacityCounterTableName}"
