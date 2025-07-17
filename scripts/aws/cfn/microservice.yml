@@ -1394,7 +1394,7 @@ Resources:
             {
               "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
               "PAPERDELIVERYDRIVERCAPACITIES_TABLENAME": "${PaperDeliveryDriverCapacitiesTableName}",
-              "PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME": "${PaperDeliveryDriverUsedCapacitiesTableName}"
+              "PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME": "${PaperDeliveryDriverUsedCapacitiesTableName}",
               "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
               "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
               "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
