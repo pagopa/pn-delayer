@@ -26,6 +26,8 @@ public class PnDelayerConfigs {
     private Duration deliveryDateInterval;
     private String actualTenderId;
     private Integer printCapacityWeeklyWorkingDays;
+    private String paperDeliveryPriorityParameterName;
+    private String paperChannelTenderApiLambdaName;
 
 
     @Data

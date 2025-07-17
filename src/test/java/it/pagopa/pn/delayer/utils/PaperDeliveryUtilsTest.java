@@ -2,6 +2,9 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
+import it.pagopa.pn.delayer.model.DeliveryDriverRequest;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverRequest;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -153,4 +156,109 @@ class PaperDeliveryUtilsTest {
         assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
         assertEquals("RM~2023-10-03~requestId2", result.getFirst().getSk());
     }
+
+    @Test
+    void buildDriverCapacityEvaluation_createsCorrectPaperDeliveryObjects() {
+        PaperDelivery paperDelivery = new PaperDelivery();
+        paperDelivery.setProductType("RS");
+        paperDelivery.setAttempt(1);
+        paperDelivery.setDeliveryDate("2023-10-01");
+        paperDelivery.setCap("12345");
+        paperDelivery.setRecipientId("recipient1");
+        paperDelivery.setIun("iun1");
+        paperDelivery.setRequestId("requestId1");
+        paperDelivery.setCreatedAt("2023-10-01T10:00:00Z");
+        paperDelivery.setNotificationSentAt("2023-10-01T12:00:00Z");
+        paperDelivery.setPrepareRequestDate("2023-10-01");
+        paperDelivery.setSenderPaId("sender1");
+        paperDelivery.setProvince("RM");
+
+        List<PaperDelivery> deliveries = List.of(paperDelivery);
+        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("PRODUCT_RS.ATTEMPT_1"));
+        String unifiedDeliveryDriver = "driver1";
+        String tenderId = "tender1";
+
+        List<PaperDelivery> result = paperDeliveryUtils.buildtoDriverCapacityEvaluation(deliveries, unifiedDeliveryDriver, tenderId, priorityMap);
+
+        assertEquals(1, result.size());
+        PaperDelivery resultDelivery = result.get(0);
+        assertEquals("driver1", resultDelivery.getUnifiedDeliveryDriver());
+        assertEquals("tender1", resultDelivery.getTenderId());
+        assertEquals(1, resultDelivery.getPriority());
+    }
+
+    @Test
+    void assignUnifiedDeliveryDriverAndBuildNewStepEntities_filtersAndBuildsCorrectly() {
+        PaperChannelDeliveryDriverResponse response = new PaperChannelDeliveryDriverResponse();
+        response.setGeoKey("RM");
+        response.setProduct("RS");
+        response.setUnifiedDeliveryDriver("driver1");
+
+        PaperDelivery paperDelivery = new PaperDelivery();
+        paperDelivery.setCap("12345");
+        paperDelivery.setProductType("RS");
+        paperDelivery.setAttempt(1);
+        paperDelivery.setDeliveryDate("2023-10-01");
+        paperDelivery.setRequestId("requestId1");
+
+        List<PaperChannelDeliveryDriverResponse> responses = List.of(response);
+        Map<String, List<PaperDelivery>> groupedByCapProductType = Map.of("RM~RS", List.of(paperDelivery));
+        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("PRODUCT_RS.ATTEMPT_1"));
+        String tenderId = "tender1";
+
+        List<PaperDelivery> result = paperDeliveryUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(responses, groupedByCapProductType, tenderId, priorityMap);
+
+        assertEquals(1, result.size());
+        PaperDelivery resultDelivery = result.get(0);
+        assertEquals("driver1", resultDelivery.getUnifiedDeliveryDriver());
+        assertEquals("tender1", resultDelivery.getTenderId());
+    }
+
+    @Test
+    void assignUnifiedDeliveryDriverAndBuildNewStepEntities_handlesEmptyGroupedByCapProductType() {
+        List<PaperChannelDeliveryDriverResponse> responses = List.of();
+        Map<String, List<PaperDelivery>> groupedByCapProductType = Map.of();
+        Map<Integer, List<String>> priorityMap = Map.of();
+        String tenderId = "tender1";
+
+        List<PaperDelivery> result = paperDeliveryUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(responses, groupedByCapProductType, tenderId, priorityMap);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void groupByGeoKeyAndProduct_createsCorrectMapping() {
+        PaperChannelDeliveryDriverResponse response1 = new PaperChannelDeliveryDriverResponse();
+        response1.setGeoKey("RM");
+        response1.setProduct("RS");
+        response1.setUnifiedDeliveryDriver("driver1");
+
+        PaperChannelDeliveryDriverResponse response2 = new PaperChannelDeliveryDriverResponse();
+        response2.setGeoKey("MI");
+        response2.setProduct("RS");
+        response2.setUnifiedDeliveryDriver("driver2");
+
+        List<PaperChannelDeliveryDriverResponse> responses = List.of(response1, response2);
+
+        Map<String, String> result = paperDeliveryUtils.groupByGeoKeyAndProduct(responses);
+
+        assertEquals(2, result.size());
+        assertEquals("driver1", result.get("RM~RS"));
+        assertEquals("driver2", result.get("MI~RS"));
+    }
+
+    @Test
+    void constructPaperChannelTenderApiPayloadTest(){
+        List<DeliveryDriverRequest> deliveryDriverRequests = new ArrayList<>();
+        deliveryDriverRequests.add(new DeliveryDriverRequest("geoKey1", "product1"));
+        String tenderId = "tender123";
+
+        PaperChannelDeliveryDriverRequest response = paperDeliveryUtils.constructPaperChannelTenderApiPayload(deliveryDriverRequests, tenderId);
+
+        assertEquals(tenderId, response.getTenderId());
+        assertEquals("GET_UNIFIED_DELIVERY_DRIVERS", response.getOperation());
+        assertEquals(deliveryDriverRequests, response.getRequests());
+    }
+
+
 }

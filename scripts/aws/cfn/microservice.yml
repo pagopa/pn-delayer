@@ -349,6 +349,23 @@ Parameters:
     Type: String
     Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
 
+  DelayerStartWorkflowCron:
+    Type: String
+    Default: '0 3 * * ? 1'
+    Description: 'Cron expression for DelayerStartWorkflowRule'
+
+  DelayerStartWorkflowRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the DelayerStartWorkflowRule'
+
+  PaperChannelTenderApiLambdaName:
+    Type: String
+    Description: 'PaperChannelTenderApiLambda function name'
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -407,6 +424,8 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
+          - Name: PN_PAPERCHANNEL_TENDERAPI_LAMBDA_NAME
+            Value: !Ref PaperChannelTenderApiLambdaName
 
       PlatformCapabilities:
         - FARGATE
@@ -487,6 +506,11 @@ Resources:
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
                   - !Sub "${PaperDeliveryTableArn}"
                   - !Sub "${PaperDeliveryTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
 
   SenderLimitSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -1359,6 +1383,56 @@ Resources:
               - kms:DescribeKey
             Resource:
               - !Sub "${TestDelayerKmsBucketArn}"
+
+  DelayerStartWorkflowScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-delayerStartWorkflowScheduleRule'
+      ScheduleExpression: !Sub cron(${DelayerStartWorkflowCron})
+      State: !Ref DelayerStartWorkflowRuleState
+      Targets:
+        - Id: StepFunctionTarget
+          Arn: !Ref PaperDeliveryStateMachine
+          Input: !Sub |
+            {
+              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+              "PAPERDELIVERYDRIVERCAPACITIES_TABLENAME": "${PaperDeliveryDriverCapacitiesTableName}",
+              "PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME": "${PaperDeliveryDriverUsedCapacitiesTableName}"
+              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+              "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
+              "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
+              "PAPERDELIVERYPRINTCAPACITYCOUNTER_TABLENAME": "${PaperDeliveryPrintCapacityCounterTableName}"
+            }
+  DelayerStartWorkflowScheduleRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayerStartWorkflowScheduleRuleRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  DelayerStartWorkflowScheduleRulePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayerStartWorkflowScheduleRulePolicy
+      Roles:
+        - !Ref PaperDeliveryStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+             - !Ref PaperDeliveryStateMachine
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
