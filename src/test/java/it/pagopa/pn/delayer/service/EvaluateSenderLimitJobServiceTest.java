@@ -1,8 +1,15 @@
 package it.pagopa.pn.delayer.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import it.pagopa.pn.delayer.cache.CapProductTypeDriverCacheService;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.config.SsmParameterConsumerActivation;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
+import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -10,13 +17,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
+import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.services.lambda.LambdaClient;
+import software.amazon.awssdk.services.lambda.model.InvokeRequest;
+import software.amazon.awssdk.services.lambda.model.InvokeResponse;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,8 +40,29 @@ class EvaluateSenderLimitJobServiceTest {
     @Mock
     private PnDelayerConfigs pnDelayerConfigs;
 
-    @InjectMocks
+    @Mock
+    private PaperDeliveryUtils paperDeliveryUtils;
+
+    @Mock
+    private CapProductTypeDriverCacheService cacheService;
+
+    @Mock
+    private LambdaClient lambdaClient;
+
     private EvaluateSenderLimitJobServiceImpl evaluateSenderLimitJobService;
+
+    @BeforeEach
+    void setUp() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        evaluateSenderLimitJobService = new EvaluateSenderLimitJobServiceImpl(
+                paperDeliverySenderLimitDAO,
+                pnDelayerConfigs,
+                cacheService,
+                paperDeliveryUtils,
+                lambdaClient,
+                objectMapper
+        );
+    }
 
     @Test
     void calculateSenderLimit_returnsCorrectSenderLimitMap() {
@@ -70,6 +103,61 @@ class EvaluateSenderLimitJobServiceTest {
                         senderLimitMap.get("PA1~ProductA~RM") == 20 &&
                                 senderLimitMap.get("PA2~ProductB~RM") == 50 &&
                         senderLimitMap.get("PA2~ProductA~RM") == 50)
+                .verifyComplete();
+    }
+
+    @Test
+    void retrieveUnifiedDeliveryDriverAndConstructHighPriorityEntity_handlesSingleDriver() {
+        List<PaperDelivery> paperDeliveries = List.of(new PaperDelivery());
+        String tenderId = "tender1";
+        List<String> drivers = List.of("driver1");
+        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("DEFAULT"));
+
+        when(paperDeliveryUtils.buildtoDriverCapacityEvaluation(paperDeliveries, "driver1", tenderId, priorityMap))
+                .thenReturn(List.of(new PaperDelivery()));
+
+        StepVerifier.create(evaluateSenderLimitJobService.retrieveUnifiedDeliveryDriverAndConstructHighPriorityEntity(paperDeliveries, tenderId, drivers, priorityMap))
+                .expectNextMatches(result -> result.size() == 1)
+                .verifyComplete();
+    }
+
+    @Test
+    void retrieveUnifiedDeliveryDriverAndConstructHighPriorityEntity_handlesMultipleDriversWithCacheHit() {
+        List<PaperDelivery> paperDeliveries = List.of(new PaperDelivery());
+        String tenderId = "tender1";
+        List<String> drivers = List.of("driver1", "driver2");
+        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("DEFAULT"));
+
+        when(cacheService.getFromCache(anyString())).thenReturn(Optional.of("driver1"));
+        when(paperDeliveryUtils.buildtoDriverCapacityEvaluation(anyList(), eq("driver1"), eq(tenderId), eq(priorityMap)))
+                .thenReturn(List.of(new PaperDelivery()));
+
+        String responseString = "[{\"unifiedDeliveryDriver\":\"driver1\",\"geoKey\":\"geoKey1\",\"product\":\"AR\"}]";
+        when(lambdaClient.invoke((InvokeRequest) any())).thenReturn(InvokeResponse.builder()
+                .payload(SdkBytes.fromByteArray(responseString.getBytes(StandardCharsets.UTF_8)))
+                .build());
+
+        StepVerifier.create(evaluateSenderLimitJobService.retrieveUnifiedDeliveryDriverAndConstructHighPriorityEntity(paperDeliveries, tenderId, drivers, priorityMap))
+                .expectNextMatches(result -> result.size() == 1)
+                .verifyComplete();
+    }
+
+    @Test
+    void retrieveUnifiedDeliveryDriverAndConstructHighPriorityEntity_handlesMultipleDriversWithCacheMiss() {
+        List<PaperDelivery> paperDeliveries = List.of(new PaperDelivery());
+        String tenderId = "tender1";
+        List<String> drivers = List.of("driver1", "driver2");
+        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("DEFAULT"));
+
+        when(cacheService.getFromCache(anyString())).thenReturn(Optional.empty());
+        String responseString = "[{\"unifiedDeliveryDriver\":\"driver1\",\"geoKey\":\"geoKey1\",\"product\":\"AR\"}]";
+        when(lambdaClient.invoke((InvokeRequest) any())).thenReturn(InvokeResponse.builder()
+                .payload(SdkBytes.fromByteArray(responseString.getBytes(StandardCharsets.UTF_8)))
+                .build());        when(paperDeliveryUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(anyList(), anyMap(), eq(tenderId), eq(priorityMap)))
+                .thenReturn(List.of(new PaperDelivery()));
+
+        StepVerifier.create(evaluateSenderLimitJobService.retrieveUnifiedDeliveryDriverAndConstructHighPriorityEntity(paperDeliveries, tenderId, drivers, priorityMap))
+                .expectNextMatches(result -> result.size() == 1)
                 .verifyComplete();
     }
 }

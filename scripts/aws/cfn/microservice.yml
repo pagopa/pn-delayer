@@ -362,6 +362,10 @@ Parameters:
       - DISABLED
     Description: 'State of the DelayerStartWorkflowRule'
 
+  PaperChannelTenderApiLambdaName:
+    Type: String
+    Description: 'PaperChannelTenderApiLambda function name'
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -420,6 +424,8 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
+          - Name: PN_PAPERCHANNEL_TENDERAPI_LAMBDA_NAME
+            Value: !Ref PaperChannelTenderApiLambdaName
 
       PlatformCapabilities:
         - FARGATE
@@ -500,6 +506,11 @@ Resources:
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
                   - !Sub "${PaperDeliveryTableArn}"
                   - !Sub "${PaperDeliveryTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
 
   SenderLimitSecurityGroup:
     Type: AWS::EC2::SecurityGroup

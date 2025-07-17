@@ -2,6 +2,9 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
+import it.pagopa.pn.delayer.model.DeliveryDriverRequest;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverRequest;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,7 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -97,5 +100,67 @@ public class PaperDeliveryUtils {
     private String retrieveDateForSk(PaperDelivery paperDelivery) {
         return paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
                 paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
+    }
+
+    public List<PaperDelivery> buildtoDriverCapacityEvaluation(List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, Map<Integer, List<String>> priorityMap) {
+        return deliveries.stream()
+                .map(paperDelivery -> {
+                    String key = "PRODUCT_" + paperDelivery.getProductType() + ".ATTEMPT_" + paperDelivery.getAttempt();
+                    Integer priority = priorityMap.entrySet().stream()
+                            .filter(entry -> entry.getValue().contains(key))
+                            .map(Map.Entry::getKey)
+                            .findFirst()
+                            .orElse(3);
+
+                    PaperDelivery toDriverCapacityEvaluation = new PaperDelivery();
+                    toDriverCapacityEvaluation.setPk(PaperDelivery.buildPk(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, paperDelivery.getDeliveryDate()));
+                    toDriverCapacityEvaluation.setSk(PaperDelivery.buildSortKey(paperDelivery.getIun(), paperDelivery.getRecipientId()));
+                    toDriverCapacityEvaluation.setCap(paperDelivery.getCap());
+                    toDriverCapacityEvaluation.setProductType(paperDelivery.getProductType());
+                    toDriverCapacityEvaluation.setUnifiedDeliveryDriver(unifiedDeliveryDriver);
+
+                    toDriverCapacityEvaluation.setTenderId(tenderId);
+                    toDriverCapacityEvaluation.setPriority(priority);
+                    toDriverCapacityEvaluation.setAttempt(paperDelivery.getAttempt());
+                    toDriverCapacityEvaluation.setRecipientId(paperDelivery.getRecipientId());
+                    toDriverCapacityEvaluation.setIun(paperDelivery.getIun());
+                    toDriverCapacityEvaluation.setCreatedAt(paperDelivery.getCreatedAt());
+                    toDriverCapacityEvaluation.setRequestId(paperDelivery.getRequestId());
+                    toDriverCapacityEvaluation.setNotificationSentAt(paperDelivery.getNotificationSentAt());
+                    toDriverCapacityEvaluation.setPrepareRequestDate(paperDelivery.getPrepareRequestDate());
+                    toDriverCapacityEvaluation.setSenderPaId(paperDelivery.getSenderPaId());
+                    toDriverCapacityEvaluation.setProvince(paperDelivery.getProvince());
+                    toDriverCapacityEvaluation.setDeliveryDate(paperDelivery.getDeliveryDate());
+                    return toDriverCapacityEvaluation;
+                })
+                .collect(Collectors.toList());
+    }
+
+    public PaperChannelDeliveryDriverRequest constructPaperChannelTenderApiPayload(List<DeliveryDriverRequest> deliveryDriverRequests, String tenderId) {
+        return new PaperChannelDeliveryDriverRequest(
+                deliveryDriverRequests,
+                tenderId,
+                "GET_UNIFIED_DELIVERY_DRIVERS"
+        );
+    }
+
+    public List<PaperDelivery> assignUnifiedDeliveryDriverAndBuildNewStepEntities(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses, Map<String, List<PaperDelivery>> groupedByCapProductType, String tenderId, Map<Integer, List<String>> priorityMap) {
+        Map<String, String> map = groupByGeoKeyAndProduct(paperChannelDeliveryDriverResponses);
+        return new ArrayList<>(groupedByCapProductType.entrySet().stream()
+                .filter(stringListEntry -> map.containsKey(stringListEntry.getKey()))
+                .flatMap(stringListEntry -> {
+                    String unifiedDeliveryDriver = map.get(stringListEntry.getKey());
+                    List<PaperDelivery> paperDeliveriesChunk = stringListEntry.getValue();
+                    return buildtoDriverCapacityEvaluation(paperDeliveriesChunk, unifiedDeliveryDriver, tenderId, priorityMap).stream();
+                })
+                .toList());
+    }
+
+    public Map<String, String> groupByGeoKeyAndProduct(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses) {
+        return paperChannelDeliveryDriverResponses.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getGeoKey() + "~" + item.getProduct(),
+                        PaperChannelDeliveryDriverResponse::getUnifiedDeliveryDriver
+                ));
     }
 }
