@@ -1,7 +1,6 @@
 package it.pagopa.pn.delayer.service;
 
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
-import it.pagopa.pn.delayer.utils.DeliveryDriverUtils;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import it.pagopa.pn.delayer.utils.PnDelayerUtils;
 import lombok.RequiredArgsConstructor;
@@ -17,17 +16,14 @@ import java.util.Map;
 @Component
 @Slf4j
 @RequiredArgsConstructor
-public class EvaluateResidualCapacityJobServiceImpl implements  EvaluateResidualCapacityJobService {
+public class EvaluateResidualCapacityJobServiceImpl implements EvaluateResidualCapacityJobService {
 
     private final PaperDeliveryUtils paperDeliveryUtils;
     private final PnDelayerUtils pnDelayerUtils;
-    private final DeliveryDriverUtils deliveryDriverUtils;
 
     @Override
     public Mono<Void> startEvaluateResidualCapacityJob(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch, String tenderId) {
         LocalDate deliveryWeek = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
-        return deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(province, unifiedDeliveryDriver, tenderId, deliveryWeek)
-                .doOnNext(tuple -> log.info("Retrieved capacities for province: [{}], unifiedDeliveryDriver: [{}] -> declared capacity={}, used capacity={}", province, unifiedDeliveryDriver, tuple.getT1(), tuple.getT2()))
-                .flatMap(provinceCapacities -> paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(provinceCapacities, WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, unifiedDeliveryDriver, province, lastEvaluatedKey, deliveryWeek, tenderId));
+        return paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, unifiedDeliveryDriver, province, lastEvaluatedKey, deliveryWeek, tenderId);
     }
 }

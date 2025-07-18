@@ -4,6 +4,7 @@ import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
 import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,302 +38,297 @@ class PnDelayerUtilsTest {
     }
 
     @Test
-    void groupByPaIdProductTypeProvince_groupsCorrectly() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setSenderPaId("pa1");
-        paperDelivery1.setProductType("RS");
-        paperDelivery1.setProvince("RM");
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setSenderPaId("pa1");
-        paperDelivery2.setProductType("RS");
-        paperDelivery2.setProvince("RM");
-        PaperDelivery paperDelivery3 = new PaperDelivery();
-        paperDelivery3.setSenderPaId("pa2");
-        paperDelivery3.setProductType("RS");
-        paperDelivery3.setProvince("MI");
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2, paperDelivery3);
-
-        Map<String, List<PaperDelivery>> result = pnDelayerUtils.groupByPaIdProductTypeProvince(deliveries, "RM");
-
-        assertEquals(1, result.size());
-        assertEquals(2, result.get("pa1~RS~RM").size());
+    void testCalculateDeliveryWeek() {
+        Instant startExecutionBatch = Instant.parse("2023-10-02T00:00:00Z"); // Monday
+        LocalDate expectedDeliveryWeek = LocalDate.parse("2023-10-02");
+        LocalDate actualDeliveryWeek = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
+        assertEquals(expectedDeliveryWeek, actualDeliveryWeek);
     }
 
     @Test
-    void groupByPaIdProductTypeProvinceAndCount_countsCorrectly() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setSenderPaId("pa1");
-        paperDelivery1.setProductType("RS");
-        paperDelivery1.setProvince("RM");
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setSenderPaId("pa1");
-        paperDelivery2.setProductType("RS");
-        paperDelivery2.setProvince("RM");
-        PaperDelivery paperDelivery3 = new PaperDelivery();
-        paperDelivery3.setSenderPaId("pa2");
-        paperDelivery3.setProductType("RS");
-        paperDelivery3.setProvince("MI");
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2, paperDelivery3);
+    void testGroupByCap() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
 
-        Map<String, Long> result = pnDelayerUtils.groupByPaIdProductTypeProvinceAndCount(deliveries);
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
+
+        Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.groupByCap(paperDeliveries);
+        assertEquals(2, grouped.size());
+        assertEquals(3, grouped.get("00178").size());
+        assertEquals(1, grouped.get("00179").size());
+    }
+
+
+    @Test
+    void groupByPaIdProductTypeProvince() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0));
+
+
+        Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.groupByPaIdProductTypeProvince(paperDeliveries);
+        assertEquals(4, grouped.size());
+        assertEquals(2, grouped.get("paId1~AR~RM").size());
+        assertEquals(1, grouped.get("paId1~890~RM").size());
+        assertEquals(1, grouped.get("paId2~890~RM").size());
+        assertEquals(1, grouped.get("paId1~890~NA").size());
+    }
+
+
+    @Test
+    void groupByPaIdProductTypeProvinceAndCount() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0));
+
+
+        Map<String, Long> grouped = pnDelayerUtils.groupByPaIdProductTypeProvinceAndCount(paperDeliveries);
+        assertEquals(4, grouped.size());
+        assertEquals(2, grouped.get("paId1~AR~RM"));
+        assertEquals(1, grouped.get("paId1~890~RM"));
+        assertEquals(1, grouped.get("paId2~890~RM"));
+        assertEquals(1, grouped.get("paId1~890~NA"));
+    }
+
+    @Test
+    void groupByGeoKeyAndProduct() {
+        List<PaperChannelDeliveryDriverResponse> paperDeliveries = new ArrayList<>();
+
+        paperDeliveries.add(createPaperChannelDeliveryDriverResponse("00178","AR", "driver1"));
+        paperDeliveries.add(createPaperChannelDeliveryDriverResponse("00178", "890", "driver2"));
+        paperDeliveries.add(createPaperChannelDeliveryDriverResponse("00179","890", "driver2"));
+
+
+        Map<String, String> grouped = pnDelayerUtils.groupByGeoKeyAndProduct(paperDeliveries);
+        assertEquals(3, grouped.size());
+        assertEquals("driver1", grouped.get("00178~AR"));
+        assertEquals("driver2", grouped.get("00178~890"));
+        assertEquals("driver2", grouped.get("00179~890"));
+    }
+
+    @Test
+    void groupByCapAndProductType() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0));
+
+        Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.groupByCapAndProductType(paperDeliveries);
+        assertEquals(3, grouped.size());
+        assertEquals(2, grouped.get("00178~AR").size());
+        assertEquals(1, grouped.get("00178~890").size());
+        assertEquals(2, grouped.get("00179~890").size());
+    }
+
+    @Test
+    void mapItemForResidualCapacityStep() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForResidualCapacityStep(paperDeliveries, deliveryWeek);
 
         assertEquals(2, result.size());
-        assertEquals(2L, result.get("pa1~RS~RM"));
-        assertEquals(1L, result.get("pa2~RS~MI"));
+        assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY.name())
+        && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getUnifiedDeliveryDriver(), delivery.getProvince(), "2023-10-01T12:00:00Z", delivery.getRequestId()))));
     }
 
     @Test
-    void mapItemForResidualCapacityStep_mapsCorrectly() {
-        PaperDelivery paperDelivery = new PaperDelivery();
-        paperDelivery.setPk("2025-01-01~EVALUATE_SENDER_LIMIT");
-        paperDelivery.setSk("RM~2025-01-01t00:00:00Z~requestId1");
-        List<PaperDelivery> deliveries = List.of(paperDelivery);
-        LocalDate deliveryWeek = LocalDate.parse("2025-01-01");
+    void mapItemForEvaluateDriverCapacityStep() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
 
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForResidualCapacityStep(deliveries, deliveryWeek);
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(paperDeliveries, deliveryWeek);
 
-        assertEquals(1, result.size());
-        assertEquals("2025-01-01~EVALUATE_RESIDUAL_CAPACITY", result.getFirst().getPk());
+        assertEquals(2, result.size());
+        assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY.name())
+                && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getUnifiedDeliveryDriver(), delivery.getProvince(), String.valueOf(delivery.getPriority()),  "2023-10-01T12:00:00Z", delivery.getRequestId()))));
     }
 
     @Test
-    void evaluateSenderLimitAndFilter_filtersCorrectly() {
-        Map<String, Integer> senderLimitMap = Map.of("key1", 1);
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId = Map.of("key1", List.of(paperDelivery1, paperDelivery2));
+    void mapItemForEvaluatePrintCapacityStep() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluatePrintCapacityStep(paperDeliveries, deliveryWeek);
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_PRINT_CAPACITY.name())
+                && delivery.getSk().equalsIgnoreCase(String.join("~", String.valueOf(delivery.getPriority()), delivery.getDeliveryDate(), delivery.getRequestId()))));
+    }
+
+    @Test
+    void mapItemForEvaluateSenderLimitOnNextWeek() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(paperDeliveries, deliveryWeek);
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-09~" + EVALUATE_SENDER_LIMIT.name())
+                && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getProvince(), "2023-10-01T12:00:00Z", delivery.getRequestId()))));
+    }
+
+    @Test
+    void filterOnResidualDriverCapacity(){
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+        Integer result = pnDelayerUtils.filterOnResidualDriverCapacity(paperDeliveries, Tuples.of(10,5), new ArrayList<>(), new ArrayList<>(), deliveryWeek);
+
+        assertEquals(2, result);
+    }
+
+    @Test
+    void assignUnifiedDeliveryDriverAndBuildNewStepEntities(){
+        List<PaperChannelDeliveryDriverResponse> driverResponses = new ArrayList<>();
+        driverResponses.add(createPaperChannelDeliveryDriverResponse("00178", "AR", "driverX"));
+        driverResponses.add(createPaperChannelDeliveryDriverResponse("00179", "RS", "driverY"));
+
+        List<PaperDelivery> deliveries1 = new ArrayList<>();
+        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
+        List<PaperDelivery> deliveries2 = new ArrayList<>();
+        deliveries2.add(createPaperDelivery("RS", "00179", "RM", "paId2", 1));
+
+        Map<String, List<PaperDelivery>> grouped = Map.of(
+                "00178~AR", deliveries1,
+                "00179~RS", deliveries2
+        );
+
+        Map<Integer, List<String>> priorityMap = Map.of(
+                1, List.of("PRODUCT_AR.ATTEMPT_0"),
+                2, List.of("PRODUCT_RS.ATTEMPT_1")
+        );
+
+        List<PaperDelivery> result = pnDelayerUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(
+                driverResponses, grouped, "tenderTest", priorityMap
+        );
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverX") && d.getPriority() == 1));
+        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverY") && d.getPriority() == 2));
+    }
+
+    @Test
+    void evaluateSenderLimitAndFilterDeliveries(){
+        Map<String, Tuple2<Integer, Integer>> senderLimitMap = Map.of(
+                "paId1~AR~RM", Tuples.of(3, 1),
+                "paId2~890~RM", Tuples.of(2, 0)
+        );
+
+        List<PaperDelivery> deliveries1 = new ArrayList<>();
+        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
+        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
+        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
+
+        List<PaperDelivery> deliveries2 = new ArrayList<>();
+        deliveries2.add(createPaperDelivery("890", "00179", "RM", "paId2", 0));
+        deliveries2.add(createPaperDelivery("890", "00179", "RM", "paId2", 0));
+
+        Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId = Map.of(
+                "paId1~AR~RM", deliveries1,
+                "paId2~890~RM", deliveries2
+        );
+
         SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
 
-        SenderLimitJobPaperDeliveries result = pnDelayerUtils.evaluateSenderLimitAndFilter(senderLimitMap, deliveriesGroupedByProductTypePaId, senderLimitJobPaperDeliveries);
+        pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitMap, deliveriesGroupedByProductTypePaId, senderLimitJobPaperDeliveries);
 
-        assertEquals(1, result.getSendToNextStep().size());
-        assertEquals(1, result.getSendToResidualStep().size());
+        assertEquals(2, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().stream()
+                .filter(d -> d.getSenderPaId().equals("paId1")).count());
+        assertEquals(1, senderLimitJobPaperDeliveries.getSendToResidualCapacityStep().stream()
+                .filter(d -> d.getSenderPaId().equals("paId1")).count());
+
+        assertEquals(2, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().stream()
+                .filter(d -> d.getSenderPaId().equals("paId2")).count());
+        assertEquals(0, senderLimitJobPaperDeliveries.getSendToResidualCapacityStep().stream()
+                .filter(d -> d.getSenderPaId().equals("paId2")).count());
     }
 
     @Test
-    void excludeRsAndSecondAttempt_filtersCorrectly() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setProductType("RS");
-        paperDelivery1.setAttempt(1);
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setProductType("Non-RS");
-        paperDelivery2.setAttempt(2);
-        List<PaperDelivery> items = new ArrayList<>(List.of(paperDelivery1, paperDelivery2));
+    void enrichWithPriorityAndUnifiedDeliveryDriver(){
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1));
+        paperDeliveries.add(createPaperDelivery("RS","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+        Map<Integer, List<String>> priorityMap = Map.of(
+                1, List.of("PRODUCT_RS.ATTEMPT_0"),
+                2, List.of("PRODUCT_AR.ATTEMPT_1","PRODUCT_890.ATTEMPT_1"),
+                3, List.of("PRODUCT_AR.ATTEMPT_0","PRODUCT_890.ATTEMPT_0"));
+
+        List<PaperDelivery> result = pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDeliveries, "driver2", "tenderId", priorityMap);
+
+        assertEquals(3, result.size());
+        assertEquals(2, result.get(0).getPriority());
+        assertEquals("driver2", result.get(0).getUnifiedDeliveryDriver());
+        assertEquals("tenderId", result.get(0).getTenderId());
+        assertEquals(1, result.get(1).getPriority());
+        assertEquals("driver2", result.get(1).getUnifiedDeliveryDriver());
+        assertEquals("tenderId", result.get(1).getTenderId());
+        assertEquals(3, result.get(2).getPriority());
+        assertEquals("driver2", result.get(2).getUnifiedDeliveryDriver());
+        assertEquals("tenderId", result.get(2).getTenderId());
+    }
+
+    @Test
+    void excludeRsAndSecondAttempt() {
+        PaperDelivery paperDelivery1 = createPaperDelivery("RS", "00178", "RM", "paId1", 1);
+        PaperDelivery paperDelivery2 = createPaperDelivery("AR", "00179", "RM", "paId2", 2);
+        PaperDelivery paperDelivery3 = createPaperDelivery("RS", "00180", "RM", "paId3", 2);
+        List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3);
         SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
 
         List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobPaperDeliveries);
 
         assertEquals(1, result.size());
-        assertEquals(1, senderLimitJobPaperDeliveries.getSendToResidualStep().size());
+        assertEquals(2, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().size());
     }
 
-    @Test
-    void filterOnResidualDriverCapacityFitCapacity() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
-        paperDelivery1.setPriority(1);
-        paperDelivery1.setRequestId("requestId1");
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        paperDelivery2.setPriority(1);
-        paperDelivery2.setRequestId("requestId2");
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2);
-        Tuple2<Integer, Integer> capacityTuple = Tuples.of(5, 2);
-        List<PaperDelivery> deliveriesToSend = new ArrayList<>();
-
-        Integer result = pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
-
-        assertEquals(2, result);
-        assertEquals(2, deliveriesToSend.size());
-    }
-
-    @Test
-    void filterOnResidualDriverCapacity_returnsZero_whenNoRemainingCapacity() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2);
-        Tuple2<Integer, Integer> capacityTuple = Tuples.of(2, 2);
-        List<PaperDelivery> deliveriesToSend = new ArrayList<>();
-
-        Integer result = pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
-
-        assertEquals(0, result);
-        assertTrue(deliveriesToSend.isEmpty());
-    }
-
-    @Test
-    void groupByCreatedAt_groupsAndSortsCorrectly() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
-        paperDelivery1.setCap("12345");
-        paperDelivery1.setCreatedAt(Instant.now().toString());
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        paperDelivery2.setCap("12345");
-        paperDelivery2.setCreatedAt(Instant.now().toString());
-        PaperDelivery paperDelivery3 = new PaperDelivery();
-        paperDelivery3.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery3.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        paperDelivery3.setCap("67890");
-        paperDelivery3.setCreatedAt(Instant.now().toString());
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2, paperDelivery3);
-
-        Map<String, List<PaperDelivery>> result = pnDelayerUtils.groupByCap(deliveries);
-
-        assertEquals(2, result.size());
-        assertEquals(List.of(paperDelivery1, paperDelivery2), result.get("12345"));
-        assertEquals(List.of(paperDelivery3), result.get("67890"));
-    }
-
-    @Test
-    void calculateDeliveryWeek_returnsCorrectStartOfWeek() {
-        Instant startExecutionBatch = Instant.parse("2023-10-04T10:00:00Z");
-
-        LocalDate result = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
-
-        assertEquals(LocalDate.parse("2023-10-02"), result);
-    }
-
-    @Test
-    void mapItemForEvaluateSenderLimitOnNextWeek_correctlyUpdatesPkAndSk() {
-        PaperDelivery paperDelivery = new PaperDelivery();
-        paperDelivery.setProvince("RM");
-        paperDelivery.setRequestId("requestId1");
-        paperDelivery.setProductType("RS");
-        paperDelivery.setPrepareRequestDate("2023-10-01");
-        List<PaperDelivery> deliveries = List.of(paperDelivery);
-        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(deliveries, deliveryWeek);
-
-        assertEquals(1, result.size());
-        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
-        assertEquals("RM~2023-10-01~requestId1", result.getFirst().getSk());
-    }
-
-    @Test
-    void mapItemForEvaluateSenderLimitOnNextWeek_handlesEmptyDeliveriesList() {
-        List<PaperDelivery> deliveries = List.of();
-        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(deliveries, deliveryWeek);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void mapItemForEvaluateSenderLimitOnNextWeek_usesNotificationSentAtForNonRSAndNonFirstAttempt() {
-        PaperDelivery paperDelivery = new PaperDelivery();
-        paperDelivery.setProvince("RM");
-        paperDelivery.setRequestId("requestId2");
-        paperDelivery.setProductType("Non-RS");
-        paperDelivery.setAttempt(2);
-        paperDelivery.setNotificationSentAt("2023-10-03");
-        List<PaperDelivery> deliveries = List.of(paperDelivery);
-        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(deliveries, deliveryWeek);
-
-        assertEquals(1, result.size());
-        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
-        assertEquals("RM~2023-10-03~requestId2", result.getFirst().getSk());
-    }
-
-    @Test
-    void buildDriverCapacityEvaluation_createsCorrectPaperDeliveryObjects() {
-        PaperDelivery paperDelivery = new PaperDelivery();
-        paperDelivery.setProductType("RS");
-        paperDelivery.setAttempt(1);
-        paperDelivery.setDeliveryDate("2023-10-01");
-        paperDelivery.setCap("12345");
-        paperDelivery.setRecipientId("recipient1");
-        paperDelivery.setIun("iun1");
-        paperDelivery.setRequestId("requestId1");
-        paperDelivery.setCreatedAt("2023-10-01T10:00:00Z");
-        paperDelivery.setNotificationSentAt("2023-10-01T12:00:00Z");
-        paperDelivery.setPrepareRequestDate("2023-10-01");
-        paperDelivery.setSenderPaId("sender1");
-        paperDelivery.setProvince("RM");
-
-        List<PaperDelivery> deliveries = List.of(paperDelivery);
-        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("PRODUCT_RS.ATTEMPT_1"));
-        String unifiedDeliveryDriver = "driver1";
-        String tenderId = "tender1";
-
-        List<PaperDelivery> result = pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(deliveries, unifiedDeliveryDriver, tenderId, priorityMap);
-
-        assertEquals(1, result.size());
-        PaperDelivery resultDelivery = result.getFirst();
-        assertEquals("driver1", resultDelivery.getUnifiedDeliveryDriver());
-        assertEquals("tender1", resultDelivery.getTenderId());
-        assertEquals(1, resultDelivery.getPriority());
-    }
-
-    @Test
-    void assignUnifiedDeliveryDriverAndBuildNewStepEntities_filtersAndBuildsCorrectly() {
+    private PaperChannelDeliveryDriverResponse createPaperChannelDeliveryDriverResponse(String geoKey, String product, String driver) {
         PaperChannelDeliveryDriverResponse response = new PaperChannelDeliveryDriverResponse();
-        response.setGeoKey("RM");
-        response.setProduct("RS");
-        response.setUnifiedDeliveryDriver("driver1");
-
-        PaperDelivery paperDelivery = new PaperDelivery();
-        paperDelivery.setCap("12345");
-        paperDelivery.setProductType("RS");
-        paperDelivery.setAttempt(1);
-        paperDelivery.setDeliveryDate("2023-10-01");
-        paperDelivery.setRequestId("requestId1");
-
-        List<PaperChannelDeliveryDriverResponse> responses = List.of(response);
-        Map<String, List<PaperDelivery>> groupedByCapProductType = Map.of("RM~RS", List.of(paperDelivery));
-        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("PRODUCT_RS.ATTEMPT_1"));
-        String tenderId = "tender1";
-
-        List<PaperDelivery> result = pnDelayerUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(responses, groupedByCapProductType, tenderId, priorityMap);
-
-        assertEquals(1, result.size());
-        PaperDelivery resultDelivery = result.getFirst();
-        assertEquals("driver1", resultDelivery.getUnifiedDeliveryDriver());
-        assertEquals("tender1", resultDelivery.getTenderId());
+        response.setGeoKey(geoKey);
+        response.setProduct(product);
+        response.setUnifiedDeliveryDriver(driver);
+        return response;
     }
 
-    @Test
-    void assignUnifiedDeliveryDriverAndBuildNewStepEntities_handlesEmptyGroupedByCapProductType() {
-        List<PaperChannelDeliveryDriverResponse> responses = List.of();
-        Map<String, List<PaperDelivery>> groupedByCapProductType = Map.of();
-        Map<Integer, List<String>> priorityMap = Map.of();
-        String tenderId = "tender1";
 
-        List<PaperDelivery> result = pnDelayerUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(responses, groupedByCapProductType, tenderId, priorityMap);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void groupByGeoKeyAndProduct_createsCorrectMapping() {
-        PaperChannelDeliveryDriverResponse response1 = new PaperChannelDeliveryDriverResponse();
-        response1.setGeoKey("RM");
-        response1.setProduct("RS");
-        response1.setUnifiedDeliveryDriver("driver1");
-
-        PaperChannelDeliveryDriverResponse response2 = new PaperChannelDeliveryDriverResponse();
-        response2.setGeoKey("MI");
-        response2.setProduct("RS");
-        response2.setUnifiedDeliveryDriver("driver2");
-
-        List<PaperChannelDeliveryDriverResponse> responses = List.of(response1, response2);
-
-        Map<String, String> result = pnDelayerUtils.groupByGeoKeyAndProduct(responses);
-
-        assertEquals(2, result.size());
-        assertEquals("driver1", result.get("RM~RS"));
-        assertEquals("driver2", result.get("MI~RS"));
+    private PaperDelivery createPaperDelivery(String productType, String cap, String province, String senderPaId, Integer attempt) {
+        PaperDelivery delivery = new PaperDelivery();
+        delivery.setCap(cap);
+        delivery.setProvince(province);
+        delivery.setProductType(productType);
+        delivery.setUnifiedDeliveryDriver("driver1");
+        delivery.setRequestId("requestId");
+        delivery.setNotificationSentAt("2023-10-01T12:00:00Z");
+        delivery.setSenderPaId(senderPaId);
+        delivery.setDeliveryDate("2023-10-02");
+        delivery.setPriority(1);
+        delivery.setAttempt(attempt);
+        delivery.setDeliveryDate("2023-10-02");
+        delivery.setPk("2023-10-02~EVALUATE_RESIDUAL_CAPACITY");
+        return delivery;
     }
 }

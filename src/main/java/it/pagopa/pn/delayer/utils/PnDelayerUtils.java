@@ -2,7 +2,9 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.model.*;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
+import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.util.function.Tuple2;
@@ -16,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Component
@@ -36,9 +39,9 @@ public class PnDelayerUtils {
         return paperDeliveries.stream().collect(Collectors.groupingBy(PaperDelivery::getCap, Collectors.toList()));
     }
 
-    public Map<String, List<PaperDelivery>> groupByPaIdProductTypeProvince(List<PaperDelivery> paperDeliveries, String province) {
+    public Map<String, List<PaperDelivery>> groupByPaIdProductTypeProvince(List<PaperDelivery> paperDeliveries) {
         return paperDeliveries.stream()
-                .collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + province,
+                .collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + paperDelivery.getProvince(),
                         Collectors.toList()));
     }
 
@@ -51,7 +54,7 @@ public class PnDelayerUtils {
 
     public Map<String, String> groupByGeoKeyAndProduct(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses) {
         return paperChannelDeliveryDriverResponses.stream()
-                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriverResponse::getUnifiedDeliveryDriver));
+                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriverResponse::getUnifiedDeliveryDriver, (x, y) -> x));
     }
 
     public Map<String, List<PaperDelivery>> groupByCapAndProductType(List<PaperDelivery> paperDeliveries) {
@@ -111,13 +114,16 @@ public class PnDelayerUtils {
                 .toList();
     }
 
-    public SenderLimitJobPaperDeliveries evaluateSenderLimitAndFilter(Map<String, Integer> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
+    public void evaluateSenderLimitAndFilterDeliveries(Map<String, Tuple2<Integer, Integer>> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
         deliveriesGroupedByProductTypePaId.forEach((key, deliveries) -> {
-            List<PaperDelivery> filteredList = Optional.ofNullable(senderLimitMap.get(key)).map(limit -> deliveries.stream().limit(limit).toList()).orElse(deliveries);
-            senderLimitJobPaperDeliveries.getSendToNextStep().addAll(filteredList);
-            Optional.of(deliveries.size() - filteredList.size()).filter(remaining -> remaining > 0).ifPresent(remaining -> senderLimitJobPaperDeliveries.getSendToResidualStep().addAll(deliveries.subList(filteredList.size(), deliveries.size())));
+            int limit = Optional.ofNullable(senderLimitMap.get(key))
+                    .map(senderLimits -> senderLimits.getT1() - senderLimits.getT2())
+                    .orElse(deliveries.size());
+
+            int actualLimit = Math.min(limit, deliveries.size());
+            senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
+            senderLimitJobPaperDeliveries.getSendToResidualCapacityStep().addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
         });
-        return senderLimitJobPaperDeliveries;
     }
 
     public List<PaperDelivery> enrichWithPriorityAndUnifiedDeliveryDriver(List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, Map<Integer, List<String>> priorityMap) {
@@ -140,12 +146,10 @@ public class PnDelayerUtils {
     }
 
     public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
-        List<PaperDelivery> sendToResidualStep = new ArrayList<>();
-        List<PaperDelivery> sendToNextStep = new ArrayList<>(items.stream().filter(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1).toList());
-        items.removeIf(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1);
-        senderLimitJobPaperDeliveries.setSendToResidualStep(sendToResidualStep);
-        senderLimitJobPaperDeliveries.setSendToNextStep(sendToNextStep);
-        return senderLimitJobPaperDeliveries.getSendToNextStep();
+        Predicate<PaperDelivery> shouldExclude = paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1;
+        Map<Boolean, List<PaperDelivery>> partitioned = items.stream().collect(Collectors.partitioningBy(shouldExclude));
+        senderLimitJobPaperDeliveries.setSendToDriverCapacityStep(partitioned.get(true));
+        return partitioned.get(false);
     }
 
 }

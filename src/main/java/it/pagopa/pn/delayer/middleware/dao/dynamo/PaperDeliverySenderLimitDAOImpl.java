@@ -70,7 +70,7 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Mono<Integer> updateUsedSenderLimit(String pk, Integer increment, LocalDate deliveryDate, Integer senderLimit) {
+    public Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate deliveryDate, Integer senderLimit) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put(PaperDeliverySenderLimit.COL_PK, AttributeValue.builder().s(pk).build());
         key.put(PaperDeliverySenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());

@@ -9,6 +9,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
 import it.pagopa.pn.delayer.model.DeliveryDriverRequest;
+import it.pagopa.pn.delayer.model.IncrementUsedCapacityDto;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,11 +26,13 @@ import software.amazon.awssdk.services.lambda.model.InvokeResponse;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class DeliveryDriverUtilsTest {
@@ -128,19 +131,22 @@ public class DeliveryDriverUtilsTest {
     }
 
     @Test
-    void retrieveDriversCapacityOnProvince_handlesValidData() {
+    void retrieveDriversCapacityOnProvinceWithoutExclude() {
         LocalDate deliveryDate = LocalDate.now();
         String tenderId = "tender1";
         String province = "RM";
-        List<PaperDeliveryDriverCapacity> driverCapacities = List.of(
-                new PaperDeliveryDriverCapacity(),
-                new PaperDeliveryDriverCapacity()
-        );
+        PaperDeliveryDriverCapacity driverCapacity1 = new PaperDeliveryDriverCapacity();
+        driverCapacity1.setUnifiedDeliveryDriver("driver1");
+        driverCapacity1.setCapacity(30);
+        PaperDeliveryDriverCapacity driverCapacity2 = new PaperDeliveryDriverCapacity();
+        driverCapacity2.setUnifiedDeliveryDriver("driver2");
+        driverCapacity2.setCapacity(30);
+
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province))
-                .thenReturn(Mono.just(new PaperDeliveryCounter()));
+                .thenReturn(Mono.empty());
         when(paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate))
-                .thenReturn(Mono.just(driverCapacities));
+                .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1)));
 
         StepVerifier.create(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryDate, tenderId, province))
                 .expectNextMatches(result -> result.getCapacity() == 60 && result.getUnifiedDeliveryDrivers().size() == 2)
@@ -148,18 +154,63 @@ public class DeliveryDriverUtilsTest {
     }
 
     @Test
-    void retrieveDriversCapacityOnProvince_handlesNoDriverCapacities() {
+    void retrieveDriversCapacityOnProvinceWithExclude() {
         LocalDate deliveryDate = LocalDate.now();
         String tenderId = "tender1";
         String province = "RM";
+        PaperDeliveryDriverCapacity driverCapacity1 = new PaperDeliveryDriverCapacity();
+        driverCapacity1.setUnifiedDeliveryDriver("driver1");
+        driverCapacity1.setCapacity(30);
+        PaperDeliveryDriverCapacity driverCapacity2 = new PaperDeliveryDriverCapacity();
+        driverCapacity2.setUnifiedDeliveryDriver("driver2");
+        driverCapacity2.setCapacity(30);
+
+        PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
+        paperDeliveryCounter.setCounter(10);
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province))
-                .thenReturn(Mono.just(new PaperDeliveryCounter()));
+                .thenReturn(Mono.just(paperDeliveryCounter));
         when(paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate))
-                .thenReturn(Mono.just(List.of()));
+                .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1)));
 
         StepVerifier.create(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryDate, tenderId, province))
-                .expectNextMatches(result -> result.getCapacity() == -20 && result.getUnifiedDeliveryDrivers().isEmpty())
+                .expectNextMatches(result -> result.getCapacity() == 50 && result.getUnifiedDeliveryDrivers().size() == 2)
                 .verifyComplete();
+    }
+
+    @Test
+    void updateCounter(){
+        List<IncrementUsedCapacityDto> incrementCapacities = List.of(
+                new IncrementUsedCapacityDto("unifiedDeliveryDriver", "geoKey", 10, LocalDate.now(), 100),
+                new IncrementUsedCapacityDto("unifiedDeliveryDriver2", "geoKey2", 5, LocalDate.now(), 50)
+        );
+
+        when(paperDeliveryUsedCapacityDAO.updateCounter(
+                "unifiedDeliveryDriver", "geoKey", 10, LocalDate.now(), 100))
+                .thenReturn(Mono.empty());
+
+        when(paperDeliveryUsedCapacityDAO.updateCounter(
+                "unifiedDeliveryDriver2", "geoKey2", 5, LocalDate.now(), 50))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(deliveryDriverUtils.updateCounters(incrementCapacities))
+                .verifyComplete();
+
+        verify(paperDeliveryUsedCapacityDAO, times(2)).updateCounter(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void insertInCache() {
+        List<PaperChannelDeliveryDriverResponse> responses = List.of(new PaperChannelDeliveryDriverResponse("geoKey", "AR", "unifiedDeliveryDriver"));
+        when(pnDelayerUtils.groupByGeoKeyAndProduct(any())).thenReturn(Map.of("geoKey~AR", "unifiedDeliveryDriver"));
+        deliveryDriverUtils.insertInCache(responses);
+        verify(cacheService, times(1)).addToCache("geoKey~AR", "unifiedDeliveryDriver");
+    }
+
+    @Test
+    void retrieveFromCache() {
+        when(cacheService.getFromCache("capProductTypeKey")).thenReturn(Optional.of("unifiedDeliveryDriver"));
+        var result = deliveryDriverUtils.retrieveFromCache("capProductTypeKey");
+        assertEquals("unifiedDeliveryDriver", result.orElse(null));
     }
 }
