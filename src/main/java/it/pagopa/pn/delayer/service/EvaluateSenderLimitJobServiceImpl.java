@@ -87,9 +87,10 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                             .ifPresentOrElse(unifiedDeliveryDriver -> toSenderLimitEvaluation.addAll(pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(capProductTypeEntry.getValue(), unifiedDeliveryDriver, tenderId, priorityMap)),
                                     () -> deliveryDriverRequest.add(new DeliveryDriverRequest(capProductTypeEntry.getKey().split("~")[0], capProductTypeEntry.getKey().split("~")[1]))))
                     .then(Mono.just(deliveryDriverRequest))
+                    .filter(deliveryDriverRequests -> !CollectionUtils.isEmpty(deliveryDriverRequests))
                     .map(deliveryDriverRequests -> deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(deliveryDriverRequests, tenderId))
                     .doOnNext(deliveryDriverUtils::insertInCache)
-                    .map(paperChannelDeliveryDriverResponses -> pnDelayerUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(paperChannelDeliveryDriverResponses, groupedByCapProductType, tenderId, priorityMap))
+                    .map(paperChannelDeliveryDriverResponses -> pnDelayerUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(paperChannelDeliveryDriverResponses, groupedByCapProductType, tenderId, priorityMap))
                     .doOnNext(toSenderLimitEvaluation::addAll)
                     .thenReturn(toSenderLimitEvaluation);
         }

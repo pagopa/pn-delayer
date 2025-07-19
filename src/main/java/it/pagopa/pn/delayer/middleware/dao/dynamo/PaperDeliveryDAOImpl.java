@@ -55,9 +55,12 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
 
     @Override
     public Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveries) {
-        return Flux.fromIterable(paperDeliveries).buffer(25)
-                .flatMap(chunk -> insertWithRetry(chunk, 3))
-                .then();
+        if(!CollectionUtils.isEmpty(paperDeliveries)) {
+            return Flux.fromIterable(paperDeliveries).buffer(25)
+                    .flatMap(chunk -> insertWithRetry(chunk, 3))
+                    .then();
+        }
+        return Mono.empty();
     }
 
     private Mono<Void> insertWithRetry(List<PaperDelivery> paperDeliveriesChunk, int retriesLeft) {

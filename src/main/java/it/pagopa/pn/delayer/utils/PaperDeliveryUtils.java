@@ -176,6 +176,7 @@ public class PaperDeliveryUtils {
         return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(senderLimitJobPaperDeliveries.getSendToDriverCapacityStep(), deliveryWeek))
                 .thenReturn(senderLimitJobPaperDeliveries)
                 .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobPaperDeliveries.getSendToResidualCapacityStep(), deliveryWeek))
-                        .thenReturn(senderLimitJobPaperDeliveries.getSendToDriverCapacityStep()));
+                        .thenReturn(senderLimitJobPaperDeliveries.getSendToDriverCapacityStep())
+                        .doOnNext(paperDeliveries -> paperDeliveries.removeIf(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1)));
     }
 }

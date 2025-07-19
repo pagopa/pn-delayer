@@ -105,7 +105,7 @@ public class PnDelayerUtils {
         return filteredList.size();
     }
 
-    public List<PaperDelivery> assignUnifiedDeliveryDriverAndBuildNewStepEntities(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses, Map<String, List<PaperDelivery>> groupedByCapProductType, String tenderId, Map<Integer, List<String>> priorityMap) {
+    public List<PaperDelivery> assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses, Map<String, List<PaperDelivery>> groupedByCapProductType, String tenderId, Map<Integer, List<String>> priorityMap) {
         Map<String, String> driverMap = groupByGeoKeyAndProduct(paperChannelDeliveryDriverResponses);
         return groupedByCapProductType.entrySet().stream()
                 .flatMap(entry -> Optional.ofNullable(driverMap.get(entry.getKey()))

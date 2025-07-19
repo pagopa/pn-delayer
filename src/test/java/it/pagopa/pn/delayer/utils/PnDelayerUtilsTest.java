@@ -202,7 +202,7 @@ class PnDelayerUtilsTest {
     }
 
     @Test
-    void assignUnifiedDeliveryDriverAndBuildNewStepEntities(){
+    void assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(){
         List<PaperChannelDeliveryDriverResponse> driverResponses = new ArrayList<>();
         driverResponses.add(createPaperChannelDeliveryDriverResponse("00178", "AR", "driverX"));
         driverResponses.add(createPaperChannelDeliveryDriverResponse("00179", "RS", "driverY"));
@@ -222,7 +222,7 @@ class PnDelayerUtilsTest {
                 2, List.of("PRODUCT_RS.ATTEMPT_1")
         );
 
-        List<PaperDelivery> result = pnDelayerUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(
+        List<PaperDelivery> result = pnDelayerUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(
                 driverResponses, grouped, "tenderTest", priorityMap
         );
 

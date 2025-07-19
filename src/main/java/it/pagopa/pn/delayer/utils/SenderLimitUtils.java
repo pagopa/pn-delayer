@@ -29,7 +29,9 @@ public class SenderLimitUtils {
         return retrieveUsedSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId.keySet(), senderLimitMap)
                 .thenReturn(senderLimitMap)
                 .flatMap(unused -> retrieveAndCalculateSenderLimit(deliveryWeek, capacity, deliveriesGroupedByProductTypePaId.keySet(), senderLimitMap))
-                .doOnNext(residualSenderLimitMaps -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitMap, deliveriesGroupedByProductTypePaId, senderLimitJobPaperDeliveries));
+                .thenReturn(senderLimitMap)
+                .doOnNext(limitMap -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(limitMap, deliveriesGroupedByProductTypePaId, senderLimitJobPaperDeliveries))
+                .then();
     }
 
     private Mono<Void> retrieveUsedSenderLimit(LocalDate deliveryWeek, Set<String> paIdProductTypeTuples, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {

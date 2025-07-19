@@ -1,27 +1,36 @@
-/*
 package it.pagopa.pn.delayer.service;
 
-import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.config.SsmParameterConsumerActivation;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.model.*;
-import it.pagopa.pn.delayer.utils.*;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
+import it.pagopa.pn.delayer.model.DriversTotalCapacity;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
+import it.pagopa.pn.delayer.model.WorkflowStepEnum;
+import it.pagopa.pn.delayer.utils.DeliveryDriverUtils;
+import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
+import it.pagopa.pn.delayer.utils.PnDelayerUtils;
+import it.pagopa.pn.delayer.utils.SenderLimitUtils;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
-import reactor.util.function.Tuples;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 
 import static it.pagopa.pn.delayer.model.WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY;
@@ -31,168 +40,311 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class EvaluateSenderLimitJobServiceTest {
 
-    @InjectMocks
     private EvaluateSenderLimitJobServiceImpl service;
-
-    @Mock
-    private PnDelayerUtils pnDelayerUtils;
 
     @Mock
     private PnDelayerConfigs pnDelayerConfigs;
 
     @Mock
-    private PaperDeliveryUtils paperDeliveryUtils;
+    private DeliveryDriverUtils deliveryDriverUtils;
 
     @Mock
-    private DeliveryDriverUtils deliveryDriverUtils;
+    private PaperDeliveryDAO paperDeliveryDao;
 
     @Mock
     private SsmParameterConsumerActivation ssmParameterConsumerActivation;
 
     @Mock
-    private SenderLimitUtils senderLimitUtils;
+    private PaperDeliverySenderLimitDAO paperDeliverySenderLimitDAO;
+
+    @Mock
+    private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
+
+    @Mock
+    private PaperDeliveryPrintCapacityDAO paperDeliveryPrintCapacityDAO;
 
     private final String province = "RM";
-    private final String tenderId = "TENDER1";
-    private final Instant now = Instant.now();
-    private final LocalDate deliveryWeek = LocalDate.now();
-    private final Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
+    private final String tenderId = "TENDERID";
 
     @BeforeEach
     void setupMocks() {
-        when(pnDelayerUtils.calculateDeliveryWeek(now)).thenReturn(deliveryWeek);
-        when(pnDelayerConfigs.getPaperDeliveryPriorityParameterName()).thenReturn("priority-param");
+        PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
+        pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
+        pnDelayerConfigs.setPaperDeliveryPriorityParameterName("priority-param");
+        PnDelayerUtils pnDelayerUtils = new PnDelayerUtils(pnDelayerConfigs);
+        PnDelayerConfigs.Dao daoConfig = new PnDelayerConfigs.Dao();
+        daoConfig.setPaperDeliveryQueryLimit(50);
+        pnDelayerConfigs.setDao(daoConfig);
 
-        Map<Integer, List<String>> priorityMap = Map.of(1, List.of("AR"), 2, List.of("890"));
+        service = new EvaluateSenderLimitJobServiceImpl(
+                pnDelayerUtils,
+                pnDelayerConfigs,
+                new PaperDeliveryUtils(paperDeliveryDao, pnDelayerConfigs, pnDelayerUtils, deliveryDriverUtils, paperDeliveryCounterDAO, paperDeliveryPrintCapacityDAO),
+                deliveryDriverUtils,
+                ssmParameterConsumerActivation,
+                new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils)
+        );
+
+        Map<Integer, List<String>> priorityMap = Map.of(
+                1, List.of("PRODUCT_RS.ATTEMPT_0"),
+                2, List.of("PRODUCT_AR.ATTEMPT_1", "PRODUCT_890.ATTEMPT_1"),
+                3, List.of("PRODUCT_AR.ATTEMPT_0", "PRODUCT_890.ATTEMPT_0"));
         when(ssmParameterConsumerActivation.getParameterValue(eq("priority-param"), eq(Map.class)))
                 .thenReturn(Optional.of(priorityMap));
     }
 
     @Test
-    void startSenderLimitJob_singleDriver_success() {
-        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("Driver1"), Map.of());
-        List<PaperDelivery> deliveries = getPaperDeliveries(false);
-        List<PaperDelivery> deliveries2 = getPaperDeliveries(true);
-        List<PaperDelivery> deliveries3 = getPaperDeliveries(false);
+    void startSenderLimitJob_singleDriver_withoutLastEvaluatedKey() {
+
+        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE"));
+        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
+                .thenReturn(Mono.just(capacity));
+
+        List<PaperDelivery> deliveries = new ArrayList<>();
+        deliveries.addAll(getPaperDeliveries(false));
+        deliveries.addAll(getPaperDeliveries(false));
         Page<PaperDelivery> page = mock(Page.class);
         when(page.items()).thenReturn(deliveries);
         Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
         lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_RESIDUAL_CAPACITY).build());
         lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
-        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);
+        when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+                .thenReturn(Mono.just(page));
 
+        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
+        usedSenderLimit.setPk("paId1~RS~RM");
+        usedSenderLimit.setSenderLimit(5);
+        usedSenderLimit.setNumberOfShipment(5);
+
+        PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
+        paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setPercentageLimit(10);
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(usedSenderLimit));
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(paperDeliverySenderLimit));
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
+                .thenReturn(Mono.just(2L));
+
+        ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
+        when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
+                .verifyComplete();
+
+        List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
+        Assertions.assertEquals(3, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliveryDao, times(2)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+    }
+
+    @Test
+    void startSenderLimitJob_singleDriver_withLastEvaluatedKey() {
+
+        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE"));
+        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
+                .thenReturn(Mono.just(capacity));
+
+        List<PaperDelivery> deliveries = new ArrayList<>();
+        deliveries.addAll(getPaperDeliveries(false));
+        deliveries.addAll(getPaperDeliveries(false));
+        Page<PaperDelivery> page = mock(Page.class);
+        when(page.items()).thenReturn(deliveries);
+        Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
+        lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_SENDER_LIMIT).build());
+        lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
+        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);;
+
+        List<PaperDelivery> deliveries2 = new ArrayList<>();
+        deliveries2.addAll(getPaperDeliveries(false));
+        deliveries2.addAll(getPaperDeliveries(false));
         Page<PaperDelivery> page2 = mock(Page.class);
         when(page2.items()).thenReturn(deliveries2);
-        when(page2.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);
+        when(page2.lastEvaluatedKey()).thenReturn(new HashMap<>());
 
-        Page<PaperDelivery> page3 = mock(Page.class);
-        when(page3.items()).thenReturn(deliveries3);
-        when(page3.lastEvaluatedKey()).thenReturn(new HashMap<>());
-
-        when(paperDeliveryUtils.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), eq(String.join("~", province, "2025-07-07")), any(), eq(3)))
-                .thenReturn(Mono.just(page));
-
-        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province))
-                .thenReturn(Mono.just(capacity));
-
-        when(pnDelayerUtils.excludeRsAndSecondAttempt(any(), any())).thenReturn(mockItems);
-        when(pnDelayerUtils.groupByPaIdProductTypeProvince(any())).thenReturn(Map.of());
-
-        when(paperDeliveryUtils.insertPaperDeliveries(any(), any()))
-                .thenReturn(Mono.just(mockItems));
-        when(senderLimitUtils.updateUsedSenderLimit(any(), any(), any()))
-                .thenReturn(Mono.empty());
-
-        when(senderLimitUtils.retrieveAndEvaluateSenderLimit(any(), any(), any(), any(), any()))
-                .thenReturn(Mono.empty());
-
-        when(pnDelayerConfigs.getDao()).thenReturn(mock(PnDelayerConfigs.DaoConfig.class));
-        when(pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()).thenReturn(50);
-
-        when(pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(any(), any(), any(), any()))
-                .thenReturn(mockItems);
-
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, now))
-                .verifyComplete();
-    }
-
-    @Test
-    void startSenderLimitJob_multipleDrivers_withCacheAndFallback() {
-        List<String> drivers = List.of("driver1", "driver2");
-        DriversTotalCapacity capacity = new DriversTotalCapacity(drivers, Map.of());
-        List<PaperDelivery> paperDeliveries = List.of(mock(PaperDelivery.class));
-        PaperDeliveryPage page = new PaperDeliveryPage(paperDeliveries, Map.of());
-
-        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province))
-                .thenReturn(Mono.just(capacity));
-        when(paperDeliveryUtils.retrievePaperDeliveries(any(), any(), any(), any(), anyInt()))
-                .thenReturn(Mono.just(page));
-
-        Map<String, List<PaperDelivery>> grouped = Map.of("00100~AR", paperDeliveries);
-        when(pnDelayerUtils.groupByCapAndProductType(any())).thenReturn(grouped);
-
-        when(deliveryDriverUtils.retrieveFromCache(any())).thenReturn(Optional.empty());
-        when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(any()))
-                .thenReturn(Map.of("00100~AR", "driver2"));
-        doNothing().when(deliveryDriverUtils).insertInCache(any());
-
-        when(pnDelayerUtils.assignUnifiedDeliveryDriverAndBuildNewStepEntities(any(), any(), any(), any()))
-                .thenReturn(paperDeliveries);
-
-        when(pnDelayerUtils.excludeRsAndSecondAttempt(any(), any())).thenReturn(paperDeliveries);
-        when(pnDelayerUtils.groupByPaIdProductTypeProvince(any())).thenReturn(Map.of());
-        when(senderLimitUtils.retrieveAndEvaluateSenderLimit(any(), any(), any(), any(), any()))
-                .thenReturn(Mono.empty());
-
-        when(paperDeliveryUtils.insertPaperDeliveries(any(), any())).thenReturn(Mono.just(paperDeliveries));
-        when(senderLimitUtils.updateUsedSenderLimit(any(), any(), any())).thenReturn(Mono.empty());
-
-        when(pnDelayerConfigs.getDao()).thenReturn(mock(PnDelayerConfigs.DaoConfig.class));
-        when(pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()).thenReturn(50);
-
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, now))
-                .verifyComplete();
-    }
-
-
-    @Test
-    void startSenderLimitJob_withPagination_callsRecursive() {
-        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("Driver1"), Map.of());
-        List<PaperDelivery> mockItems = List.of(new PaperDelivery());
-        Map<String, AttributeValue> nextPageKey = Map.of("key", AttributeValue.builder().s("val").build());
-
-        PaperDeliveryPage page1 = new PaperDeliveryPage(mockItems, nextPageKey);
-        PaperDeliveryPage page2 = new PaperDeliveryPage(mockItems, Map.of());
-
-        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province))
-                .thenReturn(Mono.just(capacity));
-
-        when(paperDeliveryUtils.retrievePaperDeliveries(any(), any(), any(), eq(lastEvaluatedKey), anyInt()))
-                .thenReturn(Mono.just(page1));
-        when(paperDeliveryUtils.retrievePaperDeliveries(any(), any(), any(), eq(nextPageKey), anyInt()))
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+                .thenReturn(Mono.just(page))
                 .thenReturn(Mono.just(page2));
 
-        when(pnDelayerUtils.excludeRsAndSecondAttempt(any(), any())).thenReturn(mockItems);
-        when(pnDelayerUtils.groupByPaIdProductTypeProvince(any())).thenReturn(Map.of());
+        PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
+        paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setPercentageLimit(50);
 
-        when(paperDeliveryUtils.insertPaperDeliveries(any(), any()))
-                .thenReturn(Mono.just(mockItems));
-        when(senderLimitUtils.updateUsedSenderLimit(any(), any(), any()))
+        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
+        usedSenderLimit.setPk("paId2~AR~RM");
+        usedSenderLimit.setSenderLimit(5);
+        usedSenderLimit.setNumberOfShipment(4);
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.empty())
+                .thenReturn(Flux.just(usedSenderLimit));
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(paperDeliverySenderLimit));
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
+                .thenReturn(Mono.just(2L));
+
+        ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
+        when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
                 .thenReturn(Mono.empty());
 
-        when(senderLimitUtils.retrieveAndEvaluateSenderLimit(any(), any(), any(), any(), any()))
-                .thenReturn(Mono.empty());
-
-        when(pnDelayerConfigs.getDao()).thenReturn(mock(PnDelayerConfigs.DaoConfig.class));
-        when(pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()).thenReturn(50);
-        when(pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(any(), any(), any(), any()))
-                .thenReturn(mockItems);
-
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, now))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
                 .verifyComplete();
 
-        verify(paperDeliveryUtils, times(2)).retrievePaperDeliveries(any(), any(), any(), any(), anyInt());
+        List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
+        Assertions.assertEquals(4, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(0, capturedDeliveries.get(1).size());
+        Assertions.assertEquals(3, capturedDeliveries.get(2).size());
+        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
+        verify(paperDeliverySenderLimitDAO, times(2)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
     }
+
+    @Test
+    void startSenderLimitJob_multipleDriver_withoutLastEvaluatedKey() {
+
+        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE", "FULMINE"));
+        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
+                .thenReturn(Mono.just(capacity));
+
+        when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString()))
+                .thenReturn(List.of(new PaperChannelDeliveryDriverResponse("00184", "AR", "driver1"),
+                        new PaperChannelDeliveryDriverResponse("00185", "RS", "driver2")));
+
+        List<PaperDelivery> deliveries = new ArrayList<>();
+        deliveries.addAll(getPaperDeliveries(false));
+        deliveries.addAll(getPaperDeliveries(false));
+        Page<PaperDelivery> page = mock(Page.class);
+        when(page.items()).thenReturn(deliveries);
+        Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
+        lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_RESIDUAL_CAPACITY).build());
+        lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
+        when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+                .thenReturn(Mono.just(page));
+
+        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
+        usedSenderLimit.setPk("paId1~RS~RM");
+        usedSenderLimit.setSenderLimit(5);
+        usedSenderLimit.setNumberOfShipment(5);
+
+        PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
+        paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setPercentageLimit(10);
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(usedSenderLimit));
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(paperDeliverySenderLimit));
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
+                .thenReturn(Mono.just(2L));
+
+        ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
+        when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
+                .thenReturn(Mono.empty());
+
+        when(deliveryDriverUtils.retrieveFromCache("00184~AR"))
+                .thenReturn(Optional.empty());
+        when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
+                .thenReturn(Optional.empty());
+
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
+                .verifyComplete();
+
+        List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
+        Assertions.assertEquals(3, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
+        verify(deliveryDriverUtils, times(2)).retrieveFromCache(anyString());
+        verify(deliveryDriverUtils, times(1)).insertInCache(anyList());
+        verify(deliveryDriverUtils, times(1)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliveryDao, times(2)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+    }
+
+    @Test
+    void startSenderLimitJob_multiple_withLastEvaluatedKey() {
+
+        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE", "FULMINE"));
+        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
+                .thenReturn(Mono.just(capacity));
+
+        when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString()))
+                .thenReturn(List.of(new PaperChannelDeliveryDriverResponse("00184", "AR", "driver1"),
+                        new PaperChannelDeliveryDriverResponse("00185", "RS", "driver2")));
+
+        List<PaperDelivery> deliveries = new ArrayList<>();
+        deliveries.addAll(getPaperDeliveries(false));
+        deliveries.addAll(getPaperDeliveries(false));
+        Page<PaperDelivery> page = mock(Page.class);
+        when(page.items()).thenReturn(deliveries);
+        Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
+        lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_SENDER_LIMIT).build());
+        lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
+        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);;
+
+        List<PaperDelivery> deliveries2 = new ArrayList<>();
+        deliveries2.addAll(getPaperDeliveries(false));
+        deliveries2.addAll(getPaperDeliveries(false));
+        Page<PaperDelivery> page2 = mock(Page.class);
+        when(page2.items()).thenReturn(deliveries2);
+        when(page2.lastEvaluatedKey()).thenReturn(new HashMap<>());
+
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+                .thenReturn(Mono.just(page))
+                .thenReturn(Mono.just(page2));
+
+        PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
+        paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setPercentageLimit(50);
+
+        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
+        usedSenderLimit.setPk("paId2~AR~RM");
+        usedSenderLimit.setSenderLimit(5);
+        usedSenderLimit.setNumberOfShipment(4);
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.empty())
+                .thenReturn(Flux.just(usedSenderLimit));
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(paperDeliverySenderLimit));
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
+                .thenReturn(Mono.just(2L));
+
+        ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
+        when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
+                .thenReturn(Mono.empty());
+
+        when(deliveryDriverUtils.retrieveFromCache("00184~AR"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of("driver1"));
+        when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of("driver2"));
+
+
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
+                .verifyComplete();
+
+        List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
+        Assertions.assertEquals(4, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(0, capturedDeliveries.get(1).size());
+        Assertions.assertEquals(3, capturedDeliveries.get(2).size());
+        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
+        verify(paperDeliverySenderLimitDAO, times(2)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+        verify(deliveryDriverUtils, times(4)).retrieveFromCache(anyString());
+        verify(deliveryDriverUtils, times(1)).insertInCache(anyList());
+        verify(deliveryDriverUtils, times(1)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());
+
+    }
+
 
     private static @NotNull List<PaperDelivery> getPaperDeliveries(boolean sameCap) {
         PaperDelivery paperDelivery1 = new PaperDelivery();
@@ -205,6 +357,7 @@ class EvaluateSenderLimitJobServiceTest {
         paperDelivery1.setPrepareRequestDate("2025-01-02T00:00:00Z");
         paperDelivery1.setProductType("RS");
         paperDelivery1.setAttempt(0);
+        paperDelivery1.setSenderPaId("paId1");
         paperDelivery1.setProvince("RM");
         PaperDelivery paperDelivery2 = new PaperDelivery();
         paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
@@ -215,6 +368,7 @@ class EvaluateSenderLimitJobServiceTest {
         paperDelivery2.setPrepareRequestDate("2025-01-02T00:00:00Z");
         paperDelivery2.setProductType("AR");
         paperDelivery2.setAttempt(0);
+        paperDelivery2.setSenderPaId("paId2");
         paperDelivery2.setProvince("RM");
         paperDelivery2.setCreatedAt(Instant.now().toString());
         if (sameCap) {
@@ -227,4 +381,3 @@ class EvaluateSenderLimitJobServiceTest {
         return List.of(paperDelivery1, paperDelivery2);
     }
 }
-*/
