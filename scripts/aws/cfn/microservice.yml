@@ -370,6 +370,10 @@ Parameters:
     Type: String
     Description: 'ARN of DynamoDB table containing Province'
 
+  PaperChannelTenderApiLambdaName:
+    Type: String
+    Description: 'PaperChannelTenderApiLambda function name'
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -1512,7 +1516,23 @@ Resources:
                 - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${UnifiedDeliveryDriverProvinceParameter}
             - Effect: Allow
               Action:
-                  - dynamodb:Scan
+                - dynamodb:Scan
               Resource:
-                  - !Sub "${ProvinceTableArn}"
-                  - !Sub "${ProvinceTableArn}/*"
+                - !Sub "${ProvinceTableArn}"
+                - !Sub "${ProvinceTableArn}/*"
+            - Effect: Allow
+              Action:
+                - batch:SubmitJob
+                - batch:DescribeJobs
+              Resource:
+                  - !Ref SenderLimitJobDefinition
+                  - !Ref ResidualCapacityJobDefinition
+                  - !Ref DriverCapacityJobDefinition
+                  - !Ref SenderLimitJobQueue
+                  - !Ref ResidualCapacityJobQueue
+                  - !Ref DriverCapacityJobQueue
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
