@@ -91,7 +91,7 @@ Un esempio di risposta è il seguente:
   }
 ]
 ```
-### Output GET_BY_REQUEST_ID
+### Output RUN_ALGORITHM
 ```json
 {
   "PaperDeliveryTableName":"pn-DelayerPaperDelivery",
