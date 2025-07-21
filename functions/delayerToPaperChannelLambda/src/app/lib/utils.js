@@ -1,18 +1,54 @@
+const { LocalDate } = require('@js-joda/core');
+
 function chunkArray(messages, size) {
     return Array.from({ length: Math.ceil(messages.length / size) },
     (_, i) => messages.slice(i * size, i * size + size));
 }
 
-const groupRecordsByProductAndProvince = (items) => {
-  return items.reduce((acc, item) => {
-    const { productType, province } = item.paperDeliveryIncoming;
-    const key = `${productType}~${province}`;
-    if (!acc[key]) {
-      acc[key] = [];
+function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
+   if(step === 'EVALUATE_SENDER_LIMIT'){
+      let deliveryWeekLocalDate = LocalDate.parse(deliveryWeek);
+      deliveryWeek = deliveryWeekLocalDate.plusDays(7).toString();
     }
-    acc[key].push(item);
-    return acc;
-  }, {});
-};
+    return {
+        pk: `${deliveryWeek}~${step}`,
+        sk: buildSk(step, item),
+        requestId: payload.requestId,
+        createdAt: new Date().toISOString(),
+        notificationSentAt: payload.notificationSentAt,
+        prepareRequestDate: payload.prepareRequestDate,
+        productType: payload.productType,
+        senderPaId: payload.senderPaId,
+        province: payload.province,
+        cap: payload.cap,
+        attempt: payload.attempt,
+        iun: payload.iun,
+        unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
+        tenderId: payload.tenderId,
+        recipientId: payload.recipientId,
+        priority: payload.priority
+      };
+}
 
-module.exports = { chunkArray, groupRecordsByProductAndProvince };
+function buildSk(workflowStepEnum, paperDelivery) {
+  const isRS = paperDelivery.productType?.toLowerCase() === "rs";
+  const isFirstAttempt = paperDelivery.attempt === 1;
+  const date = isRS || isFirstAttempt ? paperDelivery.prepareRequestDate : paperDelivery.notificationSentAt;
+
+  switch (workflowStepEnum) {
+    case "EVALUATE_SENDER_LIMIT":
+      return [paperDelivery.province, date, paperDelivery.requestId].join("~");
+
+    case "SENT_TO_PREPARE_PHASE_2":
+      return [paperDelivery.priority, date, paperDelivery.requestId].join("~");
+
+    default:
+      throw new Error(`Unsupported workflow step: ${workflowStepEnum}`);
+  }
+}
+
+module.exports = {
+    chunkArray,
+    mapToPaperDeliveryForGivenStep,
+    buildSk
+}
