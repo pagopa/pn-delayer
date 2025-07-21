@@ -145,6 +145,15 @@ public class PnDelayerUtils {
                 .orElse(3);
     }
 
+    /**
+     *
+     * @param items spedizioni in input
+     * @param senderLimitJobPaperDeliveries contiene nel campo sendToDriverCapacityStep le spedizioni che sono RS e secondo tentativi
+     * @return le spedizioni che non sono nè RS nè secondi tentativi
+     * <p>
+     * partitioned.get(true) -> spedizioni che sono RS o secondi tentativi
+     * partitioned.get(false) -> spedizioni che non sono nè RS nè secondi tentativi
+     */
     public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
         Predicate<PaperDelivery> shouldExclude = paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1;
         Map<Boolean, List<PaperDelivery>> partitioned = items.stream().collect(Collectors.partitioningBy(shouldExclude));

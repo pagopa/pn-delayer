@@ -294,16 +294,17 @@ class PnDelayerUtilsTest {
 
     @Test
     void excludeRsAndSecondAttempt() {
-        PaperDelivery paperDelivery1 = createPaperDelivery("RS", "00178", "RM", "paId1", 1);
-        PaperDelivery paperDelivery2 = createPaperDelivery("AR", "00179", "RM", "paId2", 2);
-        PaperDelivery paperDelivery3 = createPaperDelivery("RS", "00180", "RM", "paId3", 2);
-        List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3);
+        PaperDelivery paperDelivery1 = createPaperDelivery("RS", "00178", "RM", "paId1", 0);
+        PaperDelivery paperDelivery2 = createPaperDelivery("RS", "00179", "RM", "paId2", 1);
+        PaperDelivery paperDelivery3 = createPaperDelivery("AR", "00180", "RM", "paId3", 0);
+        PaperDelivery paperDelivery4 = createPaperDelivery("890", "00181", "RM", "paId4", 1);
+        List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3, paperDelivery4);
         SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
 
         List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobPaperDeliveries);
 
         assertEquals(1, result.size());
-        assertEquals(2, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().size());
+        assertEquals(3, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().size());
     }
 
     private PaperChannelDeliveryDriverResponse createPaperChannelDeliveryDriverResponse(String geoKey, String product, String driver) {
