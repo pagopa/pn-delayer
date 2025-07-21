@@ -18,16 +18,26 @@ function calculateTtl(){
 }
 
 function retrieveCounterMap(excludeGroupedRecords) {
-  return Object.keys(excludeGroupedRecords).map(key => {
-    const value = excludeGroupedRecords[key];
-    let rsCounter = value.filter(record => record.entity.productType === "RS").length;
-    let attemptCounter = value.filter(record => record.entity.productType != "RS" && record.entity.attempt && parseInt(record.entity.attempt, 10) === 1).length;
-    let counter = rsCounter + attemptCounter;
-    return { [key]: counter };
-  }).filter(entry => {
-    const key = Object.keys(entry)[0];
-    return entry[key] > 0;
-  });
+  const result = {};
+  for (const key of Object.keys(excludeGroupedRecords)) {
+    const records = excludeGroupedRecords[key];
+    const productTypeKey = key.split("~")[0];
+
+    let filteredRecords;
+
+    if (productTypeKey === "RS") {
+      filteredRecords = records;
+    } else {
+      filteredRecords = records.filter(
+        record => record.entity.attempt && parseInt(record.entity.attempt, 10) === 1
+      );
+    }
+
+    if (filteredRecords.length > 0) {
+      result[key] = filteredRecords.length;
+    }
+  }
+  return result;
 }
 
 function getDeliveryWeek() {
@@ -39,17 +49,16 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
    
     const deliveryDate = getDeliveryWeek();
     let ttl = calculateTtl();
-    const counterMap = retrieveCounterMap(excludeGroupedRecords);
+    let counterMap = retrieveCounterMap(excludeGroupedRecords);
 
-    for (const mapEntry of counterMap) {
-      let sk = Object.keys(mapEntry)[0];
-      const inc = mapEntry[sk];
+    for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
+      const sk = `EXCLUDE~${productTypeProvince}`;
       try {
         const input = {
             TableName: counterTableName,
             Key: {
               deliveryDate: deliveryDate,
-              sk: `EXCLUDE~${sk}`
+              sk: sk
             },
             UpdateExpression: 'ADD #counter :inc SET #ttl = :ttl',
             ExpressionAttributeNames: {
@@ -66,7 +75,7 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
           console.log(`updateSuccessfully for ${sk}`);
       } catch (error) {
         console.error(`Failed to update counter for sk: ${sk}`, error);
-        const failedRecords = excludeGroupedRecords[sk];
+        const failedRecords = excludeGroupedRecords[productTypeProvince];
         if (failedRecords) {
           const failedSeqNumbers = failedRecords.map((i) => { return { itemIdentifier: i.kinesisSeqNumber }; });
           batchItemFailures.push(...failedSeqNumbers);

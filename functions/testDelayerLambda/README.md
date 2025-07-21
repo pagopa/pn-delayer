@@ -11,6 +11,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **IMPORT_DATA** | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`. | _Nessuno_ → passare un array vuoto `[]` |
 | **GET_USED_CAPACITY** | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]` |
 | **GET_BY_REQUEST_ID**  | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`. | `[ requestId ]`                                                              |
+| **RUN_ALGORITHM** | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle. | [] |
 
 ### Esempi di payload
 
@@ -38,7 +39,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   "operationType": "GET_BY_REQUEST_ID",
   "parameters": ["PREPARE_ANALOG_DOMICILE.IUN_ADTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0"]
 }
+```
 
+*RUN_ALGORITHM*
+```json
+{
+  "operationType": "RUN_ALGORITHM",
+  "parameters": []
+}
 ```
 
 ### Output GET_USED_CAPACITY
@@ -83,6 +91,18 @@ Un esempio di risposta è il seguente:
   }
 ]
 ```
+### Output RUN_ALGORITHM
+```json
+{
+  "PaperDeliveryTableName":"pn-DelayerPaperDelivery",
+  "DeliveryDriverCapacityTableName":"pn-PaperDeliveryDriverCapacities",
+  "DeliveryDriverUsedCapacityTableName":"pn-PaperDeliveryDriverUsedCapacities",
+  "EstimateSendersTableName":"pn-PaperDeliveryEstimateSenders",
+  "SenderUsedLimitTableName": "pn-PaperDeliveriesSenderUsedLimit",
+  "PrintCapacityCounterTableName": "pn-PaperDeliveriesPrintCapacityCounter",
+  "CounterTableName": "pn-PaperDeliveriesCounter"
+}
+```
 
 
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
@@ -99,6 +119,7 @@ Un esempio di risposta è il seguente:
 │       ├── getDelayerPaperDeliveriesByRequestId.js.js  # Implementazione operazione GET_BY_REQUEST_ID
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
+│       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
@@ -113,10 +134,11 @@ Un esempio di risposta è il seguente:
 
 ## Variabili d’ambiente
 
-| Nome           | Descrizione                                 | Obbligatoria |
-|----------------|---------------------------------------------|--------------|
-| `BUCKET_NAME`  | Bucket S3 contenente il CSV                 | ✅ |
-| `OBJECT_KEY`   | Key/Path dell’oggetto CSV                   | ✅ |
+| Nome          | Descrizione                 | Obbligatoria |
+|---------------|-----------------------------|--------------|
+| `BUCKET_NAME` | Bucket S3 contenente il CSV | ✅ |
+| `OBJECT_KEY`  | Key/Path dell’oggetto CSV   | ✅ |
+| `SFN_ARN`     | ARN della Step Function     | ✅ |
 
 ## Setup locale
 Dalla cartella testDelayerLambda

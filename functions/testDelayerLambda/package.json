@@ -1,7 +1,7 @@
 {
   "name": "testDelayerLambda",
   "version": "1.0.0",
-  "description": "AWS Lambda dispatcher: IMPORT_DATA (CSV→Dynamo) + GET_USED_CAPACITY (read used capacity), GET_BY_REQUEST_ID (read paper deliveries)",
+  "description": "AWS Lambda dispatcher: IMPORT_DATA (CSV→Dynamo), GET_USED_CAPACITY (read used capacity), GET_BY_REQUEST_ID (read paper deliveries), RUN_ALGORITHM (launch algorithm)",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -15,6 +15,7 @@
     "@aws-sdk/client-dynamodb": "^3.569.0",
     "@aws-sdk/lib-dynamodb": "^3.569.0",
     "@aws-sdk/client-s3": "^3.569.0",
+    "@aws-sdk/client-sfn": "^3.569.0",
     "csv-parser": "^3.0.0"
   },
   "devDependencies": {
