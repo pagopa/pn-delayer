@@ -57,7 +57,7 @@ async function sendToNextWeek(deliveryWeek, lastEvaluatedKeyNextWeek, sendToNext
 }
 
 async function retrieveAndProcessItemsToNextWeek(deliveryWeek, lastEvaluatedKey, sendToNextWeekCounter, processedCount, toNextWeekIncrementCounter, queryLimit) {
-    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, processedCount);
+    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, true);
 
     if (response.Items.length === 0) {
         return {
@@ -96,7 +96,7 @@ async function retrieveAndProcessItemsToNextWeek(deliveryWeek, lastEvaluatedKey,
 }
 
 async function retrieveAndProcessItemsToNextStep(deliveryWeek, lastEvaluatedKey, toNextStepIncrementCounter, queryLimit, processedCount) {
-    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, processedCount);
+    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, false);
 
     if (response.Items.length === 0) {
         return {
