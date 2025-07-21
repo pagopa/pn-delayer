@@ -1219,14 +1219,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           PAPER_DELIVERY_TABLENAME: !Ref PaperDeliveryTableName
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
-          PAPER_DELIVERY_PRINTCAPACITY_TABLENAME: !Ref PaperDeliveryPrintCapacityTableName
-          PAPER_DELIVERY_COUNTER_TABLENAME: !Ref PaperDeliveryCounterTableName
-          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TABLENAME: !Ref PaperDeliveryPrintCapacityCounterTableName
-          PAPER_DELIVERY_PRIORITY_PARAMETER: !Ref PaperDeliveryPriorityParameterName
-          PAPER_DELIVERY_PRINTCAPACITYCOUNTER_TTLDAYS: !Ref PaperDeliveryPrintCapacityCounterTtlDays
-          DELAYERTOPAPERCHANNEL_QUEUEURL: !Ref DelayerToPaperChannelQueueQueueURL
           PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
-          PN_DELAYER_WEEKLY_WORKING_DAYS: !Ref PrintCapacityWeeklyWorkingDays
       TracingConfig:
         Mode: Active
       Layers:

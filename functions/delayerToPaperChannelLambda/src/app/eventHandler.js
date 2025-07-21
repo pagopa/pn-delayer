@@ -1,99 +1,135 @@
 const dynamo = require("./lib/dynamo");
-const sqsSender = require("./lib/sqsSender");
-const { LocalDate } = require("@js-joda/core");
-const ssmParameter = require("./lib/ssmParameter");
+const utils = require("./lib/utils");
+const { DayOfWeek, TemporalAdjusters } = require('@js-joda/core');
 
-exports.handleEvent = async () => {
+exports.handleEvent = async (event) => {
+    console.log("Event received:", JSON.stringify(event));
 
-    const priorityMap = await ssmParameter.getPriorityMap();
-    const orderedPriorityKeys = Object.keys(priorityMap).sort((a, b) => Number(a) - Number(b));
+    const {
+        processType,
+        sendToNextWeekCounter,
+        lastEvaluatedKeyPhase2,
+        lastEvaluatedKeyNextWeek,
+        executionDate,
+        toNextWeekIncrementCounter,
+        toNextStepIncrementCounter
+    } = event;
 
-    const capacityMap = await dynamo.getUsedPrintCapacities();
-    let usedDailyCapacity = capacityMap.daily?.usedCapacity;
-    let usedWeeklyCapacity = capacityMap.weekly?.usedCapacity;
-    let dailyPrintCapacity = capacityMap.daily?.capacity;
-    let weeklyPrintCapacity;
-
-    if(!dailyPrintCapacity){
-        dailyPrintCapacity = await dynamo.getPrintCapacity();
-        usedDailyCapacity = 0;
-        usedWeeklyCapacity = 0;
+    if (!processType) {
+        throw new Error("processType is required in the event");
     }
 
-    weeklyPrintCapacity = dailyPrintCapacity * parseInt(process.env.PN_DELAYER_WEEKLY_WORKING_DAYS);
+    const dayOfWeek = parseInt(process.env.PN_DELAYER_DELIVERYDATEDAYOFWEEK, 10) || 1;
+    const deliveryWeek = executionDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
 
-    const executionDate = LocalDate.now().toString();
+    switch (processType) {
+        case "SEND_TO_PHASE_2":
+            return await sendToPhase2(deliveryWeek, lastEvaluatedKeyPhase2, toNextStepIncrementCounter);
+        case "SEND_TO_NEXT_WEEK":
+            return await sendToNextWeek(deliveryWeek, lastEvaluatedKeyNextWeek, sendToNextWeekCounter, toNextWeekIncrementCounter);
+        default:
+            throw new Error("Invalid processType. Available options are: SEND_TO_PHASE_2, SEND_TO_NEXT_WEEK");
+    }
+};
 
-    let processedCount = 0;
-    let remainingDailyCapacity = dailyPrintCapacity - usedDailyCapacity;
-    let remainingWeeklyCapacity = weeklyPrintCapacity - usedWeeklyCapacity;
+async function sendToPhase2(deliveryWeek, lastEvaluatedKeyPhase2, toNextStepIncrementCounter) {
+    const processedCount = 0;
+    return await retrieveAndProcessItemsToNextStep(
+        deliveryWeek,
+        lastEvaluatedKeyPhase2,
+        toNextStepIncrementCounter,
+        parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10),
+        processedCount
+    );
+}
 
-    for (const priorityKey of orderedPriorityKeys) {
-        let result = { lastEvaluatedKey: {}, processed: 0 };
-        if (remainingDailyCapacity > 0 && remainingWeeklyCapacity > 0) {  
-            do {
-                result = await retrieveAndProcessItems(priorityKey, executionDate, result.lastEvaluatedKey, Math.min(remainingDailyCapacity, process.env.PAPER_DELIVERY_READYTOSEND_QUERYLIMIT));
-                if (!result || !result.processed) break;
-                processedCount += result.processed;
-                remainingDailyCapacity -= result.processed;
-                remainingWeeklyCapacity -= result.processed;
-            } while (canProcessMore(remainingDailyCapacity, remainingWeeklyCapacity, processedCount, result));
-        }
-        if (result.processed === 0) {
-            console.log(`No items processed for priority ${priorityKey} and executionDate: ${executionDate}`);
-        }else{
-            console.log(`Processed ${result.processed} of priority ${priorityKey} items for executionDate: ${executionDate}`);    
-        }
-        console.log(`Remaining Daily Capacity: ${remainingDailyCapacity} - Remaining Weekly Capacity: ${remainingWeeklyCapacity}`);
+async function sendToNextWeek(deliveryWeek, lastEvaluatedKeyNextWeek, sendToNextWeekCounter, toNextWeekIncrementCounter) {
+    const processedCount = 0;
+    const queryLimit = Math.min(sendToNextWeekCounter, parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10));
+    return await retrieveAndProcessItemsToNextWeek(
+        deliveryWeek,
+        lastEvaluatedKeyNextWeek,
+        sendToNextWeekCounter,
+        processedCount,
+        toNextWeekIncrementCounter,
+        queryLimit
+    );
+}
+
+async function retrieveAndProcessItemsToNextWeek(deliveryWeek, lastEvaluatedKey, sendToNextWeekCounter, processedCount, toNextWeekIncrementCounter, queryLimit) {
+    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, true);
+
+    if (response.Items.length === 0) {
+        return {
+            toNextWeekIncrementCounter,
+            lastEvaluatedKey: null,
+            sendToNextWeekCounter
+        };
     }
 
-    if (remainingDailyCapacity <= 0 && remainingWeeklyCapacity > 0) {
-        console.log("Daily print capacity exhausted. Stopping processing for today.");
-    } else if (remainingDailyCapacity > 0 && remainingWeeklyCapacity <= 0) {
-        console.error("Weekly print capacity exhausted but daily capacity not exhausted. This should not happen.");
-        throw new Error("Weekly print capacity exhausted but daily capacity not exhausted. This should not happen.");
+    await processItems(deliveryWeek, response.Items, "EVALUATE_PRINT_CAPACITY");
+
+    processedCount += response.Items.length;
+    sendToNextWeekCounter -= response.Items.length;
+
+    if (
+        response.LastEvaluatedKey &&
+        Object.keys(response.LastEvaluatedKey).length > 0 &&
+        processedCount < 4000 &&
+        sendToNextWeekCounter > 0
+    ) {
+        return await retrieveAndProcessItemsToNextWeek(
+            deliveryWeek,
+            response.LastEvaluatedKey,
+            sendToNextWeekCounter,
+            processedCount,
+            toNextWeekIncrementCounter,
+            Math.min(sendToNextWeekCounter, parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10))
+        );
     } else {
-        console.error("Both daily and weekly print capacities exhausted. Moving all items to incoming.");
-        //call job
-    }
-
-    if (processedCount > 0) {
-        await updatePrintCapacityCounters(executionDate, processedCount);
+        return {
+            toNextWeekIncrementCounter: toNextWeekIncrementCounter + processedCount,
+            lastEvaluatedKey: response.LastEvaluatedKey,
+            sendToNextWeekCounter: sendToNextWeekCounter
+        };
     }
 }
 
-function canProcessMore(remainingDailyCapacity, remainingWeeklyCapacity, processedCount, result) {
-    return remainingDailyCapacity > 0 &&
-           remainingWeeklyCapacity > 0 &&
-           processedCount < 4000 &&
-           result.processed > 0 &&
-           (result.lastEvaluatedKey && Object.keys(result.lastEvaluatedKey).length !== 0)
-}
+async function retrieveAndProcessItemsToNextStep(deliveryWeek, lastEvaluatedKey, toNextStepIncrementCounter, queryLimit, processedCount) {
+    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, false);
 
-async function updatePrintCapacityCounters(executionDate, processedCount) {
-    await dynamo.updatePrintCapacityCounter(executionDate, "DAY", processedCount);
-    await dynamo.updatePrintCapacityCounter(executionDate, "WEEK", processedCount);
-    console.log(`used daily capacity incremented of: ${processedCount} - used weekly capacity incremented of: ${processedCount}`);
-}
-
-async function retrieveAndProcessItems(priorityKey, executionDate, lastEvaluatedKey, queryLimit) {
-    const queryResult = await dynamo.getItems(priorityKey, executionDate, lastEvaluatedKey, queryLimit);
-    if (queryResult.Items.length === 0) {
-        console.log(`No items found for executionDate: ${executionDate}`);
-        return null;
+    if (response.Items.length === 0) {
+        return {
+            toNextStepIncrementCounter,
+            lastEvaluatedKey: null
+        };
     }
 
-    const sendMessageResponse = await sqsSender.prepareAndSendSqsMessages(queryResult.Items);
-    console.log(`Sent ${sendMessageResponse.successes.length} messages`);
-    console.log(`Not Sent ${sendMessageResponse.failures.length} messages`);
-    const successIds = sendMessageResponse.successes;
-    const unprocessedItems = successIds.length
-        ? await dynamo.deleteItems(successIds, executionDate)
-        : (console.log("No items to delete as no messages were successfully sent."), []);
-    console.log(`Deleted ${successIds.length - unprocessedItems.length} items`);
+    await processItems(deliveryWeek, response.Items, "EVALUATE_SENDER_LIMIT");
 
-    return {
-        processed: successIds.length,
-        lastEvaluatedKey: queryResult.LastEvaluatedKey
-    };
+    processedCount += response.Items.length;
+
+    if (
+        response.LastEvaluatedKey &&
+        Object.keys(response.LastEvaluatedKey).length > 0 &&
+        processedCount < 4000
+    ) {
+        return await retrieveAndProcessItemsToNextStep(
+            deliveryWeek,
+            response.LastEvaluatedKey,
+            toNextStepIncrementCounter,
+            queryLimit,
+            processedCount
+        );
+    } else {
+        return {
+            toNextStepIncrementCounter: toNextStepIncrementCounter + processedCount,
+            lastEvaluatedKey: response.LastEvaluatedKey
+        };
+    }
+}
+
+async function processItems(deliveryWeek, items, step) {
+    const paperDeliveries = items.map(item => utils.mapToPaperDeliveryForGivenStep(item, deliveryWeek, step));
+    await dynamo.insertItems(paperDeliveries);
 }

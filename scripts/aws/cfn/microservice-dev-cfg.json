@@ -15,6 +15,7 @@
     "PaperDeliveryCounterTtlDays": "14",
     "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority",
     "UnifiedDeliveryDriverProvinceParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
-    "PaperDeliveryPrintCapacityCounterTtlDuration": "60d"
+    "PaperDeliveryPrintCapacityCounterTtlDuration": "60d",
+    "PaperChannelTenderApiLambdaName": "pn-delayer-kinesisPaperDeliveryLambda"
   }
 }
