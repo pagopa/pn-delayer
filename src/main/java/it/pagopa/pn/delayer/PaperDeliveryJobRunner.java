@@ -101,7 +101,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
                         addMDC( String.join("~", unifiedDeliveryDriver,  province));
                         try {
                             var startExecutionBatch = Instant.now();
-                            Mono<Void> monoExcecution = evaluateDriverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, new HashMap<>(), startExecutionBatch, pnDelayerConfigs.getActualTenderId());
+                            Mono<Void> monoExcecution = evaluateDriverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, pnDelayerConfigs.getActualTenderId());
                             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();return 0;
                         } catch (Exception e) {
                             log.error("Error while executing batch", e);

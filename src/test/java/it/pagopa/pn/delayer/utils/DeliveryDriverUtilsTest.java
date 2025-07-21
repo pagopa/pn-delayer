@@ -166,7 +166,7 @@ public class DeliveryDriverUtilsTest {
         driverCapacity2.setCapacity(30);
 
         PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
-        paperDeliveryCounter.setCounter(10);
+        paperDeliveryCounter.setNumberOfShipments(10);
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province))
                 .thenReturn(Mono.just(List.of(paperDeliveryCounter)));

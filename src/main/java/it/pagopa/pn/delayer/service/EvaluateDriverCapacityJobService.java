@@ -8,5 +8,5 @@ import java.util.Map;
 
 public interface EvaluateDriverCapacityJobService {
 
-    Mono<Void> startEvaluateDriverCapacityJob(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch, String tenderId);
+    Mono<Void> startEvaluateDriverCapacityJob(String unifiedDeliveryDriver, String province, Instant startExecutionBatch, String tenderId);
 }

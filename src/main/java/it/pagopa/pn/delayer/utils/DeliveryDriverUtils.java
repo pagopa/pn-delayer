@@ -114,7 +114,7 @@ public class DeliveryDriverUtils {
 
     private Map<String, Integer> createProductCounterMap(List<PaperDeliveryCounter> paperDeliveryCounters) {
         return paperDeliveryCounters.stream().collect(Collectors.toMap(paperDeliveryCounter -> retrieveProductFromSk(paperDeliveryCounter.getSk()),
-                PaperDeliveryCounter::getCounter, (existing, replacement) -> existing));
+                PaperDeliveryCounter::getNumberOfShipments, (existing, replacement) -> existing));
     }
 
     private String retrieveProductFromSk(String sk) {
