@@ -2,6 +2,7 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
+import it.pagopa.pn.delayer.model.DriversTotalCapacity;
 import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,13 +26,13 @@ public class SenderLimitUtils {
     private final PaperDeliverySenderLimitDAO paperDeliverySenderLimitDAO;
     private final PnDelayerUtils pnDelayerUtils;
 
-    public Mono<Void> retrieveAndEvaluateSenderLimit(LocalDate deliveryWeek, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, Map<String, Tuple2<Integer, Integer>> senderLimitMap, Integer capacity, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
+    public Mono<SenderLimitJobPaperDeliveries> retrieveAndEvaluateSenderLimit(LocalDate deliveryWeek, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, Map<String, Tuple2<Integer, Integer>> senderLimitMap, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
         return retrieveUsedSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId.keySet(), senderLimitMap)
                 .thenReturn(senderLimitMap)
-                .flatMap(unused -> retrieveAndCalculateSenderLimit(deliveryWeek, capacity, deliveriesGroupedByProductTypePaId.keySet(), senderLimitMap))
+                .flatMap(unused -> retrieveAndCalculateSenderLimit(deliveryWeek, driversTotalCapacity, deliveriesGroupedByProductTypePaId.keySet(), senderLimitMap))
                 .thenReturn(senderLimitMap)
                 .doOnNext(limitMap -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(limitMap, deliveriesGroupedByProductTypePaId, senderLimitJobPaperDeliveries))
-                .then();
+                .thenReturn(senderLimitJobPaperDeliveries);
     }
 
     private Mono<Void> retrieveUsedSenderLimit(LocalDate deliveryWeek, Set<String> paIdProductTypeTuples, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
@@ -43,12 +44,17 @@ public class SenderLimitUtils {
                 .then();
     }
 
-    private Mono<Void> retrieveAndCalculateSenderLimit(LocalDate deliveryDate, Integer declaredCapacity, Set<String> paIdProductTypeTuples, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
+    private Mono<Void> retrieveAndCalculateSenderLimit(LocalDate deliveryDate, List<DriversTotalCapacity> driversTotalCapacity, Set<String> paIdProductTypeTuples, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
         List<String> paIdProductTypeTuplesCopy = new ArrayList<>(paIdProductTypeTuples);
         paIdProductTypeTuplesCopy.removeIf(senderLimitMap::containsKey);
         return Flux.fromIterable(paIdProductTypeTuplesCopy).buffer(25)
                 .flatMap(senderLimitPkSubList -> paperDeliverySenderLimitDAO.retrieveSendersLimit(senderLimitPkSubList, deliveryDate)
                         .doOnNext(paperDeliverySenderLimit -> {
+                            int declaredCapacity = driversTotalCapacity.stream()
+                                    .filter(driver -> driver.getProducts().contains(paperDeliverySenderLimit.getProductType()))
+                                    .map(DriversTotalCapacity::getCapacity)
+                                    .findFirst()
+                                    .orElse(0);
                             Integer limit = (declaredCapacity * paperDeliverySenderLimit.getPercentageLimit()) / 100; //LIMITE ARROTONDATO PER DIFETTO
                             senderLimitMap.put(paperDeliverySenderLimit.getPk(), Tuples.of(limit,0));
                         }))

@@ -5,6 +5,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
+import it.pagopa.pn.delayer.model.DriversTotalCapacity;
 import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,7 @@ public class SenderLimitUtilsTest {
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), eq(deliveryWeek)))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
 
-        senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, senderLimitMaps, capacity, senderLimitJobPaperDeliveries)
+        senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, senderLimitMaps, List.of(new DriversTotalCapacity(List.of("RS", "AR"), capacity, List.of("POSTE"))), senderLimitJobPaperDeliveries)
                 .block();
 
         assertEquals(2, senderLimitMaps.size());

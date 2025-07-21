@@ -149,7 +149,7 @@ public class DeliveryDriverUtilsTest {
                 .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1)));
 
         StepVerifier.create(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryDate, tenderId, province))
-                .expectNextMatches(result -> result.getCapacity() == 60 && result.getUnifiedDeliveryDrivers().size() == 2)
+                .expectNextMatches(result -> result.getFirst().getCapacity() == 60 && result.getFirst().getUnifiedDeliveryDrivers().size() == 2)
                 .verifyComplete();
     }
 
@@ -169,12 +169,12 @@ public class DeliveryDriverUtilsTest {
         paperDeliveryCounter.setCounter(10);
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province))
-                .thenReturn(Mono.just(paperDeliveryCounter));
+                .thenReturn(Mono.just(List.of(paperDeliveryCounter)));
         when(paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate))
                 .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1)));
 
         StepVerifier.create(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryDate, tenderId, province))
-                .expectNextMatches(result -> result.getCapacity() == 50 && result.getUnifiedDeliveryDrivers().size() == 2)
+                .expectNextMatches(result -> result.getFirst().getCapacity() == 50 && result.getFirst().getUnifiedDeliveryDrivers().size() == 2)
                 .verifyComplete();
     }
 

@@ -96,9 +96,9 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_singleDriver_withoutLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS"), 10, List.of("POSTE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
-                .thenReturn(Mono.just(capacity));
+                .thenReturn(Mono.just(List.of(capacity)));
 
         List<PaperDelivery> deliveries = new ArrayList<>();
         deliveries.addAll(getPaperDeliveries(false));
@@ -146,9 +146,9 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_singleDriver_withLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS"), 10, List.of("POSTE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
-                .thenReturn(Mono.just(capacity));
+                .thenReturn(Mono.just(List.of(capacity)));
 
         List<PaperDelivery> deliveries = new ArrayList<>();
         deliveries.addAll(getPaperDeliveries(false));
@@ -208,9 +208,9 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_multipleDriver_withoutLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE", "FULMINE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS"),10, List.of("POSTE", "FULMINE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
-                .thenReturn(Mono.just(capacity));
+                .thenReturn(Mono.just(List.of(capacity)));
 
         when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString()))
                 .thenReturn(List.of(new PaperChannelDeliveryDriverResponse("00184", "AR", "driver1"),
@@ -270,9 +270,9 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_multiple_withLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(10, List.of("POSTE", "FULMINE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS"), 10, List.of("POSTE", "FULMINE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
-                .thenReturn(Mono.just(capacity));
+                .thenReturn(Mono.just(List.of(capacity)));
 
         when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString()))
                 .thenReturn(List.of(new PaperChannelDeliveryDriverResponse("00184", "AR", "driver1"),
