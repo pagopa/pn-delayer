@@ -9,6 +9,6 @@ import java.util.Map;
 
 public interface EvaluateResidualCapacityJobService {
 
-    Mono<Void> startEvaluateResidualCapacityJob(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch, String tenderId);
+    Mono<Void> startEvaluateResidualCapacityJob(String unifiedDeliveryDriver, String province, Instant startExecutionBatch, String tenderId);
 
 }

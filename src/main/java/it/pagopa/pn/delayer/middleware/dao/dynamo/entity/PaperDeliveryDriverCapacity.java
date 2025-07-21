@@ -5,6 +5,7 @@ import lombok.Getter;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
+import java.util.List;
 
 @DynamoDbBean
 @Data
@@ -20,6 +21,7 @@ public class PaperDeliveryDriverCapacity {
     public static final String COL_PEAK_CAPACITY = "peakCapacity";
     public static final String COL_CREATED_AT = "createdAt";
     public static final String COL_TENDER_ID_GEO_KEY = "tenderIdGeoKey";
+    public static final String COL_PRODUCTS = "products";
 
     public static final String TENDER_ID_GEO_KEY_INDEX = "tenderIdGeoKey-index";
 
@@ -43,6 +45,8 @@ public class PaperDeliveryDriverCapacity {
     private Instant createdAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TENDER_ID_GEO_KEY), @DynamoDbSecondaryPartitionKey(indexNames = TENDER_ID_GEO_KEY_INDEX)}))
     private String tenderIdGeoKey;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_CREATED_AT)}))
+    private List<String> products;
 
     @DynamoDbIgnore
     public static String buildKey(String tenderId, String deliveryDriver, String geokey) {
