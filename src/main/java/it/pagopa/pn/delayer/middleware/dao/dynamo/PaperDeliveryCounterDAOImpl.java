@@ -10,11 +10,15 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.model.Page;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -30,12 +34,12 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
         this.tableCounter = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryCounterTableName(), TableSchema.fromBean(PaperDeliveryCounter.class));
     }
 
-    public Mono<PaperDeliveryCounter> getPaperDeliveryCounter(LocalDate deliveryDate, String sk) {
-        Key key = Key.builder()
-                .partitionValue(deliveryDate.toString())
-                .sortValue(sk)
+    public Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(LocalDate deliveryDate, String sk) {
+        QueryEnhancedRequest queryEnhancedRequest = QueryEnhancedRequest.builder()
+                .queryConditional(QueryConditional.sortBeginsWith(Key.builder().partitionValue(deliveryDate.toString())
+                        .sortValue(sk).build()))
                 .build();
-        return Mono.fromFuture(tableCounter.getItem(key))
+        return Mono.from(tableCounter.query(queryEnhancedRequest).map(Page::items))
                 .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", deliveryDate, sk, error));
     }
 

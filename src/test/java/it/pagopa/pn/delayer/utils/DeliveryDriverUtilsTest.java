@@ -138,18 +138,23 @@ public class DeliveryDriverUtilsTest {
         PaperDeliveryDriverCapacity driverCapacity1 = new PaperDeliveryDriverCapacity();
         driverCapacity1.setUnifiedDeliveryDriver("driver1");
         driverCapacity1.setCapacity(30);
+        driverCapacity1.setProducts(List.of("RS","AR"));
         PaperDeliveryDriverCapacity driverCapacity2 = new PaperDeliveryDriverCapacity();
         driverCapacity2.setUnifiedDeliveryDriver("driver2");
         driverCapacity2.setCapacity(30);
-
+        driverCapacity2.setProducts(List.of("890"));
+        PaperDeliveryDriverCapacity driverCapacity3 = new PaperDeliveryDriverCapacity();
+        driverCapacity3.setUnifiedDeliveryDriver("driver3");
+        driverCapacity3.setCapacity(30);
+        driverCapacity3.setProducts(List.of("RS"));
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province))
                 .thenReturn(Mono.empty());
         when(paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate))
-                .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1)));
+                .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1, driverCapacity3)));
 
         StepVerifier.create(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryDate, tenderId, province))
-                .expectNextMatches(result -> result.getCapacity() == 60 && result.getUnifiedDeliveryDrivers().size() == 2)
+                .expectNextMatches(result -> result.getFirst().getCapacity() == 60 && result.getFirst().getUnifiedDeliveryDrivers().size() == 2)
                 .verifyComplete();
     }
 
@@ -161,20 +166,23 @@ public class DeliveryDriverUtilsTest {
         PaperDeliveryDriverCapacity driverCapacity1 = new PaperDeliveryDriverCapacity();
         driverCapacity1.setUnifiedDeliveryDriver("driver1");
         driverCapacity1.setCapacity(30);
+        driverCapacity1.setProducts(List.of("RS","AR"));
         PaperDeliveryDriverCapacity driverCapacity2 = new PaperDeliveryDriverCapacity();
         driverCapacity2.setUnifiedDeliveryDriver("driver2");
         driverCapacity2.setCapacity(30);
+        driverCapacity2.setProducts(List.of("RS"));
 
         PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
+        paperDeliveryCounter.setSk("EXCLUDE~RS~" + province);
         paperDeliveryCounter.setCounter(10);
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province))
-                .thenReturn(Mono.just(paperDeliveryCounter));
+                .thenReturn(Mono.just(List.of(paperDeliveryCounter)));
         when(paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate))
                 .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1)));
 
         StepVerifier.create(deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryDate, tenderId, province))
-                .expectNextMatches(result -> result.getCapacity() == 50 && result.getUnifiedDeliveryDrivers().size() == 2)
+                .expectNextMatches(result -> result.getFirst().getCapacity() == 50 && result.getFirst().getUnifiedDeliveryDrivers().size() == 2)
                 .verifyComplete();
     }
 

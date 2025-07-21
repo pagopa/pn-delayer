@@ -24,6 +24,6 @@ public class EvaluateDriverCapacityJobServiceImpl implements EvaluateDriverCapac
     @Override
     public Mono<Void> startEvaluateDriverCapacityJob(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch, String tenderId) {
         LocalDate deliveryWeek = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
-        return paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, unifiedDeliveryDriver, province, lastEvaluatedKey, deliveryWeek, tenderId);
+        return paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, unifiedDeliveryDriver, province, deliveryWeek, tenderId);
     }
 }

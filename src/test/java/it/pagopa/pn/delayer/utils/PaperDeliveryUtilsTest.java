@@ -73,7 +73,7 @@ public class PaperDeliveryUtilsTest {
         when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
                 .thenReturn(Mono.empty());
 
-        StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(workflowStepEnum, unifiedDeliveryDriver, province, lastEvaluatedKey, deliveryWeek, tenderId))
+        StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(workflowStepEnum, unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
     }
 
@@ -96,7 +96,7 @@ public class PaperDeliveryUtilsTest {
         when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
                 .thenReturn(Mono.empty());
 
-        StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(workflowStepEnum, unifiedDeliveryDriver, province, lastEvaluatedKey, deliveryWeek, tenderId))
+        StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(workflowStepEnum, unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
     }
 

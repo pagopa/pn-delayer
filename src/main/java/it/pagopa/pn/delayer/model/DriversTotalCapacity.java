@@ -9,6 +9,7 @@ import java.util.List;
 @AllArgsConstructor
 public class DriversTotalCapacity {
 
+    private List<String> products;
     private Integer capacity;
     private List<String> unifiedDeliveryDrivers;
 }

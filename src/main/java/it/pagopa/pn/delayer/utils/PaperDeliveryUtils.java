@@ -19,6 +19,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,11 +44,10 @@ public class PaperDeliveryUtils {
      * @param workflowStepEnum      the workflow step enum indicating the current processing step (EVALUATE_DRIVER_CAPACITY, EVALUATE_RESIDUAL_CAPACITY)
      * @param unifiedDeliveryDriver the unified delivery driver identifier
      * @param province              the province for which the capacity is evaluated
-     * @param lastEvaluatedKey      the last evaluated key for pagination
      * @param deliveryWeek          the initial day of delivery week (e.g., Monday of current week)
      * @param tenderId              the tender identifier
      */
-    public Mono<Void> evaluateCapacitiesAndProcessDeliveries(WorkflowStepEnum workflowStepEnum, String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, LocalDate deliveryWeek, String tenderId) {
+    public Mono<Void> evaluateCapacitiesAndProcessDeliveries(WorkflowStepEnum workflowStepEnum, String unifiedDeliveryDriver, String province, LocalDate deliveryWeek, String tenderId) {
         return deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(province, unifiedDeliveryDriver, tenderId, deliveryWeek)
                 .doOnNext(tuple -> log.info("Retrieved capacities for province: [{}], unifiedDeliveryDriver: [{}] -> declared capacity={}, used capacity={}", province, unifiedDeliveryDriver, tuple.getT1(), tuple.getT2()))
                 .flatMap(tuple -> {
@@ -55,10 +55,10 @@ public class PaperDeliveryUtils {
                     int residualCapacity = tuple.getT1() - tuple.getT2();
                     if (residualCapacity <= 0) {
                         log.warn("No capacity for province={} and unifiedDeliveryDriver={}, no records will be processed", province, unifiedDeliveryDriver);
-                        return sendToNextWeek(workflowStepEnum, sortKeyPrefix, lastEvaluatedKey, deliveryWeek);
+                        return sendToNextWeek(workflowStepEnum, sortKeyPrefix, new HashMap<>(), deliveryWeek);
                     } else {
                         return paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(deliveryWeek)
-                                .flatMap(dailyPrintCapacity -> sendToNextStep(workflowStepEnum, sortKeyPrefix, lastEvaluatedKey, tenderId, deliveryWeek, residualCapacity, tuple.getT1(), dailyPrintCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays()));
+                                .flatMap(dailyPrintCapacity -> sendToNextStep(workflowStepEnum, sortKeyPrefix, new HashMap<>(), tenderId, deliveryWeek, residualCapacity, tuple.getT1(), dailyPrintCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays()));
                     }
                 })
                 .then();
