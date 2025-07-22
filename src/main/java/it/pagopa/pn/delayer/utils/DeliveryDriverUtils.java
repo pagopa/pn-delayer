@@ -86,35 +86,33 @@ public class DeliveryDriverUtils {
     }
 
     public Mono<List<DriversTotalCapacity>> retrieveDriversCapacityOnProvince(LocalDate deliveryDate, String tenderId, String province) {
-        List<DriversTotalCapacity> driversTotalCapacities = new ArrayList<>();
         return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province)
-                .switchIfEmpty(Mono.defer(() -> {
-                    log.info("No paper delivery counter found for tenderId: {}, province: {}, deliveryDate: {}", tenderId, province, deliveryDate);
-                    return Mono.just(Collections.emptyList());
-                }))
+                .defaultIfEmpty(Collections.emptyList())
                 .map(this::createProductCounterMap)
-                .map(counters ->
+                .flatMap(counters ->
                         paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate)
                                 .map(this::groupDriversByIntersectingProducts)
-                                .map(Map::entrySet)
-                                .flatMapMany(Flux::fromIterable)
-                                .doOnNext(entry -> {
+                                .flatMapMany(map -> Flux.fromIterable(map.entrySet()))
+                                .map(entry -> {
                                     Integer capacity = entry.getValue().stream().mapToInt(PaperDeliveryDriverCapacity::getCapacity).sum();
                                     Integer reducedCapacity = capacity - counters.entrySet().stream()
-                                            .filter(paperDeliveryCounter -> entry.getKey().contains(paperDeliveryCounter.getKey()))
+                                            .filter(counter -> entry.getKey().contains(counter.getKey()))
                                             .findFirst()
                                             .map(Map.Entry::getValue)
                                             .orElse(0);
-                                    driversTotalCapacities.add(new DriversTotalCapacity(entry.getKey(),
+                                    return new DriversTotalCapacity(
+                                            entry.getKey(),
                                             reducedCapacity,
-                                            entry.getValue().stream().map(PaperDeliveryDriverCapacity::getUnifiedDeliveryDriver).toList()));
-                                }))
-                .then(Mono.just(driversTotalCapacities));
+                                            entry.getValue().stream().map(PaperDeliveryDriverCapacity::getUnifiedDeliveryDriver).toList()
+                                    );
+                                })
+                                .collectList()
+                );
     }
 
     private Map<String, Integer> createProductCounterMap(List<PaperDeliveryCounter> paperDeliveryCounters) {
         return paperDeliveryCounters.stream().collect(Collectors.toMap(paperDeliveryCounter -> retrieveProductFromSk(paperDeliveryCounter.getSk()),
-                PaperDeliveryCounter::getNumberOfShipments, (existing, replacement) -> existing));
+                PaperDeliveryCounter::getCounter, (existing, replacement) -> existing));
     }
 
     private String retrieveProductFromSk(String sk) {
@@ -140,7 +138,7 @@ public class DeliveryDriverUtils {
                     mergedDrivers.addAll(g.getValue());
                 });
                 groups.removeAll(overlapping);
-                groups.add(Map.entry(mergedProducts, mergedDrivers));
+                groups.add(Map.entry(mergedProducts.stream().distinct().toList(), mergedDrivers));
             }
         }
 

@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,18 +55,18 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
 
         List<PaperDeliveryCounter> result = paperDeliveryCounterDAO.getPaperDeliveryCounter(LocalDate.parse("2025-04-07"), "EXCLUDE~RM").block();
         Assertions.assertNotNull(result);
-        Assertions.assertEquals(5, result.getFirst().getNumberOfShipments());
-        Assertions.assertEquals("2025-04-07", result.getFirst().getPk());
+        Assertions.assertEquals(5, result.getFirst().getCounter());
+        Assertions.assertEquals(LocalDate.parse("2025-04-07"), result.getFirst().getDeliveryDate());
         Assertions.assertEquals("EXCLUDE~RM", result.getFirst().getSk());
 
         List<PaperDeliveryCounter> result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter(LocalDate.parse("2025-04-07"), "EXCLUDE~NA").block();
         Assertions.assertNotNull(result2);
-        Assertions.assertEquals(10, result2.getFirst().getNumberOfShipments());
-        Assertions.assertEquals("2025-04-07", result2.getFirst().getPk());
+        Assertions.assertEquals(10, result2.getFirst().getCounter());
+        Assertions.assertEquals(LocalDate.parse("2025-04-07"), result2.getFirst().getDeliveryDate());
         Assertions.assertEquals("EXCLUDE~NA", result2.getFirst().getSk());
 
         List<PaperDeliveryCounter> result3 = paperDeliveryCounterDAO.getPaperDeliveryCounter(LocalDate.parse("2025-04-07"), "EXCLUDE~MI").block();
-        Assertions.assertNull(result3);
+        Assertions.assertEquals(0, result3.size());
 
     }
 
@@ -73,38 +74,42 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
     void updatePrintCapacityCounterTest() {
         LocalDate deliveryDate = LocalDate.parse("2025-04-07");
 
-        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000).block();
+        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000, null).block();
         List<PaperDeliveryCounter> result = paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "PRINT").block();
         Assertions.assertNotNull(result);
-        Assertions.assertEquals(3000, result.getFirst().getNumberOfShipments());
-        Assertions.assertEquals(deliveryDate.toString(), result.getFirst().getSk());
-        Assertions.assertEquals("PRINT", result.getFirst().getPk());
+        Assertions.assertEquals(3000, result.getFirst().getCounter());
+        Assertions.assertEquals(deliveryDate, result.getFirst().getDeliveryDate());
+        Assertions.assertEquals("PRINT", result.getFirst().getSk());
         Assertions.assertEquals(5000, result.getFirst().getWeeklyPrintCapacity());
+        Assertions.assertNull(result.getFirst().getExcludedDeliveryCounter());
 
 
-        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000).block();
+        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000, null).block();
         List<PaperDeliveryCounter> result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "PRINT").block();
         Assertions.assertNotNull(result2);
-        Assertions.assertEquals(6000, result2.getFirst().getNumberOfShipments());
-        Assertions.assertEquals(deliveryDate.toString(), result2.getFirst().getSk());
-        Assertions.assertEquals("PRINT", result2.getFirst().getPk());
+        Assertions.assertEquals(6000, result2.getFirst().getCounter());
+        Assertions.assertEquals(deliveryDate, result2.getFirst().getDeliveryDate());
+        Assertions.assertEquals("PRINT", result2.getFirst().getSk());
         Assertions.assertEquals(5000, result2.getFirst().getWeeklyPrintCapacity());
+        Assertions.assertNull(result2.getFirst().getExcludedDeliveryCounter());
 
-        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, null, 5000).block();
+        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, null, 5000, 500).block();
         List<PaperDeliveryCounter> result3 = paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "PRINT").block();
         Assertions.assertNotNull(result3);
-        Assertions.assertEquals(6000, result3.getFirst().getNumberOfShipments());
-        Assertions.assertEquals(deliveryDate.toString(), result3.getFirst().getSk());
-        Assertions.assertEquals("PRINT", result3.getFirst().getPk());
+        Assertions.assertEquals(6000, result3.getFirst().getCounter());
+        Assertions.assertEquals(deliveryDate, result3.getFirst().getDeliveryDate());
+        Assertions.assertEquals("PRINT", result3.getFirst().getSk());
         Assertions.assertEquals(5000, result3.getFirst().getWeeklyPrintCapacity());
+        Assertions.assertEquals(500, result3.getFirst().getExcludedDeliveryCounter());
 
-        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, null, 5000).block();
+        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, null, 5000, 500).block();
         List<PaperDeliveryCounter> result4 = paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "PRINT").block();
         Assertions.assertNotNull(result4);
-        Assertions.assertEquals(6000, result4.getFirst().getNumberOfShipments());
-        Assertions.assertEquals(deliveryDate.toString(), result4.getFirst().getSk());
-        Assertions.assertEquals("PRINT", result4.getFirst().getPk());
+        Assertions.assertEquals(6000, result4.getFirst().getCounter());
+        Assertions.assertEquals(deliveryDate, result4.getFirst().getDeliveryDate());
+        Assertions.assertEquals("PRINT", result4.getFirst().getSk());
         Assertions.assertEquals(5000, result4.getFirst().getWeeklyPrintCapacity());
+        Assertions.assertEquals(1000, result4.getFirst().getExcludedDeliveryCounter());
 
 
     }

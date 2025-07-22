@@ -96,7 +96,7 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_singleDriver_withoutLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS"), 10, List.of("POSTE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS","AR"), 10, List.of("POSTE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
                 .thenReturn(Mono.just(List.of(capacity)));
 
@@ -112,17 +112,13 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
                 .thenReturn(Mono.just(page));
 
-        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
-        usedSenderLimit.setPk("paId1~RS~RM");
-        usedSenderLimit.setSenderLimit(5);
-        usedSenderLimit.setNumberOfShipment(5);
-
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setPercentageLimit(10);
 
         when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.just(usedSenderLimit));
+                .thenReturn(Flux.empty());
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
         when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
@@ -173,6 +169,7 @@ class EvaluateSenderLimitJobServiceTest {
 
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setPercentageLimit(50);
 
         PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
@@ -196,11 +193,11 @@ class EvaluateSenderLimitJobServiceTest {
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
-        Assertions.assertEquals(4, capturedDeliveries.getFirst().size());
-        Assertions.assertEquals(0, capturedDeliveries.get(1).size());
+        Assertions.assertEquals(2, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(2, capturedDeliveries.get(1).size());
         Assertions.assertEquals(3, capturedDeliveries.get(2).size());
         Assertions.assertEquals(1, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(2)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
     }
@@ -229,18 +226,12 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(Mono.just(page));
 
         PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
-        usedSenderLimit.setPk("paId1~RS~RM");
+        usedSenderLimit.setPk("paId2~AR~RM");
         usedSenderLimit.setSenderLimit(5);
-        usedSenderLimit.setNumberOfShipment(5);
-
-        PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
-        paperDeliverySenderLimit.setPk("paId2~AR~RM");
-        paperDeliverySenderLimit.setPercentageLimit(10);
+        usedSenderLimit.setNumberOfShipment(4);
 
         when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(usedSenderLimit));
-        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
-                .thenReturn(Flux.just(paperDeliverySenderLimit));
         when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
                 .thenReturn(Mono.just(2L));
 
@@ -270,7 +261,7 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_multiple_withLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS"), 10, List.of("POSTE", "FULMINE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS", "AR"), 10, List.of("POSTE", "FULMINE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
                 .thenReturn(Mono.just(List.of(capacity)));
 
@@ -301,6 +292,7 @@ class EvaluateSenderLimitJobServiceTest {
 
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setPercentageLimit(50);
 
         PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();

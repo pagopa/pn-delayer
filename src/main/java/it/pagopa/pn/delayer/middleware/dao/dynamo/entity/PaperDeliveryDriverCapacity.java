@@ -45,7 +45,7 @@ public class PaperDeliveryDriverCapacity {
     private Instant createdAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TENDER_ID_GEO_KEY), @DynamoDbSecondaryPartitionKey(indexNames = TENDER_ID_GEO_KEY_INDEX)}))
     private String tenderIdGeoKey;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_CREATED_AT)}))
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_PRODUCTS)}))
     private List<String> products;
 
     @DynamoDbIgnore

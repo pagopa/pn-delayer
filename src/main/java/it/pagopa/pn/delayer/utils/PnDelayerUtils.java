@@ -114,6 +114,15 @@ public class PnDelayerUtils {
                 .toList();
     }
 
+    /**
+     * Evaluates the sender limit for each product type and PaId.
+     * Based on the sender's limit, it splits the deliveries into two groups:
+     * those to be sent to the driver capacity evaluation step,
+     * and those to be sent to the residual capacity evaluation step.
+     * @param senderLimitMap Map containing the sender limits for each product type and Pa - key in the format "PaId~ProductType~Province"
+     * @param deliveriesGroupedByProductTypePaId Map containing the deliveries grouped by product type and Pa
+     * @param senderLimitJobPaperDeliveries Object containing the lists to which the deliveries will be
+     */
     public void evaluateSenderLimitAndFilterDeliveries(Map<String, Tuple2<Integer, Integer>> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
         deliveriesGroupedByProductTypePaId.forEach((key, deliveries) -> {
             int limit = Optional.ofNullable(senderLimitMap.get(key))

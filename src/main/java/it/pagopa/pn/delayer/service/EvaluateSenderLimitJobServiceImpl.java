@@ -59,6 +59,24 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .then();
     }
 
+    /**
+     * Processes the list of paper deliveries through the following steps:
+     * 1. Retrieves the unified delivery drivers and assigns them to each paper delivery.
+     * 2. Excludes deliveries marked as RS or Second Attempt from sender limit evaluation,
+     *      and includes them directly in the list for the EVALUATE_DRIVER_CAPACITY step.
+     * 3. Groups the remaining deliveries by product type, PaId, and province.
+     * 4. Calculates and evaluates the sender limit for each group,returning a SenderLimitJobPaperDeliveries object
+     *      that categorizes deliveries for either the EVALUATE_DRIVER_CAPACITY or EVALUATE_RESIDUAL_CAPACITY step.
+     * 5. Inserts new entities into the Pn-DelayerPaperDeliveries collection, mapped to their corresponding evaluation step.
+     * 6. Updates the used sender limits in the database for deliveries assigned to the EVALUATE_DRIVER_CAPACITY step.
+     *
+     * @param items List of PaperDelivery items to be processed
+     * @param tenderId The tender ID associated with the deliveries
+     * @param deliveryWeek The week of delivery for which the items are being processed
+     * @param driversTotalCapacity List of DriversTotalCapacity containing unified delivery drivers and their capacities
+     * @param priorityMap Map containing priority information for paper deliveries
+     * @return Mono<Long> indicating the count of items sent to the next step
+     * */
     private Mono<Long> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap) {
         SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
         Map<String, Tuple2<Integer, Integer>> senderLimitMap = new HashMap<>();
@@ -70,6 +88,13 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitMap));
     }
 
+    /**
+     * This method checks whether there is only one unified delivery driver available for the given province.
+     * If exactly one driver is found, it assigns that driver to all paper deliveries.
+     * Otherwise, it attempts to retrieve the list of unified delivery drivers from the internal cache.
+     * If the drivers are not found in the cache, it retrieves them from the Paper Channel Lambda,
+     * assigns them to the paper deliveries, and updates the cache accordingly.
+     */
     private Mono<List<PaperDelivery>> retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(List<PaperDelivery> paperDelivery, String tenderId, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap) {
         List<PaperDelivery> toSenderLimitEvaluation = new ArrayList<>();
         if (driversTotalCapacity.size() == 1 && driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().size() == 1){

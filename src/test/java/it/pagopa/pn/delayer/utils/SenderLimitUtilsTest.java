@@ -58,6 +58,7 @@ public class SenderLimitUtilsTest {
 
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("key2");
+        paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setPercentageLimit(50);
 
         when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(deliveryWeek)))
