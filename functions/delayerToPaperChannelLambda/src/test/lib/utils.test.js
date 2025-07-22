@@ -1,109 +1,114 @@
-const { expect } = require("chai");
-const { chunkArray } = require("../../app/lib/utils");
-const { groupRecordsByProductAndProvince } = require("../../app/lib/utils");
+const { expect } = require('chai');
 
-describe("utils.test.js", () => {
+// Importa le funzioni da testare
+const {
+  chunkArray,
+  mapToPaperDeliveryForGivenStep,
+  buildSk
+} = require('../../app/lib/utils'); // modifica il path se necessario
 
-  it("splits array into chunks of given size", () => {
-    const messages = [1, 2, 3, 4, 5];
-    const size = 2;
-
-    const expectedChunks = [
-      [1, 2],
-      [3, 4],
-      [5],
-    ];
-
-    const result = chunkArray(messages, size);
-    expect(result).to.deep.equal(expectedChunks);
+describe('chunkArray', () => {
+  it('should divide array into chunks of specified size', () => {
+    const input = [1, 2, 3, 4, 5];
+    const result = chunkArray(input, 2);
+    expect(result).to.deep.equal([[1, 2], [3, 4], [5]]);
   });
 
-  it("returns an empty array when input is empty", () => {
-    const messages = [];
-    const size = 3;
-
-    const expectedChunks = [];
-
-    const result = chunkArray(messages, size);
-    expect(result).to.deep.equal(expectedChunks);
+  it('should return an empty array when input is empty', () => {
+    const result = chunkArray([], 3);
+    expect(result).to.deep.equal([]);
   });
 
-  it("handles chunk size larger than array length", () => {
-    const messages = [1, 2];
-    const size = 5;
+  it('should return one chunk if size >= array length', () => {
+    const result = chunkArray([1, 2], 10);
+    expect(result).to.deep.equal([[1, 2]]);
+  });
+});
 
-    const expectedChunks = [[1, 2]];
+describe('mapToPaperDeliveryForGivenStep', () => {
+  it('should map item and payload correctly', () => {
+    global.payload = {
+      requestId: "requestId",
+      createdAt: new Date().toISOString(),
+      notificationSentAt: "2025-01-01T00:00:00Z",
+      prepareRequestDate: "2025-02-01T00:00:00Z",
+      productType: "AR",
+      senderPaId: "paId1",
+      province: "RM",
+      cap: "00100",
+      attempt: "0",
+      iun: "iun",
+      unifiedDeliveryDriver: "POSTE",
+      tenderId: "TENDER1",
+      recipientId: "RecipientId",
+      priority: 3
+    };
 
-    const result = chunkArray(messages, size);
-    expect(result).to.deep.equal(expectedChunks);
+    const deliveryWeek = '2025-01-01';
+
+    const result = mapToPaperDeliveryForGivenStep(global.payload, deliveryWeek, 'SENT_TO_PREPARE_PHASE_2');
+    const result2 = mapToPaperDeliveryForGivenStep(global.payload, deliveryWeek, 'EVALUATE_SENDER_LIMIT');
+
+    expect(result).to.include({
+      pk: '2025-01-01~SENT_TO_PREPARE_PHASE_2',
+      sk: '3~2025-01-01T00:00:00Z~requestId',
+      requestId: 'requestId',
+      notificationSentAt: "2025-01-01T00:00:00Z",
+      prepareRequestDate: "2025-02-01T00:00:00Z",
+      productType: "AR",
+      senderPaId: "paId1",
+      province: "RM",
+      cap: "00100",
+      attempt: "0",
+      iun: "iun",
+      unifiedDeliveryDriver: "POSTE",
+      tenderId: "TENDER1",
+      recipientId: "RecipientId",
+      priority: 3
+    });
+
+    expect(result2).to.include({
+      pk: '2025-01-08~EVALUATE_SENDER_LIMIT',
+      sk: 'RM~2025-01-01T00:00:00Z~requestId',
+      requestId: 'requestId',
+      notificationSentAt: "2025-01-01T00:00:00Z",
+      prepareRequestDate: "2025-02-01T00:00:00Z",
+      productType: "AR",
+      senderPaId: "paId1",
+      province: "RM",
+      cap: "00100",
+      attempt: "0",
+      iun: "iun",
+      unifiedDeliveryDriver: "POSTE",
+      tenderId: "TENDER1",
+      recipientId: "RecipientId",
+      priority: 3
+    });
+  });
+});
+
+describe('buildSortKey', () => {
+  const paperDelivery = {
+    productType: 'RS',
+    attempt: 1,
+    prepareRequestDate: '2023-01-02T10:00:00.000Z',
+    notificationSentAt: '2023-01-01T10:00:00.000Z',
+    province: 'RM',
+    priority: 'HIGH',
+    requestId: 'REQ123',
+  };
+
+  it('should build sort key for EVALUATE_SENDER_LIMIT using province and prepareRequestDate', () => {
+    const result = buildSk('EVALUATE_SENDER_LIMIT', paperDelivery);
+    expect(result).to.equal('RM~2023-01-02T10:00:00.000Z~REQ123');
   });
 
-  it("handles chunk size of 1", () => {
-    const messages = [1, 2, 3];
-    const size = 1;
-
-    const expectedChunks = [[1], [2], [3]];
-
-    const result = chunkArray(messages, size);
-    expect(result).to.deep.equal(expectedChunks);
+  it('should build sort key for SENT_TO_PREPARE_PHASE_2 using priority and prepareRequestDate', () => {
+    const result = buildSk('SENT_TO_PREPARE_PHASE_2', paperDelivery);
+    expect(result).to.equal('HIGH~2023-01-02T10:00:00.000Z~REQ123');
   });
 
-  describe("groupRecordsByProductAndProvince", () => {
-    it("groups items by productType and province", () => {
-      const items = [
-        { paperDeliveryIncoming: { productType: "A", province: "X" }, id: 1 },
-        { paperDeliveryIncoming: { productType: "A", province: "X" }, id: 2 },
-        { paperDeliveryIncoming: { productType: "B", province: "Y" }, id: 3 },
-        { paperDeliveryIncoming: { productType: "A", province: "Y" }, id: 4 },
-      ];
-
-      const result = groupRecordsByProductAndProvince(items);
-
-      expect(result).to.deep.equal({
-        "A~X": [
-          { paperDeliveryIncoming: { productType: "A", province: "X" }, id: 1 },
-          { paperDeliveryIncoming: { productType: "A", province: "X" }, id: 2 },
-        ],
-        "B~Y": [
-          { paperDeliveryIncoming: { productType: "B", province: "Y" }, id: 3 },
-        ],
-        "A~Y": [
-          { paperDeliveryIncoming: { productType: "A", province: "Y" }, id: 4 },
-        ],
-      });
-    });
-
-    it("returns an empty object when input is empty", () => {
-      const result = groupRecordsByProductAndProvince([]);
-      expect(result).to.deep.equal({});
-    });
-
-    it("handles items with different productTypes and same province", () => {
-      const items = [
-        { paperDeliveryIncoming: { productType: "A", province: "Z" }, id: 1 },
-        { paperDeliveryIncoming: { productType: "B", province: "Z" }, id: 2 },
-      ];
-
-      const result = groupRecordsByProductAndProvince(items);
-
-      expect(result).to.deep.equal({
-        "A~Z": [
-          { paperDeliveryIncoming: { productType: "A", province: "Z" }, id: 1 },
-        ],
-        "B~Z": [
-          { paperDeliveryIncoming: { productType: "B", province: "Z" }, id: 2 },
-        ],
-      });
-    });
-
-    it("handles items with missing paperDeliveryIncoming gracefully", () => {
-      const items = [
-        { paperDeliveryIncoming: { productType: "A", province: "X" }, id: 1 },
-        { id: 2 }, // missing paperDeliveryIncoming
-      ];
-
-      // This will throw, so let's expect an error
-      expect(() => groupRecordsByProductAndProvince(items)).to.throw();
-    });
+  it('should throw error for unsupported step', () => {
+    expect(() => buildSk('UNKNOWN_STEP', paperDelivery)).to.throw('Unsupported workflow step: UNKNOWN_STEP');
   });
 });

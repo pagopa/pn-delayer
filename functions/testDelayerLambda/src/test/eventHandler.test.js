@@ -6,18 +6,22 @@ const path = require("path");
 
 process.env.BUCKET_NAME = "test-bucket";
 process.env.OBJECT_KEY = "test-key.csv";
+process.env.SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:BatchWorkflowStateMachine";
 
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
+const { SFNClient, StartExecutionCommand } = require("@aws-sdk/client-sfn");
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
+const sfnMock = mockClient(SFNClient);
 
-describe("Lambda CSV import", () => {
+describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
         s3Mock.reset();
         ddbMock.reset();
+        sfnMock.reset();
     });
 
     it("Unsupported operation returns 400", async () => {
@@ -104,6 +108,17 @@ describe("Lambda CSV import", () => {
         });
 
         assert.strictEqual(res.statusCode, 500);
+    });
+
+    it("starts the step function and returns executionArn", async () => {
+        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
+        sfnMock.on(StartExecutionCommand).resolves({ executionArn: fakeArn, startDate: new Date() });
+
+        const res = await handler({ operationType: "RUN_ALGORITHM", parameters: [] });
+        assert.strictEqual(res.statusCode, 200);
+        const body = JSON.parse(res.body);
+        assert.strictEqual(body.executionArn, fakeArn);
+
     });
 
 });
