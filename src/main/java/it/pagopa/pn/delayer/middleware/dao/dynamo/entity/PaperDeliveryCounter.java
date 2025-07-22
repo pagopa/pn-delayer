@@ -2,10 +2,7 @@ package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
 import lombok.Data;
 import lombok.Getter;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
 @Data
@@ -32,4 +29,9 @@ public class PaperDeliveryCounter {
     private Integer sentToNextWeek;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TTL)}))
     private long ttl;
+
+    @DynamoDbIgnore
+    public static String retrieveProductFromSk(String sk) {
+        return sk.split("~")[2];
+    }
 }

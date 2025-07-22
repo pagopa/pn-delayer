@@ -172,7 +172,7 @@ class PnDelayerUtilsTest {
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_PRINT_CAPACITY.name())
-                && delivery.getSk().equalsIgnoreCase(String.join("~", String.valueOf(delivery.getPriority()), "2023-10-01T12:00:00Z", delivery.getRequestId()))));
+                && delivery.getSk().equalsIgnoreCase(String.join("~", String.valueOf(delivery.getPriority()), delivery.getDeliveryDate(), delivery.getRequestId()))));
     }
 
     @Test

@@ -74,6 +74,7 @@ class EvaluateDriverCapacityJobServiceTest {
         String province = "RM";
         Instant startExecutionBatch = Instant.parse("2025-01-06T00:00:00Z");
         String tenderId = "tender123";
+        Tuple2<Integer, Integer> capacityTuple = Tuples.of(10, 10);
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
@@ -85,7 +86,7 @@ class EvaluateDriverCapacityJobServiceTest {
                 any(),
                 eq(5))).thenReturn(Mono.just(Page.create(deliveries)));
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();
 
         List<PaperDelivery> capturedDeliveries = argumentCaptor.getValue();
@@ -120,7 +121,7 @@ class EvaluateDriverCapacityJobServiceTest {
                 .thenReturn(Mono.just(Page.create(Collections.emptyList())));
         when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();
 
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(
@@ -155,8 +156,8 @@ class EvaluateDriverCapacityJobServiceTest {
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
 
         when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
-        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province,  startExecutionBatch, tenderId))
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = argumentCaptor.getAllValues();
@@ -212,14 +213,14 @@ class EvaluateDriverCapacityJobServiceTest {
 
         when(paperDeliveryDAO.retrievePaperDeliveries(eq(EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4)))
                 .thenReturn(Mono.just(Page.create(deliveries2)));
-        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(any())).thenReturn(Mono.empty());
 
         ArgumentCaptor<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptor = ArgumentCaptor.forClass(List.class);
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = argumentCaptor.getAllValues();
@@ -291,10 +292,10 @@ class EvaluateDriverCapacityJobServiceTest {
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
-        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, null, startExecutionBatch, tenderId))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = argumentCaptor.getAllValues();
