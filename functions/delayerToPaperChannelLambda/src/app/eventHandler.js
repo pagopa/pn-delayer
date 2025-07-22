@@ -1,135 +1,128 @@
 const dynamo = require("./lib/dynamo");
 const utils = require("./lib/utils");
-const { DayOfWeek, TemporalAdjusters } = require('@js-joda/core');
+const { DayOfWeek, TemporalAdjusters, Instant, ZoneId } = require('@js-joda/core');
 
 exports.handleEvent = async (event) => {
     console.log("Event received:", JSON.stringify(event));
 
-    const {
-        processType,
-        sendToNextWeekCounter,
-        lastEvaluatedKeyPhase2,
-        lastEvaluatedKeyNextWeek,
-        executionDate,
-        toNextWeekIncrementCounter,
-        toNextStepIncrementCounter
-    } = event;
-
-    if (!processType) {
+    if (!event.processType) {
         throw new Error("processType is required in the event");
     }
 
     const dayOfWeek = parseInt(process.env.PN_DELAYER_DELIVERYDATEDAYOFWEEK, 10) || 1;
-    const deliveryWeek = executionDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
+    const instant = Instant.parse(event.input.executionDate);
+    const zone = ZoneId.systemDefault(); // Or use ZoneId.of("Europe/Rome") if you want to specify
+    const deliveryWeek = instant.atZone(zone).toLocalDate()
+        .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek)))
+        .toString();
 
-    switch (processType) {
-        case "SEND_TO_PHASE_2":
-            return await sendToPhase2(deliveryWeek, lastEvaluatedKeyPhase2, toNextStepIncrementCounter);
-        case "SEND_TO_NEXT_WEEK":
-            return await sendToNextWeek(deliveryWeek, lastEvaluatedKeyNextWeek, sendToNextWeekCounter, toNextWeekIncrementCounter);
+    switch (event.processType) {
+        case "SEND_TO_PHASE_2": {
+            const toSendToNextStep = event.input.dailyPrintCapacity - event.input.sendToNextStepCounter;
+            return sendToPhase2(deliveryWeek, event.input, toSendToNextStep);
+        }
+        case "SEND_TO_NEXT_WEEK": {
+            const exceed = event.input.numberOfShipments - event.input.weeklyPrintCapacity;
+            const toSendToNextWeek = exceed - event.input.sentToNextWeek - event.input.sendToNextWeekCounter;
+            if (toSendToNextWeek > 0) {
+                return sendToNextWeek(deliveryWeek, event.input, toSendToNextWeek);
+            }
+            return {
+                input: {
+                    dailyPrintCapacity: event.input.dailyPrintCapacity,
+                    weeklyPrintCapacity: event.input.weeklyPrintCapacity,
+                    numberOfShipments: event.input.numberOfShipments,
+                    lastEvaluatedKeyNextWeek: null,
+                    sendToNextWeekCounter: event.input.sendToNextWeekCounter,
+                    sentToNextWeek: event.input.sentToNextWeek,
+                    executionDate: event.input.executionDate
+                },
+                processType: "SEND_TO_NEXT_WEEK"
+            };
+        }
         default:
-            throw new Error("Invalid processType. Available options are: SEND_TO_PHASE_2, SEND_TO_NEXT_WEEK");
+            throw new Error("Invalid processType. Use: SEND_TO_PHASE_2 or SEND_TO_NEXT_WEEK");
     }
 };
 
-async function sendToPhase2(deliveryWeek, lastEvaluatedKeyPhase2, toNextStepIncrementCounter) {
-    const processedCount = 0;
-    return await retrieveAndProcessItemsToNextStep(
-        deliveryWeek,
-        lastEvaluatedKeyPhase2,
-        toNextStepIncrementCounter,
-        parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10),
-        processedCount
-    );
+async function sendToPhase2(deliveryWeek, input, toSendToNextStep) {
+    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyPhase2,input.sendToNextStepCounter,toSendToNextStep,0,"SENT_TO_PREPARE_PHASE_2", false)
+        .then(result => {
+            return {
+                input: {
+                    dailyPrintCapacity: input.dailyPrintCapacity,
+                    weeklyPrintCapacity: input.weeklyPrintCapacity,
+                    numberOfShipments: input.numberOfShipments,
+                    lastEvaluatedKeyPhase2: result.lastEvaluatedKey,
+                    sendToNextStepCounter: result.dailyCounter,
+                    executionDate: input.executionDate
+                },
+                processType: "SEND_TO_PHASE_2"
+            };
+    });
 }
 
-async function sendToNextWeek(deliveryWeek, lastEvaluatedKeyNextWeek, sendToNextWeekCounter, toNextWeekIncrementCounter) {
-    const processedCount = 0;
-    const queryLimit = Math.min(sendToNextWeekCounter, parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10));
-    return await retrieveAndProcessItemsToNextWeek(
-        deliveryWeek,
-        lastEvaluatedKeyNextWeek,
-        sendToNextWeekCounter,
-        processedCount,
-        toNextWeekIncrementCounter,
-        queryLimit
-    );
+async function sendToNextWeek(deliveryWeek, input, toSendToNextWeek) {
+    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyNextWeek,input.sendToNextWeekCounter,toSendToNextWeek,0,"EVALUATE_SENDER_LIMIT", true)
+        .then(result => {
+            return {
+                input: {
+                    dailyPrintCapacity: input.dailyPrintCapacity,
+                    weeklyPrintCapacity: input.weeklyPrintCapacity,
+                    numberOfShipments: input.numberOfShipments,
+                    lastEvaluatedKeyNextWeek: result.lastEvaluatedKey,
+                    sendToNextWeekCounter: result.dailyCounter,
+                    sentToNextWeek: input.sentToNextWeek,
+                    executionDate: input.executionDate
+                },
+                processType: "SEND_TO_NEXT_WEEK"
+            };
+    });
 }
 
-async function retrieveAndProcessItemsToNextWeek(deliveryWeek, lastEvaluatedKey, sendToNextWeekCounter, processedCount, toNextWeekIncrementCounter, queryLimit) {
-    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, true);
+async function retrieveAndProcessItems(deliveryWeek, lastEvaluatedKey, dailyCounter, toHandle, executionCounter, step, scanIndexForward) {
+    const limit = Math.min(toHandle, parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10));
+    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, limit, scanIndexForward);
 
-    if (response.Items.length === 0) {
+    if (!response.Items || response.Items.length === 0) {
         return {
-            toNextWeekIncrementCounter,
             lastEvaluatedKey: null,
-            sendToNextWeekCounter
+            dailyCounter: dailyCounter
         };
     }
 
-    await processItems(deliveryWeek, response.Items, "EVALUATE_PRINT_CAPACITY");
+    await processItems(deliveryWeek, response.Items, step);
 
-    processedCount += response.Items.length;
-    sendToNextWeekCounter -= response.Items.length;
+    const itemsProcessed = response.Items.length;
+    dailyCounter += itemsProcessed;
+    toHandle -= itemsProcessed;
+    executionCounter += itemsProcessed;
 
     if (
         response.LastEvaluatedKey &&
         Object.keys(response.LastEvaluatedKey).length > 0 &&
-        processedCount < 4000 &&
-        sendToNextWeekCounter > 0
+        executionCounter < 4000 &&
+        toHandle > dailyCounter
     ) {
-        return await retrieveAndProcessItemsToNextWeek(
+        return retrieveAndProcessItems(
             deliveryWeek,
             response.LastEvaluatedKey,
-            sendToNextWeekCounter,
-            processedCount,
-            toNextWeekIncrementCounter,
-            Math.min(sendToNextWeekCounter, parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10))
+            dailyCounter,
+            toHandle,
+            executionCounter,
+            step
         );
-    } else {
-        return {
-            toNextWeekIncrementCounter: toNextWeekIncrementCounter + processedCount,
-            lastEvaluatedKey: response.LastEvaluatedKey,
-            sendToNextWeekCounter: sendToNextWeekCounter
-        };
-    }
-}
-
-async function retrieveAndProcessItemsToNextStep(deliveryWeek, lastEvaluatedKey, toNextStepIncrementCounter, queryLimit, processedCount) {
-    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, queryLimit, false);
-
-    if (response.Items.length === 0) {
-        return {
-            toNextStepIncrementCounter,
-            lastEvaluatedKey: null
-        };
     }
 
-    await processItems(deliveryWeek, response.Items, "EVALUATE_SENDER_LIMIT");
-
-    processedCount += response.Items.length;
-
-    if (
-        response.LastEvaluatedKey &&
-        Object.keys(response.LastEvaluatedKey).length > 0 &&
-        processedCount < 4000
-    ) {
-        return await retrieveAndProcessItemsToNextStep(
-            deliveryWeek,
-            response.LastEvaluatedKey,
-            toNextStepIncrementCounter,
-            queryLimit,
-            processedCount
-        );
-    } else {
-        return {
-            toNextStepIncrementCounter: toNextStepIncrementCounter + processedCount,
-            lastEvaluatedKey: response.LastEvaluatedKey
-        };
-    }
+    return {
+        lastEvaluatedKey: response.LastEvaluatedKey,
+        dailyCounter: dailyCounter
+    };
 }
 
 async function processItems(deliveryWeek, items, step) {
-    const paperDeliveries = items.map(item => utils.mapToPaperDeliveryForGivenStep(item, deliveryWeek, step));
+    const paperDeliveries = items.map(item =>
+        utils.mapToPaperDeliveryForGivenStep(item, deliveryWeek, step)
+    );
     await dynamo.insertItems(paperDeliveries);
 }
