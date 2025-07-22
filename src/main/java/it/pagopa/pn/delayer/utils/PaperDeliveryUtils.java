@@ -122,7 +122,7 @@ public class PaperDeliveryUtils {
         return evaluateCapCapacity(chunk, unifiedDeliveryDriver, tenderId, deliveryWeek, deliveriesToSend, incrementCapacities)
                 .doOnNext(unused -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, province, deliveriesToSend.size(), deliveryWeek, provinceDeclaredCapacity)))
                 .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(deliveriesToSend).thenReturn(deliveriesToSend.size())
-                        .flatMap(sentToNextStepCounter -> paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryWeek, sentToNextStepCounter, weeklyPrintCapacity, null)
+                        .flatMap(sentToNextStepCounter -> paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryWeek, sentToNextStepCounter, weeklyPrintCapacity)
                                 .thenReturn(sentToNextStepCounter))
                         .flatMap(sentToNextStepCounter -> deliveryDriverUtils.updateCounters(incrementCapacities)
                                 .thenReturn(sentToNextStepCounter)));

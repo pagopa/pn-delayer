@@ -107,19 +107,6 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryKinesisEvent'
 
-  PaperDeliveryPrintCapacityCounterTableName:
-    Type: String
-    Description: 'DynamoDB table name for PaperDeliveryPrintCapacityCounter'
-
-  PaperDeliveryPrintCapacityCounterTtlDuration:
-    Type: String
-    Default: 60d
-    Description: 'DynamoDB PaperDeliveryPrintCapacityCounter ttl duration'
-
-  PaperDeliveryPrintCapacityCounterTableArn:
-    Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter'
-
   PaperDeliveryTableName:
     Type: String
     Description: Name of dynamodb table containing paper deliveries workflow
@@ -576,8 +563,6 @@ Resources:
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
             Value: !Ref PaperDeliveryPrintCapacityTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTABLENAME
-            Value: !Ref PaperDeliveryPrintCapacityCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -592,8 +577,6 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
-            Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
           - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
             Value: !Ref PrintCapacityWeeklyWorkingDays
 
@@ -733,8 +716,6 @@ Resources:
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
             Value: !Ref PaperDeliveryPrintCapacityTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTABLENAME
-            Value: !Ref PaperDeliveryPrintCapacityCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -749,8 +730,6 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYCOUNTERTTLDURATION
-            Value: !Ref PaperDeliveryPrintCapacityCounterTtlDuration
           - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
             Value: !Ref PrintCapacityWeeklyWorkingDays
 
@@ -862,7 +841,6 @@ Resources:
             - !Ref PaperDeliverySenderLimitTableName
             - !Ref PaperDeliveryUsedSenderLimitTableName
             - !Ref PaperDeliveryPrintCapacityTableName
-            - !Ref PaperDeliveryPrintCapacityCounterTableName
         LogGroupsNames: !Join
           - ','
           - - !Sub '/aws/ecs/${ProjectName}-delayer-sender-limit-job'
@@ -1267,13 +1245,6 @@ Resources:
               - dynamodb:DeleteItem
             Resource:
               - !Ref PaperDeliveryTableArn
-          - Effect: Allow
-            Action:
-              - dynamodb:GetItem
-              - dynamodb:BatchGetItem
-              - dynamodb:UpdateItem
-              - dynamodb:TransactWriteItems
-            Resource: !Ref PaperDeliveryPrintCapacityCounterTableArn
           - Effect: Allow
             Action:
               - sqs:SendMessage

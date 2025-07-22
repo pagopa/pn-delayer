@@ -20,7 +20,6 @@ import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Component
 @Slf4j
@@ -28,39 +27,40 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
 
     private final DynamoDbAsyncTable<PaperDeliveryCounter> tableCounter;
     private final DynamoDbAsyncClient dynamoDbAsyncClient;
+    private final PnDelayerConfigs pnDelayerConfigs;
 
     public PaperDeliveryCounterDAOImpl(PnDelayerConfigs pnDelayerConfigs, DynamoDbEnhancedAsyncClient dynamoDbEnhancedAsyncClient, DynamoDbAsyncClient dynamoDbAsyncClient) {
         this.dynamoDbAsyncClient = dynamoDbAsyncClient;
         this.tableCounter = dynamoDbEnhancedAsyncClient.table(pnDelayerConfigs.getDao().getPaperDeliveryCounterTableName(), TableSchema.fromBean(PaperDeliveryCounter.class));
+        this.pnDelayerConfigs = pnDelayerConfigs;
     }
 
-    public Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(LocalDate deliveryDate, String sk) {
+    public Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk) {
         QueryEnhancedRequest queryEnhancedRequest = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.sortBeginsWith(Key.builder().partitionValue(deliveryDate.toString())
+                .queryConditional(QueryConditional.sortBeginsWith(Key.builder().partitionValue(pk)
                         .sortValue(sk).build()))
                 .build();
         return Mono.from(tableCounter.query(queryEnhancedRequest).map(Page::items))
-                .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", deliveryDate, sk, error));
+                .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", pk, sk, error));
     }
 
-    public Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer weeklyPrintCapacity, Integer excludedDeliveryCounter) {
-        log.info("update print capacity counter for deliveryDate={} with weeklyPrintCapacity={} and field {} to increment of={}",
-                deliveryDate, weeklyPrintCapacity, Objects.isNull(counter) ? "excludedDeliveryCounter" : "counter",
-                Objects.isNull(counter) ? excludedDeliveryCounter : counter);
+    public Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer printCapacity) {
+        log.info("update print capacity counter for deliveryDate={} with printCapacity={} and field counter to increment of={}",
+                deliveryDate, printCapacity, counter);
 
         Map<String, AttributeValue> key = Map.of(
-                PaperDeliveryCounter.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build(),
-                PaperDeliveryCounter.COL_SK, AttributeValue.builder().s("PRINT").build()
+                PaperDeliveryCounter.COL_PK, AttributeValue.builder().s("PRINT").build(),
+                PaperDeliveryCounter.COL_SK, AttributeValue.builder().s(deliveryDate.toString()).build()
         );
 
         Map<String, AttributeValue> attributeValue = Map.of(
-                ":weeklyPrintCapacity", AttributeValue.builder().n(String.valueOf(weeklyPrintCapacity)).build(),
-                ":v", AttributeValue.builder().n(String.valueOf(counter == null ? excludedDeliveryCounter : counter)).build()
+                ":weeklyPrintCapacity", AttributeValue.builder().n(String.valueOf(printCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays())).build(),
+                ":dailyPrintCapacity", AttributeValue.builder().n(String.valueOf(printCapacity)).build(),
+                ":v", AttributeValue.builder().n(String.valueOf(counter)).build()
         );
 
-        String updateExpression = Objects.isNull(counter)
-                ? "ADD " + PaperDeliveryCounter.COL_COUNTER_EXCLUDED_DELIVERY_COUNTER + " :v SET " + PaperDeliveryCounter.COL_WEEKLY_PRINT_CAPACITY + " = :weeklyPrintCapacity"
-                : "ADD " + PaperDeliveryCounter.COL_COUNTER + " :v SET " + PaperDeliveryCounter.COL_WEEKLY_PRINT_CAPACITY + " = :weeklyPrintCapacity";
+        String updateExpression = "ADD " + PaperDeliveryCounter.COL_NUMBER_OF_SHIPMENTS + " :v SET " + PaperDeliveryCounter.COL_WEEKLY_PRINT_CAPACITY + " = :weeklyPrintCapacity,"
+                + PaperDeliveryCounter.COL_DAILY_PRINT_CAPACITY + " = :dailyPrintCapacity";
 
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                 .tableName(tableCounter.tableName())

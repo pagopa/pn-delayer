@@ -157,7 +157,7 @@ class EvaluateResidualCapacityJobServiceTest {
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
 
         when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
-        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
                 .verifyComplete();
 
@@ -214,7 +214,7 @@ class EvaluateResidualCapacityJobServiceTest {
 
         when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4)))
                 .thenReturn(Mono.just(Page.create(deliveries2)));
-        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(any())).thenReturn(Mono.empty());
 
         ArgumentCaptor<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptor = ArgumentCaptor.forClass(List.class);
@@ -293,7 +293,7 @@ class EvaluateResidualCapacityJobServiceTest {
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
-        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt(), eq(null))).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
 
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))

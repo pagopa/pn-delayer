@@ -145,29 +145,6 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  PaperDeliveryPrintCapacityCounterTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryPrintCapacityCounter'
-      AttributeDefinitions:
-        - AttributeName: "pk"
-          AttributeType: "S"
-        - AttributeName: "sk"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "pk"
-          KeyType: "HASH"
-        - AttributeName: "sk"
-          KeyType: "RANGE"
-      BillingMode: "PAY_PER_REQUEST"
-      TimeToLiveSpecification:
-        AttributeName: "ttl"
-        Enabled: true
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-
   PaperDeliverySenderLimitTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
@@ -219,16 +196,16 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-Provinces'
+      TableName: !Sub '${ProjectName}-PaperChannelProvince'
       AttributeDefinitions:
-        - AttributeName: "province"
-          AttributeType: "S"
         - AttributeName: "region"
+          AttributeType: "S"
+        - AttributeName: "province"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "province"
-          KeyType: "HASH"
         - AttributeName: "region"
+          KeyType: "HASH"
+        - AttributeName: "province"
           KeyType: "RANGE"
       BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
@@ -239,14 +216,14 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryCounter'
+      TableName: !Sub '${ProjectName}-PaperDeliveryCounters'
       AttributeDefinitions:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
           AttributeType: "S"
         - AttributeName: "sk"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
           KeyType: "HASH"
         - AttributeName: "sk"
           KeyType: "RANGE"
@@ -479,13 +456,6 @@ Outputs:
   PaperDeliveryUsedSenderLimitTableArn:
     Description: ARN of dynamodb table containing PaperDeliveryUsedSenderLimit
     Value: !Sub '${PaperDeliveryUsedSenderLimitTable.Arn}'
-
-  PaperDeliveryPrintCapacityCounterTableName:
-    Description: Name of dynamodb table containing PaperDeliveryPrintCapacityCounter
-    Value: !Ref PaperDeliveryPrintCapacityCounterTable
-  PaperDeliveryPrintCapacityCounterTableArn:
-    Description: ARN of dynamodb table containing PaperDeliveryPrintCapacityCounter
-    Value: !Sub '${PaperDeliveryPrintCapacityCounterTable.Arn}'
 
   ProvinceTableName:
     Description: Name of dynamodb table containing Province

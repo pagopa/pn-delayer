@@ -39,11 +39,11 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
 
 
     @Override
-    public Mono<Void> startSenderLimitJob(String province, String tenderId, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch) {
+    public Mono<Void> startSenderLimitJob(String province, String tenderId, Instant startExecutionBatch) {
         LocalDate deliveryWeek = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
         Map<Integer, List<String>> priorityMap = getPriorityMap();
         return deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province)
-                .flatMap(driversTotalCapacities -> retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, lastEvaluatedKey, driversTotalCapacities, priorityMap))
+                .flatMap(driversTotalCapacities -> retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, new HashMap<>(), driversTotalCapacities, priorityMap))
                 .doOnError(error -> log.error("Error processing sender limit job for province: {}, tenderId: {}, deliveryWeek: {}", province, tenderId, deliveryWeek, error));
     }
 

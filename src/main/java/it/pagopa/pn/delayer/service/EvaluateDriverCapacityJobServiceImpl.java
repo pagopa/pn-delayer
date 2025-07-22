@@ -7,11 +7,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -22,7 +20,7 @@ public class EvaluateDriverCapacityJobServiceImpl implements EvaluateDriverCapac
     private final PnDelayerUtils pnDelayerUtils;
 
     @Override
-    public Mono<Void> startEvaluateDriverCapacityJob(String unifiedDeliveryDriver, String province, Map<String, AttributeValue> lastEvaluatedKey, Instant startExecutionBatch, String tenderId) {
+    public Mono<Void> startEvaluateDriverCapacityJob(String unifiedDeliveryDriver, String province, Instant startExecutionBatch, String tenderId) {
         LocalDate deliveryWeek = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
         return paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, unifiedDeliveryDriver, province, deliveryWeek, tenderId);
     }
