@@ -45,7 +45,7 @@ function buildPaperDeliveryKinesisEventRecord(requestId) {
 
 const groupRecordsByProductAndProvince = (records) => {
   return records.reduce((acc, record) => {
-    const key = `${record.entity.productType}~${record.entity.province}`;
+    const key = `${record.entity.province}~${record.entity.productType}`;
     if (!acc[key]) {    
       acc[key] = [];
     }

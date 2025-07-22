@@ -21,7 +21,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
   const result = {};
   for (const key of Object.keys(excludeGroupedRecords)) {
     const records = excludeGroupedRecords[key];
-    const productTypeKey = key.split("~")[0];
+    const productTypeKey = key.split("~")[1];
 
     let filteredRecords;
 
