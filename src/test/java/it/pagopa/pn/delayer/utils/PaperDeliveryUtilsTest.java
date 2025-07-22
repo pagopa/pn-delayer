@@ -1,156 +1,153 @@
 package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
+import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import software.amazon.awssdk.enhanced.dynamodb.model.Page;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static it.pagopa.pn.delayer.model.WorkflowStepEnum.EVALUATE_SENDER_LIMIT;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class PaperDeliveryUtilsTest {
-
+public class PaperDeliveryUtilsTest {
 
     private PaperDeliveryUtils paperDeliveryUtils;
 
+    @Mock
+    private DeliveryDriverUtils deliveryDriverUtils;
+
+    @Mock
+    private PaperDeliveryDAO paperDeliveryDAO;
+
+    @Mock
+    private PaperDeliveryPrintCapacityDAO paperDeliveryPrintCapacityDAO;
+
+    @Mock
+    private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
+
     @BeforeEach
     void setUp() {
-        PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
-        pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
-        pnDelayerConfigs.setDeliveryDateInterval(Duration.ofDays(7));
-        paperDeliveryUtils = new PaperDeliveryUtils(pnDelayerConfigs);
+        PnDelayerConfigs config = new PnDelayerConfigs();
+        PnDelayerConfigs.Dao daoConfig = new PnDelayerConfigs.Dao();
+        daoConfig.setPaperDeliveryQueryLimit(10);
+        config.setDao(daoConfig);
+        paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, config, new PnDelayerUtils(config), deliveryDriverUtils, paperDeliveryCounterDAO, paperDeliveryPrintCapacityDAO);
+    }
+
+
+    void evaluateCapacitiesAndProcessDeliveries() {
+        Tuple2<Integer, Integer> provinceCapacities = Tuples.of(10,5);
+        WorkflowStepEnum workflowStepEnum = WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY;
+        String unifiedDeliveryDriver = "driver1";
+        String province = "RM";
+        Map<String, AttributeValue> lastEvaluatedKey = Map.of();
+        LocalDate deliveryWeek = LocalDate.now();
+        String tenderId = "tender1";
+        when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Mono.just(provinceCapacities));
+
+        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt()))
+                .thenReturn(Mono.just(Page.create(List.of(createPaperDelivery("AR", "00179", province, "senderPaId1", 1),
+                        createPaperDelivery("AR", "00178", province, "senderPaId2", 1)))));
+
+        when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(workflowStepEnum, unifiedDeliveryDriver, province, deliveryWeek, tenderId))
+                .verifyComplete();
+    }
+
+    void evaluateCapacitiesAndProcessDeliveriesNoCapacityOnProvince() {
+        Tuple2<Integer, Integer> provinceCapacities = Tuples.of(10,10);
+        WorkflowStepEnum workflowStepEnum = WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY;
+        String unifiedDeliveryDriver = "driver1";
+        String province = "RM";
+        Map<String, AttributeValue> lastEvaluatedKey = Map.of();
+        LocalDate deliveryWeek = LocalDate.now();
+        String tenderId = "tender1";
+        when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Mono.just(provinceCapacities));
+
+        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt()))
+                .thenReturn(Mono.just(Page.create(List.of(createPaperDelivery("AR", "00179", province, "senderPaId1", 1),
+                        createPaperDelivery("AR", "00178", province, "senderPaId2", 1)))));
+
+        when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(workflowStepEnum, unifiedDeliveryDriver, province, deliveryWeek, tenderId))
+                .verifyComplete();
+    }
+
+
+    @Test
+    void retrievePaperDeliveries_handlesNoRecordsFound() {
+        WorkflowStepEnum workflowStepEnum = WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY;
+        LocalDate deliveryWeek = LocalDate.now();
+        String sortKeyPrefix = "driver1~RM";
+        Map<String, AttributeValue> lastEvaluatedKey = Map.of();
+        int queryLimit = 10;
+
+        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt()))
+                .thenReturn(Mono.just(Page.create(List.of())));
+
+        StepVerifier.create(paperDeliveryUtils.retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, queryLimit))
+                .verifyComplete();
     }
 
     @Test
-    void filterAndPrepareDeliveries_returnsCorrectSize_whenDeliveriesFitCapacity() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
-        paperDelivery1.setPriority(1);
-        paperDelivery1.setRequestId("requestId1");
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        paperDelivery2.setPriority(1);
-        paperDelivery2.setRequestId("requestId2");
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2);
-        Tuple2<Integer, Integer> capacityTuple = Tuples.of(5, 2);
-        List<PaperDelivery> deliveriesToSend = new ArrayList<>();
+    void insertPaperDeliveries(){
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(new PaperDelivery());
+        LocalDate deliveryWeek = LocalDate.now();
 
-        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
+        SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
+        senderLimitJobPaperDeliveries.setSendToDriverCapacityStep(List.of(createPaperDelivery("AR", "00100", "RM", "paId", 1)));
+        senderLimitJobPaperDeliveries.setSendToResidualCapacityStep(List.of(createPaperDelivery("AR", "00100", "RM", "paId", 0)));
 
-        assertEquals(2, result);
-        assertEquals(2, deliveriesToSend.size());
+        when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
+                .thenReturn(Mono.empty());
+
+        paperDeliveryUtils.insertPaperDeliveries(new SenderLimitJobPaperDeliveries(), deliveryWeek).block();
+
+        verify(paperDeliveryDAO,times(2)).insertPaperDeliveries(anyList());
     }
 
-    @Test
-    void filterAndPrepareDeliveries_returnsZero_whenNoRemainingCapacity() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2);
-        Tuple2<Integer, Integer> capacityTuple = Tuples.of(2, 2);
-        List<PaperDelivery> deliveriesToSend = new ArrayList<>();
-
-        Integer result = paperDeliveryUtils.filterAndPrepareDeliveries(deliveries, capacityTuple, deliveriesToSend, new ArrayList<>(), LocalDate.parse("2025-01-01"));
-
-        assertEquals(0, result);
-        assertTrue(deliveriesToSend.isEmpty());
-    }
-
-    @Test
-    void groupDeliveryOnCapAndOrderOnCreatedAt_groupsAndSortsCorrectly() {
-        PaperDelivery paperDelivery1 = new PaperDelivery();
-        paperDelivery1.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery1.setSk("RM~2025-01-01t00:00:00Z~requestId1");
-        paperDelivery1.setCap("12345");
-        paperDelivery1.setCreatedAt(Instant.now().toString());
-        PaperDelivery paperDelivery2 = new PaperDelivery();
-        paperDelivery2.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery2.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        paperDelivery2.setCap("12345");
-        paperDelivery2.setCreatedAt(Instant.now().toString());
-        PaperDelivery paperDelivery3 = new PaperDelivery();
-        paperDelivery3.setPk("2025-01-01~" + EVALUATE_SENDER_LIMIT);
-        paperDelivery3.setSk("RM~2025-01-01t00:00:00Z~requestId2");
-        paperDelivery3.setCap("67890");
-        paperDelivery3.setCreatedAt(Instant.now().toString());
-        List<PaperDelivery> deliveries = List.of(paperDelivery1, paperDelivery2, paperDelivery3);
-
-        Map<String, List<PaperDelivery>> result = paperDeliveryUtils.groupDeliveryOnCapAndOrderOnCreatedAt(deliveries);
-
-        assertEquals(2, result.size());
-        assertEquals(List.of(paperDelivery1, paperDelivery2), result.get("12345"));
-        assertEquals(List.of(paperDelivery3), result.get("67890"));
-    }
-
-    @Test
-    void calculateDeliveryWeek_returnsCorrectStartOfWeek() {
-        Instant startExecutionBatch = Instant.parse("2023-10-04T10:00:00Z");
-
-        LocalDate result = paperDeliveryUtils.calculateDeliveryWeek(startExecutionBatch);
-
-        assertEquals(LocalDate.parse("2023-10-02"), result);
-    }
-
-    @Test
-    void toNextWeek_correctlyUpdatesPkAndSk() {
-        PaperDelivery paperDelivery = new PaperDelivery();
-        paperDelivery.setProvince("RM");
-        paperDelivery.setRequestId("requestId1");
-        paperDelivery.setProductType("RS");
-        paperDelivery.setPrepareRequestDate("2023-10-01");
-        List<PaperDelivery> deliveries = List.of(paperDelivery);
-        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-
-        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
-
-        assertEquals(1, result.size());
-        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
-        assertEquals("RM~2023-10-01~requestId1", result.getFirst().getSk());
-    }
-
-    @Test
-    void toNextWeek_handlesEmptyDeliveriesList() {
-        List<PaperDelivery> deliveries = List.of();
-        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-
-        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void toNextWeek_usesNotificationSentAtForNonRSAndNonFirstAttempt() {
-        PaperDelivery paperDelivery = new PaperDelivery();
-        paperDelivery.setProvince("RM");
-        paperDelivery.setRequestId("requestId2");
-        paperDelivery.setProductType("Non-RS");
-        paperDelivery.setAttempt(2);
-        paperDelivery.setNotificationSentAt("2023-10-03");
-        List<PaperDelivery> deliveries = List.of(paperDelivery);
-        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-
-        List<PaperDelivery> result = paperDeliveryUtils.toNextWeek(deliveries, deliveryWeek);
-
-        assertEquals(1, result.size());
-        assertEquals("2023-10-09~EVALUATE_SENDER_LIMIT", result.getFirst().getPk());
-        assertEquals("RM~2023-10-03~requestId2", result.getFirst().getSk());
+    private PaperDelivery createPaperDelivery(String productType, String cap, String province, String senderPaId, Integer attempt) {
+        PaperDelivery delivery = new PaperDelivery();
+        delivery.setCap(cap);
+        delivery.setProvince(province);
+        delivery.setProductType(productType);
+        delivery.setUnifiedDeliveryDriver("driver1");
+        delivery.setRequestId("requestId");
+        delivery.setNotificationSentAt("2023-10-01T12:00:00Z");
+        delivery.setSenderPaId(senderPaId);
+        delivery.setDeliveryDate("2023-10-02");
+        delivery.setPriority(1);
+        delivery.setAttempt(attempt);
+        delivery.setDeliveryDate("2023-10-02");
+        delivery.setPk("2023-10-02~EVALUATE_RESIDUAL_CAPACITY");
+        return delivery;
     }
 }

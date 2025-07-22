@@ -70,7 +70,7 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Mono<Integer> updateUsedSenderLimit(String pk, Integer increment, LocalDate deliveryDate, Integer senderLimit) {
+    public Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate deliveryDate, Integer senderLimit) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put(PaperDeliverySenderLimit.COL_PK, AttributeValue.builder().s(pk).build());
         key.put(PaperDeliverySenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());
@@ -97,5 +97,34 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
                 .thenReturn(increment)
                 .doOnSuccess(r -> log.info("Update successful for pk={} increment={}", pk, increment))
                 .doOnError(e -> log.error("Error updating item with pk {}: {}", pk, e.getMessage()));
+    }
+
+    @Override
+    public Flux<PaperDeliveryUsedSenderLimit> retrieveUsedSendersLimit(List<String> pks, LocalDate deliveryDate) {
+        log.info("retrieve used sender Limit for tuples={} on deliveryDate={}", pks, deliveryDate);
+
+        List<Key> keys = pks.stream()
+                .map(pk -> Key.builder()
+                        .partitionValue(pk)
+                        .sortValue(deliveryDate.toString())
+                        .build())
+                .toList();
+
+        ReadBatch.Builder<PaperDeliveryUsedSenderLimit> readBatchBuilder = ReadBatch
+                .builder(PaperDeliveryUsedSenderLimit.class)
+                .mappedTableResource(usedSenderLimitTable);
+
+        keys.forEach(readBatchBuilder::addGetItem);
+        ReadBatch readBatch = readBatchBuilder.build();
+
+        BatchGetItemEnhancedRequest request = BatchGetItemEnhancedRequest.builder()
+                .addReadBatch(readBatch)
+                .build();
+
+        return Mono.from(dynamoDbEnhancedClient.batchGetItem(request))
+                .map(batchGetResultPage -> batchGetResultPage.resultsForTable(usedSenderLimitTable))
+                .doOnNext(items -> log.info("Retrieved used senderLimits [{}] items", items.size()))
+                .flatMapMany(Flux::fromIterable)
+                .doOnError(e -> log.error("Error retrieving usedSenderLimits items with pks {}: {}", pks, e.getMessage()));
     }
 }
