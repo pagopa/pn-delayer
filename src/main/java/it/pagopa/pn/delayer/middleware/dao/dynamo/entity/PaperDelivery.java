@@ -100,7 +100,7 @@ public class PaperDelivery {
             case EVALUATE_RESIDUAL_CAPACITY ->
                     String.join("~", paperDelivery.getUnifiedDeliveryDriver(), paperDelivery.getProvince(), date, paperDelivery.getRequestId());
             case EVALUATE_PRINT_CAPACITY ->
-                    String.join("~", String.valueOf(paperDelivery.getPriority()), paperDelivery.getDeliveryDate(), paperDelivery.getRequestId());
+                    String.join("~", String.valueOf(paperDelivery.getPriority()), date, paperDelivery.getRequestId());
             case SENT_TO_PREPARE_PHASE_2 ->
                     String.join("~", paperDelivery.getDeliveryDate(), paperDelivery.getRequestId());
         };

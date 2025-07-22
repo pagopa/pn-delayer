@@ -216,7 +216,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryCounter'
+      TableName: !Sub '${ProjectName}-PaperDeliveryCounters'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"

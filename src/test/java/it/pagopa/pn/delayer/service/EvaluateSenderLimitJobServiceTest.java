@@ -128,7 +128,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
                 .thenReturn(Mono.empty());
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -189,7 +189,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
                 .thenReturn(Mono.empty());
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -244,7 +244,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
                 .thenReturn(Optional.empty());
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -320,7 +320,7 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(Optional.of("driver2"));
 
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, lastEvaluatedKey, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
