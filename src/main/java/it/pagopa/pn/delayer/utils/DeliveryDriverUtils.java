@@ -97,9 +97,8 @@ public class DeliveryDriverUtils {
                                     Integer capacity = entry.getValue().stream().mapToInt(PaperDeliveryDriverCapacity::getCapacity).sum();
                                     Integer reducedCapacity = capacity - counters.entrySet().stream()
                                             .filter(counter -> entry.getKey().contains(counter.getKey()))
-                                            .findFirst()
                                             .map(Map.Entry::getValue)
-                                            .orElse(0);
+                                            .reduce(0, Integer::sum);
                                     return new DriversTotalCapacity(
                                             entry.getKey(),
                                             reducedCapacity,
@@ -116,7 +115,7 @@ public class DeliveryDriverUtils {
     }
 
     private String retrieveProductFromSk(String sk) {
-        return sk.split("~")[1];
+        return sk.split("~")[2];
     }
 
     public Map<List<String>, List<PaperDeliveryDriverCapacity>> groupDriversByIntersectingProducts(List<PaperDeliveryDriverCapacity> paperDeliveryDriverCapacities) {
