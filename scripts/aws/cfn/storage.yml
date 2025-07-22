@@ -219,7 +219,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      TableName: !Sub '${ProjectName}-Provinces'
+      TableName: !Sub '${ProjectName}-PaperChannelProvince'
       AttributeDefinitions:
         - AttributeName: "region"
           AttributeType: "S"
@@ -241,12 +241,12 @@ Resources:
     Properties:
       TableName: !Sub '${ProjectName}-PaperDeliveryCounter'
       AttributeDefinitions:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
           AttributeType: "S"
         - AttributeName: "sk"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "deliveryDate"
+        - AttributeName: "pk"
           KeyType: "HASH"
         - AttributeName: "sk"
           KeyType: "RANGE"

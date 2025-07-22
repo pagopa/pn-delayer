@@ -20,7 +20,6 @@ import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Component
 @Slf4j
@@ -36,13 +35,13 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
         this.pnDelayerConfigs = pnDelayerConfigs;
     }
 
-    public Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(LocalDate deliveryDate, String sk) {
+    public Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk) {
         QueryEnhancedRequest queryEnhancedRequest = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.sortBeginsWith(Key.builder().partitionValue(deliveryDate.toString())
+                .queryConditional(QueryConditional.sortBeginsWith(Key.builder().partitionValue(pk)
                         .sortValue(sk).build()))
                 .build();
         return Mono.from(tableCounter.query(queryEnhancedRequest).map(Page::items))
-                .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", deliveryDate, sk, error));
+                .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", pk, sk, error));
     }
 
     public Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer printCapacity) {

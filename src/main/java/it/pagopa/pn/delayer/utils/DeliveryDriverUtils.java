@@ -86,7 +86,7 @@ public class DeliveryDriverUtils {
     }
 
     public Mono<List<DriversTotalCapacity>> retrieveDriversCapacityOnProvince(LocalDate deliveryDate, String tenderId, String province) {
-        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province)
+        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), "EXCLUDE~" + province)
                 .defaultIfEmpty(Collections.emptyList())
                 .map(this::createProductCounterMap)
                 .flatMap(counters ->
@@ -112,7 +112,7 @@ public class DeliveryDriverUtils {
 
     private Map<String, Integer> createProductCounterMap(List<PaperDeliveryCounter> paperDeliveryCounters) {
         return paperDeliveryCounters.stream().collect(Collectors.toMap(paperDeliveryCounter -> retrieveProductFromSk(paperDeliveryCounter.getSk()),
-                PaperDeliveryCounter::getCounter, (existing, replacement) -> existing));
+                PaperDeliveryCounter::getNumberOfShipments, (existing, replacement) -> existing));
     }
 
     private String retrieveProductFromSk(String sk) {

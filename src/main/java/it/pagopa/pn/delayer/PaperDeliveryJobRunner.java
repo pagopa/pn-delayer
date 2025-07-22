@@ -124,7 +124,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         addMDC(province);
         try {
             var startExecutionBatch = Instant.now();
-            Mono<Void> monoExcecution = evaluateSenderLimitJobService.startSenderLimitJob(province, tenderId, new HashMap<>(), startExecutionBatch);
+            Mono<Void> monoExcecution = evaluateSenderLimitJobService.startSenderLimitJob(province, tenderId, startExecutionBatch);
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
         } catch (Exception e) {
