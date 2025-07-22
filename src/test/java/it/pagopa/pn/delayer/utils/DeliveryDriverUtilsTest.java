@@ -173,7 +173,7 @@ public class DeliveryDriverUtilsTest {
         driverCapacity2.setProducts(List.of("RS"));
 
         PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
-        paperDeliveryCounter.setSk("EXCLUDE~RS~" + province);
+        paperDeliveryCounter.setSk("EXCLUDE~" + province + "~RS");
         paperDeliveryCounter.setCounter(10);
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate, "EXCLUDE~" + province))

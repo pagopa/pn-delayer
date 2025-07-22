@@ -110,14 +110,22 @@ public class DeliveryDriverUtils {
     }
 
     private Map<String, Integer> createProductCounterMap(List<PaperDeliveryCounter> paperDeliveryCounters) {
-        return paperDeliveryCounters.stream().collect(Collectors.toMap(paperDeliveryCounter -> retrieveProductFromSk(paperDeliveryCounter.getSk()),
+        return paperDeliveryCounters.stream().collect(Collectors.toMap(paperDeliveryCounter -> PaperDeliveryCounter.retrieveProductFromSk(paperDeliveryCounter.getSk()),
                 PaperDeliveryCounter::getCounter, (existing, replacement) -> existing));
     }
 
-    private String retrieveProductFromSk(String sk) {
-        return sk.split("~")[2];
-    }
-
+    /**
+     * Groups drivers by intersecting product sets.
+     * If a driver has products that intersect with an existing group, the driver is merged into that group.
+     * Otherwise, a new group is created for that PaperDeliveryDriverCapacity entity.
+     *
+     * For example, given three PaperDeliveryDriverCapacity entities with product lists: ["RS", "AR"], ["RS"], and ["890"],
+     * the resulting map will have two entries with keys ["AR", "RS"] and ["890"],
+     * and values containing the corresponding PaperDeliveryDriverCapacity entities.
+     *
+     * @param paperDeliveryDriverCapacities List of PaperDeliveryDriverCapacity objects to be grouped
+     * @return A map where the key is a list of products, and the value is a list of PaperDeliveryDriverCapacity entities
+     */
     public Map<List<String>, List<PaperDeliveryDriverCapacity>> groupDriversByIntersectingProducts(List<PaperDeliveryDriverCapacity> paperDeliveryDriverCapacities) {
         List<Map.Entry<List<String>, List<PaperDeliveryDriverCapacity>>> groups = new ArrayList<>();
 
