@@ -345,6 +345,11 @@ Parameters:
     Default: '0 3 * * ? 1'
     Description: 'Cron expression for DelayerStartWorkflowRule'
 
+  DelayerToPaperChannelDailyScheduleCron:
+    Type: String
+    Default: 'cron(0 10 ? * * *)'
+    Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
+
   DelayerStartWorkflowRuleState:
     Type: String
     Default: DISABLED
@@ -352,6 +357,14 @@ Parameters:
       - ENABLED
       - DISABLED
     Description: 'State of the DelayerStartWorkflowRule'
+
+  DelayerToPaperChannelDailyScheduleRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the DelayerToPaperChannelDailyScheduleRuleState'
 
   ProvinceTableName:
     Type: String
@@ -1816,11 +1829,9 @@ Resources:
           - Effect: Allow
             Principal:
               Service:
-                - lambda.amazonaws.com
+                - states.amazonaws.com
             Action:
               - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
     # Lambda function IAM policy
   PaperDeliveryStateMachinePolicy:
@@ -1859,6 +1870,353 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+                -
+  DelayerToPaperChannelDailyScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
+      ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
+      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      Targets:
+        - Id: DelayerToPaperChannelStepFunctionTarget
+          Arn: !Ref DelayerToPaperChannelStateMachine
+          RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+          Input: !Sub |
+            {
+              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}
+            }
+
+  DelayerToPaperChannelDailyScheduleRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayerToPaperChannelDailyScheduleRuleRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DelayerToPaperChannelStepFunctionInvokePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: !Ref DelayerToPaperChannelStateMachine
+
+  DelayerToPaperChannelStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: DelayerToPaperChannelStateMachine
+      RoleArn: !GetAtt DelayerToPaperChannelStateMachineRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Paper Delivery State Machine",
+          "StartAt": "RetrieveCounter",
+          "States": {
+            "RetrieveCounter": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+              "Parameters": {
+                "TableName.$": "$$.Execution.Input.paperDeliveryCounterTableName",
+                "KeyConditionExpression": "deliveryDate = :deliveryDate",
+                "ExpressionAttributeValues": {
+                  ":deliveryDate": {
+                    "S": "PRINT"
+                  }
+                },
+                "Limit": 1,
+                "ScanIndexForward": false
+              },
+              "OutputPath": "$.queryResult.Items[0]",
+              "Next": "mapItem",
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "BackoffRate": 2,
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "Next": "DynamoDb OperationFail"
+                }
+              ],
+              "Assign": {
+                "paperDeliveryCounterTable.$": "$$.Execution.Input.paperDeliveryCounterTableName"
+              },
+              "ResultPath": "$.queryResult"
+            },
+            "DynamoDb OperationFail": {
+              "Type": "Fail"
+            },
+            "mapItem": {
+              "Type": "Pass",
+              "Parameters": {
+                "numberOfShipments.$": "$.numberOfShipments.N",
+                "weeklyPrintCapacity.$": "$.weeklyPrintCapacity.N",
+                "sentToNextWeek.$": "$.sentToNextWeek.N",
+                "lastEvaluatedKeyPhase2.$": "$.lastEvaluatedKeyPhase2.M",
+                "lastEvaluatedKeyNextWeek.$": "$.lastEvaluatedKeyNextWeek.M",
+                "dailyPrintCapacity.$": "$.dailyPrintCapacity.N",
+                "sendToNextWeekCounter": 0,
+                "sendToNextStepCounter": 0,
+                "executionDate.$": "$$.Execution.StartTime",
+                "deliveryDate.$": "$.deliveryDate.S",
+                "sk.$": "$.sk.S"
+              },
+              "Next": "Parallel",
+              "Assign": {
+                "numberOfShipments.$": "$.numberOfShipments",
+                "weeklyPrintCapacity.$": "$.weeklyPrintCapacity",
+                "dailyPrintCapacity.$": "$.dailyPrintCapacity",
+                "pk.$": "$.deliveryDate",
+                "sk.$": "$.sk"
+              }
+            },
+            "Parallel": {
+              "Type": "Parallel",
+              "Branches": [
+                {
+                  "StartAt": "sendPrintCapacityExceedToNextWeek",
+                  "States": {
+                    "sendPrintCapacityExceedToNextWeek": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::lambda:invoke",
+                      "OutputPath": "$.Payload",
+                      "Parameters": {
+                        "FunctionName": "arn:aws:lambda:eu-south-1:830192246553:function:pn-delayerToPaperChannelLambda:$LATEST",
+                        "Payload": {
+                          "input.$": "$",
+                          "context": "SEND_TO_NEXT_WEEK"
+                        }
+                      },
+                      "Retry": [
+                        {
+                          "ErrorEquals": [
+                            "Lambda.ServiceException",
+                            "Lambda.AWSLambdaException",
+                            "Lambda.SdkClientException",
+                            "Lambda.TooManyRequestsException"
+                          ],
+                          "IntervalSeconds": 1,
+                          "MaxAttempts": 3,
+                          "BackoffRate": 2,
+                          "JitterStrategy": "FULL"
+                        }
+                      ],
+                      "Next": "moreItemsToSendToNextWeek",
+                      "Catch": [
+                        {
+                          "ErrorEquals": [
+                            "States.ALL"
+                          ],
+                          "Next": "sendPrintCapacityExceedToNextWeek fail"
+                        }
+                      ]
+                    },
+                    "sendPrintCapacityExceedToNextWeek fail": {
+                      "Type": "Fail"
+                    },
+                    "moreItemsToSendToNextWeek": {
+                      "Type": "Choice",
+                      "Choices": [
+                        {
+                          "Next": "sendPrintCapacityExceedToNextWeek",
+                          "And": [
+                            {
+                              "Variable": "$.lastEvaluatedKeyNextWeek",
+                              "IsPresent": true
+                            },
+                            {
+                              "Variable": "$.sendToNextWeekCounter",
+                              "NumericLessThan": 250000
+                            },
+                            {
+                              "Variable": "$.sentToNextWeek",
+                              "StringLessThanPath": "$.toSendToNextWeek"
+                            }
+                          ]
+                        }
+                      ],
+                      "Default": "Success"
+                    },
+                    "Success": {
+                      "Type": "Succeed"
+                    }
+                  }
+                },
+                {
+                  "StartAt": "sendPaperDeliveryToPreparePhase2",
+                  "States": {
+                    "sendPaperDeliveryToPreparePhase2": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::lambda:invoke",
+                      "OutputPath": "$.Payload",
+                      "Parameters": {
+                        "FunctionName": "arn:aws:lambda:eu-south-1:830192246553:function:pn-delayerToPaperChannelLambda:$LATEST",
+                        "Payload": {
+                          "input.$": "$",
+                          "context": "SEND_TO_PHASE_2"
+                        }
+                      },
+                      "Retry": [
+                        {
+                          "ErrorEquals": [
+                            "Lambda.ServiceException",
+                            "Lambda.AWSLambdaException",
+                            "Lambda.SdkClientException",
+                            "Lambda.TooManyRequestsException"
+                          ],
+                          "IntervalSeconds": 1,
+                          "MaxAttempts": 3,
+                          "BackoffRate": 2,
+                          "JitterStrategy": "FULL"
+                        }
+                      ],
+                      "Next": "moreItemsToSendToPreparePhase2",
+                      "Catch": [
+                        {
+                          "ErrorEquals": [
+                            "States.ALL"
+                          ],
+                          "Next": "sendPaperDeliveryToPreparePhase2 fail"
+                        }
+                      ]
+                    },
+                    "sendPaperDeliveryToPreparePhase2 fail": {
+                      "Type": "Fail"
+                    },
+                    "moreItemsToSendToPreparePhase2": {
+                      "Type": "Choice",
+                      "Choices": [
+                        {
+                          "Next": "sendPaperDeliveryToPreparePhase2",
+                          "And": [
+                            {
+                              "Variable": "$.lastEvaluatedKeyPhase2",
+                              "IsPresent": true
+                            },
+                            {
+                              "Variable": "$.sendToNextStepCounter",
+                              "NumericLessThanPath": "$.dailyPrintCapacity"
+                            }
+                          ]
+                        }
+                      ],
+                      "Default": "Success (1)"
+                    },
+                    "Success (1)": {
+                      "Type": "Succeed"
+                    }
+                  }
+                }
+              ],
+              "Next": "UpdatePaperDeliveryCounter"
+            },
+            "UpdatePaperDeliveryCounter": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:dynamodb:updateItem",
+              "Parameters": {
+                "TableName.$": "$.paperDeliveryCounterTable",
+                "Key": {
+                  "pk": {
+                    "S.$": "$.pk"
+                  },
+                  "sk": {
+                    "S.$": "$.sk"
+                  }
+                },
+                "UpdateExpression": "SET numberOfShipments = :numberOfShipments, lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, weeklyPrintCapacity = :weeklyVal, dailyPrintCapacity = :dailyVal ADD sentToNextWeek :sentToNextWeekInc",
+                "ExpressionAttributeValues": {
+                  ":numberOfShipments": {
+                    "N.$": "$.numberOfShipments"
+                  },
+                  ":phase2Val": {
+                    "M.$": "$.Parallel.sendPaperDeliveryToPreparePhase2.lastEvaluatedKeyPhase2"
+                  },
+                  ":nextWeekVal": {
+                    "M.$": "$.Parallel.sendPrintCapacityExceedToNextWeek.lastEvaluatedKeyNextWeek"
+                  },
+                  ":weeklyVal": {
+                    "N.$": "$.weeklyPrintCapacity"
+                  },
+                  ":dailyVal": {
+                    "N.$": "$.dailyPrintCapacity"
+                  },
+                  ":sentToNextWeekInc": {
+                    "N.$": "$.Parallel.sendPrintCapacityExceedToNextWeek.sendToNextWeekCounter"
+                  }
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "IntervalSeconds": 1,
+                  "BackoffRate": 2,
+                  "MaxAttempts": 3
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "Next": "DynamoDb OperationFail"
+                }
+              ],
+              "End": true
+            }
+          }
+        }
+
+  DelayerToPaperChannelStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayerToPaperChannelStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  DelayerToPaperChannelStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayerToPaperChannelStateMachinePolicy
+      Roles:
+        - !Ref DelayerToPaperChannelStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub "${PaperDeliveryCounterTableArn}"
+              - !Sub "${PaperDeliveryCounterTableArn}/*"
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
 
   DelayerToPaperChannelPipe:
     Type: AWS::Pipes::Pipe
