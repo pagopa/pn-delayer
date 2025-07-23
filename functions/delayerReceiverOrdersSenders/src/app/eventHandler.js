@@ -9,10 +9,11 @@ const { getProvinceDistribution, persistWeeklyEstimates } = require('./dynamo');
  * @param {import('aws-lambda').SQSEvent} event
  */
 exports.handleEvent = async (event = {}) => {
+    const allEstimates = [];
+
     for (const record of event.Records) {
         const body = JSON.parse(record.body);
         const fileKey = body.key;
-        const lastUpdate = body.lastUpdate;
 
         // 1. Scarica il JSON commessa
         const commessaJson = await downloadJson(fileKey);
@@ -22,10 +23,6 @@ exports.handleEvent = async (event = {}) => {
             region => getProvinceDistribution(region)
         );
         allEstimates.push(...estimates);
-    }
-
-    if (allEstimates.length > 0) {
-        await persistWeeklyEstimates(allEstimates);
     }
 
     return {

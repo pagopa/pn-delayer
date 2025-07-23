@@ -4,6 +4,14 @@ const fs = require("fs");
 const path = require("path");
 const { calculateWeeklyEstimates } = require('../app/algorithm');
 
+const { mockClient } = require("aws-sdk-client-mock");
+const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const ddbMock = mockClient(DynamoDBDocumentClient);
+
+// 1️⃣ risposte di default per le operazioni Dynamo
+ddbMock.on(BatchWriteCommand).resolves({ UnprocessedItems: {} });
+ddbMock.on(UpdateCommand).resolves({});
+
 // Dummy provider returning static percentages for test
 const provider = async region => {
     if (region === 'Lombardia') {
@@ -28,6 +36,11 @@ const provider = async region => {
 };
 
 describe('calculateWeeklyEstimates', () => {
+
+    beforeEach(() => {
+        ddbMock.resetHistory();
+    });
+
     it('should compute weekly estimates for February 2025', async () => {
         const sampleCommessaPath = path.join(__dirname, "Modulo_Commessa_v4.json");
         const sampleCommessa = JSON.parse(fs.readFileSync(sampleCommessaPath, "utf8"));

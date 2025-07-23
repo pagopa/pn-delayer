@@ -4,10 +4,11 @@ const {
     endOfMonth,
     eachWeekOfInterval,
     getDaysInMonth,
-    subWeeks,
     differenceInCalendarDays,
     formatISO
 } = require('date-fns');
+
+const { persistWeeklyEstimates } = require('./dynamo');
 
 /**
  * Calculate weekly provincial estimates starting from a monthly‑regional JSON “commessa”.
@@ -46,6 +47,10 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
                 });
 
                 results.push(...provinceRecords);
+
+                if (provinceRecords.length > 0) {
+                    await persistWeeklyEstimates(provinceRecords);
+                }
             }
         }
     }
@@ -93,7 +98,8 @@ function buildProvinceRecords({
     const monthlyRegionalEstimate = regionale.valore;
 
     for (const { province: provinceSigla, percentageDistribution: percentage } of provinceDistribution) {
-        const monthlyProvEstimate = (monthlyRegionalEstimate * percentage) / 100;
+        const perc = percentage ?? 100;          // default a 100%
+        const monthlyProvEstimate = (monthlyRegionalEstimate * perc) / 100;
         const dailyProvEstimate   = monthlyProvEstimate / daysInMonth;
         const weeklyProvEstimate  = Math.round(dailyProvEstimate * 7);
 
