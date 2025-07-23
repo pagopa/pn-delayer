@@ -36,33 +36,87 @@ describe('handleEvent', () => {
     try {
       await handler.handleEvent({
         processType: 'UNKNOWN',
-        executionDate: LocalDate.parse('2025-07-20')
+        input: {
+          dailyPrintCapacity: 10,
+          weeklyPrintCapacity: 70,
+          numberOfShipments: 100,
+          lastEvaluatedKeyPhase2: {},
+          sendToNextStepCounter: 0,
+          executionDate: '2025-07-01T00:00:00Z'
+        }
       });
     } catch (err) {
-      expect(err.message).to.include('Invalid processType');
+      expect(err.message).to.include('Invalid processType. Use: SEND_TO_PHASE_2 or SEND_TO_NEXT_WEEK');
     }
   });
 
   it('should execute SEND_TO_PHASE_2 and process items', async () => {
     retrieveStub
-      .onFirstCall().resolves({
+      .onCall(0).resolves({
         Items: [{ id: 1 }],
         LastEvaluatedKey: null
       });
 
     const result = await handler.handleEvent({
       processType: 'SEND_TO_PHASE_2',
-      lastEvaluatedKeyPhase2: null,
-      toNextStepIncrementCounter: 0,
-      executionDate: LocalDate.parse('2025-07-21')
+      input: {
+        dailyPrintCapacity: 10,
+        weeklyPrintCapacity: 70,
+        numberOfShipments: 100,
+        lastEvaluatedKeyPhase2: {},
+        sendToNextStepCounter: 0,
+        executionDate: '2025-07-01T00:00:00Z'
+      }
     });
 
-    expect(retrieveStub.called).to.be.true;
+    expect(retrieveStub.calledOnce).to.be.true;
     expect(mapStub.calledOnce).to.be.true;
     expect(insertStub.calledOnce).to.be.true;
-    expect(result).to.deep.include({
-      toNextStepIncrementCounter: 1,
-      lastEvaluatedKey: null
+    expect(result.input).to.deep.include({
+      sendToNextStepCounter: 1,
+      lastEvaluatedKeyPhase2: null,
+      dailyPrintCapacity: 10,
+      weeklyPrintCapacity: 70,
+      numberOfShipments: 100,
+      executionDate: '2025-07-01T00:00:00Z'
+    });
+  });
+
+  it('should execute SEND_TO_NEXT_WEEK and process items recursively no items to process', async () => {
+    retrieveStub
+      .onCall(0).resolves({
+        Items: [{ id: 1 }, { id: 2 }],
+        LastEvaluatedKey: { id: 'last' }
+      })
+      .onCall(1).resolves({
+        Items: [{ id: 3 }],
+        LastEvaluatedKey: null
+      });
+
+    const result = await handler.handleEvent({
+      processType: 'SEND_TO_NEXT_WEEK',
+      input: {
+        dailyPrintCapacity: 4,
+        weeklyPrintCapacity: 28,
+        numberOfShipments: 20,
+        lastEvaluatedKeyNextWeek: {},
+        sendToNextWeekCounter: 0,
+        sentToNextWeek: 0,
+        executionDate: '2025-07-01T00:00:00Z'
+      },
+    });
+
+    expect(retrieveStub.callCount).to.equal(0);
+    expect(mapStub.callCount).to.equal(0);
+    expect(insertStub.callCount).to.equal(0);
+    expect(result.input).to.deep.include({
+      sendToNextWeekCounter: 0,
+      lastEvaluatedKeyNextWeek: null,
+      dailyPrintCapacity: 4,
+      weeklyPrintCapacity: 28,
+      numberOfShipments: 20,
+      executionDate: '2025-07-01T00:00:00Z',
+      sentToNextWeek: 0
     });
   });
 
@@ -79,19 +133,28 @@ describe('handleEvent', () => {
 
     const result = await handler.handleEvent({
       processType: 'SEND_TO_NEXT_WEEK',
-      lastEvaluatedKeyNextWeek: null,
-      sendToNextWeekCounter: 10,
-      toNextWeekIncrementCounter: 0,
-      executionDate: LocalDate.parse('2025-07-21')
+      input: {
+        dailyPrintCapacity: 4,
+        weeklyPrintCapacity: 28,
+        numberOfShipments: 8000,
+        lastEvaluatedKeyNextWeek: {},
+        sendToNextWeekCounter: 0,
+        sentToNextWeek: 0,
+        executionDate: '2025-07-01T00:00:00Z'
+      },
     });
 
     expect(retrieveStub.callCount).to.equal(2);
     expect(mapStub.callCount).to.equal(3);
     expect(insertStub.callCount).to.equal(2);
-    expect(result).to.deep.include({
-      toNextWeekIncrementCounter: 3,
-      lastEvaluatedKey: null,
-      sendToNextWeekCounter: 7
+    expect(result.input).to.deep.include({
+      sendToNextWeekCounter: 3,
+      lastEvaluatedKeyNextWeek: null,
+      dailyPrintCapacity: 4,
+      weeklyPrintCapacity: 28,
+      numberOfShipments: 8000,
+      executionDate: '2025-07-01T00:00:00Z',
+      sentToNextWeek: 0
     });
   });
 });
