@@ -115,6 +115,10 @@ Parameters:
     Type: String
     Description: ARN of dynamodb table containing paper deliveries workflow
 
+  PaperDeliveryTableStreamArn:
+    Type: String
+    Description: 'ARN of dynamodb table stream containing paper deliveries workflow'
+
   PaperDeliveryQueryLimit:
     Type: Number
     Default: 1000
@@ -1855,3 +1859,65 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+
+  DelayerToPaperChannelPipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Name: !Sub '${ProjectName}-delayerToPaperChannelPipe'
+      RoleArn: !GetAtt DelayerToPaperChannelPipeExecutionRole.Arn
+      Source: !Ref PaperDeliveryTableStreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+        FilterCriteria:
+          Filters:
+            - Pattern: >
+                {
+                  "eventName": ["INSERT"],
+                  "dynamodb": {
+                    "NewImage": {
+                      "pk": {
+                        "S": [{ "suffix": "SENT_TO_PREPARE_PHASE_2" }]
+                      }
+                    }
+                  }
+                }
+      Target: !Ref DelayerToPaperChannelQueueQueueURL
+      TargetParameters:
+        InputTemplate: >
+          {
+            "requestId": <$.dynamodb.NewImage.requestId.S>,
+            "iun": <$.dynamodb.NewImage.iun.S>
+          }
+        SqsQueueParameters:
+          MessageGroupId: "paper-delivery-pipe"
+
+  DelayerToPaperChannelPipeExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-DelayerToPaperChannelPipeExecutionRole'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pipes.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PipeDynamoDBToSqsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeStream
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:ListStreams
+                Resource:
+                  - !Sub "${PaperDeliveryTableArn}"
+                  - !Sub "${PaperDeliveryTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !Ref DelayerToPaperChannelQueueARN
