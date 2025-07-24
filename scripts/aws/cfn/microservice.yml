@@ -1964,7 +1964,7 @@ Resources:
           Input: !Sub |
             {
               "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}
+              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
             }
 
   DelayerToPaperChannelDailyScheduleRuleRole:
