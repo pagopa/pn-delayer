@@ -1422,7 +1422,6 @@ Resources:
     Properties:
       StateMachineName: BatchWorkflowStateMachine
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
-      DefinitionString: !Sub |
       Definition:
         Comment: "Paper Delivery State Machine"
         StartAt: Lambda Invoke
@@ -1459,7 +1458,6 @@ Resources:
                 paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
                 paperDeliveryPrintCapacityTableName.$: $$.Execution.Input.PAPERDELIVERYPRINTCAPACITY_TABLENAME
                 deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
-
           retrieveProvince:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:scan
@@ -1478,7 +1476,6 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Next: WorkflowFail
-
           MapSubmitSenderLimitJobs:
             Type: Map
             ItemsPath: $.provinces.Items
@@ -1545,7 +1542,6 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Next: WorkflowFail
-
           GetUnifiedDeliveryDriverProvinceParameter:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:ssm:getParameter
@@ -1566,7 +1562,6 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Next: WorkflowFail
-
           CleanUpInput:
             Type: Pass
             Parameters:
@@ -1581,152 +1576,146 @@ Resources:
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
               unifiedDeliveryDrivers.$: $.tempGetParameterResult.unifiedDeliveryDrivers
             Next: MapSubmitEvaluateDriverCapacityJobs
+          MapSubmitEvaluateDriverCapacityJobs:
+            Type: Map
+            ItemsPath: $.unifiedDeliveryDrivers
+            InputPath: $
+            MaxConcurrency: 40
+            Parameters:
+              driver.$: $$.Map.Item.Value.driver
+              provinces.$: $$.Map.Item.Value.provinces
+              actualTenderId.$: $.actualTenderId
+              paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
+              paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
+              paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
+              paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
+              paperDeliveryTableName.$: $.paperDeliveryTableName
+              deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
+              paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
+              paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
+            Iterator:
+              StartAt: submitEvaluateDriverCapacityJob
+              States:
+                submitEvaluateDriverCapacityJob:
+                  Type: Task
+                  Resource: arn:aws:states:::batch:submitJob.sync
+                  Parameters:
+                    JobName.$: $.driver
+                    JobQueue: !Ref DriverCapacityJobQueue
+                    JobDefinition: !Ref DriverCapacityJobDefinition
+                    ArrayProperties:
+                      Size.$: States.ArrayLength($.provinces)
+                    ContainerOverrides:
+                      Environment:
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
+                          Value.$: $.paperDeliveryDriverCapacitiesTableName
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
+                          Value.$: $.paperDeliveryCounterTableName
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
+                          Value.$: $.paperDeliveryPrintCapacityTableName
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
+                          Value.$: $.paperDeliveryTableName
+                        - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
+                          Value.$: $.deliveryDateDayOfWeek
+                        - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
+                          Value.$: $.driver
+                        - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
+                          Value.$: States.JsonToString($.provinces)
+                        - Name: PN_DELAYER_ACTUALTENDERID
+                          Value.$: $.actualTenderId
+                        - Name: PN_DELAYER_WORKFLOWSTEP
+                          Value: EVALUATE_DRIVER_CAPACITY
+                  Retry:
+                    - ErrorEquals:
+                        - States.ALL
+                      IntervalSeconds: 1
+                      MaxAttempts: 3
+                      BackoffRate: 2
+                  Catch:
+                    - ErrorEquals:
+                        - States.ALL
+                      Next: EvaluateDriverCapacityFail
+                  End: true
 
-        MapSubmitEvaluateDriverCapacityJobs:
-          Type: Map
-          ItemsPath: $.unifiedDeliveryDrivers
-          InputPath: $
-          MaxConcurrency: 40
-          Parameters:
-            driver.$: $$.Map.Item.Value.driver
-            provinces.$: $$.Map.Item.Value.provinces
-            actualTenderId.$: $.actualTenderId
-            paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
-            paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
-            paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
-            paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
-            paperDeliveryTableName.$: $.paperDeliveryTableName
-            deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-            paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
-            paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
-          Iterator:
-            StartAt: submitEvaluateDriverCapacityJob
-            States:
-              submitEvaluateDriverCapacityJob:
-                Type: Task
-                Resource: arn:aws:states:::batch:submitJob.sync
-                Parameters:
-                  JobName.$: $.driver
-                  JobQueue: !Ref DriverCapacityJobQueue
-                  JobDefinition: !Ref DriverCapacityJobDefinition
-                  ArrayProperties:
-                    Size.$: States.ArrayLength($.provinces)
-                  ContainerOverrides:
-                    Environment:
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
-                        Value.$: $.paperDeliveryDriverCapacitiesTableName
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
-                        Value.$: $.paperDeliveryCounterTableName
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
-                        Value.$: $.paperDeliveryPrintCapacityTableName
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
-                        Value.$: $.paperDeliveryTableName
-                      - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
-                        Value.$: $.deliveryDateDayOfWeek
-                      - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
-                        Value.$: $.driver
-                      - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
-                        Value.$: States.JsonToString($.provinces)
-                      - Name: PN_DELAYER_ACTUALTENDERID
-                        Value.$: $.actualTenderId
-                      - Name: PN_DELAYER_WORKFLOWSTEP
-                        Value: EVALUATE_DRIVER_CAPACITY
-                Retry:
-                  - ErrorEquals:
-                      - States.ALL
-                    IntervalSeconds: 1
-                    MaxAttempts: 3
-                    BackoffRate: 2
-                Catch:
-                  - ErrorEquals:
-                      - States.ALL
-                    Next: EvaluateDriverCapacityFail
-                End: true
+                EvaluateDriverCapacityFail:
+                  Type: Fail
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+            Next: MapSubmitEvaluateResidualCapacityJobs
+          MapSubmitEvaluateResidualCapacityJobs:
+            Type: Map
+            ItemsPath: $.unifiedDeliveryDrivers
+            InputPath: $
+            MaxConcurrency: 40
+            Parameters:
+              driver.$: $$.Map.Item.Value.driver
+              provinces.$: $$.Map.Item.Value.provinces
+              actualTenderId.$: $.actualTenderId
+              paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
+              paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
+              paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
+              paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
+              paperDeliveryTableName.$: $.paperDeliveryTableName
+              deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
+              paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
+              paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
+            Iterator:
+              StartAt: submitEvaluateResidualCapacityJob
+              States:
+                submitEvaluateResidualCapacityJob:
+                  Type: Task
+                  Resource: arn:aws:states:::batch:submitJob.sync
+                  Parameters:
+                    JobName.$: $.driver
+                    JobQueue: !Ref ResidualCapacityJobQueue
+                    JobDefinition: !Ref ResidualCapacityJobDefinition
+                    ArrayProperties:
+                      Size.$: States.ArrayLength($.provinces)
+                    ContainerOverrides:
+                      Environment:
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
+                          Value.$: $.paperDeliveryDriverCapacitiesTableName
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
+                          Value.$: $.paperDeliveryCounterTableName
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
+                          Value.$: $.paperDeliveryPrintCapacityTableName
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
+                          Value.$: $.paperDeliveryTableName
+                        - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
+                          Value.$: $.deliveryDateDayOfWeek
+                        - Name: PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
+                          Value.$: $.driver
+                        - Name: PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_PROVINCELIST
+                          Value.$: States.JsonToString($.provinces)
+                        - Name: PN_DELAYER_ACTUALTENDERID
+                          Value.$: $.actualTenderId
+                        - Name: PN_DELAYER_WORKFLOWSTEP
+                          Value: EVALUATE_RESIDUAL_CAPACITY
+                  Retry:
+                    - ErrorEquals:
+                        - States.ALL
+                      IntervalSeconds: 1
+                      MaxAttempts: 3
+                      BackoffRate: 2
+                  Catch:
+                    - ErrorEquals:
+                        - States.ALL
+                      Next: EvaluateResidualCapacityFail
+                  End: true
 
-              EvaluateDriverCapacityFail:
-                Type: Fail
-          Catch:
-            - ErrorEquals:
-                - States.ALL
-              Next: WorkflowFail
-
-          Next: MapSubmitEvaluateResidualCapacityJobs
-
-        MapSubmitEvaluateResidualCapacityJobs:
-          Type: Map
-          ItemsPath: $.unifiedDeliveryDrivers
-          InputPath: $
-          MaxConcurrency: 40
-          Parameters:
-            driver.$: $$.Map.Item.Value.driver
-            provinces.$: $$.Map.Item.Value.provinces
-            actualTenderId.$: $.actualTenderId
-            paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
-            paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
-            paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
-            paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
-            paperDeliveryTableName.$: $.paperDeliveryTableName
-            deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-            paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
-            paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
-          Iterator:
-            StartAt: submitEvaluateResidualCapacityJob
-            States:
-              submitEvaluateResidualCapacityJob:
-                Type: Task
-                Resource: arn:aws:states:::batch:submitJob.sync
-                Parameters:
-                  JobName.$: $.driver
-                  JobQueue: !Ref ResidualCapacityJobQueue
-                  JobDefinition: !Ref ResidualCapacityJobDefinition
-                  ArrayProperties:
-                    Size.$: States.ArrayLength($.provinces)
-                  ContainerOverrides:
-                    Environment:
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
-                        Value.$: $.paperDeliveryDriverCapacitiesTableName
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
-                        Value.$: $.paperDeliveryCounterTableName
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
-                        Value.$: $.paperDeliveryPrintCapacityTableName
-                      - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
-                        Value.$: $.paperDeliveryTableName
-                      - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
-                        Value.$: $.deliveryDateDayOfWeek
-                      - Name: PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
-                        Value.$: $.driver
-                      - Name: PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_PROVINCELIST
-                        Value.$: States.JsonToString($.provinces)
-                      - Name: PN_DELAYER_ACTUALTENDERID
-                        Value.$: $.actualTenderId
-                      - Name: PN_DELAYER_WORKFLOWSTEP
-                        Value: EVALUATE_RESIDUAL_CAPACITY
-                Retry:
-                  - ErrorEquals:
-                      - States.ALL
-                    IntervalSeconds: 1
-                    MaxAttempts: 3
-                    BackoffRate: 2
-                Catch:
-                  - ErrorEquals:
-                      - States.ALL
-                    Next: EvaluateResidualCapacityFail
-                End: true
-
-              EvaluateResidualCapacityFail:
-                Type: Fail
-          Catch:
-            - ErrorEquals:
-                - States.ALL
-              Next: WorkflowFail
-
-          Next: WorkflowSuccess
-
-        WorkflowFail:
-          Type: Fail
-
-        WorkflowSuccess:
-          Type: Succeed
+                EvaluateResidualCapacityFail:
+                  Type: Fail
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+            Next: WorkflowSuccess
+          WorkflowFail:
+            Type: Fail
+          WorkflowSuccess:
+            Type: Succeed
 
   PaperDeliveryStateMachineRole:
     Type: AWS::IAM::Role
@@ -1779,7 +1768,6 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
-                -
   DelayerToPaperChannelDailyScheduleRule:
     Type: AWS::Events::Rule
     Properties:
@@ -1848,10 +1836,8 @@ Resources:
             Catch:
               - ErrorEquals: [ States.ALL ]
                 Next: DynamoDb OperationFail
-
           DynamoDb OperationFail:
             Type: Fail
-
           mapItem:
             Type: Pass
             Parameters:
@@ -1867,7 +1853,6 @@ Resources:
               deliveryDate.$: $.deliveryDate.S
               sk.$: $.sk.S
             Next: Parallel
-
           Parallel:
             Type: Parallel
             Branches:
@@ -1959,7 +1944,6 @@ Resources:
                   toPreparePhase2Successfully:
                     Type: Succeed
             Next: UpdatePaperDeliveryCounter
-
           UpdatePaperDeliveryCounter:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:updateItem
@@ -2058,15 +2042,13 @@ Resources:
                     }
                   }
                 }
-      Target: !Ref DelayerToPaperChannelQueueQueueURL
+      Target: !Ref DelayerToPaperChannelQueueARN
       TargetParameters:
         InputTemplate: >
           {
             "requestId": <$.dynamodb.NewImage.requestId.S>,
             "iun": <$.dynamodb.NewImage.iun.S>
           }
-        SqsQueueParameters:
-          MessageGroupId: "paper-delivery-pipe"
 
   DelayerToPaperChannelPipeExecutionRole:
     Type: AWS::IAM::Role
