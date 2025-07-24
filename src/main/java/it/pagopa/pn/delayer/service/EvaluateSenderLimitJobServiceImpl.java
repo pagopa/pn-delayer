@@ -24,6 +24,9 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND;
 
 @Component
 @Slf4j
@@ -118,7 +121,9 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
     }
 
     private Map<Integer, List<String>> getPriorityMap() {
-        return ssmParameterConsumerActivation.getParameterValue(pnDelayerConfigs.getPaperDeliveryPriorityParameterName(), Map.class)
-                .orElseThrow(() -> new PnInternalException("Failed to retrieve paper delivery priority map from SSM parameter store", "PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND"));
+        return ((Map<String, List<String>>) ssmParameterConsumerActivation.getParameterValue(pnDelayerConfigs.getPaperDeliveryPriorityParameterName(), Map.class)
+                .orElseThrow(() -> new PnInternalException("Failed to retrieve paper delivery priority map from SSM parameter store", PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND)))
+                .entrySet().stream()
+                .collect(Collectors.toMap(e -> Integer.parseInt(e.getKey()), Map.Entry::getValue));
     }
 }

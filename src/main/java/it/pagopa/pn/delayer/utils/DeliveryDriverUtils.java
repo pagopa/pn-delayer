@@ -1,6 +1,7 @@
 package it.pagopa.pn.delayer.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.cache.CapProductTypeDriverCacheService;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
@@ -12,6 +13,7 @@ import it.pagopa.pn.delayer.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
@@ -25,6 +27,8 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND;
 
 @Component
 @Slf4j
@@ -106,6 +110,11 @@ public class DeliveryDriverUtils {
                                     );
                                 })
                                 .collectList()
+                                .filter(driversTotalCapacities -> !CollectionUtils.isEmpty(driversTotalCapacities))
+                                .doOnDiscard(List.class, list -> {
+                                    log.error("No drivers found for province: {}", province);
+                                    throw new PnInternalException(String.format("No drivers found for province: %s", province),404,ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND);
+                                })
                 );
     }
 
