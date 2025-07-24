@@ -387,6 +387,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  DelayerReceiverOrdersSendersLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-ReceiverOrdersSendersLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   TestDelayerKmsBucket:
     Type: AWS::KMS::Key
     Properties:
@@ -525,6 +536,9 @@ Outputs:
 
   TestDelayerLambdaName:
     Value: !Sub "${ProjectName}-testDelayerLambda"
+
+  DelayerReceiverOrdersSendersLambdaName:
+    Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN

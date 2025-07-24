@@ -373,6 +373,31 @@ Parameters:
     Type: String
     Description: 'PaperChannelTenderApiLambda function name'
 
+  DelayerReceiverOrdersSendersLambdaName:
+    Type: String
+    Description: 'ReceiverOrdersSendersLambda function name'
+
+  SafeStorageCxId:
+    Type: String
+    Description: 'SafeStorage cx-id for pn-Delayer request'
+
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to delayer receiver orders senders lambda'
+
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN:
+    Type: String
+    Description: 'arn for safeStorage to delayer receiver orders senders lambda'
+
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
+    Type: String
+    Description: 'Events from safe storage to pn-delayer queue URL'
+
+  DelayerReceiverOrdersSendersLambdaMaxRetry:
+    Type: Number
+    Default: 3
+    Description: 'Maximum retry attempts for received message for DelayerReceiverOrdersSendersLambdaQueue
+
 Resources:
 
   SenderLimitComputeEnvironment:
@@ -1288,6 +1313,109 @@ Resources:
       SourceArn: !GetAtt DelayerToPaperChannelScheduleRule.Arn
 
   #########################################################
+  ###         DelayerReceiverOrdersSendersLambda          ###
+  #########################################################
+
+  DelayerReceiverOrdersSendersLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${DelayerReceiverOrdersSendersLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  DelayerReceiverOrdersSendersLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref DelayerReceiverOrdersSendersLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerReceiverOrdersSendersLambda.zip"
+      Role: !GetAtt DelayerReceiverOrdersSendersLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PN_SAFESTORAGE_URL: !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL
+          PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
+          PAPER_CHANNEL_PROVINCE_TABLENAME: !Ref ProvinceTableName
+          PAPER_DELIVERY_SENDER_LIMIT_TABLENAME: !Ref PaperDeliverySenderLimitTableName
+          PAPER_DELIVERY_COUNTERS_TABLENAME: !Ref PaperDeliveryCounterTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  DelayerReceiverOrdersSendersLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-DelayerReceiverOrdersSendersLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  DelayerReceiverOrdersSendersLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DelayerReceiverOrdersSendersLambdaPolicy
+      Roles:
+        - !Ref DelayerReceiverOrdersSendersLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:BatchWriteItem
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub "${ProvinceTableArn}"
+              - !Sub "${ProvinceTableArn}/*"
+              - !Sub "${PaperDeliverySenderLimitTableArn}"
+              - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+              - !Sub "${PaperDeliveryCounterTableArn}"
+              - !Sub "${PaperDeliveryCounterTableArn}/*"
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ReceiveMessage
+            Resource:
+              - !Ref PaperArchivesQueueARN
+              - !Ref PnPaperEventEnricherInputQueueARN
+
+  DelayerReceiverOrdersSendersLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DelayerReceiverOrdersSendersLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  DelayerReceiverOrdersSendersLambdaSQSSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      EventSourceArn: !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+      FunctionName: !Ref DelayerReceiverOrdersSendersLambda
+      Enabled: true
+      MaximumBatchingWindowInSeconds: 0
+      MaximumRetryAttempts: !Ref DelayerReceiverOrdersSendersLambdaMaxRetry
+
+  #########################################################
   ###         TestDelayerLambda                ###
   #########################################################
 
@@ -1822,7 +1950,8 @@ Resources:
               TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
               KeyConditionExpression: "pk = :pk"
               ExpressionAttributeValues:
-                ":pk": "{S: 'PRINT'}"
+                ":pk":
+                  S: "PRINT"
               Limit: 1
               ScanIndexForward: false
             ResultPath: $.queryResult
