@@ -16,10 +16,10 @@ exports.handleEvent = async (event = {}) => {
         const fileKey = body.key;
 
         // 1. Scarica il JSON commessa
-        const commessaJson = await downloadJson(fileKey);
+        const estimateJson = await downloadJson(fileKey);
 
         const estimates = await calculateWeeklyEstimates(
-            commessaJson,
+            estimateJson,
             region => getProvinceDistribution(region)
         );
         allEstimates.push(...estimates);
