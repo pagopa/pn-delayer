@@ -1469,7 +1469,6 @@ Resources:
       FunctionName: !Ref DelayerReceiverOrdersSendersLambda
       Enabled: true
       MaximumBatchingWindowInSeconds: 0
-      MaximumRetryAttempts: !Ref DelayerReceiverOrdersSendersLambdaMaxRetry
 
   #########################################################
   ###         TestDelayerLambda                ###
