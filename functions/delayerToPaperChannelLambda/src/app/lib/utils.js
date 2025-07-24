@@ -13,20 +13,20 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
     return {
         pk: `${deliveryWeek}~${step}`,
         sk: buildSk(step, item),
-        requestId: payload.requestId,
+        requestId: item.requestId,
         createdAt: new Date().toISOString(),
-        notificationSentAt: payload.notificationSentAt,
-        prepareRequestDate: payload.prepareRequestDate,
-        productType: payload.productType,
-        senderPaId: payload.senderPaId,
-        province: payload.province,
-        cap: payload.cap,
-        attempt: payload.attempt,
-        iun: payload.iun,
-        unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
-        tenderId: payload.tenderId,
-        recipientId: payload.recipientId,
-        priority: payload.priority
+        notificationSentAt: item.notificationSentAt,
+        prepareRequestDate: item.prepareRequestDate,
+        productType: item.productType,
+        senderPaId: item.senderPaId,
+        province: item.province,
+        cap: item.cap,
+        attempt: item.attempt,
+        iun: item.iun,
+        unifiedDeliveryDriver: item.unifiedDeliveryDriver,
+        tenderId: item.tenderId,
+        recipientId: item.recipientId,
+        priority: item.priority
       };
 }
 

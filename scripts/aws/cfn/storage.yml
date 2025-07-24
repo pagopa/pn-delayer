@@ -269,6 +269,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
 
   ### Kinesis Data Stream: kinesis data stream for pn-delayer-inputs
   PnDelayerInputsKinesisDataStream:
@@ -435,6 +437,9 @@ Outputs:
   PaperDeliveryTableArn:
     Description: ARN of dynamodb table containing paper deliveries workflow
     Value: !Sub '${PaperDeliveryTable.Arn}'
+  PaperDeliveryTableStreamArn:
+    Description: ARN of dynamodb table stream containing paper deliveries workflow
+    Value: !GetAtt PaperDeliveryTable.StreamArn
 
   PaperDeliveryCounterTableName:
     Description: Name of dynamodb table containing PaperDeliveryCounter
