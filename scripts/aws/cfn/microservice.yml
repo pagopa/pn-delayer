@@ -342,7 +342,7 @@ Parameters:
 
   DelayerToPaperChannelDailyScheduleCron:
     Type: String
-    Default: 'cron(0 10 ? * * *)'
+    Default: '0 10 * * ? *'
     Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
 
   DelayerStartWorkflowRuleState:
