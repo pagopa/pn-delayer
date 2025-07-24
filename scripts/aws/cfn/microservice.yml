@@ -1550,9 +1550,9 @@ Resources:
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
       Definition:
         Comment: "Paper Delivery State Machine"
-        StartAt: Lambda Invoke
+        StartAt: GetActiveTender
         States:
-          LambdaInvoke:
+          GetActiveTender:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
             Parameters:
