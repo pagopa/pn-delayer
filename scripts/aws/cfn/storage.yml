@@ -394,7 +394,7 @@ Resources:
     Properties:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
-        LogGroupName: !Sub ${ProjectName}-delayer-ReceiverOrdersSendersLambda
+        LogGroupName: !Sub ${ProjectName}-delayer-receiverOrdersSendersLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
