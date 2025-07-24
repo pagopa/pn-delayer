@@ -9,11 +9,17 @@ const { getProvinceDistribution, persistWeeklyEstimates } = require('./dynamo');
  * @param {import('aws-lambda').SQSEvent} event
  */
 exports.handleEvent = async (event = {}) => {
+    console.info(
+        `[HANDLER] ▶︎ Received SQS batch with ${event.Records?.length ?? 0} records`
+    );
+
     const allEstimates = [];
 
     for (const record of event.Records) {
         const body = JSON.parse(record.body);
         const fileKey = body.key;
+
+        console.debug(`[HANDLER] fileKey="${fileKey}"`);
 
         // 1. Scarica il JSON commessa
         const estimateJson = await downloadJson(fileKey);

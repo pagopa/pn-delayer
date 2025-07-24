@@ -21,6 +21,9 @@ const { persistWeeklyEstimates } = require('./dynamo');
  */
 async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
     const { weekNotInTheMonth, weeks, daysInMonth } = getMonthContext(commessa.periodoRiferimento);
+    console.debug(
+        `[ALGO] Month context – weeks in month: ${weeks}, partialWeek: ${weekNotInTheMonth}, daysInMonth: ${daysInMonth}`
+    );
     const results = [];
 
     const filteredProducts = commessa.prodotti.filter(prod => prod.id === "AR" || prod.id === "890");
@@ -55,6 +58,7 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
         }
     }
 
+    console.info(`[ALGO] ▶︎ End – total records generated: ${results.length}`);
     return results;
 }
 
