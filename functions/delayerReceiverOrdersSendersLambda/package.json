@@ -1,5 +1,5 @@
 {
-  "name": "delayerReceiverOrdersSenders",
+  "name": "delayerReceiverOrdersSendersLambda",
   "version": "1.0.0",
   "description": "Lambda that receives Safe Storage availability events and persists weekly provincial estimates.",
   "main": "index.js",
