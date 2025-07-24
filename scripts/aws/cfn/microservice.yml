@@ -1392,8 +1392,9 @@ Resources:
               "PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME": "${PaperDeliveryDriverUsedCapacitiesTableName}",
               "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
               "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
+              "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
               "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}
+              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
             }
 
   DelayerStartWorkflowScheduleRuleRole:
@@ -1426,38 +1427,38 @@ Resources:
         Comment: "Paper Delivery State Machine"
         StartAt: Lambda Invoke
         States:
-          Lambda Invoke:
+          LambdaInvoke:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
             Parameters:
               FunctionName: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
               Payload:
                 operation: GET_TENDER_ACTIVE
-              Retry:
-                - ErrorEquals:
-                    - Lambda.ServiceException
-                    - Lambda.AWSLambdaException
-                    - Lambda.SdkClientException
-                    - Lambda.TooManyRequestsException
-                  IntervalSeconds: 1
-                  MaxAttempts: 3
-                  BackoffRate: 2
-                  JitterStrategy: FULL
-              Catch:
-                - ErrorEquals:
-                    - States.ALL
-                  Next: WorkflowFail
-              Next: retrieveProvince
-              ResultSelector:
-                actualTenderId.$: $.Payload.body.tenderId
-                paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
-                paperDeliveryDriverCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERCAPACITIES_TABLENAME
-                paperDeliveryDriverUsedCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME
-                paperDeliveryCounterTableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
-                paperDeliverySenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYSENDERLIMIT_TABLENAME
-                paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
-                paperDeliveryPrintCapacityTableName.$: $$.Execution.Input.PAPERDELIVERYPRINTCAPACITY_TABLENAME
-                deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 1
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+            Next: retrieveProvince
+            ResultSelector:
+              actualTenderId.$: $.Payload.body.tenderId
+              paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
+              paperDeliveryDriverCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERCAPACITIES_TABLENAME
+              paperDeliveryDriverUsedCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME
+              paperDeliveryCounterTableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
+              paperDeliverySenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYSENDERLIMIT_TABLENAME
+              paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
+              paperDeliveryPrintCapacityTableName.$: $$.Execution.Input.PAPERDELIVERYPRINTCAPACITY_TABLENAME
+              deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
           retrieveProvince:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:scan
@@ -1610,7 +1611,7 @@ Resources:
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
                           Value.$: $.paperDeliveryDriverCapacitiesTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
-                          Value.$: $.paperDeliveryCounterTableName
+                          Value.$: $.paperDeliveryDriverUsedCapacitiesTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
                           Value.$: $.paperDeliveryPrintCapacityTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
@@ -1678,7 +1679,7 @@ Resources:
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
                           Value.$: $.paperDeliveryDriverCapacitiesTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
-                          Value.$: $.paperDeliveryCounterTableName
+                          Value.$: $.paperDeliveryDriverUsedCapacitiesTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
                           Value.$: $.paperDeliveryPrintCapacityTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
@@ -1818,11 +1819,10 @@ Resources:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:query
             Parameters:
-              TableName.$: $$.Execution.Input.paperDeliveryCounterTableName
-              KeyConditionExpression: "deliveryDate = :deliveryDate"
+              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
+              KeyConditionExpression: "pk = :pk"
               ExpressionAttributeValues:
-                ":deliveryDate":
-                  S: "PRINT"
+                ":pk": "{S: 'PRINT'}"
               Limit: 1
               ScanIndexForward: false
             ResultPath: $.queryResult
