@@ -44,9 +44,9 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
                 .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", pk, sk, error));
     }
 
-    public Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer printCapacity) {
-        log.info("update print capacity counter for deliveryDate={} with printCapacity={} and field counter to increment of={}",
-                deliveryDate, printCapacity, counter);
+    public Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer weeklyPrintCapacity) {
+        log.info("update print capacity counter for deliveryDate={} with weeklyPrintCapacity={} and field counter to increment of={}",
+                deliveryDate, weeklyPrintCapacity, counter);
 
         Map<String, AttributeValue> key = Map.of(
                 PaperDeliveryCounter.COL_PK, AttributeValue.builder().s("PRINT").build(),
@@ -54,8 +54,8 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
         );
 
         Map<String, AttributeValue> attributeValue = Map.of(
-                ":weeklyPrintCapacity", AttributeValue.builder().n(String.valueOf(printCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays())).build(),
-                ":dailyPrintCapacity", AttributeValue.builder().n(String.valueOf(printCapacity)).build(),
+                ":dailyPrintCapacity", AttributeValue.builder().n(String.valueOf(weeklyPrintCapacity / pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays())).build(),
+                ":weeklyPrintCapacity", AttributeValue.builder().n(String.valueOf(weeklyPrintCapacity)).build(),
                 ":v", AttributeValue.builder().n(String.valueOf(counter)).build()
         );
 

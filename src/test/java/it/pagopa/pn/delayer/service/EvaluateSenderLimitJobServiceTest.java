@@ -85,10 +85,10 @@ class EvaluateSenderLimitJobServiceTest {
                 new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils)
         );
 
-        Map<Integer, List<String>> priorityMap = Map.of(
-                1, List.of("PRODUCT_RS.ATTEMPT_0"),
-                2, List.of("PRODUCT_AR.ATTEMPT_1", "PRODUCT_890.ATTEMPT_1"),
-                3, List.of("PRODUCT_AR.ATTEMPT_0", "PRODUCT_890.ATTEMPT_0"));
+        Map<String, List<String>> priorityMap = Map.of(
+                "1", List.of("PRODUCT_RS.ATTEMPT_0"),
+                "2", List.of("PRODUCT_AR.ATTEMPT_1", "PRODUCT_890.ATTEMPT_1"),
+                "3", List.of("PRODUCT_AR.ATTEMPT_0", "PRODUCT_890.ATTEMPT_0"));
         when(ssmParameterConsumerActivation.getParameterValue(eq("priority-param"), eq(Map.class)))
                 .thenReturn(Optional.of(priorityMap));
     }
@@ -142,7 +142,7 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_singleDriver_withLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS"), 10, List.of("POSTE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS", "AR"), 2, List.of("POSTE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
                 .thenReturn(Mono.just(List.of(capacity)));
 
@@ -193,11 +193,11 @@ class EvaluateSenderLimitJobServiceTest {
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
-        Assertions.assertEquals(2, capturedDeliveries.getFirst().size());
-        Assertions.assertEquals(2, capturedDeliveries.get(1).size());
+        Assertions.assertEquals(3, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(1, capturedDeliveries.get(1).size());
         Assertions.assertEquals(3, capturedDeliveries.get(2).size());
         Assertions.assertEquals(1, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(2)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
     }
