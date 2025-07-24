@@ -1602,6 +1602,8 @@ Resources:
                 Resource: !Ref PaperDeliveryStateMachine
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - PaperDeliveryStateMachinePolicy
     Properties:
       StateMachineName: BatchWorkflowStateMachine
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
@@ -1958,6 +1960,9 @@ Resources:
                 - events:DescribeRule
                 - events:DeleteRule
                 - events:RemoveTargets
+                - events:TagResource
+                - events:ListTagsForResource
+                - events:PutPermission
               Resource: "*"
   DelayerToPaperChannelDailyScheduleRule:
     Type: AWS::Events::Rule
