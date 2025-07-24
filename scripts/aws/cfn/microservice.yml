@@ -396,10 +396,9 @@ Parameters:
   DelayerReceiverOrdersSendersLambdaMaxRetry:
     Type: Number
     Default: 3
-    Description: 'Maximum retry attempts for received message for DelayerReceiverOrdersSendersLambdaQueue
+    Description: 'Maximum retry attempts for received message for DelayerReceiverOrdersSendersLambdaQueue'
 
 Resources:
-
   SenderLimitComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
@@ -1545,7 +1544,6 @@ Resources:
                 Action:
                   - states:StartExecution
                 Resource: !Ref PaperDeliveryStateMachine
-
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
     Properties:
