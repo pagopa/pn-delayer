@@ -10,7 +10,7 @@ public interface PaperDeliveryCounterDAO {
 
     Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk);
 
-    Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer dailyPrintCapacity);
+    Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer weeklyPrintCapacity);
 
 
 }

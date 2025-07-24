@@ -73,7 +73,7 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
     void updatePrintCapacityCounterTest() {
         LocalDate deliveryDate = LocalDate.parse("2025-04-07");
 
-        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000).block();
+        paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 35000).block();
         List<PaperDeliveryCounter> result = paperDeliveryCounterDAO.getPaperDeliveryCounter("PRINT", deliveryDate.toString()).block();
         Assertions.assertNotNull(result);
         Assertions.assertEquals(3000, result.getFirst().getNumberOfShipments());

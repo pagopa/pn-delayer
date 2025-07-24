@@ -127,7 +127,7 @@ public class PnDelayerUtils {
         deliveriesGroupedByProductTypePaId.forEach((key, deliveries) -> {
             int limit = Optional.ofNullable(senderLimitMap.get(key))
                     .map(senderLimits -> senderLimits.getT1() - senderLimits.getT2())
-                    .orElse(deliveries.size());
+                    .orElse(0);
 
             int actualLimit = Math.min(limit, deliveries.size());
             senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));

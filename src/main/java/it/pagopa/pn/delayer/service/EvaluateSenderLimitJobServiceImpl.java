@@ -88,6 +88,8 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .map(pnDelayerUtils::groupByPaIdProductTypeProvince)
                 .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, senderLimitMap, driversTotalCapacity, senderLimitJobPaperDeliveries))
                 .flatMap(deliveries -> paperDeliveryUtils.insertPaperDeliveries(deliveries, deliveryWeek))
+                .filter(paperDeliveries -> !CollectionUtils.isEmpty(paperDeliveries))
+                .doOnDiscard(Integer.class, item -> log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek))
                 .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitMap));
     }
 
