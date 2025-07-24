@@ -1951,6 +1951,14 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+            - Effect: Allow
+              Action:
+                - events:PutRule
+                - events:PutTargets
+                - events:DescribeRule
+                - events:DeleteRule
+                - events:RemoveTargets
+              Resource: "*"
   DelayerToPaperChannelDailyScheduleRule:
     Type: AWS::Events::Rule
     Properties:
