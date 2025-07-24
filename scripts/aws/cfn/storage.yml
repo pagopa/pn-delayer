@@ -50,6 +50,10 @@ Parameters:
     Type: Number
     Default: 14
 
+  AlarmSNSTopicName:
+    Type: String
+    Description: "Topic alarm"
+
 Resources:
   # PaperDeliveryDriverCapacities DynamoDB Table
   PaperDeliveryDriverCapacitiesTable:
@@ -288,6 +292,19 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StandardAlarmThresholdsMs: !Ref PnDelayerInputsStandardAlarmThresholdsMs
         OnCallAlarmThresholdsMs: !Ref PnDelayerInputsOnCallAlarmThresholdsMs
+
+  ### Communication FROM SafeStorage TO delayerReceiverOrdersSendersLambda ###
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_delayer_orders_senders'
+        DelaySeconds: 1
+        VisibilityTimeout: 240 # 4 minutes
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
         
   PnDelayerSenderLimitJobLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -468,6 +485,17 @@ Outputs:
   ProvinceTableArn:
     Description: ARN of dynamodb table containing Province
     Value: !Sub '${ProvinceTable.Arn}'
+
+  # SQS
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueQueueName:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueName
+    Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue name
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueURL
+    Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue URL
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueARN
+    Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue ARN
 
   # Kinesis data stream
   PnDelayerInputsKinesisDataStreamArn:
