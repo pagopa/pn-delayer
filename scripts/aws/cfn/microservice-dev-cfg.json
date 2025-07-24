@@ -17,6 +17,6 @@
     "UnifiedDeliveryDriverProvinceParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
     "PaperDeliveryPrintCapacityCounterTtlDuration": "60d",
     "PaperChannelTenderApiLambdaName": "pn-paper-channel-TenderAPI",
-    "SafeStorageCxId":""
+    "SafeStorageCxId":"pn-delayer"
   }
 }
