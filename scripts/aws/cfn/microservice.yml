@@ -342,7 +342,7 @@ Parameters:
 
   DelayerToPaperChannelDailyScheduleCron:
     Type: String
-    Default: 'cron(0 10 ? * * *)'
+    Default: '0 10 * * ? *'
     Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
 
   DelayerStartWorkflowRuleState:
@@ -387,7 +387,7 @@ Parameters:
 
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN:
     Type: String
-    Description: 'arn for safeStorage to delayer receiver orders senders lambda'
+    Description: 'queue arn for safeStorage to delayer receiver orders senders lambda'
 
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
@@ -1054,6 +1054,64 @@ Resources:
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
+  # Send Safe Storage Response to delayerReceiverOrdersSendersLambda
+  PnCoreEventBusToDelayerOrdersSendersSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Route SafeStorage Events to pn-delayerReceiverOrdersSendersLambda
+      RoleArn: !GetAtt "DelayerOrdersSendersEventBusEnqueueRole.Arn"
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_SERVICE_ORDER' ]
+      Targets:
+        - Arn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:PnCoreEventBusMatchedEventLogger
+          Id: !Sub ${ProjectName}-Logger-SafeStore2DelayerOrdersSenders
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }
+        - Id: !Sub '${ProjectName}-SafeStore2DelayerSendersOrders'
+          Arn: !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+          InputPath: $.detail.body
+          DeadLetterConfig:
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+
+  DelayerOrdersSendersEventBusEnqueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-delayer-orders-senders-eventBusRuleQueuePolicy
+          PolicyDocument:
+            Statement:
+              - Sid: putEvents
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:SendMessage
+                Effect: Allow
+                Resource:
+                  - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+
   DelayerInputsRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1411,7 +1469,6 @@ Resources:
       FunctionName: !Ref DelayerReceiverOrdersSendersLambda
       Enabled: true
       MaximumBatchingWindowInSeconds: 0
-      MaximumRetryAttempts: !Ref DelayerReceiverOrdersSendersLambdaMaxRetry
 
   #########################################################
   ###         TestDelayerLambda                ###
@@ -1545,14 +1602,16 @@ Resources:
                 Resource: !Ref PaperDeliveryStateMachine
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - PaperDeliveryStateMachinePolicy
     Properties:
       StateMachineName: BatchWorkflowStateMachine
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
       Definition:
         Comment: "Paper Delivery State Machine"
-        StartAt: Lambda Invoke
+        StartAt: GetActiveTender
         States:
-          LambdaInvoke:
+          GetActiveTender:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
             Parameters:
@@ -1894,6 +1953,17 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+            - Effect: Allow
+              Action:
+                - events:PutRule
+                - events:PutTargets
+                - events:DescribeRule
+                - events:DeleteRule
+                - events:RemoveTargets
+                - events:TagResource
+                - events:ListTagsForResource
+                - events:PutPermission
+              Resource: "*"
   DelayerToPaperChannelDailyScheduleRule:
     Type: AWS::Events::Rule
     Properties:
@@ -1907,7 +1977,7 @@ Resources:
           Input: !Sub |
             {
               "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}
+              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
             }
 
   DelayerToPaperChannelDailyScheduleRuleRole:
