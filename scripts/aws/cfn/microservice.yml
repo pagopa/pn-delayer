@@ -1958,6 +1958,9 @@ Resources:
                 - events:DescribeRule
                 - events:DeleteRule
                 - events:RemoveTargets
+                - events:TagResource
+                - events:ListTagsForResource
+                - events:PutPermission
               Resource: "*"
   DelayerToPaperChannelDailyScheduleRule:
     Type: AWS::Events::Rule
