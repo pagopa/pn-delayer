@@ -47,7 +47,7 @@ CloudFormation (`pn-delayer` stack).
 Ensure the execution role has permissions for:
 
 * **DynamoDB** – `GetItem`, `Query`, `BatchWriteItem`, `UpdateItem` on the three tables
-* **SQS** – `ReceiveMessage`, `DeleteMessage` on `pn-delayer-orders-senders` queue
+* **SQS** – `ReceiveMessage`, `DeleteMessage` on `pn-safestorage_to_delayer_orders_senders` queue
 * **Secrets Manager / Parameter Store** – (if you store `CX_ID` there)
 
 ```yaml
