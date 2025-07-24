@@ -1539,7 +1539,7 @@ Resources:
 
                 SenderLimitJobFail:
                   Type: Fail
-
+            ResultPath: ~
             Next: GetUnifiedDeliveryDriverProvinceParameter
             Catch:
               - ErrorEquals:
