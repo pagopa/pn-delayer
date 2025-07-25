@@ -22,9 +22,12 @@ async function retrieveItems(deliveryWeek, LastEvaluatedKey, limit, scanIndexFor
       ":partitionKey": partitionKey
     },
     ScanIndexForward: scanIndexForward,
-    ExclusiveStartKey: LastEvaluatedKey || undefined,
     Limit: parseInt(limit, 10)
   };
+
+  if (LastEvaluatedKey && Object.keys(LastEvaluatedKey).length > 0) {
+    params.ExclusiveStartKey = LastEvaluatedKey;
+  }
 
   const result = await docClient.send(new QueryCommand(params));
   return result || {Items: [], LastEvaluatedKey: {} };

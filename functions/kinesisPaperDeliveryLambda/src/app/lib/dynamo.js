@@ -60,9 +60,9 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
               pk: deliveryDate,
               sk: sk
             },
-            UpdateExpression: 'ADD #counter :inc SET #ttl = :ttl',
+            UpdateExpression: 'ADD #numberOfShipments :inc SET #ttl = :ttl',
             ExpressionAttributeNames: {
-            '#counter': 'counter',
+            '#numberOfShipments': 'numberOfShipments',
             '#ttl': 'ttl'
             },
             ExpressionAttributeValues: {
