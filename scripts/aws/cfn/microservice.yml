@@ -1736,11 +1736,11 @@ Resources:
                     - ErrorEquals:
                         - States.ALL
                       Next: SenderLimitJobFail
+                  ResultPath: null
                   End: true
-
                 SenderLimitJobFail:
                   Type: Fail
-
+            ResultPath: null
             Next: GetUnifiedDeliveryDriverProvinceParameter
             Catch:
               - ErrorEquals:
@@ -1840,9 +1840,10 @@ Resources:
                         - States.ALL
                       Next: EvaluateDriverCapacityFail
                   End: true
-
+                  ResultPath: null
                 EvaluateDriverCapacityFail:
                   Type: Fail
+            ResultPath: null
             Catch:
               - ErrorEquals:
                   - States.ALL
@@ -1908,9 +1909,10 @@ Resources:
                         - States.ALL
                       Next: EvaluateResidualCapacityFail
                   End: true
-
+                  ResultPath: null
                 EvaluateResidualCapacityFail:
                   Type: Fail
+            ResultPath: null
             Catch:
               - ErrorEquals:
                   - States.ALL

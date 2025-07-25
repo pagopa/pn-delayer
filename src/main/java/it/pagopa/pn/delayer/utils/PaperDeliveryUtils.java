@@ -132,7 +132,7 @@ public class PaperDeliveryUtils {
         return paperDeliveryDAO.retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, queryLimit)
                 .flatMap(paperDeliveryPage -> {
                     if (CollectionUtils.isEmpty(paperDeliveryPage.items())) {
-                        log.warn("No records found for unifiedDeliveryDriver-province = [{}]", sortKeyPrefix);
+                        log.warn("No records found for province = [{}] and deliveryWeek = [{}]", sortKeyPrefix, deliveryWeek);
                         return Mono.empty();
                     }
                     return Mono.just(paperDeliveryPage);
