@@ -1736,11 +1736,11 @@ Resources:
                     - ErrorEquals:
                         - States.ALL
                       Next: SenderLimitJobFail
-                  ResultPath: null
+                  OutputPath: $.Status
                   End: true
                 SenderLimitJobFail:
                   Type: Fail
-            ResultPath: null
+            ResultPath: $.ignoredMapResult
             Next: GetUnifiedDeliveryDriverProvinceParameter
             Catch:
               - ErrorEquals:
@@ -1840,10 +1840,10 @@ Resources:
                         - States.ALL
                       Next: EvaluateDriverCapacityFail
                   End: true
-                  ResultPath: null
+                  OutputPath: $.Status
                 EvaluateDriverCapacityFail:
                   Type: Fail
-            ResultPath: null
+            ResultPath: $.ignoredMapResult
             Catch:
               - ErrorEquals:
                   - States.ALL
@@ -1909,10 +1909,10 @@ Resources:
                         - States.ALL
                       Next: EvaluateResidualCapacityFail
                   End: true
-                  ResultPath: null
+                  OutputPath: $.Status
                 EvaluateResidualCapacityFail:
                   Type: Fail
-            ResultPath: null
+            ResultPath: $.ignoredMapResult
             Catch:
               - ErrorEquals:
                   - States.ALL

@@ -21,6 +21,7 @@ public class PnDelayerConfigs {
     private Dao dao;
     private EvaluateDriverCapacityJobInput evaluateDriverCapacityJobInput;
     private EvaluateSenderLimitJobInput evaluateSenderLimitJobInput;
+    private EvaluateResidualCapacityJobInput evaluateResidualCapacityJobInput;
     private WorkflowStepEnum workflowStep;
     private Integer deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
     private Duration printCounterTtlDuration;
@@ -33,7 +34,13 @@ public class PnDelayerConfigs {
     @Data
     public static class EvaluateDriverCapacityJobInput {
         private String unifiedDeliveryDriver;
-        private List<String> provinceList;
+        private String provinceList;
+    }
+
+    @Data
+    public static class EvaluateResidualCapacityJobInput {
+        private String unifiedDeliveryDriver;
+        private String provinceList;
     }
 
     @Data
