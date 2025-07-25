@@ -59,7 +59,7 @@ class EvaluateDriverCapacityJobServiceTest {
         PnDelayerConfigs.Dao dao = new PnDelayerConfigs.Dao();
         dao.setPaperDeliveryQueryLimit(5);
         PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
-        pnDelayerConfigs.setDeliveryDateInterval(Duration.ofDays(7));
+        pnDelayerConfigs.setPrintCounterTtlDuration(Duration.ofDays(7));
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
         pnDelayerConfigs.setDao(dao);
         pnDelayerConfigs.setPrintCapacityWeeklyWorkingDays(7);

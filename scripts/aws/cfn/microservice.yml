@@ -398,6 +398,11 @@ Parameters:
     Default: 3
     Description: 'Maximum retry attempts for received message for DelayerReceiverOrdersSendersLambdaQueue'
 
+  PrintCounterTtlDuration:
+    Type: String
+    Default: 30d
+    Description: 'Ttl duration for printCapacity counter'
+
 Resources:
   SenderLimitComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
@@ -439,6 +444,10 @@ Resources:
         Environment:
           - Name: AWS_REGIONCODE
             Value: !Ref AWS::Region
+          - Name: PN_DELAYER_PAPERDELIVERYPRIORITYPARAMETERNAME
+            Value: !Ref PaperDeliveryPriorityParameterName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT
+            Value: !Ref PaperDeliveryQueryLimit
           - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
@@ -455,7 +464,7 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
-          - Name: PN_PAPERCHANNEL_TENDERAPI_LAMBDA_NAME
+          - Name: PN_DELAYER_PAPERCHANNELTENDERAPILAMBDANAME
             Value: !Ref PaperChannelTenderApiLambdaName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
@@ -617,6 +626,8 @@ Resources:
             Value: !Ref WorkflowStep
           - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
             Value: !Ref PrintCapacityWeeklyWorkingDays
+          - Name: PN_DELAYER_PRINTCOUNTERTTLDURATION
+            Value: !Ref PrintCounterTtlDuration
 
       PlatformCapabilities:
         - FARGATE
@@ -768,6 +779,8 @@ Resources:
             Value: !Ref WorkflowStep
           - Name: PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS
             Value: !Ref PrintCapacityWeeklyWorkingDays
+          - Name: PN_DELAYER_PRINTCOUNTERTTLDURATION
+            Value: !Ref PrintCounterTtlDuration
 
       PlatformCapabilities:
         - FARGATE
@@ -2046,7 +2059,7 @@ Resources:
               sendToNextWeekCounter: 0
               sendToNextStepCounter: 0
               executionDate.$: $$.Execution.StartTime
-              deliveryDate.$: $.deliveryDate.S
+              pk.$: $.pk.S
               sk.$: $.sk.S
             Next: Parallel
           Parallel:

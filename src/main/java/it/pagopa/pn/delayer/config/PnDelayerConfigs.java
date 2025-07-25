@@ -23,7 +23,7 @@ public class PnDelayerConfigs {
     private EvaluateSenderLimitJobInput evaluateSenderLimitJobInput;
     private WorkflowStepEnum workflowStep;
     private Integer deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
-    private Duration deliveryDateInterval;
+    private Duration printCounterTtlDuration;
     private String actualTenderId;
     private Integer printCapacityWeeklyWorkingDays;
     private String paperDeliveryPriorityParameterName;
