@@ -21,7 +21,7 @@ public class PaperDeliveryCounter {
     public static final String COL_WEEKLY_PRINT_CAPACITY = "weeklyPrintCapacity";
     public static final String COL_DAILY_PRINT_CAPACITY = "dailyPrintCapacity";
     public static final String COL_SENT_TO_NEXT_WEEK = "sentToNextWeek";
-    public static final String COL_LEK_TO_NEXT_WEEK = "lastEvaluatedKeyToNextWeek";
+    public static final String COL_LEK_TO_NEXT_WEEK = "lastEvaluatedKeyNextWeek";
     public static final String COL_LEK_PHASE2 = "lastEvaluatedKeyPhase2";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))

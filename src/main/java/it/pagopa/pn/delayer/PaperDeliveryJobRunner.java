@@ -1,5 +1,8 @@
 package it.pagopa.pn.delayer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.commons.utils.MDCUtils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
@@ -18,7 +21,7 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,9 +36,10 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     private final EvaluateResidualCapacityJobService evaluateResidualCapacityJobService;
     private final ApplicationContext applicationContext;
     private final PnDelayerConfigs pnDelayerConfigs;
+    private final ObjectMapper objectMapper;
 
     @Override
-    public void run(String... args) {
+    public void run(String... args) throws JsonProcessingException {
         int exitCode;
         WorkflowStepEnum workflowStep = pnDelayerConfigs.getWorkflowStep();
         switch (workflowStep) {
@@ -62,12 +66,12 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     }
 
     private int executeEvaluateResidualCapacityStep() {
-        String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getUnifiedDeliveryDriver();
+        String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateResidualCapacityJobInput().getUnifiedDeliveryDriver();
         String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
         if (StringUtils.hasText(jobIndex)) {
             return Optional.of(jobIndex)
                     .map(Integer::parseInt)
-                    .map(index -> pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getProvinceList().get(index))
+                    .map(index -> pnDelayerConfigs.getEvaluateResidualCapacityJobInput().getProvinceList().split(",")[index])
                     .map(province -> {
                         log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
                         addMDC(String.join("~", unifiedDeliveryDriver, province));
@@ -89,13 +93,15 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         }
     }
 
-    private int executeEvaluateDriverCapacityStep() {
+    private int executeEvaluateDriverCapacityStep() throws JsonProcessingException {
         String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getUnifiedDeliveryDriver();
+        String provinces = pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getProvinceList();
+        List<String> provinceList = objectMapper.readValue(provinces, new TypeReference<>() {});
         String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
         if (StringUtils.hasText(jobIndex)) {
             return Optional.of(jobIndex)
                     .map(Integer::parseInt)
-                    .map(index -> pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getProvinceList().get(index))
+                    .map(provinceList::get)
                     .map(province -> {
                         log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
                         addMDC( String.join("~", unifiedDeliveryDriver,  province));
