@@ -57,7 +57,7 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
         const input = {
             TableName: counterTableName,
             Key: {
-              deliveryDate: deliveryDate,
+              pk: deliveryDate,
               sk: sk
             },
             UpdateExpression: 'ADD #counter :inc SET #ttl = :ttl',

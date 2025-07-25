@@ -1,5 +1,6 @@
 package it.pagopa.pn.delayer.utils;
 
+import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
@@ -20,6 +21,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
+import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND;
 
 @Component
 @RequiredArgsConstructor
@@ -108,9 +111,16 @@ public class PnDelayerUtils {
     public List<PaperDelivery> assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses, Map<String, List<PaperDelivery>> groupedByCapProductType, String tenderId, Map<Integer, List<String>> priorityMap) {
         Map<String, String> driverMap = groupByGeoKeyAndProduct(paperChannelDeliveryDriverResponses);
         return groupedByCapProductType.entrySet().stream()
-                .flatMap(entry -> Optional.ofNullable(driverMap.get(entry.getKey()))
-                        .stream()
-                        .flatMap(driver -> enrichWithPriorityAndUnifiedDeliveryDriver(entry.getValue(), driver, tenderId, priorityMap).stream()))
+                .map(entry -> {
+                    String driver = driverMap.get(entry.getKey());
+                    if (driver != null) {
+                        enrichWithPriorityAndUnifiedDeliveryDriver(entry.getValue(), driver, tenderId, priorityMap);
+                        return entry.getValue();
+                    } else {
+                        throw new PnInternalException(String.format("UnifiedDeliveryDriver not found for geoKey and product key [%s]", entry.getKey()), 404, ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND);
+                    }
+                })
+                .flatMap(List::stream)
                 .toList();
     }
 
