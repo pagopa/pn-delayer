@@ -53,7 +53,7 @@ async function sendToPhase2(deliveryWeek, input, toSendToNextStep) {
                     dailyPrintCapacity: input.dailyPrintCapacity,
                     weeklyPrintCapacity: input.weeklyPrintCapacity,
                     numberOfShipments: input.numberOfShipments,
-                    lastEvaluatedKeyPhase2: result.lastEvaluatedKey,
+                    lastEvaluatedKeyPhase2: result.lastEvaluatedKey || null,
                     sendToNextStepCounter: result.dailyCounter,
                     executionDate: input.executionDate
                 },
@@ -70,7 +70,7 @@ async function sendToNextWeek(deliveryWeek, input, toSendToNextWeek) {
                     dailyPrintCapacity: input.dailyPrintCapacity,
                     weeklyPrintCapacity: input.weeklyPrintCapacity,
                     numberOfShipments: input.numberOfShipments,
-                    lastEvaluatedKeyNextWeek: result.lastEvaluatedKey,
+                    lastEvaluatedKeyNextWeek: result.lastEvaluatedKey || null,
                     sendToNextWeekCounter: result.dailyCounter,
                     sentToNextWeek: input.sentToNextWeek,
                     executionDate: input.executionDate
