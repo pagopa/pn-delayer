@@ -634,6 +634,8 @@ Resources:
             Value: !Ref PrintCapacityWeeklyWorkingDays
           - Name: PN_DELAYER_PRINTCOUNTERTTLDURATION
             Value: !Ref PrintCounterTtlDuration
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT
+            Value: !Ref PaperDeliveryQueryLimit
 
       PlatformCapabilities:
         - FARGATE
@@ -787,6 +789,8 @@ Resources:
             Value: !Ref PrintCapacityWeeklyWorkingDays
           - Name: PN_DELAYER_PRINTCOUNTERTTLDURATION
             Value: !Ref PrintCounterTtlDuration
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT
+            Value: !Ref PaperDeliveryQueryLimit
 
       PlatformCapabilities:
         - FARGATE
