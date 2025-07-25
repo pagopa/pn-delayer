@@ -553,6 +553,12 @@ Resources:
                   - lambda:InvokeFunction
                 Resource:
                   - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
+
 
   SenderLimitSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -1240,7 +1246,7 @@ Resources:
             Resource:
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
-            Action: dynamodb:BatchWriteItem
+            Action: dynamodb:UpdateItem
             Resource:
               - !Ref PaperDeliveryCounterTableArn
           - Effect: Allow
@@ -2074,7 +2080,7 @@ Resources:
                       FunctionName: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
                       Payload:
                         input.$: $
-                        context: SEND_TO_NEXT_WEEK
+                        processType: SEND_TO_NEXT_WEEK
                     OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:
@@ -2119,7 +2125,7 @@ Resources:
                       FunctionName: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
                       Payload:
                         input.$: $
-                        context: SEND_TO_PHASE_2
+                        processType: SEND_TO_PHASE_2
                     OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:

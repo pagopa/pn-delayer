@@ -13,11 +13,11 @@ const paperDeliveryTableName = process.env.PAPER_DELIVERY_TABLENAME;
 
 async function retrieveItems(deliveryWeek, LastEvaluatedKey, limit, scanIndexForward) {
 
-  const partitionKey = `${deliveryWeek}~EVALUATE_SENDER_LIMIT`
+  const partitionKey = `${deliveryWeek}~EVALUATE_PRINT_CAPACITY`
 
   const params = {
     TableName: paperDeliveryTableName,
-    KeyConditionExpression: "pk = :partitionKey AND deliveryDate <= :executionDate",
+    KeyConditionExpression: "pk = :partitionKey",
     ExpressionAttributeValues: {
       ":partitionKey": partitionKey
     },
