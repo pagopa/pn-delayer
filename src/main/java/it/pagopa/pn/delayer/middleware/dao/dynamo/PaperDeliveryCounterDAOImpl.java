@@ -18,6 +18,8 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,30 +50,38 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
         log.info("update print capacity counter for deliveryDate={} with weeklyPrintCapacity={} and field counter to increment of={}",
                 deliveryDate, weeklyPrintCapacity, counter);
 
-        Map<String, AttributeValue> key = Map.of(
-                PaperDeliveryCounter.COL_PK, AttributeValue.builder().s("PRINT").build(),
-                PaperDeliveryCounter.COL_SK, AttributeValue.builder().s(deliveryDate.toString()).build()
-        );
+        Map<String, String> expressionAttributeNames = new HashMap<>();
+        Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
+        List<String> updateExpressions = new ArrayList<>();
 
-        Map<String, AttributeValue> attributeValue = Map.of(
-                ":dailyPrintCapacity", AttributeValue.builder().n(String.valueOf(weeklyPrintCapacity / pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays())).build(),
-                ":weeklyPrintCapacity", AttributeValue.builder().n(String.valueOf(weeklyPrintCapacity)).build(),
-                ":v", AttributeValue.builder().n(String.valueOf(counter)).build()
-        );
+        Map<String, AttributeValue> map = PaperDeliveryCounter.entityToAttributeValueMap(PaperDeliveryCounter.constructPrintCounterEntity(weeklyPrintCapacity, pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays(), pnDelayerConfigs.getPrintCounterTtlDuration()));
+        map.forEach((key, value) ->
+                updateExpressions.add(buildUpdateExpressions(key, value, expressionAttributeNames, expressionAttributeValues)));
 
-        String updateExpression = "ADD " + PaperDeliveryCounter.COL_NUMBER_OF_SHIPMENTS + " :v SET " + PaperDeliveryCounter.COL_WEEKLY_PRINT_CAPACITY + " = :weeklyPrintCapacity,"
-                + PaperDeliveryCounter.COL_DAILY_PRINT_CAPACITY + " = :dailyPrintCapacity";
+        String updateExpr = "SET " + String.join(", ", updateExpressions);
+        updateExpr = updateExpr + " ADD " + PaperDeliveryCounter.COL_NUMBER_OF_SHIPMENTS + " :increment";
+        expressionAttributeValues.put(":increment", AttributeValue.builder().n(String.valueOf(counter)).build());
 
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                 .tableName(tableCounter.tableName())
-                .key(key)
-                .updateExpression(updateExpression)
-                .expressionAttributeValues(attributeValue)
+                .key(Map.of("pk", AttributeValue.builder().s("PRINT").build(), "sk", AttributeValue.builder().s(deliveryDate.toString()).build()))
+                .updateExpression(updateExpr)
+                .expressionAttributeValues(expressionAttributeValues)
+                .expressionAttributeNames(expressionAttributeNames)
                 .build();
 
         return Mono.fromFuture(dynamoDbAsyncClient.updateItem(updateRequest))
                 .doOnSuccess(r -> log.info("Update print Capacity Counter successful for deliveryDate={}", deliveryDate))
                 .doOnError(e -> log.error("Error updating print Capacity Counter for deliveryDate={}", deliveryDate))
                 .then();
+    }
+
+    private String buildUpdateExpressions(String key, AttributeValue value, Map<String, String> names, Map<String, AttributeValue> values) {
+        if(key.equalsIgnoreCase(PaperDeliveryCounter.COL_NUMBER_OF_SHIPMENTS)) {
+            return "";
+        }
+        names.put("#" + key, key);
+        values.put(":" + key, value);
+        return "#" + key + " = " + ":" + key;
     }
 }

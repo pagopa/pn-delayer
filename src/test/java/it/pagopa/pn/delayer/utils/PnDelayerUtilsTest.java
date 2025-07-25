@@ -33,7 +33,6 @@ class PnDelayerUtilsTest {
     void setUp() {
         PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
-        pnDelayerConfigs.setDeliveryDateInterval(Duration.ofDays(7));
         pnDelayerUtils = new PnDelayerUtils(pnDelayerConfigs);
     }
 
