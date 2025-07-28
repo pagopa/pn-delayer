@@ -16,6 +16,7 @@ exports.handleEvent = async (event = {}) => {
     const allEstimates = [];
 
     for (const record of event.Records) {
+        console.debug(`[HANDLER] Raw SQS record: ${JSON.stringify(record)}`);
         const body = JSON.parse(record.body);
         const fileKey = body.key;
 
