@@ -1414,6 +1414,11 @@ Resources:
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
       Timeout: 15
+      VpcConfig:
+        SubnetIds:
+          - !Ref SubnetsIds
+        SecurityGroupIds:
+          - !GetAtt DelayerReceiverOrdersSendersLambdaSecGroup.GroupId
 
   # Lambda function role
   DelayerReceiverOrdersSendersLambdaRole:

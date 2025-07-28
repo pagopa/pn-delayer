@@ -15,7 +15,7 @@ if (!PN_SAFESTORAGE_URL || !PN_SAFESTORAGE_CXID) {
  * @returns {Promise<object>}
  */
 async function downloadJson(fileKey) {
-  const metaUrl = `${PN_SAFESTORAGE_URL}/safe-storage/v1/files/${encodeURIComponent(fileKey)}`;
+  const metaUrl = `${PN_SAFESTORAGE_URL}safe-storage/v1/files/${encodeURIComponent(fileKey)}`;
   console.info(`[SAFE] ▶︎ Fetching metadata for fileKey="${fileKey}" – ${metaUrl}`);
   const metaResp = await axios.get(metaUrl, {
     headers: { 'x-pagopa-safestorage-cx-id': PN_SAFESTORAGE_CXID }
