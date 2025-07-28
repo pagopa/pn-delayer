@@ -281,11 +281,6 @@ Parameters:
     Default: 20
     Description: 'Maximum batching window in seconds for KinesisPaperDeliveryLambda'
 
-  DelayerToPaperChannelLambdaCron:
-    Type: String
-    Default: '0/15 * * * ? *'
-    Description: 'Cron expression for DelayerToPaperChannelLambda'
-
   DelayerToPaperChannelLambdaName:
     Type: String
     Description: 'DelayerToPaperChannelLambda function name'
@@ -1179,125 +1174,125 @@ Resources:
   ###         KinesisPaperDeliveryLambda                ###
   #########################################################
 
-  KinesisPaperDeliveryLambdaSecGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Sub '${KinesisPaperDeliveryLambdaName}-sec-group'
-      VpcId: !Ref VpcId
+#  KinesisPaperDeliveryLambdaSecGroup:
+#    Type: AWS::EC2::SecurityGroup
+#    Properties:
+#      GroupDescription: !Sub '${KinesisPaperDeliveryLambdaName}-sec-group'
+#      VpcId: !Ref VpcId
 
   # Lambda function
-  KinesisPaperDeliveryLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Ref KinesisPaperDeliveryLambdaName
-      Runtime: !Ref LambdaRuntime
-      Handler: "index.handler"
-      Code:
-        S3Bucket: !Ref MicroserviceBucketName
-        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/kinesisPaperDeliveryLambda.zip"
-      Role: !GetAtt KinesisPaperDeliveryLambdaRole.Arn
-      Environment:
-        Variables:
-          REGION: !Sub ${AWS::Region}
-          KINESIS_PAPERDELIVERY_TABLE: !Ref PaperDeliveryTableName
-          KINESIS_PAPERDELIVERY_EVENTTABLE: !Ref PaperDeliveryKinesisEventTableName
-          KINESIS_PAPERDELIVERY_COUNTERTABLE: !Ref PaperDeliveryCounterTableName
-          KINESIS_BATCHSIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
-          KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
-          KINESIS_PAPERDELIVERY_COUNTERTTLDAYS: !Ref PaperDeliveryCounterTtlDays
-          KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
-      TracingConfig:
-        Mode: Active
-      Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 15
+#  KinesisPaperDeliveryLambda:
+#    Type: AWS::Lambda::Function
+#    Properties:
+#      FunctionName: !Ref KinesisPaperDeliveryLambdaName
+#      Runtime: !Ref LambdaRuntime
+#      Handler: "index.handler"
+#      Code:
+#        S3Bucket: !Ref MicroserviceBucketName
+#        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/kinesisPaperDeliveryLambda.zip"
+#      Role: !GetAtt KinesisPaperDeliveryLambdaRole.Arn
+#      Environment:
+#        Variables:
+#          REGION: !Sub ${AWS::Region}
+#          KINESIS_PAPERDELIVERY_TABLE: !Ref PaperDeliveryTableName
+#          KINESIS_PAPERDELIVERY_EVENTTABLE: !Ref PaperDeliveryKinesisEventTableName
+#          KINESIS_PAPERDELIVERY_COUNTERTABLE: !Ref PaperDeliveryCounterTableName
+#          KINESIS_BATCHSIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
+#          KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
+#          KINESIS_PAPERDELIVERY_COUNTERTTLDAYS: !Ref PaperDeliveryCounterTtlDays
+#          KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+#      TracingConfig:
+#        Mode: Active
+#      Layers:
+#        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+#      Timeout: 15
 
   # Lambda function role
-  KinesisPaperDeliveryLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub ${ProjectName}-kinesisPaperDeliveryLambdaRole
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+#  KinesisPaperDeliveryLambdaRole:
+#    Type: AWS::IAM::Role
+#    Properties:
+#      RoleName: !Sub ${ProjectName}-kinesisPaperDeliveryLambdaRole
+#      AssumeRolePolicyDocument:
+#        Version: 2012-10-17
+#        Statement:
+#          - Effect: Allow
+#            Principal:
+#              Service:
+#                - lambda.amazonaws.com
+#            Action:
+#              - sts:AssumeRole
+#      ManagedPolicyArns:
+#        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   # Lambda function IAM policy
-  KinesisPaperDeliveryLambdaPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${ProjectName}-kinesisPaperDeliveryLambdaPolicy
-      Roles:
-        - !Ref KinesisPaperDeliveryLambdaRole
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - kinesis:DescribeStream
-              - kinesis:DescribeStreamSummary
-              - kinesis:GetShardIterator
-              - kinesis:GetRecords
-              - kinesis:ListShards
-              - kinesis:ListStreams
-              - kinesis:SubscribeToShard
-            Resource: !Ref PnDelayerInputsKinesisDataStreamArn
-          - Effect: Allow
-            Action: kms:Decrypt
-            Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
-          - Effect: Allow
-            Action: dynamodb:BatchWriteItem
-            Resource:
-              - !Ref PaperDeliveryTableArn
-          - Effect: Allow
-            Action: dynamodb:UpdateItem
-            Resource:
-              - !Ref PaperDeliveryCounterTableArn
-          - Effect: Allow
-            Action:
-              - sqs:ChangeMessageVisibility
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-              - sqs:SendMessage
-            Resource:
-              !Ref KinesisPaperDeliveryLambdaDLQARN
-          - Effect: Allow
-            Action:
-              - dynamodb:BatchGetItem
-              - dynamodb:BatchWriteItem
-            Resource: !Ref PaperDeliveryKinesisEventTableArn
+#  KinesisPaperDeliveryLambdaPolicy:
+#    Type: AWS::IAM::Policy
+#    Properties:
+#      PolicyName: !Sub ${ProjectName}-kinesisPaperDeliveryLambdaPolicy
+#      Roles:
+#        - !Ref KinesisPaperDeliveryLambdaRole
+#      PolicyDocument:
+#        Version: 2012-10-17
+#        Statement:
+#          - Effect: Allow
+#            Action:
+#              - kinesis:DescribeStream
+#              - kinesis:DescribeStreamSummary
+#              - kinesis:GetShardIterator
+#              - kinesis:GetRecords
+#              - kinesis:ListShards
+#              - kinesis:ListStreams
+#              - kinesis:SubscribeToShard
+#            Resource: !Ref PnDelayerInputsKinesisDataStreamArn
+#          - Effect: Allow
+#            Action: kms:Decrypt
+#            Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
+#          - Effect: Allow
+#            Action: dynamodb:BatchWriteItem
+#            Resource:
+#              - !Ref PaperDeliveryTableArn
+#          - Effect: Allow
+#            Action: dynamodb:UpdateItem
+#            Resource:
+#              - !Ref PaperDeliveryCounterTableArn
+#          - Effect: Allow
+#            Action:
+#              - sqs:ChangeMessageVisibility
+#              - sqs:GetQueueAttributes
+#              - sqs:GetQueueUrl
+#              - sqs:SendMessage
+#            Resource:
+#              !Ref KinesisPaperDeliveryLambdaDLQARN
+#          - Effect: Allow
+#            Action:
+#              - dynamodb:BatchGetItem
+#              - dynamodb:BatchWriteItem
+#            Resource: !Ref PaperDeliveryKinesisEventTableArn
 
 
-  PaperDeliveryLambdaKinesisSource:
-    Type: AWS::Lambda::EventSourceMapping
-    Properties:
-      BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
-      BisectBatchOnFunctionError: true
-      EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
-      FunctionName: !Ref KinesisPaperDeliveryLambda
-      FunctionResponseTypes:
-        - ReportBatchItemFailures
-      MaximumBatchingWindowInSeconds: !Sub ${KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds}
-      MaximumRetryAttempts: !Ref KinesisPaperDeliveryLambdaMaxRetry
-      StartingPosition: TRIM_HORIZON
-      DestinationConfig:
-        OnFailure:
-          Destination: !Ref KinesisPaperDeliveryLambdaDLQARN
+#  PaperDeliveryLambdaKinesisSource:
+#    Type: AWS::Lambda::EventSourceMapping
+#    Properties:
+#      BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
+#      BisectBatchOnFunctionError: true
+#      EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
+#      FunctionName: !Ref KinesisPaperDeliveryLambda
+#      FunctionResponseTypes:
+#        - ReportBatchItemFailures
+#      MaximumBatchingWindowInSeconds: !Sub ${KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds}
+#      MaximumRetryAttempts: !Ref KinesisPaperDeliveryLambdaMaxRetry
+#      StartingPosition: TRIM_HORIZON
+#      DestinationConfig:
+#        OnFailure:
+#          Destination: !Ref KinesisPaperDeliveryLambdaDLQARN
 
-  KinesisPaperDeliveryLambdaAlarms:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
-      Parameters:
-        FunctionName: !Ref KinesisPaperDeliveryLambda
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+#  KinesisPaperDeliveryLambdaAlarms:
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+#      Parameters:
+#        FunctionName: !Ref KinesisPaperDeliveryLambda
+#        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 
   #########################################################
@@ -1380,24 +1375,6 @@ Resources:
         FunctionName: !Ref DelayerToPaperChannelLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
-  # EventBridge Rule for scheduling the Lambda
-  DelayerToPaperChannelScheduleRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub '${ProjectName}-delayerToPaperChannelScheduleRule'
-      ScheduleExpression: !Sub cron(${DelayerToPaperChannelLambdaCron})
-      State: !Ref DelayerToPaperChannelRuleState
-      Targets:
-        - Arn: !GetAtt DelayerToPaperChannelLambda.Arn
-          Id: PnDelayerToPaperChannelLambdaTarget
-
-  PermissionForDelayerToPaperChannelLambda:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt DelayerToPaperChannelLambda.Arn
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt DelayerToPaperChannelScheduleRule.Arn
 
   #########################################################
   ###         DelayerReceiverOrdersSendersLambda          ###
