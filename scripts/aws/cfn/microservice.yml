@@ -376,6 +376,10 @@ Parameters:
     Type: String
     Description: 'SafeStorage cx-id for pn-Delayer request'
 
+  SandboxSafeStorageBaseUrl:
+    Type: String
+    Description: 'Url to the SafeStorage microservice'
+
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueQueueName:
     Type: String
     Description: 'queue name for safeStorage to delayer receiver orders senders lambda'
@@ -1400,7 +1404,7 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          PN_SAFESTORAGE_URL: !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL
+          PN_SAFESTORAGE_URL: !Ref SandboxSafeStorageBaseUrl
           PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
           PAPER_CHANNEL_PROVINCE_TABLENAME: !Ref ProvinceTableName
           PAPER_DELIVERY_SENDER_LIMIT_TABLENAME: !Ref PaperDeliverySenderLimitTableName
