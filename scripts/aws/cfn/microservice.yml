@@ -2320,3 +2320,20 @@ Resources:
                 Action:
                   - sqs:SendMessage
                 Resource: !Ref DelayerToPaperChannelQueueARN
+
+  DelayerOrdersSendersQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "SQS:SendMessage"
+            Resource:
+              - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
