@@ -1106,7 +1106,7 @@ Resources:
               }
         - Id: !Sub '${ProjectName}-SafeStore2DelayerSendersOrders'
           Arn: !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
-          InputPath: $.detail.body
+          InputPath: $.detail
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 

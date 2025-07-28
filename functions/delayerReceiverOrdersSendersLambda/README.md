@@ -23,13 +23,13 @@ and persists them into DynamoDB.
 
 ## Environment variables
 
-| Name                   | Description                                      |
-|------------------------|--------------------------------------------------|
-| `SAFE_STORAGE_URL`     | Base URL of Safe Storage REST API (e.g. `https://api.pn.pagopa.it`) |
-| `PN_SAFESTORAGE_CXID`  | Client identifier header value for Safe Storage  |
-| `PROVINCE_TABLE`       | (Optional) Name of **pn-PaperChannelProvince** table |
-| `LIMIT_TABLE`          | (Optional) Name of **pn-PaperDeliverySenderLimit** table |
-| `COUNTERS_TABLE`       | (Optional) Name of **pn-PaperDeliveryCounters** table |
+| Name                      | Description                                                         |
+|---------------------------|---------------------------------------------------------------------|
+| `PN_SAFESTORAGE_URL`      | Base URL of Safe Storage REST API (e.g. `https://api.pn.pagopa.it`) |
+| `PN_SAFESTORAGE_CXID`     | Client identifier header value for Safe Storage                     |
+| `PROVINCE_TABLE`          | (Optional) Name of **pn-PaperChannelProvince** table                |
+| `LIMIT_TABLE`             | (Optional) Name of **pn-PaperDeliverySenderLimit** table            |
+| `COUNTERS_TABLE`          | (Optional) Name of **pn-PaperDeliveryCounters** table               |
 
 ## Tests
 
@@ -60,7 +60,7 @@ ReceiverOrdersSendersFunction:
     CodeUri: .
     Environment:
       Variables:
-        SAFE_STORAGE_URL: https://api.pn.pagopa.it
+        PN_SAFESTORAGE_URL: https://api.pn.pagopa.it
         PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
     Events:
       SafeStorageQueue:
