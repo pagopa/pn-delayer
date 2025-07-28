@@ -1,12 +1,12 @@
 'use strict';
 const axios = require('axios');
 
-const SAFE_STORAGE_URL = process.env.SAFE_STORAGE_URL;
+const PN_SAFESTORAGE_URL = process.env.PN_SAFESTORAGE_URL;
 const PN_SAFESTORAGE_CXID = process.env.PN_SAFESTORAGE_CXID;
 
-if (!SAFE_STORAGE_URL || !PN_SAFESTORAGE_CXID) {
+if (!PN_SAFESTORAGE_URL || !PN_SAFESTORAGE_CXID) {
     /* eslint-disable no-console */
-    console.warn('SAFE_STORAGE_URL or PN_SAFESTORAGE_CXID env variables are missing – SafeStorage client will not work properly.');
+    console.warn('PN_SAFESTORAGE_URL or PN_SAFESTORAGE_CXID env variables are missing – SafeStorage client will not work properly.');
 }
 
 /**
@@ -15,7 +15,7 @@ if (!SAFE_STORAGE_URL || !PN_SAFESTORAGE_CXID) {
  * @returns {Promise<object>}
  */
 async function downloadJson(fileKey) {
-  const metaUrl = `${SAFE_STORAGE_URL}/safe-storage/v1/files/${encodeURIComponent(fileKey)}`;
+  const metaUrl = `${PN_SAFESTORAGE_URL}/safe-storage/v1/files/${encodeURIComponent(fileKey)}`;
   console.info(`[SAFE] ▶︎ Fetching metadata for fileKey="${fileKey}" – ${metaUrl}`);
   const metaResp = await axios.get(metaUrl, {
     headers: { 'x-pagopa-safestorage-cx-id': PN_SAFESTORAGE_CXID }
