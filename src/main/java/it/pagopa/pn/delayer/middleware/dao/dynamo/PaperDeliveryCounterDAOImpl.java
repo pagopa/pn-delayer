@@ -72,7 +72,7 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
 
         return Mono.fromFuture(dynamoDbAsyncClient.updateItem(updateRequest))
                 .doOnSuccess(r -> log.info("Update print Capacity Counter successful for deliveryDate={}", deliveryDate))
-                .doOnError(e -> log.error("Error updating print Capacity Counter for deliveryDate={}", deliveryDate))
+                .doOnError(e -> log.error("Error updating print Capacity Counter for deliveryDate={} --> {}", deliveryDate, e.getMessage(), e))
                 .then();
     }
 
