@@ -403,6 +403,11 @@ Parameters:
     Default: 30d
     Description: 'Ttl duration for printCapacity counter'
 
+  StepFunctionStateMaxAttempts:
+    Type: Number
+    Default: 2
+    Description: 'Maximum number of attempts for step function state'
+
 Resources:
   SenderLimitComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
@@ -1648,7 +1653,7 @@ Resources:
                   - Lambda.SdkClientException
                   - Lambda.TooManyRequestsException
                 IntervalSeconds: 1
-                MaxAttempts: 3
+                MaxAttempts: !Ref StepFunctionStateMaxAttempts
                 BackoffRate: 2
                 JitterStrategy: FULL
             Catch:
@@ -1678,7 +1683,7 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 IntervalSeconds: 1
-                MaxAttempts: 3
+                MaxAttempts: !Ref StepFunctionStateMaxAttempts
                 BackoffRate: 2
             Catch:
               - ErrorEquals:
@@ -1734,7 +1739,7 @@ Resources:
                     - ErrorEquals:
                         - States.ALL
                       IntervalSeconds: 1
-                      MaxAttempts: 3
+                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
                       BackoffRate: 2
                   Catch:
                     - ErrorEquals:
@@ -1764,7 +1769,7 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 IntervalSeconds: 1
-                MaxAttempts: 3
+                MaxAttempts: !Ref StepFunctionStateMaxAttempts
                 BackoffRate: 2
             Catch:
               - ErrorEquals:
@@ -1821,6 +1826,8 @@ Resources:
                           Value.$: $.paperDeliveryDriverUsedCapacitiesTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
                           Value.$: $.paperDeliveryPrintCapacityTableName
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
+                          Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
                           Value.$: $.paperDeliveryTableName
                         - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -1837,7 +1844,7 @@ Resources:
                     - ErrorEquals:
                         - States.ALL
                       IntervalSeconds: 1
-                      MaxAttempts: 3
+                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
                       BackoffRate: 2
                   Catch:
                     - ErrorEquals:
@@ -1906,7 +1913,7 @@ Resources:
                     - ErrorEquals:
                         - States.ALL
                       IntervalSeconds: 1
-                      MaxAttempts: 3
+                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
                       BackoffRate: 2
                   Catch:
                     - ErrorEquals:
@@ -2052,7 +2059,7 @@ Resources:
                   - States.ALL
                 IntervalSeconds: 1
                 BackoffRate: 2
-                MaxAttempts: 3
+                MaxAttempts: !Ref StepFunctionStateMaxAttempts
             Catch:
               - ErrorEquals:
                   - States.ALL
@@ -2101,7 +2108,7 @@ Resources:
                           - Lambda.TooManyRequestsException
                         IntervalSeconds: 1
                         BackoffRate: 2
-                        MaxAttempts: 3
+                        MaxAttempts: !Ref StepFunctionStateMaxAttempts
                         JitterStrategy: FULL
                     Catch:
                       - ErrorEquals:
@@ -2166,7 +2173,7 @@ Resources:
                           - Lambda.TooManyRequestsException
                         IntervalSeconds: 1
                         BackoffRate: 2
-                        MaxAttempts: 3
+                        MaxAttempts: !Ref StepFunctionStateMaxAttempts
                         JitterStrategy: FULL
                     Catch:
                       - ErrorEquals:
@@ -2231,7 +2238,7 @@ Resources:
                   - States.ALL
                 IntervalSeconds: 1
                 BackoffRate: 2
-                MaxAttempts: 3
+                MaxAttempts: !Ref StepFunctionStateMaxAttempts
             Catch:
               - ErrorEquals:
                   - States.ALL
