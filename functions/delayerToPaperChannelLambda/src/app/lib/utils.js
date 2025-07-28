@@ -10,24 +10,29 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
       let deliveryWeekLocalDate = LocalDate.parse(deliveryWeek);
       deliveryWeek = deliveryWeekLocalDate.plusDays(7).toString();
     }
-    return {
-        pk: `${deliveryWeek}~${step}`,
-        sk: buildSk(step, item),
-        requestId: item.requestId,
-        createdAt: new Date().toISOString(),
-        notificationSentAt: item.notificationSentAt,
-        prepareRequestDate: item.prepareRequestDate,
-        productType: item.productType,
-        senderPaId: item.senderPaId,
-        province: item.province,
-        cap: item.cap,
-        attempt: item.attempt,
-        iun: item.iun,
-        unifiedDeliveryDriver: item.unifiedDeliveryDriver,
-        tenderId: item.tenderId,
-        recipientId: item.recipientId,
-        priority: item.priority
-      };
+
+    const paperDelivery = {
+      pk: `${deliveryWeek}~${step}`,
+      sk: buildSk(step, item),
+      requestId: item.requestId,
+      createdAt: new Date().toISOString(),
+      notificationSentAt: item.notificationSentAt,
+      prepareRequestDate: item.prepareRequestDate,
+      productType: item.productType,
+      senderPaId: item.senderPaId,
+      province: item.province,
+      cap: item.cap,
+      attempt: item.attempt,
+      iun: item.iun,
+      unifiedDeliveryDriver: item.unifiedDeliveryDriver,
+      tenderId: item.tenderId,
+      recipientId: item.recipientId,
+      priority: item.priority
+  };
+
+  return Object.fromEntries(
+      Object.entries(paperDelivery).filter(([_, value]) => value !== null && value !== undefined)
+  );
 }
 
 function buildSk(workflowStepEnum, paperDelivery) {

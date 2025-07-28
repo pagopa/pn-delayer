@@ -36,8 +36,10 @@ async function retrieveItems(deliveryWeek, LastEvaluatedKey, limit, scanIndexFor
 
 async function insertItems(items) {
     const putRequests = items.map(item => ({
-            PutRequests: item
-        }));
+        PutRequest: {
+            Item: item
+        }
+    }));
     return await insertItemsBatch(putRequests, 1);
 }
 
@@ -56,7 +58,7 @@ async function insertItemsBatch(putRequests, retryCount) {
                 ...(result.UnprocessedItems?.[paperDeliveryTableName] || [])
             );
         } catch (error) {
-            console.error("Error during batch delete:", error);
+            console.error("Error during batch insert:", error);
             unprocessedRequests.push(...(chunk))
         }
     }
