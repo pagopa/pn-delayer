@@ -23,13 +23,13 @@ and persists them into DynamoDB.
 
 ## Environment variables
 
-| Name                | Description                                      |
-|---------------------|--------------------------------------------------|
-| `SAFE_STORAGE_URL`  | Base URL of Safe Storage REST API (e.g. `https://api.pn.pagopa.it`) |
-| `CX_ID`             | Client identifier header value for Safe Storage  |
-| `PROVINCE_TABLE`    | (Optional) Name of **pn-PaperChannelProvince** table |
-| `LIMIT_TABLE`       | (Optional) Name of **pn-PaperDeliverySenderLimit** table |
-| `COUNTERS_TABLE`    | (Optional) Name of **pn-PaperDeliveryCounters** table |
+| Name                   | Description                                      |
+|------------------------|--------------------------------------------------|
+| `SAFE_STORAGE_URL`     | Base URL of Safe Storage REST API (e.g. `https://api.pn.pagopa.it`) |
+| `PN_SAFESTORAGE_CXID`  | Client identifier header value for Safe Storage  |
+| `PROVINCE_TABLE`       | (Optional) Name of **pn-PaperChannelProvince** table |
+| `LIMIT_TABLE`          | (Optional) Name of **pn-PaperDeliverySenderLimit** table |
+| `COUNTERS_TABLE`       | (Optional) Name of **pn-PaperDeliveryCounters** table |
 
 ## Tests
 
@@ -48,7 +48,7 @@ Ensure the execution role has permissions for:
 
 * **DynamoDB** – `GetItem`, `Query`, `BatchWriteItem`, `UpdateItem` on the three tables
 * **SQS** – `ReceiveMessage`, `DeleteMessage` on `pn-safestorage_to_delayer_orders_senders` queue
-* **Secrets Manager / Parameter Store** – (if you store `CX_ID` there)
+* **Secrets Manager / Parameter Store** – (if you store `PN_SAFESTORAGE_CXID` there)
 
 ```yaml
 # Example snippet (AWS SAM)
@@ -61,7 +61,7 @@ ReceiverOrdersSendersFunction:
     Environment:
       Variables:
         SAFE_STORAGE_URL: https://api.pn.pagopa.it
-        CX_ID: !Ref SafeStorageCxId
+        PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
     Events:
       SafeStorageQueue:
         Type: SQS
