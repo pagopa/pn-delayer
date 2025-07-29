@@ -6,7 +6,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.IncrementUsedCapacityDto;
-import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -172,11 +172,11 @@ public class PaperDeliveryUtils {
                 .flatMap(toNextWeekList -> processChunkToSendToNextWeek(toNextWeekList, deliveryWeek));
     }
 
-    public Mono<List<PaperDelivery>> insertPaperDeliveries(SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries, LocalDate deliveryWeek) {
-        return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(senderLimitJobPaperDeliveries.getSendToDriverCapacityStep(), deliveryWeek))
-                .thenReturn(senderLimitJobPaperDeliveries)
-                .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobPaperDeliveries.getSendToResidualCapacityStep(), deliveryWeek))
-                        .thenReturn(senderLimitJobPaperDeliveries.getSendToDriverCapacityStep())
+    public Mono<List<PaperDelivery>> insertPaperDeliveries(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
+        return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(senderLimitJobProcessObjects.getSendToDriverCapacityStep(), deliveryWeek))
+                .thenReturn(senderLimitJobProcessObjects)
+                .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobProcessObjects.getSendToResidualCapacityStep(), deliveryWeek))
+                        .thenReturn(senderLimitJobProcessObjects.getSendToDriverCapacityStep())
                         .doOnNext(paperDeliveries -> paperDeliveries.removeIf(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1)));
     }
 }

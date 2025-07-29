@@ -6,7 +6,7 @@ import it.pagopa.pn.delayer.config.SsmParameterConsumerActivation;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.DeliveryDriverRequest;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
-import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.utils.DeliveryDriverUtils;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
@@ -52,7 +51,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
 
     private Mono<Void> retrieveAndProcessPaperDeliveries(String province, String tenderId, LocalDate deliveryWeek, Map<String, AttributeValue> lastEvaluatedKey, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap) {
         return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek, province, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
-                .flatMap(paperDeliveryPage -> processItems(paperDeliveryPage.items(), tenderId, deliveryWeek, driversTotalCapacity, priorityMap)
+                .flatMap(paperDeliveryPage -> processItems(paperDeliveryPage.items(), tenderId, deliveryWeek, driversTotalCapacity, priorityMap, province)
                         .flatMap(sentToNextStepItemsCount -> {
                             if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {
                                 return retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, paperDeliveryPage.lastEvaluatedKey(), driversTotalCapacity, priorityMap);
@@ -80,17 +79,17 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      * @param priorityMap Map containing priority information for paper deliveries
      * @return Mono<Long> indicating the count of items sent to the next step
      * */
-    private Mono<Long> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap) {
-        SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
-        Map<String, Tuple2<Integer, Integer>> senderLimitMap = new HashMap<>();
+    private Mono<Long> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap, String province) {
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         return retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(items, tenderId, driversTotalCapacity, priorityMap)
-                .map(paperDeliveryList -> pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobPaperDeliveries))
+                .map(paperDeliveryList -> pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects))
+                .flatMap(paperDeliveries -> senderLimitUtils.retrieveTotalEstimateCounter(paperDeliveries, deliveryWeek, province, senderLimitJobProcessObjects.getTotalEstimateCounter()))
                 .map(pnDelayerUtils::groupByPaIdProductTypeProvince)
-                .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, senderLimitMap, driversTotalCapacity, senderLimitJobPaperDeliveries))
+                .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, driversTotalCapacity, senderLimitJobProcessObjects))
                 .flatMap(deliveries -> paperDeliveryUtils.insertPaperDeliveries(deliveries, deliveryWeek))
                 .filter(paperDeliveries -> !CollectionUtils.isEmpty(paperDeliveries))
                 .doOnDiscard(Integer.class, item -> log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek))
-                .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitMap));
+                .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitJobProcessObjects.getSenderLimitMap()));
     }
 
     /**

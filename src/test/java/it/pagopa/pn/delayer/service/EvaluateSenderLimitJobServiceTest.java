@@ -7,6 +7,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
@@ -82,7 +83,7 @@ class EvaluateSenderLimitJobServiceTest {
                 new PaperDeliveryUtils(paperDeliveryDao, pnDelayerConfigs, pnDelayerUtils, deliveryDriverUtils, paperDeliveryCounterDAO, paperDeliveryPrintCapacityDAO),
                 deliveryDriverUtils,
                 ssmParameterConsumerActivation,
-                new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils)
+                new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils, paperDeliveryCounterDAO)
         );
 
         Map<String, List<String>> priorityMap = Map.of(
@@ -96,7 +97,7 @@ class EvaluateSenderLimitJobServiceTest {
     @Test
     void startSenderLimitJob_singleDriver_withoutLastEvaluatedKey() {
 
-        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS","AR"), 10, List.of("POSTE"));
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS","AR"), 8, List.of("POSTE"));
         when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
                 .thenReturn(Mono.just(List.of(capacity)));
 
@@ -105,9 +106,6 @@ class EvaluateSenderLimitJobServiceTest {
         deliveries.addAll(getPaperDeliveries(false));
         Page<PaperDelivery> page = mock(Page.class);
         when(page.items()).thenReturn(deliveries);
-        Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
-        lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_RESIDUAL_CAPACITY).build());
-        lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
         when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
         when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
                 .thenReturn(Mono.just(page));
@@ -115,7 +113,7 @@ class EvaluateSenderLimitJobServiceTest {
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("paId2~AR~RM");
         paperDeliverySenderLimit.setProductType("AR");
-        paperDeliverySenderLimit.setPercentageLimit(10);
+        paperDeliverySenderLimit.setWeeklyEstimate(1);
 
         when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
                 .thenReturn(Flux.empty());
@@ -127,6 +125,15 @@ class EvaluateSenderLimitJobServiceTest {
         ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
                 .thenReturn(Mono.empty());
+
+        PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
+        paperDeliveryCounter.setPk("SUM_ESTIMATES~AR~RM");
+        paperDeliveryCounter.setNumberOfShipments(8);
+
+        List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
+
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
+                .thenReturn(Mono.just(paperDeliveryCounterList));
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
@@ -170,7 +177,7 @@ class EvaluateSenderLimitJobServiceTest {
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("paId2~AR~RM");
         paperDeliverySenderLimit.setProductType("AR");
-        paperDeliverySenderLimit.setPercentageLimit(50);
+        paperDeliverySenderLimit.setWeeklyEstimate(5);
 
         PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
         usedSenderLimit.setPk("paId2~AR~RM");
@@ -188,6 +195,14 @@ class EvaluateSenderLimitJobServiceTest {
         ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
                 .thenReturn(Mono.empty());
+
+        PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
+        paperDeliveryCounter.setNumberOfShipments(10);
+
+        List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
+
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
+                .thenReturn(Mono.just(paperDeliveryCounterList));
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
@@ -244,6 +259,14 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
                 .thenReturn(Optional.empty());
 
+        PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
+        paperDeliveryCounter.setNumberOfShipments(100);
+
+        List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
+
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
+                .thenReturn(Mono.just(paperDeliveryCounterList));
+
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
 
@@ -293,7 +316,7 @@ class EvaluateSenderLimitJobServiceTest {
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("paId2~AR~RM");
         paperDeliverySenderLimit.setProductType("AR");
-        paperDeliverySenderLimit.setPercentageLimit(50);
+        paperDeliverySenderLimit.setWeeklyEstimate(5);
 
         PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
         usedSenderLimit.setPk("paId2~AR~RM");
@@ -312,12 +335,18 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
                 .thenReturn(Mono.empty());
 
+        PaperDeliveryCounter paperDeliveryCounter1 = new PaperDeliveryCounter();
+        paperDeliveryCounter1.setNumberOfShipments(10);
+        paperDeliveryCounter1.setPk("SUM_ESTIMATES~AR~RM");
+
         when(deliveryDriverUtils.retrieveFromCache("00184~AR"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of("driver1"));
         when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of("driver2"));
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
+                .thenReturn(Mono.just(List.of(paperDeliveryCounter1)));
 
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))

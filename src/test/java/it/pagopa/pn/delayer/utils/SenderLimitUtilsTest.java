@@ -1,12 +1,13 @@
 package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
-import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,20 +37,25 @@ public class SenderLimitUtilsTest {
     @Mock
     private PaperDeliverySenderLimitDAO paperDeliverySenderLimitDAO;
 
+    @Mock
+    private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
+
     @BeforeEach
     void setUp() {
-        senderLimitUtils = new SenderLimitUtils(paperDeliverySenderLimitDAO, new PnDelayerUtils(new PnDelayerConfigs()));
+        senderLimitUtils = new SenderLimitUtils(paperDeliverySenderLimitDAO, new PnDelayerUtils(new PnDelayerConfigs()), paperDeliveryCounterDAO);
     }
 
     @Test
     void retrieveAndEvaluateSenderLimit() {
         LocalDate deliveryWeek = LocalDate.now();
         Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId =
-                Map.of("key1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
-                        "key2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));
+                Map.of("paid1~productType1~province1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
+                        "paid2~productType2~province2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));
         Map<String, Tuple2<Integer, Integer>> senderLimitMaps = new HashMap<>();
-        Integer capacity = 125;
-        SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
+        Integer capacity = 72;
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+        senderLimitJobProcessObjects.setSenderLimitMap(senderLimitMaps);
+        senderLimitJobProcessObjects.setTotalEstimateCounter(Map.of("AR", 72));
 
         PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
         usedSenderLimit.setPk("key1");
@@ -59,14 +65,14 @@ public class SenderLimitUtilsTest {
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("key2");
         paperDeliverySenderLimit.setProductType("AR");
-        paperDeliverySenderLimit.setPercentageLimit(50);
+        paperDeliverySenderLimit.setWeeklyEstimate(62);
 
         when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(deliveryWeek)))
                 .thenReturn(Flux.just(usedSenderLimit));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), eq(deliveryWeek)))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
 
-        senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, senderLimitMaps, List.of(new DriversTotalCapacity(List.of("RS", "AR"), capacity, List.of("POSTE"))), senderLimitJobPaperDeliveries)
+        senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, List.of(new DriversTotalCapacity(List.of("RS", "AR"), capacity, List.of("POSTE"))), senderLimitJobProcessObjects)
                 .block();
 
         assertEquals(2, senderLimitMaps.size());

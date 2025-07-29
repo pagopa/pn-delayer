@@ -90,7 +90,7 @@ public class DeliveryDriverUtils {
     }
 
     public Mono<List<DriversTotalCapacity>> retrieveDriversCapacityOnProvince(LocalDate deliveryDate, String tenderId, String province) {
-        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), "EXCLUDE~" + province)
+        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.EXCLUDE, province), null)
                 .defaultIfEmpty(Collections.emptyList())
                 .map(this::createProductCounterMap)
                 .flatMap(counters ->

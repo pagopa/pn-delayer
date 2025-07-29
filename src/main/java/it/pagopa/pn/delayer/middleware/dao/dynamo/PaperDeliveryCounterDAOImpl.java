@@ -18,10 +18,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Component
 @Slf4j
@@ -37,11 +34,19 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
         this.pnDelayerConfigs = pnDelayerConfigs;
     }
 
-    public Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk) {
-        QueryEnhancedRequest queryEnhancedRequest = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.sortBeginsWith(Key.builder().partitionValue(pk)
-                        .sortValue(sk).build()))
-                .build();
+    public Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk, Integer limit) {
+
+        QueryEnhancedRequest.Builder queryEnhancedRequestBuilder = QueryEnhancedRequest.builder()
+                .queryConditional(QueryConditional.sortBeginsWith(
+                        Key.builder().partitionValue(pk).sortValue(sk).build()
+                ));
+
+        if (Objects.nonNull(limit)) {
+            queryEnhancedRequestBuilder.limit(limit);
+            queryEnhancedRequestBuilder.scanIndexForward(false);
+        }
+        QueryEnhancedRequest queryEnhancedRequest = queryEnhancedRequestBuilder.build();
+
         return Mono.from(tableCounter.query(queryEnhancedRequest).map(Page::items))
                 .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", pk, sk, error));
     }

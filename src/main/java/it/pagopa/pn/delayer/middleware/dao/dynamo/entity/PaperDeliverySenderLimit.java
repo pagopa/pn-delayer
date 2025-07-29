@@ -12,7 +12,8 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortK
 public class PaperDeliverySenderLimit {
     public static final String COL_PK = "pk";
     public static final String COL_DELIVERY_DATE = "deliveryDate";
-    public static final String COL_PERCENTAGE_LIMIT = "percentageLimit";
+    public static final String COL_WEEKLY_ESTIMATE = "weeklyEstimate";
+    public static final String COL_MONTHLY_ESTIMATE = "monthlyEstimate";
     public static final String COL_PAID = "paId";
     public static final String COL_PRODUCT_TYPE = "productType";
     public static final String COL_PROVINCE = "province";
@@ -23,8 +24,10 @@ public class PaperDeliverySenderLimit {
     private String pk;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_DELIVERY_DATE)}))
     private String deliveryDate;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_PERCENTAGE_LIMIT)}))
-    private int percentageLimit;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_WEEKLY_ESTIMATE)}))
+    private int weeklyEstimate;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_MONTHLY_ESTIMATE)}))
+    private int monthlyEstimate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PAID)}))
     private String paId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PRODUCT_TYPE)}))

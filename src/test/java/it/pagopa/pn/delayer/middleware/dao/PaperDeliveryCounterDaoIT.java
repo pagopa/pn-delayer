@@ -51,19 +51,19 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
                         .build())
                 .join();
 
-        List<PaperDeliveryCounter> result = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~RM").block();
+        List<PaperDeliveryCounter> result = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~RM", null).block();
         Assertions.assertNotNull(result);
         Assertions.assertEquals(5, result.getFirst().getNumberOfShipments());
         Assertions.assertEquals("2025-04-07", result.getFirst().getPk());
         Assertions.assertEquals("EXCLUDE~RM", result.getFirst().getSk());
 
-        List<PaperDeliveryCounter> result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~NA").block();
+        List<PaperDeliveryCounter> result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~NA", null).block();
         Assertions.assertNotNull(result2);
         Assertions.assertEquals(10, result2.getFirst().getNumberOfShipments());
         Assertions.assertEquals("2025-04-07", result2.getFirst().getPk());
         Assertions.assertEquals("EXCLUDE~NA", result2.getFirst().getSk());
 
-        List<PaperDeliveryCounter> result3 = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~MI").block();
+        List<PaperDeliveryCounter> result3 = paperDeliveryCounterDAO.getPaperDeliveryCounter("2025-04-07", "EXCLUDE~MI", null).block();
         Assertions.assertNotNull(result3);
         Assertions.assertEquals(0, result3.size());
 
@@ -74,7 +74,7 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
         LocalDate deliveryDate = LocalDate.parse("2025-04-07");
 
         paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 35000).block();
-        List<PaperDeliveryCounter> result = paperDeliveryCounterDAO.getPaperDeliveryCounter("PRINT", deliveryDate.toString()).block();
+        List<PaperDeliveryCounter> result = paperDeliveryCounterDAO.getPaperDeliveryCounter("PRINT", deliveryDate.toString(), null).block();
         Assertions.assertNotNull(result);
         Assertions.assertEquals(3000, result.getFirst().getNumberOfShipments());
         Assertions.assertEquals(deliveryDate.toString(), result.getFirst().getSk());
@@ -84,7 +84,7 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
 
 
         paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000).block();
-        List<PaperDeliveryCounter> result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter("PRINT", deliveryDate.toString()).block();
+        List<PaperDeliveryCounter> result2 = paperDeliveryCounterDAO.getPaperDeliveryCounter("PRINT", deliveryDate.toString(), null).block();
         Assertions.assertNotNull(result2);
         Assertions.assertEquals(6000, result2.getFirst().getNumberOfShipments());
         Assertions.assertEquals(deliveryDate.toString(), result2.getFirst().getSk());

@@ -148,7 +148,7 @@ public class DeliveryDriverUtilsTest {
         driverCapacity3.setCapacity(30);
         driverCapacity3.setProducts(List.of("RS"));
 
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), "EXCLUDE~" + province))
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), "EXCLUDE~" + province, null))
                 .thenReturn(Mono.empty());
         when(paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate))
                 .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1, driverCapacity3)));
@@ -176,7 +176,7 @@ public class DeliveryDriverUtilsTest {
         paperDeliveryCounter.setSk("EXCLUDE~" + province + "~RS");
         paperDeliveryCounter.setNumberOfShipments(10);
 
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), "EXCLUDE~" + province))
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), "EXCLUDE~" + province, null))
                 .thenReturn(Mono.just(List.of(paperDeliveryCounter)));
         when(paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate))
                 .thenReturn(Mono.just(List.of(driverCapacity2, driverCapacity1)));
