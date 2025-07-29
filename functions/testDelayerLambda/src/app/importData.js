@@ -7,6 +7,8 @@ const {
 } = require("@aws-sdk/lib-dynamodb");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
+const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
+
 const TABLE_NAME = "pn-DelayerPaperDelivery";
 
 // AWS SDK clients
@@ -39,9 +41,12 @@ exports.importData = async (_params = []) => {
 
     let processed = 0;
     const itemsBuffer = [];
+    const dayOfWeek = 1; //lunedì
+    const deliveryWeek = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
     for await (const record of stream.pipe(csv({ separator: ";" }))) {
         processed += 1;
-        itemsBuffer.push(record);
+        const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);
+        itemsBuffer.push(paperDelivery);
         if (itemsBuffer.length === 25) {
             await batchWriteItems(itemsBuffer.splice(0, itemsBuffer.length));
         }
@@ -79,3 +84,38 @@ async function batchWriteItems(items) {
         }
     } while (unprocessed.length);
 }
+
+function buildPaperDeliveryRecord(payload, deliveryWeek) {
+    let date = retrieveDate(payload);
+    return {
+        pk: buildPk(deliveryWeek),
+        sk: buildSk(payload.province, date, payload.requestId),
+        requestId: payload.requestId,
+        createdAt: new Date().toISOString(),
+        notificationSentAt: payload.notificationSentAt,
+        prepareRequestDate: payload.prepareRequestDate,
+        productType: payload.productType,
+        senderPaId: payload.senderPaId,
+        province: payload.province,
+        cap: payload.cap,
+        attempt: payload.attempt,
+        iun: payload.iun,
+    };
+}
+
+function retrieveDate(payload) {
+    if(payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
+        return payload.prepareRequestDate;
+    }else{
+        return payload.notificationSentAt;
+    }
+}
+
+function buildPk(deliveryWeek) {
+    return `${deliveryWeek}~EVALUATE_SENDER_LIMIT`;
+}
+
+function buildSk(province, date, requestId) {
+    return `${province}~${date}~${requestId}`;
+}
+
