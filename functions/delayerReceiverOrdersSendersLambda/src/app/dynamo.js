@@ -69,8 +69,9 @@ async function persistWeeklyEstimates(estimates) {
       new UpdateCommand({
         TableName: LIMIT_TABLE,
         Key: { pk, deliveryDate: p.deliveryDate },
-        UpdateExpression: 'SET weeklyEstimate = if_not_exists(weeklyEstimate, :zero) + :inc, productType = if_not_exists(productType, :pt), province = if_not_exists(province, :p), paId = if_not_exists(paId, :pId), ttl = if_not_exists(ttl, :ttl)',
-        ExpressionAttributeValues: { ':inc': p.weeklyEstimate, ':zero': 0, ':pt': p.productType, ':p': p.province, ':pId': p.paId, ':ttl': ttlValue},
+        UpdateExpression: 'SET weeklyEstimate = if_not_exists(weeklyEstimate, :zero) + :inc, productType = if_not_exists(productType, :pt), province = if_not_exists(province, :p), paId = if_not_exists(paId, :pId), #ttlAttribute = if_not_exists(#ttlAttribute, :ttlValue)',
+        ExpressionAttributeValues: { ':inc': p.weeklyEstimate, ':zero': 0, ':pt': p.productType, ':p': p.province, ':pId': p.paId, ':ttlValue': ttlValue},
+        ExpressionAttributeNames:{ '#ttlAttribute' : 'ttl'}
       })
     );
   }
