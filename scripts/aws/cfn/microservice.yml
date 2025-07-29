@@ -1416,7 +1416,7 @@ Resources:
       Timeout: 15
       VpcConfig:
         SubnetIds:
-          - !Ref SubnetsIds
+          - !Split [ ",", !Ref SubnetsIds ]
         SecurityGroupIds:
           - !GetAtt DelayerReceiverOrdersSendersLambdaSecGroup.GroupId
 
