@@ -85,7 +85,7 @@ async function persistWeeklyEstimates(estimates) {
         TableName: COUNTERS_TABLE,
         Key: { pk: counterPk, sk: counterSk },
         UpdateExpression: 'ADD #c :inc',
-        ExpressionAttributeNames: { '#c': 'counter' },
+        ExpressionAttributeNames: { '#c': 'numberOfShipments' },
         ExpressionAttributeValues: { ':inc': item.weeklyEstimate }
       })
     );
