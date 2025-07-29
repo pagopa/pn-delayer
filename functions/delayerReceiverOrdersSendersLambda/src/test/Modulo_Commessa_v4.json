@@ -40,14 +40,6 @@
           "valore_totale": 700,
           "distribuzione": {
             "regionale": [
-              {
-                "regione": "Lombardia",
-                "valore": 700,
-                "province": [
-                  {"nome": "Milano", "valore": 400},
-                  {"nome": "Bergamo", "valore": 300}
-                ]
-              }
             ]
           }
         }
