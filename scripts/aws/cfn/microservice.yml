@@ -1550,9 +1550,12 @@ Resources:
             Action:
               - dynamodb:BatchWriteItem
               - dynamodb:Query
+              - dynamodb:GetItem
             Resource:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
           - Effect: Allow
             Action:
               - s3:GetObject
