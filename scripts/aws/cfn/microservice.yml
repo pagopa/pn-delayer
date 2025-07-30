@@ -1414,6 +1414,10 @@ Resources:
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
       Timeout: 15
+      VpcConfig:
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
+        SecurityGroupIds:
+          - !GetAtt DelayerReceiverOrdersSendersLambdaSecGroup.GroupId
 
   # Lambda function role
   DelayerReceiverOrdersSendersLambdaRole:
@@ -1430,7 +1434,8 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 
   # Lambda function IAM policy
   DelayerReceiverOrdersSendersLambdaPolicy:
@@ -1545,9 +1550,12 @@ Resources:
             Action:
               - dynamodb:BatchWriteItem
               - dynamodb:Query
+              - dynamodb:GetItem
             Resource:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
           - Effect: Allow
             Action:
               - s3:GetObject

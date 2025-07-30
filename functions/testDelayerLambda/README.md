@@ -6,12 +6,12 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 ## Operazioni disponibili
 
-| Nome | Descrizione | Parametri (`event.parameters`) |
-|------|-------------|--------------------------------|
-| **IMPORT_DATA** | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`. | _Nessuno_ → passare un array vuoto `[]` |
+| Nome                  | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                         |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| **IMPORT_DATA**       | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | _Nessuno_ → passare un array vuoto `[]`                                |
 | **GET_USED_CAPACITY** | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]` |
-| **GET_BY_REQUEST_ID**  | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`. | `[ requestId ]`                                                              |
-| **RUN_ALGORITHM** | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle. | [] |
+| **GET_BY_REQUEST_ID** | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                        |
+| **RUN_ALGORITHM**     | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | []                                                                     |
 
 ### Esempi di payload
 
@@ -23,6 +23,20 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   "parameters": []
 }
 ```
+
+#### CAMPI DEL CSV
+| Nome                   | Descrizione                                                                                                 |
+|------------------------|-------------------------------------------------------------------------------------------------------------|
+| **requestId**          | Identificativo spedizione nel formato PREPARE_ANALOG_DOMICILE.IUN_<iun>.RECINDEX_<index>.ATTEMPT_<attempt>. | 
+| **notificationSentAt** | Data deposito notifica in formato ISO 8601 con fuso orario UTC. Esempio 2025-01-01T00:00:00Z.               |
+| **prepareRequestDate** | Data deposito notifica in formato ISO 8601 con fuso orario UTC. Esempio 2025-01-01T00:00:00Z.               |
+| **productType**        | Prodotto postale (AR, 890, RS).                                                                             |
+| **senderPaId**         | Identificativo mittente della notifica.                                                                     |
+| **province**           | Sigla ufficiale a due cifre della provincia della spedizione. Esempio: NA.                                  |
+| **cap**                | Cap della spedizione.                                                                                       |
+| **attempt**            | Intero che indica il numero di tentativo della spedizione (0=primo, 1=secondo).                             |
+| **iun**                | Identificativo della notifica.                                                                              |
+
 
 *GET_USED_CAPACITY*
 
