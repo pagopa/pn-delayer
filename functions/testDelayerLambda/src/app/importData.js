@@ -42,7 +42,7 @@ exports.importData = async (_params = []) => {
     let processed = 0;
     const itemsBuffer = [];
     const dayOfWeek = 1; //lunedì
-    const deliveryWeek = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
+    const deliveryWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
     for await (const record of stream.pipe(csv({ separator: ";" }))) {
         processed += 1;
         const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);
