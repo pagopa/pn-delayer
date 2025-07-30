@@ -3,7 +3,7 @@ package it.pagopa.pn.delayer.utils;
 import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.RequiredArgsConstructor;
@@ -55,9 +55,9 @@ public class PnDelayerUtils {
                         Collectors.counting()));
     }
 
-    public Map<String, String> groupByGeoKeyAndProduct(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses) {
-        return paperChannelDeliveryDriverResponses.stream()
-                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriverResponse::getUnifiedDeliveryDriver, (x, y) -> x));
+    public Map<String, String> groupByGeoKeyAndProduct(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriver) {
+        return paperChannelDeliveryDriver.stream()
+                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriver::getUnifiedDeliveryDriver, (x, y) -> x));
     }
 
     public Map<String, List<PaperDelivery>> groupByCapAndProductType(List<PaperDelivery> paperDeliveries) {
@@ -108,7 +108,7 @@ public class PnDelayerUtils {
         return filteredList.size();
     }
 
-    public List<PaperDelivery> assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses, Map<String, List<PaperDelivery>> groupedByCapProductType, String tenderId, Map<Integer, List<String>> priorityMap) {
+    public List<PaperDelivery> assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriverResponses, Map<String, List<PaperDelivery>> groupedByCapProductType, String tenderId, Map<Integer, List<String>> priorityMap) {
         Map<String, String> driverMap = groupByGeoKeyAndProduct(paperChannelDeliveryDriverResponses);
         return groupedByCapProductType.entrySet().stream()
                 .map(entry -> {

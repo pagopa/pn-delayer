@@ -4,11 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class PaperChannelDeliveryDriverResponse {
-    private List<PaperChannelDeliveryDriver> body;
+public class PaperChannelDeliveryDriver {
+    private String geoKey;
+    private String product;
+    private String unifiedDeliveryDriver;
 }

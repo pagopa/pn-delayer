@@ -97,7 +97,10 @@ public class SenderLimitUtils {
         }
 
         double percentage = (double) paperDeliverySenderLimit.getWeeklyEstimate() / totalEstimate;
-        return (int) Math.floor(declaredCapacity * percentage);
+        int limit = (int) Math.floor(declaredCapacity * percentage);
+        log.info("Calculated [{}] as limit for productType: {}, paId: {}, province: {} with declaredProvinceCapacity: {}, totalEstimate: {}, weeklyEstimate: {}",
+                limit, paperDeliverySenderLimit.getProductType(), paperDeliverySenderLimit.getPaId(), paperDeliverySenderLimit.getProvince(), declaredCapacity, totalEstimate, paperDeliverySenderLimit.getWeeklyEstimate());
+        return limit;
     }
 
     public Mono<Long> updateUsedSenderLimit(List<PaperDelivery> paperDeliveryList, LocalDate deliveryDate, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
