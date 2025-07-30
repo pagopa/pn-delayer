@@ -5,7 +5,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,14 +122,14 @@ public class PaperDeliveryUtilsTest {
         paperDeliveries.add(new PaperDelivery());
         LocalDate deliveryWeek = LocalDate.now();
 
-        SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
-        senderLimitJobPaperDeliveries.setSendToDriverCapacityStep(List.of(createPaperDelivery("AR", "00100", "RM", "paId", 1)));
-        senderLimitJobPaperDeliveries.setSendToResidualCapacityStep(List.of(createPaperDelivery("AR", "00100", "RM", "paId", 0)));
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+        senderLimitJobProcessObjects.setSendToDriverCapacityStep(List.of(createPaperDelivery("AR", "00100", "RM", "paId", 1)));
+        senderLimitJobProcessObjects.setSendToResidualCapacityStep(List.of(createPaperDelivery("AR", "00100", "RM", "paId", 0)));
 
         when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
                 .thenReturn(Mono.empty());
 
-        paperDeliveryUtils.insertPaperDeliveries(new SenderLimitJobPaperDeliveries(), deliveryWeek).block();
+        paperDeliveryUtils.insertPaperDeliveries(new SenderLimitJobProcessObjects(), deliveryWeek).block();
 
         verify(paperDeliveryDAO,times(2)).insertPaperDeliveries(anyList());
     }

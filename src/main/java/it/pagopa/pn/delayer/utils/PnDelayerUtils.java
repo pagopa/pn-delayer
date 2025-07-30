@@ -4,7 +4,7 @@ import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
-import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -131,17 +131,17 @@ public class PnDelayerUtils {
      * and those to be sent to the residual capacity evaluation step.
      * @param senderLimitMap Map containing the sender limits for each product type and Pa - key in the format "PaId~ProductType~Province"
      * @param deliveriesGroupedByProductTypePaId Map containing the deliveries grouped by product type and Pa
-     * @param senderLimitJobPaperDeliveries Object containing the lists to which the deliveries will be
+     * @param senderLimitJobProcessObjects Object containing the lists to which the deliveries will be
      */
-    public void evaluateSenderLimitAndFilterDeliveries(Map<String, Tuple2<Integer, Integer>> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
+    public void evaluateSenderLimitAndFilterDeliveries(Map<String, Tuple2<Integer, Integer>> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         deliveriesGroupedByProductTypePaId.forEach((key, deliveries) -> {
             int limit = Optional.ofNullable(senderLimitMap.get(key))
                     .map(senderLimits -> senderLimits.getT1() - senderLimits.getT2())
                     .orElse(0);
 
             int actualLimit = Math.min(limit, deliveries.size());
-            senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
-            senderLimitJobPaperDeliveries.getSendToResidualCapacityStep().addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
+            senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
+            senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
         });
     }
 
@@ -167,16 +167,16 @@ public class PnDelayerUtils {
     /**
      *
      * @param items spedizioni in input
-     * @param senderLimitJobPaperDeliveries contiene nel campo sendToDriverCapacityStep le spedizioni che sono RS e secondo tentativi
+     * @param senderLimitJobProcessObjects contiene nel campo sendToDriverCapacityStep le spedizioni che sono RS e secondo tentativi
      * @return le spedizioni che non sono nè RS nè secondi tentativi
      * <p>
      * partitioned.get(true) -> spedizioni che sono RS o secondi tentativi
      * partitioned.get(false) -> spedizioni che non sono nè RS nè secondi tentativi
      */
-    public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries) {
+    public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         Predicate<PaperDelivery> shouldExclude = paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1;
         Map<Boolean, List<PaperDelivery>> partitioned = items.stream().collect(Collectors.partitioningBy(shouldExclude));
-        senderLimitJobPaperDeliveries.setSendToDriverCapacityStep(partitioned.get(true));
+        senderLimitJobProcessObjects.setSendToDriverCapacityStep(partitioned.get(true));
         return partitioned.get(false);
     }
 

@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface PaperDeliveryCounterDAO {
 
-    Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk);
+    Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk, Integer limit);
 
     Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer weeklyPrintCapacity);
 

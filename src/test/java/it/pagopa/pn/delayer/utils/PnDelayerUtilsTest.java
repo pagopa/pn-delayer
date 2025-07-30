@@ -3,7 +3,7 @@ package it.pagopa.pn.delayer.utils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
-import it.pagopa.pn.delayer.model.SenderLimitJobPaperDeliveries;
+import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -251,18 +250,18 @@ class PnDelayerUtilsTest {
                 "paId2~890~RM", deliveries2
         );
 
-        SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitMap, deliveriesGroupedByProductTypePaId, senderLimitJobPaperDeliveries);
+        pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitMap, deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects);
 
-        assertEquals(2, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().stream()
+        assertEquals(2, senderLimitJobProcessObjects.getSendToDriverCapacityStep().stream()
                 .filter(d -> d.getSenderPaId().equals("paId1")).count());
-        assertEquals(1, senderLimitJobPaperDeliveries.getSendToResidualCapacityStep().stream()
+        assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
                 .filter(d -> d.getSenderPaId().equals("paId1")).count());
 
-        assertEquals(2, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().stream()
+        assertEquals(2, senderLimitJobProcessObjects.getSendToDriverCapacityStep().stream()
                 .filter(d -> d.getSenderPaId().equals("paId2")).count());
-        assertEquals(0, senderLimitJobPaperDeliveries.getSendToResidualCapacityStep().stream()
+        assertEquals(0, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
                 .filter(d -> d.getSenderPaId().equals("paId2")).count());
     }
 
@@ -298,12 +297,12 @@ class PnDelayerUtilsTest {
         PaperDelivery paperDelivery3 = createPaperDelivery("AR", "00180", "RM", "paId3", 0);
         PaperDelivery paperDelivery4 = createPaperDelivery("890", "00181", "RM", "paId4", 1);
         List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3, paperDelivery4);
-        SenderLimitJobPaperDeliveries senderLimitJobPaperDeliveries = new SenderLimitJobPaperDeliveries();
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobPaperDeliveries);
+        List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects);
 
         assertEquals(1, result.size());
-        assertEquals(3, senderLimitJobPaperDeliveries.getSendToDriverCapacityStep().size());
+        assertEquals(3, senderLimitJobProcessObjects.getSendToDriverCapacityStep().size());
     }
 
     private PaperChannelDeliveryDriverResponse createPaperChannelDeliveryDriverResponse(String geoKey, String product, String driver) {
