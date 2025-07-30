@@ -2,7 +2,7 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import org.junit.jupiter.api.BeforeEach;
@@ -100,11 +100,11 @@ class PnDelayerUtilsTest {
 
     @Test
     void groupByGeoKeyAndProduct() {
-        List<PaperChannelDeliveryDriverResponse> paperDeliveries = new ArrayList<>();
+        List<PaperChannelDeliveryDriver> paperDeliveries = new ArrayList<>();
 
-        paperDeliveries.add(createPaperChannelDeliveryDriverResponse("00178","AR", "driver1"));
-        paperDeliveries.add(createPaperChannelDeliveryDriverResponse("00178", "890", "driver2"));
-        paperDeliveries.add(createPaperChannelDeliveryDriverResponse("00179","890", "driver2"));
+        paperDeliveries.add(createPaperChannelDeliveryDriver("00178","AR", "driver1"));
+        paperDeliveries.add(createPaperChannelDeliveryDriver("00178", "890", "driver2"));
+        paperDeliveries.add(createPaperChannelDeliveryDriver("00179","890", "driver2"));
 
 
         Map<String, String> grouped = pnDelayerUtils.groupByGeoKeyAndProduct(paperDeliveries);
@@ -201,9 +201,9 @@ class PnDelayerUtilsTest {
 
     @Test
     void assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(){
-        List<PaperChannelDeliveryDriverResponse> driverResponses = new ArrayList<>();
-        driverResponses.add(createPaperChannelDeliveryDriverResponse("00178", "AR", "driverX"));
-        driverResponses.add(createPaperChannelDeliveryDriverResponse("00179", "RS", "driverY"));
+        List<PaperChannelDeliveryDriver> driverResponses = new ArrayList<>();
+        driverResponses.add(createPaperChannelDeliveryDriver("00178", "AR", "driverX"));
+        driverResponses.add(createPaperChannelDeliveryDriver("00179", "RS", "driverY"));
 
         List<PaperDelivery> deliveries1 = new ArrayList<>();
         deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
@@ -305,8 +305,8 @@ class PnDelayerUtilsTest {
         assertEquals(3, senderLimitJobProcessObjects.getSendToDriverCapacityStep().size());
     }
 
-    private PaperChannelDeliveryDriverResponse createPaperChannelDeliveryDriverResponse(String geoKey, String product, String driver) {
-        PaperChannelDeliveryDriverResponse response = new PaperChannelDeliveryDriverResponse();
+    private PaperChannelDeliveryDriver createPaperChannelDeliveryDriver(String geoKey, String product, String driver) {
+        PaperChannelDeliveryDriver response = new PaperChannelDeliveryDriver();
         response.setGeoKey(geoKey);
         response.setProduct(product);
         response.setUnifiedDeliveryDriver(driver);

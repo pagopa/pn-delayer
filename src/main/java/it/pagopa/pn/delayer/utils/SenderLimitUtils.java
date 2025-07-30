@@ -6,10 +6,12 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
+import it.pagopa.pn.delayer.model.ProductType;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
@@ -34,16 +36,17 @@ public class SenderLimitUtils {
                 .thenReturn(senderLimitJobProcessObjects);
     }
 
-    public Mono<List<PaperDelivery>> retrieveTotalEstimateCounter(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek, String province,  Map<String, Integer> totalEstimateCounter){
-        List<String> productList = paperDeliveries.stream().map(PaperDelivery::getProductType).distinct().toList();
-        return Flux.fromIterable(productList)
+    public Mono<Map<String,Integer>> retrieveTotalEstimateCounter(LocalDate deliveryWeek, String province){
+        Map<String,Integer> totalEstimateCounter = new HashMap<>();
+        return Flux.fromStream(Arrays.stream(ProductType.values()))
                 .flatMap(product -> {
-                    String sk = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product, province);
+                    String sk = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product.getValue(), province);
                     return paperDeliveryCounterDAO.getPaperDeliveryCounter(String.valueOf(deliveryWeek), sk, 1)
-                            .doOnNext(estimateShipmentCounter -> totalEstimateCounter.put(product, estimateShipmentCounter.getFirst().getNumberOfShipments()));
+                            .filter(paperDeliveryCounters -> !CollectionUtils.isEmpty(paperDeliveryCounters))
+                            .doOnNext(estimateShipmentCounter -> totalEstimateCounter.put(product.getValue(), estimateShipmentCounter.getFirst().getNumberOfShipments()));
                 })
-                .then(Mono.just(paperDeliveries));
-
+                .collectList()
+                .then(Mono.just(totalEstimateCounter));
     }
 
     /**
@@ -83,21 +86,44 @@ public class SenderLimitUtils {
                 .then(Mono.just(senderLimitJobProcessObjects.getSenderLimitMap()));
     }
 
-    private static Integer calculateLimit(List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects, PaperDeliverySenderLimit paperDeliverySenderLimit) {
-        int declaredCapacity = driversTotalCapacity.stream()
-                .filter(driver -> driver.getProducts().contains(paperDeliverySenderLimit.getProductType()))
+    private static Integer calculateLimit(List<DriversTotalCapacity> driversTotalCapacity,
+                                          SenderLimitJobProcessObjects senderLimitJobProcessObjects,
+                                          PaperDeliverySenderLimit paperDeliverySenderLimit) {
+
+        String productType = paperDeliverySenderLimit.getProductType();
+
+        return driversTotalCapacity.stream()
+                .filter(d -> d.getProducts().contains(productType))
                 .findFirst()
-                .map(DriversTotalCapacity::getCapacity)
+                .map(driver -> SenderLimitUtils.retrieveCapacityAndCalculateLimit(driver, senderLimitJobProcessObjects, paperDeliverySenderLimit))
                 .orElse(0);
 
-        int totalEstimate = Optional.ofNullable(senderLimitJobProcessObjects.getTotalEstimateCounter().get(paperDeliverySenderLimit.getProductType())).orElse(0);
+    }
+
+    private static Integer retrieveCapacityAndCalculateLimit(DriversTotalCapacity driver, SenderLimitJobProcessObjects senderLimitJobProcessObjects, PaperDeliverySenderLimit paperDeliverySenderLimit) {
+        int declaredCapacity = driver.getCapacity();
+        List<String> relevantProducts = driver.getProducts().stream()
+                .filter(p -> !ProductType.RS.getValue().equalsIgnoreCase(p))
+                .toList();
+
+        int totalEstimate;
+        if (relevantProducts.size() > 1) {
+            totalEstimate = relevantProducts.stream()
+                    .mapToInt(p -> Optional.ofNullable(senderLimitJobProcessObjects.getTotalEstimateCounter().get(paperDeliverySenderLimit.getProductType())).orElse(0))
+                    .sum();
+        } else {
+            totalEstimate = Optional.ofNullable(senderLimitJobProcessObjects.getTotalEstimateCounter().get(paperDeliverySenderLimit.getProductType())).orElse(0);
+        }
 
         if (totalEstimate == 0) {
             return 0;
         }
 
         double percentage = (double) paperDeliverySenderLimit.getWeeklyEstimate() / totalEstimate;
-        return (int) Math.floor(declaredCapacity * percentage);
+        int limit = (int) Math.floor(declaredCapacity * percentage);
+        log.info("Calculated [{}] as limit for productType: {}, paId: {}, province: {} with declaredProvinceCapacity: {}, totalEstimate: {}, weeklyEstimate: {}",
+                limit, paperDeliverySenderLimit.getProductType(), paperDeliverySenderLimit.getPaId(), paperDeliverySenderLimit.getProvince(), declaredCapacity, totalEstimate, paperDeliverySenderLimit.getWeeklyEstimate());
+        return limit;
     }
 
     public Mono<Long> updateUsedSenderLimit(List<PaperDelivery> paperDeliveryList, LocalDate deliveryDate, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {

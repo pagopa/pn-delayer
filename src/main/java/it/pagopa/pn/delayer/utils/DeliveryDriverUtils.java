@@ -44,23 +44,22 @@ public class DeliveryDriverUtils {
     private final PaperDeliveryDriverCapacitiesDAO paperDeliveryDriverCapacitiesDAO;
     private final PaperDeliveryCounterDAO paperDeliveryCounterDAO;
 
-    public List<PaperChannelDeliveryDriverResponse> retrieveUnifiedDeliveryDriversFromPaperChannel(List<DeliveryDriverRequest> deliveryDriverRequests, String tenderId) {
+    public List<PaperChannelDeliveryDriver> retrieveUnifiedDeliveryDriversFromPaperChannel(List<DeliveryDriverRequest> deliveryDriverRequests, String tenderId) {
         try {
             SdkBytes sdkBytesResponse = lambdaClient.invoke(InvokeRequest.builder()
-                            .functionName(pnDelayerConfigs.getPaperChannelTenderApiLambdaName())
+                            .functionName(pnDelayerConfigs.getPaperChannelTenderApiLambdaArn())
                             .invocationType(InvocationType.REQUEST_RESPONSE)
                             .payload(SdkBytes.fromByteArray(objectMapper.writeValueAsBytes(new PaperChannelDeliveryDriverRequest(deliveryDriverRequests, tenderId, "GET_UNIFIED_DELIVERY_DRIVERS"))))
                             .build())
                     .payload();
-            return objectMapper.readValue(sdkBytesResponse.asByteArray(), new com.fasterxml.jackson.core.type.TypeReference<>() {
-            });
+            return objectMapper.readValue(sdkBytesResponse.asByteArray(), PaperChannelDeliveryDriverResponse.class).getBody();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public void insertInCache(List<PaperChannelDeliveryDriverResponse> paperChannelDeliveryDriverResponses) {
-        Map<String, String> map = pnDelayerUtils.groupByGeoKeyAndProduct(paperChannelDeliveryDriverResponses);
+    public void insertInCache(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriver) {
+        Map<String, String> map = pnDelayerUtils.groupByGeoKeyAndProduct(paperChannelDeliveryDriver);
         map.forEach(cacheService::addToCache);
     }
 
@@ -93,6 +92,7 @@ public class DeliveryDriverUtils {
         return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryDate.toString(), PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.EXCLUDE, province), null)
                 .defaultIfEmpty(Collections.emptyList())
                 .map(this::createProductCounterMap)
+                .doOnNext(stringIntegerMap -> log.info("Retrieved counters for province {}: {}", province, stringIntegerMap))
                 .flatMap(counters ->
                         paperDeliveryDriverCapacitiesDAO.retrieveUnifiedDeliveryDriversOnProvince(tenderId, province, deliveryDate)
                                 .map(this::groupDriversByIntersectingProducts)
@@ -103,6 +103,7 @@ public class DeliveryDriverUtils {
                                             .filter(counter -> entry.getKey().contains(counter.getKey()))
                                             .map(Map.Entry::getValue)
                                             .reduce(0, Integer::sum);
+                                    log.info("calculated reduced capacity for province {} and products [{}] --> declaredCapacity: {}, reducedCapacity: {}", province, entry.getKey(), capacity, reducedCapacity);
                                     return new DriversTotalCapacity(
                                             entry.getKey(),
                                             reducedCapacity,

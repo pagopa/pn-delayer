@@ -11,7 +11,7 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
-import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.utils.DeliveryDriverUtils;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
@@ -225,8 +225,8 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(Mono.just(List.of(capacity)));
 
         when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString()))
-                .thenReturn(List.of(new PaperChannelDeliveryDriverResponse("00184", "AR", "driver1"),
-                        new PaperChannelDeliveryDriverResponse("00185", "RS", "driver2")));
+                .thenReturn(List.of(new PaperChannelDeliveryDriver("00184", "AR", "driver1"),
+                        new PaperChannelDeliveryDriver("00185", "RS", "driver2")));
 
         List<PaperDelivery> deliveries = new ArrayList<>();
         deliveries.addAll(getPaperDeliveries(false));
@@ -289,8 +289,8 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(Mono.just(List.of(capacity)));
 
         when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString()))
-                .thenReturn(List.of(new PaperChannelDeliveryDriverResponse("00184", "AR", "driver1"),
-                        new PaperChannelDeliveryDriverResponse("00185", "RS", "driver2")));
+                .thenReturn(List.of(new PaperChannelDeliveryDriver("00184", "AR", "driver1"),
+                        new PaperChannelDeliveryDriver("00185", "RS", "driver2")));
 
         List<PaperDelivery> deliveries = new ArrayList<>();
         deliveries.addAll(getPaperDeliveries(false));

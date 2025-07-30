@@ -364,7 +364,7 @@ Parameters:
     Type: String
     Description: 'ARN of DynamoDB table containing Province'
 
-  PaperChannelTenderApiLambdaName:
+  PaperChannelTenderApiLambdaArn:
     Type: String
     Description: 'PaperChannelTenderApiLambda function name'
 
@@ -468,8 +468,8 @@ Resources:
             Value: !Ref ActualTenderId
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
-          - Name: PN_DELAYER_PAPERCHANNELTENDERAPILAMBDANAME
-            Value: !Ref PaperChannelTenderApiLambdaName
+          - Name: PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN
+            Value: !Ref PaperChannelTenderApiLambdaArn
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
 
@@ -556,7 +556,7 @@ Resources:
                 Action:
                   - lambda:InvokeFunction
                 Resource:
-                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+                  - !Ref PaperChannelTenderApiLambdaArn
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
@@ -1634,7 +1634,7 @@ Resources:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
             Parameters:
-              FunctionName: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+              FunctionName: !Ref PaperChannelTenderApiLambdaArn
               Payload:
                 operation: GET_TENDER_ACTIVE
             Retry:
@@ -1975,7 +1975,7 @@ Resources:
               Action:
                 - lambda:InvokeFunction
               Resource:
-                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}"
+                - !Ref PaperChannelTenderApiLambdaArn
             - Effect: Allow
               Action:
                 - events:PutRule

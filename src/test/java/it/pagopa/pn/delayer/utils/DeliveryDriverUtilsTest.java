@@ -10,7 +10,7 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
 import it.pagopa.pn.delayer.model.DeliveryDriverRequest;
 import it.pagopa.pn.delayer.model.IncrementUsedCapacityDto;
-import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriverResponse;
+import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -78,11 +78,11 @@ public class DeliveryDriverUtilsTest {
     void retrieveUnifiedDeliveryDriversFromPaperChannel_handlesValidResponse() {
         List<DeliveryDriverRequest> deliveryDriverRequests = List.of(new DeliveryDriverRequest("geoKey", "AR"));
         String tenderId = "tender1";
-        SdkBytes sdkBytesResponse = SdkBytes.fromUtf8String("[{\"unifiedDeliveryDriver\":\"driver1\"}]");
+        SdkBytes sdkBytesResponse = SdkBytes.fromUtf8String("{\"body\":[{\"unifiedDeliveryDriver\":\"driver1\"}]}");
 
         when(lambdaClient.invoke(any(InvokeRequest.class))).thenReturn(InvokeResponse.builder().payload(sdkBytesResponse).build());
 
-        List<PaperChannelDeliveryDriverResponse> result = deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(deliveryDriverRequests, tenderId);
+        List<PaperChannelDeliveryDriver> result = deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(deliveryDriverRequests, tenderId);
 
         assertEquals(1, result.size());
         assertEquals("driver1", result.getFirst().getUnifiedDeliveryDriver());
@@ -209,7 +209,7 @@ public class DeliveryDriverUtilsTest {
 
     @Test
     void insertInCache() {
-        List<PaperChannelDeliveryDriverResponse> responses = List.of(new PaperChannelDeliveryDriverResponse("geoKey", "AR", "unifiedDeliveryDriver"));
+        List<PaperChannelDeliveryDriver> responses = List.of(new PaperChannelDeliveryDriver("geoKey", "AR", "unifiedDeliveryDriver"));
         when(pnDelayerUtils.groupByGeoKeyAndProduct(any())).thenReturn(Map.of("geoKey~AR", "unifiedDeliveryDriver"));
         deliveryDriverUtils.insertInCache(responses);
         verify(cacheService, times(1)).addToCache("geoKey~AR", "unifiedDeliveryDriver");

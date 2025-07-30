@@ -16,7 +16,7 @@
     "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority",
     "UnifiedDeliveryDriverProvinceParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
     "PaperDeliveryPrintCapacityCounterTtlDuration": "60d",
-    "PaperChannelTenderApiLambdaName": "pn-paper-channel-TenderAPI",
+    "PaperChannelTenderApiLambdaArn": "arn:aws:lambda:eu-south-1:830192246553:function:pn-paper-channel-TenderAPI",
     "SafeStorageCxId":"pn-delayer",
     "PrintCounterTtlDuration": "30d"
   }
