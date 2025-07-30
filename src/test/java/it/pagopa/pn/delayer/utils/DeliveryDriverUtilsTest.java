@@ -78,7 +78,7 @@ public class DeliveryDriverUtilsTest {
     void retrieveUnifiedDeliveryDriversFromPaperChannel_handlesValidResponse() {
         List<DeliveryDriverRequest> deliveryDriverRequests = List.of(new DeliveryDriverRequest("geoKey", "AR"));
         String tenderId = "tender1";
-        SdkBytes sdkBytesResponse = SdkBytes.fromUtf8String("[{\"unifiedDeliveryDriver\":\"driver1\"}]");
+        SdkBytes sdkBytesResponse = SdkBytes.fromUtf8String("{\"body\":[{\"unifiedDeliveryDriver\":\"driver1\"}]}");
 
         when(lambdaClient.invoke(any(InvokeRequest.class))).thenReturn(InvokeResponse.builder().payload(sdkBytesResponse).build());
 

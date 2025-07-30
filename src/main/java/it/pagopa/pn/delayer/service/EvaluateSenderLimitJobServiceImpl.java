@@ -50,15 +50,16 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
     }
 
     private Mono<Void> retrieveAndProcessPaperDeliveries(String province, String tenderId, LocalDate deliveryWeek, Map<String, AttributeValue> lastEvaluatedKey, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap) {
-        return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek, province, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
-                .flatMap(paperDeliveryPage -> processItems(paperDeliveryPage.items(), tenderId, deliveryWeek, driversTotalCapacity, priorityMap, province)
-                        .flatMap(sentToNextStepItemsCount -> {
-                            if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {
-                                return retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, paperDeliveryPage.lastEvaluatedKey(), driversTotalCapacity, priorityMap);
-                            }
-                            return Mono.empty();
-                        }))
-                .then();
+        return senderLimitUtils.retrieveTotalEstimateCounter(deliveryWeek, province)
+                .flatMap(totalCounterMap -> paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek, province, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
+                        .flatMap(paperDeliveryPage -> processItems(paperDeliveryPage.items(), tenderId, deliveryWeek, driversTotalCapacity, priorityMap, totalCounterMap)
+                                .flatMap(sentToNextStepItemsCount -> {
+                                    if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {
+                                        return retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, paperDeliveryPage.lastEvaluatedKey(), driversTotalCapacity, priorityMap);
+                                    }
+                                    return Mono.empty();
+                                }))
+                        .then());
     }
 
     /**
@@ -78,12 +79,12 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      * @param driversTotalCapacity List of DriversTotalCapacity containing unified delivery drivers and their capacities
      * @param priorityMap Map containing priority information for paper deliveries
      * @return Mono<Long> indicating the count of items sent to the next step
-     * */
-    private Mono<Long> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap, String province) {
+     */
+    private Mono<Long> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap, Map<String,Integer> totalCounterMap) {
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+        senderLimitJobProcessObjects.setTotalEstimateCounter(totalCounterMap);
         return retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(items, tenderId, driversTotalCapacity, priorityMap)
                 .map(paperDeliveryList -> pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects))
-                .flatMap(paperDeliveries -> senderLimitUtils.retrieveTotalEstimateCounter(paperDeliveries, deliveryWeek, province, senderLimitJobProcessObjects.getTotalEstimateCounter()))
                 .map(pnDelayerUtils::groupByPaIdProductTypeProvince)
                 .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, driversTotalCapacity, senderLimitJobProcessObjects))
                 .flatMap(deliveries -> paperDeliveryUtils.insertPaperDeliveries(deliveries, deliveryWeek))
