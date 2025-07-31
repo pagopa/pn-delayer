@@ -1,12 +1,11 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
-import java.awt.print.Paper;
+import java.time.Instant;
 import java.time.LocalDate;
 
 @DynamoDbBean
@@ -72,7 +71,7 @@ public class PaperDelivery {
         this.pk = buildPk(workflowStepEnum, deliveryWeek);
         this.sk = buildSortKey(workflowStepEnum, paperDelivery);
         this.requestId = paperDelivery.getRequestId();
-        this.createdAt = paperDelivery.getCreatedAt();
+        this.createdAt = String.valueOf(Instant.now());
         this.notificationSentAt = paperDelivery.getNotificationSentAt();
         this.prepareRequestDate = paperDelivery.getPrepareRequestDate();
         this.productType = paperDelivery.getProductType();
