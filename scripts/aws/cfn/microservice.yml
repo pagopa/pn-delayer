@@ -640,6 +640,8 @@ Resources:
             Value: !Ref PrintCounterTtlDuration
           - Name: PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT
             Value: !Ref PaperDeliveryQueryLimit
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
+            Value: !Ref PaperDeliveryCounterTableName
 
       PlatformCapabilities:
         - FARGATE
@@ -795,6 +797,8 @@ Resources:
             Value: !Ref PrintCounterTtlDuration
           - Name: PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT
             Value: !Ref PaperDeliveryQueryLimit
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
+            Value: !Ref PaperDeliveryCounterTableName
 
       PlatformCapabilities:
         - FARGATE
@@ -1900,6 +1904,8 @@ Resources:
                           Value.$: $.actualTenderId
                         - Name: PN_DELAYER_WORKFLOWSTEP
                           Value: EVALUATE_RESIDUAL_CAPACITY
+                        - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
+                          Value.$: $.paperDeliveryCounterTableName
                   Retry:
                     - ErrorEquals:
                         - States.ALL
