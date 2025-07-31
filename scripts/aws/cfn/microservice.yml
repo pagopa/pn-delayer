@@ -720,6 +720,8 @@ Resources:
                   - !Sub "${PaperDeliveryPrintCapacityTableArn}/*"
                   - !Sub "${PaperDeliveryTableArn}"
                   - !Sub "${PaperDeliveryTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
 
   ResidualCapacitySecurityGroup:
     Type: AWS::EC2::SecurityGroup
