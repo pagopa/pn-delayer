@@ -65,16 +65,18 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         System.exit(exitCode);
     }
 
-    private int executeEvaluateResidualCapacityStep() {
+    private int executeEvaluateResidualCapacityStep() throws JsonProcessingException {
         String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateResidualCapacityJobInput().getUnifiedDeliveryDriver();
+        String provinces = pnDelayerConfigs.getEvaluateResidualCapacityJobInput().getProvinceList();
+        List<String> provinceList = objectMapper.readValue(provinces, new TypeReference<>() {});
         String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
         if (StringUtils.hasText(jobIndex)) {
             return Optional.of(jobIndex)
                     .map(Integer::parseInt)
-                    .map(index -> pnDelayerConfigs.getEvaluateResidualCapacityJobInput().getProvinceList().split(",")[index])
+                    .map(provinceList::get)
                     .map(province -> {
                         log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
-                        addMDC(String.join("~", unifiedDeliveryDriver, province));
+                        addMDC( String.join("~", unifiedDeliveryDriver,  province));
                         try {
                             var startExecutionBatch = Instant.now();
                             Mono<Void> monoExcecution = evaluateResidualCapacityJobService.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, pnDelayerConfigs.getActualTenderId());
