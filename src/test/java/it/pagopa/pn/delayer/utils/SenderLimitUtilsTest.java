@@ -67,9 +67,9 @@ public class SenderLimitUtilsTest {
         paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setWeeklyEstimate(62);
 
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(deliveryWeek)))
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(deliveryWeek.minusWeeks(1))))
                 .thenReturn(Flux.just(usedSenderLimit));
-        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), eq(deliveryWeek)))
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), eq(deliveryWeek.minusWeeks(1))))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
 
         senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, List.of(new DriversTotalCapacity(List.of("RS", "AR"), capacity, List.of("POSTE"))), senderLimitJobProcessObjects)
@@ -88,7 +88,7 @@ public class SenderLimitUtilsTest {
                 createPaperDelivery("AR", "00100", "RM", "paId", 0));
         LocalDate deliveryDate = LocalDate.now();
         Map<String, Tuple2<Integer, Integer>> senderLimitMaps = Map.of("paId~AR~RM", Tuples.of(100, 50));
-        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), eq(2L), eq(deliveryDate), anyInt()))
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), eq(2L), eq(deliveryDate.minusWeeks(1)), anyInt()))
                 .thenReturn(Mono.just(2L));
 
         StepVerifier.create(senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryDate, senderLimitMaps))
