@@ -20,7 +20,7 @@ const { persistWeeklyEstimates } = require('./dynamo');
  * @returns {Promise<Array<Object>>}        List of weekly‑granularity records.
  */
 async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
-    const { weekNotInTheMonth, weeks, daysInMonth } = getMonthContext(commessa.periodoRiferimento);
+    const { weekNotInTheMonth, weeks, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
     console.debug(
         `[ALGO] Month context – weeks in month: ${weeks}, partialWeek: ${weekNotInTheMonth}, daysInMonth: ${daysInMonth}`
     );
@@ -64,7 +64,7 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
 
 /**
  * Compute month context (first day, ISO‑weeks and days in month) from “mm‑YYYY” string.
- * @param {string} periodoRiferimento e.g. "07-2025"
+ * @param {string} periodo_riferimento e.g. "07-2025"
  */
 function getMonthContext(periodoRiferimento) {
     const [monthStr, yearStr] = periodoRiferimento.split('-');
@@ -155,7 +155,7 @@ function buildRecord({
         deliveryDate: formatISO(monday, { representation: 'date' }), // YYYY‑MM‑DD
         weeklyEstimate,
         monthlyEstimate,
-        lastUpdate: commessa.lastUpdate,
+        lastUpdate: commessa.last_update,
         ...(isPartialWeek ? { isPartialWeek: true } : {})
     };
 }

@@ -1,8 +1,8 @@
 {
   "idEnte": "1234abcftrs43d23el4",
   "contractId": "5678abcftrs43d23el4",
-  "periodoRiferimento": "2-2025",
-  "lastUpdate": "2025-01-01T00:00:00Z",
+  "periodo_riferimento": "2-2025",
+  "last_update": "2025-01-01T00:00:00Z",
   "prodotti": [
     {
       "id": "AR",
