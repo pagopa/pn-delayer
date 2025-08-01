@@ -19,18 +19,23 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
- * @param {Array<string>} _params – future use (per ora ignorati)
+ * @param {Array<string>} params[fileName]
  * @returns {Promise<{message:string, processed:number}>}
  */
-exports.importData = async (_params = []) => {
+exports.importData = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
-    const OBJECT_KEY = process.env.OBJECT_KEY;
+    let OBJECT_KEY = process.env.OBJECT_KEY;
+    const [fileName] = params
+
+    if(fileName){
+        OBJECT_KEY = fileName;
+    }
 
     if (!BUCKET_NAME || !OBJECT_KEY) {
         throw new Error(
             "Environment variables BUCKET_NAME and OBJECT_KEY must be defined"
         );
-}
+    }
 
     const { Body } = await s3Client.send(
         new GetObjectCommand({ Bucket: BUCKET_NAME, Key: OBJECT_KEY })
