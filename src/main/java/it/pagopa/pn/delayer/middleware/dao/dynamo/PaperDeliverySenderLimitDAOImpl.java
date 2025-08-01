@@ -41,13 +41,13 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, LocalDate deliveryDate) {
-        log.info("retrieve sender Limit for tuples={} on deliveryDate={}", pks, deliveryDate);
+    public Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, LocalDate shipmentDate) {
+        log.info("retrieve sender Limit for tuples={} on shipmentDate={}", pks, shipmentDate);
 
         List<Key> keys = pks.stream()
                 .map(pk -> Key.builder()
                         .partitionValue(pk)
-                        .sortValue(deliveryDate.toString())
+                        .sortValue(shipmentDate.toString())
                         .build())
                 .toList();
 
@@ -70,10 +70,10 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate deliveryDate, Integer senderLimit) {
+    public Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate shipmentDate, Integer senderLimit) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put(PaperDeliverySenderLimit.COL_PK, AttributeValue.builder().s(pk).build());
-        key.put(PaperDeliverySenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(deliveryDate.toString()).build());
+        key.put(PaperDeliverySenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(shipmentDate.toString()).build());
 
         Map<String, AttributeValue> attributeValue = new HashMap<>();
         attributeValue.put(":v", AttributeValue.builder().n(String.valueOf(increment)).build());
@@ -100,13 +100,13 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Flux<PaperDeliveryUsedSenderLimit> retrieveUsedSendersLimit(List<String> pks, LocalDate deliveryDate) {
-        log.info("retrieve used sender Limit for tuples={} on deliveryDate={}", pks, deliveryDate);
+    public Flux<PaperDeliveryUsedSenderLimit> retrieveUsedSendersLimit(List<String> pks, LocalDate shipmentDate) {
+        log.info("retrieve used sender Limit for tuples={} on shipmentDate={}", pks, shipmentDate);
 
         List<Key> keys = pks.stream()
                 .map(pk -> Key.builder()
                         .partitionValue(pk)
-                        .sortValue(deliveryDate.toString())
+                        .sortValue(shipmentDate.toString())
                         .build())
                 .toList();
 

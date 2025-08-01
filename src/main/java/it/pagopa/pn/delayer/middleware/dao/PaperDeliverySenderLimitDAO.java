@@ -11,9 +11,9 @@ import java.util.List;
 
 public interface PaperDeliverySenderLimitDAO {
 
-    Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, LocalDate deliveryDate);
+    Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, LocalDate shipmentDate);
 
-    Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate deliveryDate, Integer senderLimit);
+    Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate shipmentDate, Integer senderLimit);
 
-    Flux<PaperDeliveryUsedSenderLimit> retrieveUsedSendersLimit(List<String> pks, LocalDate deliveryDate);
+    Flux<PaperDeliveryUsedSenderLimit> retrieveUsedSendersLimit(List<String> pks, LocalDate shipmentDate);
 }
