@@ -1564,6 +1564,12 @@ Resources:
               - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
           - Effect: Allow
             Action:
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub "${PaperDeliveryCounterTableArn}"
+              - !Sub "${PaperDeliveryCounterTableArn}/*"
+          - Effect: Allow
+            Action:
               - s3:GetObject
               - s3:HeadObject
               - s3:ListBucket

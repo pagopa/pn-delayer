@@ -11,7 +11,7 @@ const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
 const TABLE_NAME = "pn-DelayerPaperDelivery";
-const COUNTER_TABLE_NAME = "pn-DelayerExcludeCounter"; // ← Assunto un nome di tabella
+const COUNTER_TABLE_NAME = "pn-PaperDeliveryCounters";
 
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
@@ -65,9 +65,9 @@ exports.importData = async (params = []) => {
 };
 
 async function processBatch(items, deliveryWeek) {
-    await batchWriteItems(items);
-    const grouped = groupRecordsByProductAndProvince(items);
-    await updateExcludeCounter(grouped, deliveryWeek);
+  const grouped = groupRecordsByProductAndProvince(items);
+  await batchWriteItems(items);
+  await updateExcludeCounter(grouped, deliveryWeek);
 }
 
 /**
@@ -108,7 +108,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
       filteredRecords = records;
     } else {
       filteredRecords = records.filter(
-        record => record.entity.attempt && parseInt(record.entity.attempt, 10) === 1
+        record => record.attempt && parseInt(record.attempt, 10) === 1
       );
     }
 
@@ -127,35 +127,33 @@ function calculateTtl(){
 }
 
 async function updateExcludeCounter(excludeGroupedRecords, deliveryWeek) {
-
-    let ttl = calculateTtl();
-    let counterMap = retrieveCounterMap(excludeGroupedRecords);
-
+    const ttl = calculateTtl();
+    const counterMap = retrieveCounterMap(excludeGroupedRecords);
     for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
-      const sk = `EXCLUDE~${productTypeProvince}`;
-      try {
+        const sk = `EXCLUDE~${productTypeProvince}`;
         const input = {
-            TableName: counterTableName,
+            TableName: COUNTER_TABLE_NAME,
             Key: {
-              pk: deliveryDate,
-              sk: sk
+                pk: deliveryWeek,
+                sk: sk
             },
             UpdateExpression: 'ADD #numberOfShipments :inc SET #ttl = :ttl',
             ExpressionAttributeNames: {
-            '#numberOfShipments': 'numberOfShipments',
-            '#ttl': 'ttl'
+                '#numberOfShipments': 'numberOfShipments',
+                '#ttl': 'ttl'
             },
             ExpressionAttributeValues: {
-            ':inc': inc,
-            ':ttl': ttl
+                ':inc': inc,
+                ':ttl': ttl
             }
-          };
-          const command = new UpdateCommand(input);
-          await docClient.send(command);
-          console.log(`updateSuccessfully for ${sk}`);
-      } catch (error) {
-        console.error(`Failed to update counter for sk: ${sk}`, error);
-      }
+        };
+        try {
+            const command = new UpdateCommand(input);
+            await docClient.send(command);
+            console.log(`Counter updated successfully for ${sk}`);
+        } catch (error) {
+            console.error(`Failed to update counter for ${sk}`, error);
+        }
     }
 }
 
