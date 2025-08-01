@@ -44,6 +44,19 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
 
+    it("should batch-write items to DynamoDB with custom fileName", async () => {
+        const csvPath = path.join(__dirname, "sample.csv");
+        const csvData = fs.readFileSync(csvPath, "utf8");
+        s3Mock.on(GetObjectCommand).resolves({
+            Body: Readable.from([csvData])
+        });
+        ddbMock.on(BatchWriteCommand).resolves({});
+
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["fileName"] });
+        assert.strictEqual(result.statusCode, 200);
+        assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
+    });
+
     it("GET_USED_CAPACITY returns the item", async () => {
         const fakeItem = {
             unifiedDeliveryDriverGeokey: "Sailpost~87100",

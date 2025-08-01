@@ -3,34 +3,39 @@ const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
     DynamoDBDocumentClient,
-    BatchWriteCommand
+    BatchWriteCommand,
+    UpdateCommand
 } = require("@aws-sdk/lib-dynamodb");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
 const TABLE_NAME = "pn-DelayerPaperDelivery";
+const COUNTER_TABLE_NAME = "pn-PaperDeliveryCounters";
 
-// AWS SDK clients
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 
-
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
- * @param {Array<string>} _params – future use (per ora ignorati)
+ * @param {Array<string>} params[fileName]
  * @returns {Promise<{message:string, processed:number}>}
  */
-exports.importData = async (_params = []) => {
+exports.importData = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
-    const OBJECT_KEY = process.env.OBJECT_KEY;
+    let OBJECT_KEY = process.env.OBJECT_KEY;
+    const [fileName] = params
+
+    if(fileName){
+        OBJECT_KEY = fileName;
+    }
 
     if (!BUCKET_NAME || !OBJECT_KEY) {
         throw new Error(
             "Environment variables BUCKET_NAME and OBJECT_KEY must be defined"
         );
-}
+    }
 
     const { Body } = await s3Client.send(
         new GetObjectCommand({ Bucket: BUCKET_NAME, Key: OBJECT_KEY })
@@ -48,15 +53,21 @@ exports.importData = async (_params = []) => {
         const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);
         itemsBuffer.push(paperDelivery);
         if (itemsBuffer.length === 25) {
-            await batchWriteItems(itemsBuffer.splice(0, itemsBuffer.length));
+            await processBatch(itemsBuffer.splice(0,itemsBuffer.length), deliveryWeek);
         }
     }
     if (itemsBuffer.length) {
-        await batchWriteItems(itemsBuffer);
+        await processBatch(itemsBuffer, deliveryWeek);
     }
 
     console.log("Processed data:", processed);
     return { message: "CSV imported successfully", processed };
+};
+
+async function processBatch(items, deliveryWeek) {
+  const grouped = groupRecordsByProductAndProvince(items);
+  await batchWriteItems(items);
+  await updateExcludeCounter(grouped, deliveryWeek);
 }
 
 /**
@@ -83,6 +94,67 @@ async function batchWriteItems(items) {
             await new Promise((r) => setTimeout(r, 200));
         }
     } while (unprocessed.length);
+}
+
+function retrieveCounterMap(excludeGroupedRecords) {
+  const result = {};
+  for (const key of Object.keys(excludeGroupedRecords)) {
+    const records = excludeGroupedRecords[key];
+    const productTypeKey = key.split("~")[1];
+
+    let filteredRecords;
+
+    if (productTypeKey === "RS") {
+      filteredRecords = records;
+    } else {
+      filteredRecords = records.filter(
+        record => record.attempt && parseInt(record.attempt, 10) === 1
+      );
+    }
+
+    if (filteredRecords.length > 0) {
+      result[key] = filteredRecords.length;
+    }
+  }
+  return result;
+}
+
+function calculateTtl(){
+  const ttlDays = 14;
+  const expireDate = new Date();
+  expireDate.setDate(expireDate.getDate() + ttlDays);
+  return Math.floor(expireDate.getTime() / 1000);
+}
+
+async function updateExcludeCounter(excludeGroupedRecords, deliveryWeek) {
+    const ttl = calculateTtl();
+    const counterMap = retrieveCounterMap(excludeGroupedRecords);
+    for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
+        const sk = `EXCLUDE~${productTypeProvince}`;
+        const input = {
+            TableName: COUNTER_TABLE_NAME,
+            Key: {
+                pk: deliveryWeek,
+                sk: sk
+            },
+            UpdateExpression: 'ADD #numberOfShipments :inc SET #ttl = :ttl',
+            ExpressionAttributeNames: {
+                '#numberOfShipments': 'numberOfShipments',
+                '#ttl': 'ttl'
+            },
+            ExpressionAttributeValues: {
+                ':inc': inc,
+                ':ttl': ttl
+            }
+        };
+        try {
+            const command = new UpdateCommand(input);
+            await docClient.send(command);
+            console.log(`Counter updated successfully for ${sk}`);
+        } catch (error) {
+            console.error(`Failed to update counter for ${sk}`, error);
+        }
+    }
 }
 
 function buildPaperDeliveryRecord(payload, deliveryWeek) {
@@ -118,4 +190,15 @@ function buildPk(deliveryWeek) {
 function buildSk(province, date, requestId) {
     return `${province}~${date}~${requestId}`;
 }
+
+const groupRecordsByProductAndProvince = (records) => {
+  return records.reduce((acc, record) => {
+    const key = `${record.province}~${record.productType}`;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(record);
+    return acc;
+  }, {});
+};
 
