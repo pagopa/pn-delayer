@@ -3,19 +3,19 @@ const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
     DynamoDBDocumentClient,
-    BatchWriteCommand
+    BatchWriteCommand,
+    UpdateCommand
 } = require("@aws-sdk/lib-dynamodb");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
 const TABLE_NAME = "pn-DelayerPaperDelivery";
+const COUNTER_TABLE_NAME = "pn-DelayerExcludeCounter"; // ← Assunto un nome di tabella
 
-// AWS SDK clients
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
-
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
@@ -53,15 +53,21 @@ exports.importData = async (params = []) => {
         const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);
         itemsBuffer.push(paperDelivery);
         if (itemsBuffer.length === 25) {
-            await batchWriteItems(itemsBuffer.splice(0, itemsBuffer.length));
+            await processBatch(itemsBuffer.splice(0,itemsBuffer.length), deliveryWeek);
         }
     }
     if (itemsBuffer.length) {
-        await batchWriteItems(itemsBuffer);
+        await processBatch(itemsBuffer, deliveryWeek);
     }
 
     console.log("Processed data:", processed);
     return { message: "CSV imported successfully", processed };
+};
+
+async function processBatch(items, deliveryWeek) {
+    await batchWriteItems(items);
+    const grouped = groupRecordsByProductAndProvince(items);
+    await updateExcludeCounter(grouped, deliveryWeek);
 }
 
 /**
@@ -88,6 +94,69 @@ async function batchWriteItems(items) {
             await new Promise((r) => setTimeout(r, 200));
         }
     } while (unprocessed.length);
+}
+
+function retrieveCounterMap(excludeGroupedRecords) {
+  const result = {};
+  for (const key of Object.keys(excludeGroupedRecords)) {
+    const records = excludeGroupedRecords[key];
+    const productTypeKey = key.split("~")[1];
+
+    let filteredRecords;
+
+    if (productTypeKey === "RS") {
+      filteredRecords = records;
+    } else {
+      filteredRecords = records.filter(
+        record => record.entity.attempt && parseInt(record.entity.attempt, 10) === 1
+      );
+    }
+
+    if (filteredRecords.length > 0) {
+      result[key] = filteredRecords.length;
+    }
+  }
+  return result;
+}
+
+function calculateTtl(){
+  const ttlDays = 14;
+  const expireDate = new Date();
+  expireDate.setDate(expireDate.getDate() + ttlDays);
+  return Math.floor(expireDate.getTime() / 1000);
+}
+
+async function updateExcludeCounter(excludeGroupedRecords, deliveryWeek) {
+
+    let ttl = calculateTtl();
+    let counterMap = retrieveCounterMap(excludeGroupedRecords);
+
+    for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
+      const sk = `EXCLUDE~${productTypeProvince}`;
+      try {
+        const input = {
+            TableName: counterTableName,
+            Key: {
+              pk: deliveryDate,
+              sk: sk
+            },
+            UpdateExpression: 'ADD #numberOfShipments :inc SET #ttl = :ttl',
+            ExpressionAttributeNames: {
+            '#numberOfShipments': 'numberOfShipments',
+            '#ttl': 'ttl'
+            },
+            ExpressionAttributeValues: {
+            ':inc': inc,
+            ':ttl': ttl
+            }
+          };
+          const command = new UpdateCommand(input);
+          await docClient.send(command);
+          console.log(`updateSuccessfully for ${sk}`);
+      } catch (error) {
+        console.error(`Failed to update counter for sk: ${sk}`, error);
+      }
+    }
 }
 
 function buildPaperDeliveryRecord(payload, deliveryWeek) {
@@ -123,4 +192,15 @@ function buildPk(deliveryWeek) {
 function buildSk(province, date, requestId) {
     return `${province}~${date}~${requestId}`;
 }
+
+const groupRecordsByProductAndProvince = (records) => {
+  return records.reduce((acc, record) => {
+    const key = `${record.province}~${record.productType}`;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(record);
+    return acc;
+  }, {});
+};
 
