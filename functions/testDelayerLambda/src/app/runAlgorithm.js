@@ -4,13 +4,14 @@ const { SFNClient, StartExecutionCommand } = require("@aws-sdk/client-sfn");
 
 const sfnClient = new SFNClient({});
 const STATIC_INPUT = {
-    PaperDeliveryTableName: "pn-DelayerPaperDelivery",
-    DeliveryDriverCapacityTableName: "pn-PaperDeliveryDriverCapacities",
-    DeliveryDriverUsedCapacityTableName: "pn-PaperDeliveryDriverUsedCapacities",
-    EstimateSendersTableName: "pn-PaperDeliveryEstimateSenders",
-    SenderUsedLimitTableName: "pn-PaperDeliveriesSenderUsedLimit",
-    PrintCapacityCounterTableName: "pn-PaperDeliveriesPrintCapacityCounter",
-    CounterTableName: "pn-PaperDeliveriesCounter",
+    PAPERDELIVERY_TABLENAME: "pn-DelayerPaperDelivery",
+    PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: "pn-PaperDeliveryDriverCapacities",
+    PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: "pn-PaperDeliveryDriverUsedCapacities",
+    PAPERDELIVERYSENDERLIMIT_TABLENAME: "pn-PaperDeliverySenderLimit",
+    PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME: "pn-PaperDeliveryUsedSenderLimit",
+    PAPERDELIVERYPRINTCAPACITY_TABLENAME: "pn-PaperDeliveryPrintCapacity",
+    PAPERDELIVERYCOUNTER_TABLENAME: "pn-PaperDeliveryCounters",
+    PN_DELAYER_DELIVERYDATEDAYOFWEEK: "1"
 };
 
 /**
