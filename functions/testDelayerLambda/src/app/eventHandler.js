@@ -3,6 +3,7 @@ const { importData } = require('./importData.js');
 const { getUsedCapacity } = require("./getUsedCapacity.js");
 const { getDelayerPaperDeliveriesByRequestId } = require("./getDelayerPaperDeliveriesByRequestId.js");
 const { runAlgorithm } = require("./runAlgorithm.js");
+const { runDelayerToPaperChannelWorkflow } = require("./runDelayerToPaperChannelWorkflow.js");
 
 
 /***************************************
@@ -14,6 +15,7 @@ const OPERATIONS = {
     GET_USED_CAPACITY: getUsedCapacity,
     GET_BY_REQUEST_ID: getDelayerPaperDeliveriesByRequestId,
     RUN_ALGORITHM: runAlgorithm,
+    DELAYER_TO_PAPER_CHANNEL: runDelayerToPaperChannelWorkflow
 };
 
 /**

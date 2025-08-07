@@ -59,7 +59,15 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "RUN_ALGORITHM",
-  "parameters": []
+  "parameters": ["180000","1"]
+}
+```
+
+*DELAYER_TO_PAPER_CHANNEL*
+```json
+{
+  "operationType": "DELAYER_TO_PAPER_CHANNEL",
+  "parameters": ["1"]
 }
 ```
 
@@ -105,19 +113,6 @@ Un esempio di risposta è il seguente:
   }
 ]
 ```
-### Output RUN_ALGORITHM
-```json
-{
-  "PaperDeliveryTableName":"pn-DelayerPaperDelivery",
-  "DeliveryDriverCapacityTableName":"pn-PaperDeliveryDriverCapacities",
-  "DeliveryDriverUsedCapacityTableName":"pn-PaperDeliveryDriverUsedCapacities",
-  "EstimateSendersTableName":"pn-PaperDeliveryEstimateSenders",
-  "SenderUsedLimitTableName": "pn-PaperDeliveriesSenderUsedLimit",
-  "PrintCapacityCounterTableName": "pn-PaperDeliveriesPrintCapacityCounter",
-  "CounterTableName": "pn-PaperDeliveriesCounter"
-}
-```
-
 
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 
