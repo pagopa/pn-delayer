@@ -99,14 +99,14 @@ public class DeliveryDriverUtils {
                                 .flatMapMany(map -> Flux.fromIterable(map.entrySet()))
                                 .map(entry -> {
                                     Integer capacity = entry.getValue().stream().mapToInt(PaperDeliveryDriverCapacity::getCapacity).sum();
-                                    Integer reducedCapacity = capacity - counters.entrySet().stream()
+                                    int reducedCapacity = capacity - counters.entrySet().stream()
                                             .filter(counter -> entry.getKey().contains(counter.getKey()))
                                             .map(Map.Entry::getValue)
                                             .reduce(0, Integer::sum);
                                     log.info("calculated reduced capacity for province {} and products [{}] --> declaredCapacity: {}, reducedCapacity: {}", province, entry.getKey(), capacity, reducedCapacity);
                                     return new DriversTotalCapacity(
                                             entry.getKey(),
-                                            reducedCapacity,
+                                            Math.max(reducedCapacity, 0),
                                             entry.getValue().stream().map(PaperDeliveryDriverCapacity::getUnifiedDeliveryDriver).toList()
                                     );
                                 })

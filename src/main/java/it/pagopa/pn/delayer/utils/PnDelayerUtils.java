@@ -29,6 +29,7 @@ import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_D
 public class PnDelayerUtils {
 
     private final PnDelayerConfigs pnDelayerConfig;
+    private final PrintCapacityUtils printCapacityUtils;
 
     /**
      * This method calculates the start day of the delivery week based on the execution batch start date.
@@ -180,4 +181,8 @@ public class PnDelayerUtils {
         return partitioned.get(false);
     }
 
+    public Integer retrieveActualPrintCapacity(LocalDate deliveryWeek) {
+        return printCapacityUtils.getActualPrintCapacity(deliveryWeek);
+
+    }
 }
