@@ -8,6 +8,7 @@ import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.utils.DeliveryDriverUtils;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import it.pagopa.pn.delayer.utils.PnDelayerUtils;
+import it.pagopa.pn.delayer.utils.PrintCapacityUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,9 +49,6 @@ class EvaluateResidualCapacityJobServiceTest {
     private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
 
     @Mock
-    private PaperDeliveryPrintCapacityDAO paperDeliveryPrintCapacityDAO;
-
-    @Mock
     private PaperDeliveryDAO paperDeliveryDAO;
 
     private EvaluateResidualCapacityJobServiceImpl evaluateResidualCapacityJob;
@@ -64,9 +62,10 @@ class EvaluateResidualCapacityJobServiceTest {
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
         pnDelayerConfigs.setDao(dao);
         pnDelayerConfigs.setPrintCapacityWeeklyWorkingDays(7);
+        pnDelayerConfigs.setPrintCapacity(List.of("1970-01-01;180000"));
 
-        PaperDeliveryUtils paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, pnDelayerConfigs, new PnDelayerUtils(pnDelayerConfigs), deliveryDriverUtils, paperDeliveryCounterDAO, paperDeliveryPrintCapacityDAO);
-        evaluateResidualCapacityJob = new EvaluateResidualCapacityJobServiceImpl(paperDeliveryUtils, new PnDelayerUtils(pnDelayerConfigs));
+        PaperDeliveryUtils paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, pnDelayerConfigs, new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs)), deliveryDriverUtils, paperDeliveryCounterDAO);
+        evaluateResidualCapacityJob = new EvaluateResidualCapacityJobServiceImpl(paperDeliveryUtils, new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs)));
     }
 
     @Test
@@ -120,7 +119,6 @@ class EvaluateResidualCapacityJobServiceTest {
                 any(),
                 eq(5)))
                 .thenReturn(Mono.just(Page.create(Collections.emptyList())));
-        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
 
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
                 .verifyComplete();
@@ -156,7 +154,6 @@ class EvaluateResidualCapacityJobServiceTest {
         ArgumentCaptor<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptor = ArgumentCaptor.forClass(List.class);
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
 
-        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
                 .verifyComplete();
@@ -219,7 +216,6 @@ class EvaluateResidualCapacityJobServiceTest {
 
         ArgumentCaptor<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptor = ArgumentCaptor.forClass(List.class);
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
-        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
 
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
                 .verifyComplete();
@@ -292,7 +288,6 @@ class EvaluateResidualCapacityJobServiceTest {
 
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
-        when(paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(any())).thenReturn(Mono.just(1000));
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
 

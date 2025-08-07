@@ -42,7 +42,8 @@ public class SenderLimitUtilsTest {
 
     @BeforeEach
     void setUp() {
-        senderLimitUtils = new SenderLimitUtils(paperDeliverySenderLimitDAO, new PnDelayerUtils(new PnDelayerConfigs()), paperDeliveryCounterDAO);
+        PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
+        senderLimitUtils = new SenderLimitUtils(paperDeliverySenderLimitDAO, new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs)), paperDeliveryCounterDAO);
     }
 
     @Test

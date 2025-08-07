@@ -3,7 +3,6 @@ package it.pagopa.pn.delayer.utils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
@@ -39,9 +38,6 @@ public class PaperDeliveryUtilsTest {
     private PaperDeliveryDAO paperDeliveryDAO;
 
     @Mock
-    private PaperDeliveryPrintCapacityDAO paperDeliveryPrintCapacityDAO;
-
-    @Mock
     private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
 
     @BeforeEach
@@ -50,7 +46,7 @@ public class PaperDeliveryUtilsTest {
         PnDelayerConfigs.Dao daoConfig = new PnDelayerConfigs.Dao();
         daoConfig.setPaperDeliveryQueryLimit(10);
         config.setDao(daoConfig);
-        paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, config, new PnDelayerUtils(config), deliveryDriverUtils, paperDeliveryCounterDAO, paperDeliveryPrintCapacityDAO);
+        paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, config, new PnDelayerUtils(config, new PrintCapacityUtils(config)), deliveryDriverUtils, paperDeliveryCounterDAO);
     }
 
 

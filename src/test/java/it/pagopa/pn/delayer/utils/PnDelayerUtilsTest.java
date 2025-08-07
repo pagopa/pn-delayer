@@ -32,7 +32,7 @@ class PnDelayerUtilsTest {
     void setUp() {
         PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
-        pnDelayerUtils = new PnDelayerUtils(pnDelayerConfigs);
+        pnDelayerUtils = new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs));
     }
 
     @Test

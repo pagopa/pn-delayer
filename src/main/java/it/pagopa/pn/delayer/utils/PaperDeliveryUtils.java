@@ -3,7 +3,6 @@ package it.pagopa.pn.delayer.utils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.IncrementUsedCapacityDto;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
@@ -33,7 +32,6 @@ public class PaperDeliveryUtils {
     private final PnDelayerUtils pnDelayerUtils;
     private final DeliveryDriverUtils deliveryDriverUtils;
     private final PaperDeliveryCounterDAO paperDeliveryCounterDAO;
-    private final PaperDeliveryPrintCapacityDAO paperDeliveryPrintCapacityDAO;
 
 
     /**
@@ -57,7 +55,7 @@ public class PaperDeliveryUtils {
                         log.warn("No capacity for province={} and unifiedDeliveryDriver={}, no records will be processed", province, unifiedDeliveryDriver);
                         return sendToNextWeek(workflowStepEnum, sortKeyPrefix, new HashMap<>(), deliveryWeek);
                     } else {
-                        return paperDeliveryPrintCapacityDAO.retrieveActualPrintCapacity(deliveryWeek)
+                        return Mono.just(pnDelayerUtils.retrieveActualPrintCapacity(deliveryWeek))
                                 .flatMap(dailyPrintCapacity -> sendToNextStep(workflowStepEnum, sortKeyPrefix, new HashMap<>(), tenderId, deliveryWeek, residualCapacity, tuple.getT1(), dailyPrintCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays()));
                     }
                 })
