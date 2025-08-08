@@ -468,6 +468,8 @@ Resources:
             Value: !Ref PaperChannelTenderApiLambdaArn
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
+          - Name: PN_DELAYER_PRINTCAPACITY
+            Value: !Ref PrintCapacity
 
       PlatformCapabilities:
         - FARGATE
@@ -636,6 +638,8 @@ Resources:
             Value: !Ref PaperDeliveryQueryLimit
           - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
             Value: !Ref PaperDeliveryCounterTableName
+          - Name: PN_DELAYER_PRINTCAPACITY
+            Value: !Ref PrintCapacity
 
       PlatformCapabilities:
         - FARGATE
@@ -1508,6 +1512,7 @@ Resources:
           BUCKET_NAME: !Ref TestDelayerBucketName
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
+          DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
       TracingConfig:
         Mode: Active
       Layers:
@@ -1727,6 +1732,8 @@ Resources:
                           Value: EVALUATE_SENDER_LIMIT
                         - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
                           Value.$: $.deliveryDateDayOfWeek
+                        - Name: PN_DELAYER_PRINTCAPACITY
+                          Value.$: $.printCapacity
                   Retry:
                     - ErrorEquals:
                         - States.ALL
