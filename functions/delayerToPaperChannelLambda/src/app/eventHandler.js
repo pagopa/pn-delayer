@@ -46,14 +46,14 @@ exports.handleEvent = async (event) => {
 };
 
 async function sendToPhase2(deliveryWeek, input, toSendToNextStep) {
-    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyPhase2,input.sendToNextStepCounter,toSendToNextStep,0,"SENT_TO_PREPARE_PHASE_2", false)
+    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyPhase2,input.sendToNextStepCounter,toSendToNextStep,0,"SENT_TO_PREPARE_PHASE_2", true)
         .then(result => {
             return {
                 input: {
                     dailyPrintCapacity: input.dailyPrintCapacity,
                     weeklyPrintCapacity: input.weeklyPrintCapacity,
                     numberOfShipments: input.numberOfShipments,
-                    lastEvaluatedKeyPhase2: result.lastEvaluatedKey || null,
+                    lastEvaluatedKeyPhase2: remapLastEvaluatedKey(result.lastEvaluatedKey),
                     sendToNextStepCounter: result.dailyCounter,
                     executionDate: input.executionDate
                 },
@@ -63,14 +63,14 @@ async function sendToPhase2(deliveryWeek, input, toSendToNextStep) {
 }
 
 async function sendToNextWeek(deliveryWeek, input, toSendToNextWeek) {
-    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyNextWeek,input.sendToNextWeekCounter,toSendToNextWeek,0,"EVALUATE_SENDER_LIMIT", true)
+    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyNextWeek,input.sendToNextWeekCounter,toSendToNextWeek,0,"EVALUATE_SENDER_LIMIT", false)
         .then(result => {
             return {
                 input: {
                     dailyPrintCapacity: input.dailyPrintCapacity,
                     weeklyPrintCapacity: input.weeklyPrintCapacity,
                     numberOfShipments: input.numberOfShipments,
-                    lastEvaluatedKeyNextWeek: result.lastEvaluatedKey || null,
+                    lastEvaluatedKeyNextWeek: remapLastEvaluatedKey(result.lastEvaluatedKey),
                     sendToNextWeekCounter: result.dailyCounter,
                     sentToNextWeek: input.sentToNextWeek,
                     executionDate: input.executionDate
@@ -118,6 +118,16 @@ async function retrieveAndProcessItems(deliveryWeek, lastEvaluatedKey, dailyCoun
         lastEvaluatedKey: response.LastEvaluatedKey,
         dailyCounter: dailyCounter
     };
+}
+
+function remapLastEvaluatedKey(lastEvaluatedKey){
+    if(lastEvaluatedKey){
+        return {
+        pk: { S: lastEvaluatedKey.pk },
+        sk: { S: lastEvaluatedKey.sk }
+        };
+    }
+    return null;
 }
 
 async function processItems(deliveryWeek, items, step) {

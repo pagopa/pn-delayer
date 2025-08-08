@@ -26,13 +26,20 @@ async function retrieveItems(deliveryWeek, LastEvaluatedKey, limit, scanIndexFor
   };
 
   if (LastEvaluatedKey && Object.keys(LastEvaluatedKey).length > 0) {
-    params.ExclusiveStartKey = LastEvaluatedKey;
+    params.ExclusiveStartKey = removeDynamoTypes(LastEvaluatedKey);
   }
 
   const result = await docClient.send(new QueryCommand(params));
   return result || {Items: [], LastEvaluatedKey: {} };
 }
 
+function removeDynamoTypes(lastEvaluatedKey){
+    const result = {};
+    for (const key in lastEvaluatedKey) {
+      result[key] = Object.values(lastEvaluatedKey[key])[0];
+    }
+    return result;
+};
 
 async function insertItems(items) {
     const putRequests = items.map(item => ({
