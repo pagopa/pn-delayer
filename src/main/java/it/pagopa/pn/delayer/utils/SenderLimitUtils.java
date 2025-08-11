@@ -111,7 +111,8 @@ public class SenderLimitUtils {
         int totalEstimate;
         if (relevantProducts.size() > 1) {
             totalEstimate = relevantProducts.stream()
-                    .mapToInt(p -> Optional.ofNullable(senderLimitJobProcessObjects.getTotalEstimateCounter().get(paperDeliverySenderLimit.getProductType())).orElse(0))
+                    .filter(product -> senderLimitJobProcessObjects.getTotalEstimateCounter().containsKey(product))
+                    .mapToInt(product -> senderLimitJobProcessObjects.getTotalEstimateCounter().get(product))
                     .sum();
         } else {
             totalEstimate = Optional.ofNullable(senderLimitJobProcessObjects.getTotalEstimateCounter().get(paperDeliverySenderLimit.getProductType())).orElse(0);
