@@ -1581,7 +1581,9 @@ Resources:
           - Effect: Allow
             Action:
               - states:StartExecution
-            Resource: !Ref PaperDeliveryStateMachine
+            Resource:
+              - !Ref PaperDeliveryStateMachine
+              - !Ref DelayerToPaperChannelStateMachine
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule
