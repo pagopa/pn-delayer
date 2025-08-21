@@ -324,12 +324,12 @@ Parameters:
 
   DelayerStartWorkflowCron:
     Type: String
-    Default: '0 3 * * ? 1'
+    Default: '0 3 ? * MON *'
     Description: 'Cron expression for DelayerStartWorkflowRule'
 
   DelayerToPaperChannelDailyScheduleCron:
     Type: String
-    Default: '0 10 * * ? *'
+    Default: '0 9 * * ? *'
     Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
 
   DelayerStartWorkflowRuleState:
