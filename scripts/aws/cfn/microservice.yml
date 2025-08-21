@@ -2065,7 +2065,16 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Next: DynamoDbOperationFail
-            Next: MapItem
+            Next: CheckIfCounterExists
+          CheckIfCounterExists:
+            Type: Choice
+            Choices:
+              - Variable: '$.queryResult.Count'
+                NumericGreaterThan: 0
+                Next: MapItem
+            Default: NoItemToProcess
+          NoItemToProcess:
+            Type: Succeed
           MapItem:
             Type: Pass
             Parameters:
