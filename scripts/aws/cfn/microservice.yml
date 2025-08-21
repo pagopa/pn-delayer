@@ -1587,6 +1587,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub '${ProjectName}-delayerStartWorkflowScheduleRule'
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
       ScheduleExpression: !Sub cron(${DelayerStartWorkflowCron})
       State: !Ref DelayerStartWorkflowRuleState
       Targets:
@@ -2001,6 +2002,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
       State: !Ref DelayerToPaperChannelDailyScheduleRuleState
       Targets:
