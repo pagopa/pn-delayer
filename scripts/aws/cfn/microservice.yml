@@ -324,12 +324,12 @@ Parameters:
 
   DelayerStartWorkflowCron:
     Type: String
-    Default: '0 3 * * ? 1'
+    Default: '0 3 ? * MON *'
     Description: 'Cron expression for DelayerStartWorkflowRule'
 
   DelayerToPaperChannelDailyScheduleCron:
     Type: String
-    Default: '0 10 * * ? *'
+    Default: '0 9 * * ? *'
     Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
 
   DelayerStartWorkflowRuleState:
@@ -1589,6 +1589,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub '${ProjectName}-delayerStartWorkflowScheduleRule'
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
       ScheduleExpression: !Sub cron(${DelayerStartWorkflowCron})
       State: !Ref DelayerStartWorkflowRuleState
       Targets:
@@ -2003,6 +2004,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
       State: !Ref DelayerToPaperChannelDailyScheduleRuleState
       Targets:
@@ -2067,7 +2069,16 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Next: DynamoDbOperationFail
-            Next: MapItem
+            Next: CheckIfCounterExists
+          CheckIfCounterExists:
+            Type: Choice
+            Choices:
+              - Variable: '$.queryResult.Count'
+                NumericGreaterThan: 0
+                Next: MapItem
+            Default: NoItemToProcess
+          NoItemToProcess:
+            Type: Succeed
           MapItem:
             Type: Pass
             Parameters:
