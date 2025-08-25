@@ -410,8 +410,7 @@ Parameters:
   PostalSNSTopicArn:
     Type: String
     Description: ARN of postal topic to send mail on slack
-    Default: ''
-    
+
   SignUrlExpiration:
     Type: Number
     Description: 'Time available for downloading the data in minutes'
@@ -1684,10 +1683,10 @@ Resources:
           - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   # Lambda function IAM policy
-  ExportDelayerDataLambdaLambdaPolicy:
+  ExportDelayerDataLambdaPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub ${ProjectName}-ExportDelayerDataLambdaLambdaPolicy
+      PolicyName: !Sub ${ProjectName}-ExportDelayerDataLambdaPolicy
       Roles:
         - !Ref ExportDelayerDataLambdaRole
       PolicyDocument:
@@ -1711,6 +1710,14 @@ Resources:
             Resource:
               - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}:${AWS::AccountId}/postalizzazione/*"
               
+  ExportDelayerDataLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref ExportDelayerDataLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
     DependsOn:
