@@ -547,6 +547,9 @@ Outputs:
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
 
+  ExportDelayerDataLambdaName:
+    Value: !Sub "${ProjectName}-exportDelayerData"
+
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
     Description: pn-delayer_kinesis_paper_delivery_DLQ' queue ARN
