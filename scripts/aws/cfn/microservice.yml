@@ -410,7 +410,8 @@ Parameters:
   PostalSNSTopicArn:
     Type: String
     Description: ARN of postal topic to send mail on slack
-  
+    Default: ''
+    
   SignUrlExpiration:
     Type: Number
     Description: 'Time available for downloading the data in minutes'
