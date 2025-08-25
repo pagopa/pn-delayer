@@ -117,26 +117,6 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  PaperDeliveryPrintCapacityTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryPrintCapacity'
-      AttributeDefinitions:
-        - AttributeName: "pk"
-          AttributeType: "S"
-        - AttributeName: "startDate"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "pk"
-          KeyType: "HASH"
-        - AttributeName: "startDate"
-          KeyType: "RANGE"
-      BillingMode: "PAY_PER_REQUEST"
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-
   PaperDeliveryKinesisEventTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
@@ -451,13 +431,6 @@ Outputs:
   PaperDeliveryDriverUsedCapacitiesTableArn:
     Description: ARN of dynamodb table containing used capacities
     Value: !Sub '${PaperDeliveryDriverUsedCapacitiesTable.Arn}'
-  PaperDeliveryPrintCapacityTableName:
-    Description: Name of dynamodb table containing print capacity
-    Value: !Ref PaperDeliveryPrintCapacityTable
-
-  PaperDeliveryPrintCapacityTableArn:
-    Description: ARN of dynamodb table containing print capacity
-    Value: !Sub '${PaperDeliveryPrintCapacityTable.Arn}'
 
   PaperDeliveryKinesisEventTableName:
     Description: Name of dynamodb table containing Kinesis sequenceNumber for paper deliveries

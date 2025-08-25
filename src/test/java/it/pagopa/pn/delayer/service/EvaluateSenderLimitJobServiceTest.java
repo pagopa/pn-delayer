@@ -4,7 +4,6 @@ import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.config.SsmParameterConsumerActivation;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
-import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryPrintCapacityDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
@@ -13,10 +12,7 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSender
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
-import it.pagopa.pn.delayer.utils.DeliveryDriverUtils;
-import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
-import it.pagopa.pn.delayer.utils.PnDelayerUtils;
-import it.pagopa.pn.delayer.utils.SenderLimitUtils;
+import it.pagopa.pn.delayer.utils.*;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,9 +57,6 @@ class EvaluateSenderLimitJobServiceTest {
     @Mock
     private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
 
-    @Mock
-    private PaperDeliveryPrintCapacityDAO paperDeliveryPrintCapacityDAO;
-
     private final String province = "RM";
     private final String tenderId = "TENDERID";
 
@@ -72,7 +65,7 @@ class EvaluateSenderLimitJobServiceTest {
         PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
         pnDelayerConfigs.setPaperDeliveryPriorityParameterName("priority-param");
-        PnDelayerUtils pnDelayerUtils = new PnDelayerUtils(pnDelayerConfigs);
+        PnDelayerUtils pnDelayerUtils = new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs));
         PnDelayerConfigs.Dao daoConfig = new PnDelayerConfigs.Dao();
         daoConfig.setPaperDeliveryQueryLimit(50);
         pnDelayerConfigs.setDao(daoConfig);
@@ -80,7 +73,7 @@ class EvaluateSenderLimitJobServiceTest {
         service = new EvaluateSenderLimitJobServiceImpl(
                 pnDelayerUtils,
                 pnDelayerConfigs,
-                new PaperDeliveryUtils(paperDeliveryDao, pnDelayerConfigs, pnDelayerUtils, deliveryDriverUtils, paperDeliveryCounterDAO, paperDeliveryPrintCapacityDAO),
+                new PaperDeliveryUtils(paperDeliveryDao, pnDelayerConfigs, pnDelayerUtils, deliveryDriverUtils, paperDeliveryCounterDAO),
                 deliveryDriverUtils,
                 ssmParameterConsumerActivation,
                 new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils, paperDeliveryCounterDAO)

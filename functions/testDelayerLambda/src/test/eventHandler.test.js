@@ -7,6 +7,7 @@ const path = require("path");
 process.env.BUCKET_NAME = "test-bucket";
 process.env.OBJECT_KEY = "test-key.csv";
 process.env.SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:BatchWorkflowStateMachine";
+process.env.DELAYERTOPAPERCHANNEL_SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:delayerToPaperChannelStateMachine";
 
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
@@ -125,13 +126,123 @@ describe("Lambda Delayer Dispatcher", () => {
 
     it("starts the step function and returns executionArn", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
-        sfnMock.on(StartExecutionCommand).resolves({ executionArn: fakeArn, startDate: new Date() });
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({ 
+            executionArn: fakeArn, 
+            startDate: fakeStartDate 
+        });
 
-        const res = await handler({ operationType: "RUN_ALGORITHM", parameters: [] });
-        assert.strictEqual(res.statusCode, 200);
-        const body = JSON.parse(res.body);
+        const printCapacity = "180000";
+        const deliveryDay = "1";
+
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: [printCapacity, deliveryDay] });
+
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
         assert.strictEqual(body.executionArn, fakeArn);
+        
+        const calls = sfnMock.commandCalls(StartExecutionCommand);
+        assert.strictEqual(calls.length, 1);
+        
+        const input = JSON.parse(calls[0].args[0].input.input);
+        assert.strictEqual(input.PN_DELAYER_PRINTCAPACITY, `1970-01-01;${printCapacity}`);
+        assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, deliveryDay);
+    });
 
+      it("starts the step function with default parameters when none are provided", async () => {
+        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({ 
+            executionArn: fakeArn, 
+            startDate: fakeStartDate 
+        });
+
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: [] });
+
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.executionArn, fakeArn);
+        
+        const calls = sfnMock.commandCalls(StartExecutionCommand);
+        assert.strictEqual(calls.length, 1);
+        
+        const input = JSON.parse(calls[0].args[0].input.input);
+        assert.strictEqual(input.PN_DELAYER_PRINTCAPACITY, "1970-01-01;180000"); //default
+        assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1"); //default
+    });
+
+    it("starts the step function with partial parameters (only printCapacity)", async () => {
+        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec789";
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({ 
+            executionArn: fakeArn, 
+            startDate: fakeStartDate 
+        });
+
+        const printCapacity = "180000";
+
+        const result = await handler({operationType: "RUN_ALGORITHM",parameters: [printCapacity] });
+
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.executionArn, fakeArn);
+        
+        const calls = sfnMock.commandCalls(StartExecutionCommand);
+        assert.strictEqual(calls.length, 1);
+        
+        const input = JSON.parse(calls[0].args[0].input.input);
+        assert.strictEqual(input.PN_DELAYER_PRINTCAPACITY, `1970-01-01;${printCapacity}`);
+        assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1"); // default
+    });
+
+        it("starts the step function and returns executionArn", async () => {
+        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({ executionArn: fakeArn, startDate: fakeStartDate });
+
+         const deliveryDay = "1";
+
+        const result = await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: [deliveryDay] });
+        assert.strictEqual(result.statusCode, 200);
+    
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.executionArn, fakeArn);
+        assert.ok(body.startDate);
+    
+        const calls = sfnMock.commandCalls(StartExecutionCommand);
+        assert.strictEqual(calls.length, 1);
+        
+        const input = JSON.parse(calls[0].args[0].input.input);
+        assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1");
+
+    });
+
+    it("should use default deliveryDateDayOfWeek if not provided", async () => {
+        const fakeArn = "arn:aws:states:...:execution:delayerToPaperChannelStateMachine:exec123";
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({ executionArn: fakeArn, startDate: fakeStartDate });
+
+        const result = await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: [] });
+
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.executionArn, fakeArn);
+        assert.ok(body.startDate);
+
+        const calls = sfnMock.commandCalls(StartExecutionCommand);
+        assert.strictEqual(calls.length, 1);
+        
+        const input = JSON.parse(calls[0].args[0].input.input);
+        assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1");
+    });
+
+    it("should throw if DELAYERTOPAPERCHANNEL_SFN_ARN is missing", async () => {
+        delete process.env.DELAYERTOPAPERCHANNEL_SFN_ARN;
+        try {
+            await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: [] });
+            throw new Error("Should have thrown");
+        } catch (err) {
+            return err.message.includes("Missing environment variable DELAYERTOPAPERCHANNEL_SFN_ARN");
+        }
     });
 
 });

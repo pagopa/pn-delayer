@@ -6,12 +6,13 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 ## Operazioni disponibili
 
-| Nome                  | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                         |
-|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| **IMPORT_DATA**       | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | _Nessuno_ → passare un array vuoto `[]`                                |
-| **GET_USED_CAPACITY** | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]` |
-| **GET_BY_REQUEST_ID** | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                        |
-| **RUN_ALGORITHM**     | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | []                                                                     |
+| Nome                         | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                         |
+|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | _Nessuno_ → passare un array vuoto `[]`                                |
+| **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]` |
+| **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                        |
+| **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["printCapacity", "deliveryDateDayOfWeek"]` entrambi opzionali        |
+| **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["deliveryDateDayOfWeek"]` opzionale                                  |
 
 ### Esempi di payload
 
@@ -59,7 +60,15 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "RUN_ALGORITHM",
-  "parameters": []
+  "parameters": ["180000","1"]
+}
+```
+
+*DELAYER_TO_PAPER_CHANNEL*
+```json
+{
+  "operationType": "DELAYER_TO_PAPER_CHANNEL",
+  "parameters": ["1"]
 }
 ```
 
@@ -105,19 +114,6 @@ Un esempio di risposta è il seguente:
   }
 ]
 ```
-### Output RUN_ALGORITHM
-```json
-{
-  "PaperDeliveryTableName":"pn-DelayerPaperDelivery",
-  "DeliveryDriverCapacityTableName":"pn-PaperDeliveryDriverCapacities",
-  "DeliveryDriverUsedCapacityTableName":"pn-PaperDeliveryDriverUsedCapacities",
-  "EstimateSendersTableName":"pn-PaperDeliveryEstimateSenders",
-  "SenderUsedLimitTableName": "pn-PaperDeliveriesSenderUsedLimit",
-  "PrintCapacityCounterTableName": "pn-PaperDeliveriesPrintCapacityCounter",
-  "CounterTableName": "pn-PaperDeliveriesCounter"
-}
-```
-
 
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 

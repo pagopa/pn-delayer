@@ -83,14 +83,6 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing  PaperDeliveryDriverUsedCapacities'
 
-  PaperDeliveryPrintCapacityTableName:
-    Type: String
-    Description: 'DynamoDB table name for PaperDeliveryPrintCapacity'
-
-  PaperDeliveryPrintCapacityTableArn:
-    Type: String
-    Description: 'ARN of dynamodb table containing PaperDeliveryPrintCapacity'
-
   PaperDeliveryKinesisEventTableName:
     Type: String
     Description: 'DynamoDB table name for PaperDeliveryKinesisEvent'
@@ -332,12 +324,12 @@ Parameters:
 
   DelayerStartWorkflowCron:
     Type: String
-    Default: '0 3 * * ? 1'
+    Default: '0 3 ? * MON *'
     Description: 'Cron expression for DelayerStartWorkflowRule'
 
   DelayerToPaperChannelDailyScheduleCron:
     Type: String
-    Default: '0 10 * * ? *'
+    Default: '0 9 * * ? *'
     Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
 
   DelayerStartWorkflowRuleState:
@@ -406,6 +398,10 @@ Parameters:
     Type: Number
     Default: 2
     Description: 'Maximum number of attempts for step function state'
+
+  PrintCapacity:
+    Type: String
+    Description: daily print capacity
 
   ExportDelayerDataLambdaName:
     Type: String
@@ -485,6 +481,8 @@ Resources:
             Value: !Ref PaperChannelTenderApiLambdaArn
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
+          - Name: PN_DELAYER_PRINTCAPACITY
+            Value: !Ref PrintCapacity
 
       PlatformCapabilities:
         - FARGATE
@@ -631,8 +629,6 @@ Resources:
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
-            Value: !Ref PaperDeliveryPrintCapacityTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -655,6 +651,8 @@ Resources:
             Value: !Ref PaperDeliveryQueryLimit
           - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
             Value: !Ref PaperDeliveryCounterTableName
+          - Name: PN_DELAYER_PRINTCAPACITY
+            Value: !Ref PrintCapacity
 
       PlatformCapabilities:
         - FARGATE
@@ -729,8 +727,6 @@ Resources:
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
                   - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
                   - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
-                  - !Sub "${PaperDeliveryPrintCapacityTableArn}"
-                  - !Sub "${PaperDeliveryPrintCapacityTableArn}/*"
                   - !Sub "${PaperDeliveryTableArn}"
                   - !Sub "${PaperDeliveryTableArn}/*"
                   - !Sub "${PaperDeliveryCounterTableArn}"
@@ -790,8 +786,6 @@ Resources:
             Value: !Ref PaperDeliveryDriverCapacitiesTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
             Value: !Ref PaperDeliveryDriverUsedCapacitiesTableName
-          - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
-            Value: !Ref PaperDeliveryPrintCapacityTableName
           - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -814,6 +808,8 @@ Resources:
             Value: !Ref PaperDeliveryQueryLimit
           - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
             Value: !Ref PaperDeliveryCounterTableName
+          - Name: PN_DELAYER_PRINTCAPACITY
+            Value: !Ref PrintCapacity
 
       PlatformCapabilities:
         - FARGATE
@@ -889,8 +885,6 @@ Resources:
                 - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
                 - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
                 - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
-                - !Sub "${PaperDeliveryPrintCapacityTableArn}"
-                - !Sub "${PaperDeliveryPrintCapacityTableArn}/*"
                 - !Sub "${PaperDeliveryTableArn}"
                 - !Sub "${PaperDeliveryTableArn}/*"
                 - !Sub "${PaperDeliveryCounterTableArn}"
@@ -922,7 +916,6 @@ Resources:
             - !Ref PaperDeliveryCounterTableName
             - !Ref PaperDeliverySenderLimitTableName
             - !Ref PaperDeliveryUsedSenderLimitTableName
-            - !Ref PaperDeliveryPrintCapacityTableName
         LogGroupsNames: !Join
           - ','
           - - !Sub '/aws/ecs/${ProjectName}-delayer-sender-limit-job'
@@ -1532,6 +1525,7 @@ Resources:
           BUCKET_NAME: !Ref TestDelayerBucketName
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
+          DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
       TracingConfig:
         Mode: Active
       Layers:
@@ -1600,12 +1594,15 @@ Resources:
           - Effect: Allow
             Action:
               - states:StartExecution
-            Resource: !Ref PaperDeliveryStateMachine
+            Resource:
+              - !Ref PaperDeliveryStateMachine
+              - !Ref DelayerToPaperChannelStateMachine
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub '${ProjectName}-delayerStartWorkflowScheduleRule'
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
       ScheduleExpression: !Sub cron(${DelayerStartWorkflowCron})
       State: !Ref DelayerStartWorkflowRuleState
       Targets:
@@ -1620,8 +1617,8 @@ Resources:
               "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
               "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
               "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
-              "PAPERDELIVERYPRINTCAPACITY_TABLENAME": "${PaperDeliveryPrintCapacityTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}",
+              "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}"
             }
 
   DelayerStartWorkflowScheduleRuleRole:
@@ -1755,8 +1752,8 @@ Resources:
               paperDeliveryCounterTableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
               paperDeliverySenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYSENDERLIMIT_TABLENAME
               paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
-              paperDeliveryPrintCapacityTableName.$: $$.Execution.Input.PAPERDELIVERYPRINTCAPACITY_TABLENAME
               deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
+              printCapacity.$: $$.Execution.Input.PN_DELAYER_PRINTCAPACITY
           retrieveProvince:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:scan
@@ -1789,7 +1786,7 @@ Resources:
               paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-              paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
+              printCapacity.$: $.printCapacity
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitSenderLimitJob
@@ -1821,6 +1818,8 @@ Resources:
                           Value: EVALUATE_SENDER_LIMIT
                         - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
                           Value.$: $.deliveryDateDayOfWeek
+                        - Name: PN_DELAYER_PRINTCAPACITY
+                          Value.$: $.printCapacity
                   Retry:
                     - ErrorEquals:
                         - States.ALL
@@ -1867,13 +1866,13 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
-              paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
               actualTenderId.$: $.actualTenderId
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
               unifiedDeliveryDrivers.$: $.tempGetParameterResult.unifiedDeliveryDrivers
+              printCapacity.$: $.printCapacity
             Next: MapSubmitEvaluateDriverCapacityJobs
           MapSubmitEvaluateDriverCapacityJobs:
             Type: Map
@@ -1890,7 +1889,7 @@ Resources:
               paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-              paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
+              printCapacity.$: $.printCapacity
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateDriverCapacityJob
@@ -1910,14 +1909,14 @@ Resources:
                           Value.$: $.paperDeliveryDriverCapacitiesTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
                           Value.$: $.paperDeliveryDriverUsedCapacitiesTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
-                          Value.$: $.paperDeliveryPrintCapacityTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
                           Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
                           Value.$: $.paperDeliveryTableName
                         - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
                           Value.$: $.deliveryDateDayOfWeek
+                        - Name: PN_DELAYER_PRINTCAPACITY
+                          Value.$: $.printCapacity
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
                           Value.$: $.driver
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
@@ -1961,7 +1960,7 @@ Resources:
               paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-              paperDeliveryPrintCapacityTableName.$: $.paperDeliveryPrintCapacityTableName
+              printCapacity.$: $.printCapacity
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateResidualCapacityJob
@@ -1981,8 +1980,6 @@ Resources:
                           Value.$: $.paperDeliveryDriverCapacitiesTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
                           Value.$: $.paperDeliveryDriverUsedCapacitiesTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYPRINTCAPACITYTABLENAME
-                          Value.$: $.paperDeliveryPrintCapacityTableName
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
                           Value.$: $.paperDeliveryTableName
                         - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
@@ -1997,6 +1994,8 @@ Resources:
                           Value: EVALUATE_RESIDUAL_CAPACITY
                         - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
                           Value.$: $.paperDeliveryCounterTableName
+                        - Name: PN_DELAYER_PRINTCAPACITY
+                          Value.$: $.printCapacity
                   Retry:
                     - ErrorEquals:
                         - States.ALL
@@ -2088,6 +2087,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
       State: !Ref DelayerToPaperChannelDailyScheduleRuleState
       Targets:
@@ -2152,7 +2152,16 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Next: DynamoDbOperationFail
-            Next: MapItem
+            Next: CheckIfCounterExists
+          CheckIfCounterExists:
+            Type: Choice
+            Choices:
+              - Variable: '$.queryResult.Count'
+                NumericGreaterThan: 0
+                Next: MapItem
+            Default: NoItemToProcess
+          NoItemToProcess:
+            Type: Succeed
           MapItem:
             Type: Pass
             Parameters:
