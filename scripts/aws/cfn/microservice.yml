@@ -1641,7 +1641,10 @@ Resources:
                   - states:StartExecution
                 Resource: !Ref PaperDeliveryStateMachine
 
-# Lambda function
+  #########################################################
+  ###             ExportDelayerDataLambda               ###
+  #########################################################
+  # Lambda function
   ExportDelayerDataLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -1663,7 +1666,7 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 3
+      Timeout: 15
 
   # Lambda function role
   ExportDelayerDataLambdaRole:
@@ -1711,6 +1714,8 @@ Resources:
               - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}:${AWS::AccountId}/postalizzazione/*"
               
   ExportDelayerDataLambdaAlarms:
+    DependsOn:
+      - ExportDelayerDataLambda
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
