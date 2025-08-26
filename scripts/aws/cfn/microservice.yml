@@ -932,24 +932,25 @@ Resources:
                   - "sns:Publish"
                 Resource: !Ref AlarmSNSTopicArn
 
-  ### Enable sending notifications to SNS topic when the job is in failed status.
+  ### Enable sending notifications to SNS topic when the step functions are in failed, aborted or timedOut status.
   BatchBridgeStateRule:
    Type: AWS::Events::Rule
    Properties:
-     Description: The EventBridge rule to match Batch state change
+     Description: The EventBridge rule to match Step function execution state change
      RoleArn: !GetAtt PnDelayerAlarmTopicPublisherRole.Arn
      EventPattern:
        source:
-         - aws.batch
+         - aws.states
        detail-type:
-         - Batch Job State Change
+         - Step Functions Execution Status Change
        detail:
          status:
            - FAILED
-         jobDefinition:
-          - !Ref DriverCapacityJobDefinition
-          - !Ref ResidualCapacityJobDefinition
-          - !Ref SenderLimitJobDefinition
+           - TIMED_OUT
+           - ABORTED
+         stateMachineArn:
+           - !Ref PaperDeliveryStateMachine
+           - !Ref DelayerToPaperChannelStateMachine
      State: ENABLED
      Targets:
        - Arn: !Ref AlarmSNSTopicArn
@@ -960,7 +961,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${ProjectName}-delayer-FailedInvocation-Alarm"
-      AlarmDescription: "CloudWatch alarm for when pn-delayer job fails."
+      AlarmDescription: "CloudWatch alarm for when pn-delayer step function executions fails."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
