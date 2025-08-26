@@ -1,9 +1,12 @@
 {
   "processType":"SEND_TO_PHASE_2",
-  "sendToNextWeekCounter":"0",
-  "lastEvaluatedKeyPhase2":{},
-  "lastEvaluatedKeyNextWeek":{},
-  "executionDate":"2025-01-01T00:00:00Z",
-  "toNextWeekIncrementCounter":"0",
-  "toNextStepIncrementCounter":"0"
+  "paperDeliveryTableName": "Pn-DelayerPaperDelivery",
+  "input": {
+    "sendToNextWeekCounter": "0",
+    "lastEvaluatedKeyPhase2": {},
+    "lastEvaluatedKeyNextWeek": {},
+    "executionDate": "2025-01-01T00:00:00Z",
+    "toNextWeekIncrementCounter": "0",
+    "toNextStepIncrementCounter": "0"
+  }
 }

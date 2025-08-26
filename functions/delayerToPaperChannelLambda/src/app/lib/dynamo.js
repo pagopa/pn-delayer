@@ -9,9 +9,7 @@ const {
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 
-const paperDeliveryTableName = process.env.PAPER_DELIVERY_TABLENAME;
-
-async function retrieveItems(deliveryWeek, LastEvaluatedKey, limit, scanIndexForward) {
+async function retrieveItems(paperDeliveryTableName, deliveryWeek, LastEvaluatedKey, limit, scanIndexForward) {
 
   const partitionKey = `${deliveryWeek}~EVALUATE_PRINT_CAPACITY`
 
@@ -41,16 +39,16 @@ function removeDynamoTypes(lastEvaluatedKey){
     return result;
 };
 
-async function insertItems(items) {
+async function insertItems(paperDeliveryTableName, items) {
     const putRequests = items.map(item => ({
         PutRequest: {
             Item: item
         }
     }));
-    return await insertItemsBatch(putRequests, 1);
+    return await insertItemsBatch(paperDeliveryTableName, putRequests, 1);
 }
 
-async function insertItemsBatch(putRequests, retryCount) {
+async function insertItemsBatch(paperDeliveryTableName, putRequests, retryCount) {
     let unprocessedRequests = [];
     const chunks = utils.chunkArray(putRequests, 25);
     for (const chunk of chunks) {
@@ -71,7 +69,7 @@ async function insertItemsBatch(putRequests, retryCount) {
     }
     if (unprocessedRequests.length > 0 && retryCount < 3) {
         console.log(`Retrying ${unprocessedRequests.length} unprocessed items`);
-        return insertItemsBatch(unprocessedRequests, retryCount + 1);
+        return insertItemsBatch(paperDeliveryTableName, unprocessedRequests, retryCount + 1);
     }
 
     if (retryCount >= 3 && unprocessedRequests.length > 0) {

@@ -1335,7 +1335,6 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          PAPER_DELIVERY_TABLENAME: !Ref PaperDeliveryTableName
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
       TracingConfig:
@@ -2108,6 +2107,7 @@ Resources:
           Input: !Sub |
             {
               "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
               "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
             }
 
@@ -2256,6 +2256,7 @@ Resources:
                         sentToNextWeek.$: $.input.sentToNextWeek
                         executionDate.$: $.input.executionDate
                       processType.$: $.processType
+                      paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
                     ResultPath: $
                     Next: ToNextWeekSuccessfully
                   ToNextWeekSuccessfully:
@@ -2318,6 +2319,7 @@ Resources:
                         sendToNextStepCounter.$: $.input.sendToNextStepCounter
                         executionDate.$: $.input.executionDate
                       processType.$: $.processType
+                      paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
                     ResultPath: $
                     Next: ToPreparePhase2Successfully
                   ToPreparePhase2Successfully:

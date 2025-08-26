@@ -6,26 +6,37 @@ const sfnClient = new SFNClient({});
 
 /**
  *RUN_ALGORITHM operation – avvia la Step Function configurata.
- * @param {Array<string>} params[printCapacity, deliveryDateDayOfWeek]
+ * @param {Array<string>} params[paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName,
+ *         senderLimitTableName, senderUsedLimitTableName, printCapacityTableName, countersTableName, printCapacity,
+ *         deliveryDateDayOfWeek]
  */
 async function runAlgorithm(params) {
     const { SFN_ARN } = process.env;
     if (!SFN_ARN) throw new Error("Missing environment variable SFN_ARN");
-    let [printCapacity, deliveryDateDayOfWeek] = params;
+    let [paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName,
+        senderLimitTableName, senderUsedLimitTableName, printCapacityTableName, countersTableName, printCapacity,
+        deliveryDateDayOfWeek] = params;
 
     if (!printCapacity) {
         printCapacity = "180000"
     }
     const printCapacityValue = `1970-01-01;${printCapacity}`;
 
+    if (!paperDeliveryTableName || !deliveryDriverCapacitiesTableName || !deliveryDriverUsedCapacitiesTableName ||
+        !senderLimitTableName || !senderUsedLimitTableName || !printCapacityTableName || !countersTableName) {
+        throw new Error("Required parameters must be [paperDeliveryTableName, deliveryDriverCapacitiesTableName, " +
+            "deliveryDriverUsedCapacitiesTableName, senderLimitTableName, senderUsedLimitTableName, " +
+            "printCapacityTableName, countersTableName]");
+    }
+
     let INPUT = {
-        PAPERDELIVERY_TABLENAME: "pn-DelayerPaperDelivery",
-        PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: "pn-PaperDeliveryDriverCapacities",
-        PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: "pn-PaperDeliveryDriverUsedCapacities",
-        PAPERDELIVERYSENDERLIMIT_TABLENAME: "pn-PaperDeliverySenderLimit",
-        PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME: "pn-PaperDeliveryUsedSenderLimit",
-        PAPERDELIVERYPRINTCAPACITY_TABLENAME: "pn-PaperDeliveryPrintCapacity",
-        PAPERDELIVERYCOUNTER_TABLENAME: "pn-PaperDeliveryCounters",
+        PAPERDELIVERY_TABLENAME: paperDeliveryTableName, //"pn-DelayerPaperDelivery",
+        PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: deliveryDriverCapacitiesTableName, //"pn-PaperDeliveryDriverCapacities",
+        PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME: deliveryDriverUsedCapacitiesTableName, //"pn-PaperDeliveryDriverUsedCapacities",
+        PAPERDELIVERYSENDERLIMIT_TABLENAME: senderLimitTableName, //"pn-PaperDeliverySenderLimit",
+        PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME: senderUsedLimitTableName, //"pn-PaperDeliveryUsedSenderLimit",
+        PAPERDELIVERYPRINTCAPACITY_TABLENAME: printCapacityTableName, //"pn-PaperDeliveryPrintCapacity",
+        PAPERDELIVERYCOUNTER_TABLENAME: countersTableName, //"pn-PaperDeliveryCounters",
         PN_DELAYER_DELIVERYDATEDAYOFWEEK: deliveryDateDayOfWeek || "1",
         PN_DELAYER_PRINTCAPACITY: printCapacityValue
     };

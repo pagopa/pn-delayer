@@ -8,7 +8,7 @@ exports.handleEvent = async (event) => {
     if (!event.processType) {
         throw new Error("processType is required in the event");
     }
-
+    const paperDeliveryTableName = event.paperDeliveryTableName;
     const dayOfWeek = parseInt(process.env.PN_DELAYER_DELIVERYDATEDAYOFWEEK, 10) || 1;
     const instant = Instant.parse(event.input.executionDate);
     const zone = ZoneId.systemDefault(); // Or use ZoneId.of("Europe/Rome") if you want to specify
@@ -19,13 +19,13 @@ exports.handleEvent = async (event) => {
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = event.input.dailyPrintCapacity - event.input.sendToNextStepCounter;
-            return sendToPhase2(deliveryWeek, event.input, toSendToNextStep);
+            return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextStep);
         }
         case "SEND_TO_NEXT_WEEK": {
             const exceed = event.input.numberOfShipments - event.input.weeklyPrintCapacity;
             const toSendToNextWeek = exceed - event.input.sentToNextWeek - event.input.sendToNextWeekCounter;
             if (toSendToNextWeek > 0) {
-                return sendToNextWeek(deliveryWeek, event.input, toSendToNextWeek);
+                return sendToNextWeek(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextWeek);
             }
             return {
                 input: {
@@ -45,8 +45,8 @@ exports.handleEvent = async (event) => {
     }
 };
 
-async function sendToPhase2(deliveryWeek, input, toSendToNextStep) {
-    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyPhase2,input.sendToNextStepCounter,toSendToNextStep,0,"SENT_TO_PREPARE_PHASE_2", true)
+async function sendToPhase2(paperDeliveryTableName, deliveryWeek, input, toSendToNextStep) {
+    return retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek,input.lastEvaluatedKeyPhase2,input.sendToNextStepCounter,toSendToNextStep,0,"SENT_TO_PREPARE_PHASE_2", true)
         .then(result => {
             return {
                 input: {
@@ -62,8 +62,8 @@ async function sendToPhase2(deliveryWeek, input, toSendToNextStep) {
     });
 }
 
-async function sendToNextWeek(deliveryWeek, input, toSendToNextWeek) {
-    return retrieveAndProcessItems(deliveryWeek,input.lastEvaluatedKeyNextWeek,input.sendToNextWeekCounter,toSendToNextWeek,0,"EVALUATE_SENDER_LIMIT", false)
+async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, input, toSendToNextWeek) {
+    return retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek,input.lastEvaluatedKeyNextWeek,input.sendToNextWeekCounter,toSendToNextWeek,0,"EVALUATE_SENDER_LIMIT", false)
         .then(result => {
             return {
                 input: {
@@ -80,9 +80,9 @@ async function sendToNextWeek(deliveryWeek, input, toSendToNextWeek) {
     });
 }
 
-async function retrieveAndProcessItems(deliveryWeek, lastEvaluatedKey, dailyCounter, toHandle, executionCounter, step, scanIndexForward) {
+async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, lastEvaluatedKey, dailyCounter, toHandle, executionCounter, step, scanIndexForward) {
     const limit = Math.min(toHandle, parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10));
-    const response = await dynamo.retrieveItems(deliveryWeek, lastEvaluatedKey, limit, scanIndexForward);
+    const response = await dynamo.retrieveItems(paperDeliveryTableName, deliveryWeek, lastEvaluatedKey, limit, scanIndexForward);
 
     if (!response.Items || response.Items.length === 0) {
         return {
@@ -91,7 +91,7 @@ async function retrieveAndProcessItems(deliveryWeek, lastEvaluatedKey, dailyCoun
         };
     }
 
-    await processItems(deliveryWeek, response.Items, step);
+    await processItems(paperDeliveryTableName, deliveryWeek, response.Items, step);
 
     const itemsProcessed = response.Items.length;
     dailyCounter += itemsProcessed;
@@ -105,6 +105,7 @@ async function retrieveAndProcessItems(deliveryWeek, lastEvaluatedKey, dailyCoun
         toHandle > dailyCounter
     ) {
         return retrieveAndProcessItems(
+            paperDeliveryTableName,
             deliveryWeek,
             response.LastEvaluatedKey,
             dailyCounter,
@@ -130,9 +131,9 @@ function remapLastEvaluatedKey(lastEvaluatedKey){
     return null;
 }
 
-async function processItems(deliveryWeek, items, step) {
+async function processItems(paperDeliveryTableName, deliveryWeek, items, step) {
     const paperDeliveries = items.map(item =>
         utils.mapToPaperDeliveryForGivenStep(item, deliveryWeek, step)
     );
-    await dynamo.insertItems(paperDeliveries);
+    await dynamo.insertItems(paperDeliveryTableName, paperDeliveries);
 }
