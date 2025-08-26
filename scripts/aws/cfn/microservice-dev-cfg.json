@@ -20,7 +20,6 @@
     "PaperDeliveryPrintCapacityCounterTtlDuration": "60d",
     "PaperChannelTenderApiLambdaArn": "arn:aws:lambda:eu-south-1:830192246553:function:pn-paper-channel-TenderAPI",
     "SafeStorageCxId":"pn-delayer",
-    "PrintCounterTtlDuration": "30d",
-    "PostalSNSTopicArn": "pn-SnsToEmail"
+    "PrintCounterTtlDuration": "30d"
   }
 }
