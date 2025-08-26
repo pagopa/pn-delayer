@@ -60,7 +60,9 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "RUN_ALGORITHM",
-  "parameters": ["180000","1"]
+  "parameters": ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverCapacities","pn-PaperDeliveryDriverUsedCapacities",
+    "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit","pn-PaperDeliveryPrintCapacity",
+    "pn-PaperDeliveryCounters","180000","1"]
 }
 ```
 
@@ -78,14 +80,21 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **deliveryDateDayOfWeek**                 | Intero che indica il giorno della settimana su cui l'algoritmo di pianificazione deve partire (default = 1, cioè lunedì).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | ---                                                             |
 
 
-
 *DELAYER_TO_PAPER_CHANNEL*
 ```json
 {
   "operationType": "DELAYER_TO_PAPER_CHANNEL",
-  "parameters": ["1"]
+  "parameters": ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters","1"]
 }
 ```
+#### Parametri in input di DELAYER_TO_PAPER_CHANNEL
+| Nome                                      | Descrizione                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Tabella valorizzata da                                          | 
+|-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------| 
+| **paperDeliveryTableName**                | Indica il nome della [tabella](https://pagopa.atlassian.net/wiki/spaces/PN/pages/1783628166/SRS+Picchi+di+recapito+microservizio+ritardatore+-+Fase+2#Tabella-pn-DelayerPaperDelivery) contenente il workflow delle richieste di spedizioni mock.                                                                                                                                                                                                                                                                                                                                                                    | operaz. IMPORT_DATA                                             |
+| **countersTableName**                     | Indica il nome della [tabella](https://pagopa.atlassian.net/wiki/spaces/PN/pages/1783628166/SRS+Picchi+di+recapito+microservizio+ritardatore+-+Fase+2#Tabella-pn-PaperDeliveriesCounter) su cui l’algoritmo: 1. salve le coppie Province~UnifiedDeliveryDriver (prefisso chiave EXCEED~) per le quali esistono delle eccedenze. 2. legge il numero di spedizioni che devono essere escluse dal check dei limiti del mittente per la coppa ProductType~Province (prefisso chiave EXCLUDE~). L’algoritmo si aspetta che la tabella sia già  - eventualmente - valorizzata per il caso 2 (righe con prefisso EXCLUDE~.. | operaz. IMPORT_DATA per quanto riguarda RS e secondo tentativi. |
+| **deliveryDateDayOfWeek**                 | Intero che indica il giorno della settimana su cui l'algoritmo di pianificazione deve partire (default = 1, cioè lunedì).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | ---                                                             |
+
+
 
 ### Output GET_USED_CAPACITY
 

@@ -22,6 +22,13 @@ async function runAlgorithm(params) {
     }
     const printCapacityValue = `1970-01-01;${printCapacity}`;
 
+    if (!paperDeliveryTableName || !deliveryDriverCapacitiesTableName || !deliveryDriverUsedCapacitiesTableName ||
+        !senderLimitTableName || !senderUsedLimitTableName || !printCapacityTableName || !countersTableName) {
+        throw new Error("Required parameters must be [paperDeliveryTableName, deliveryDriverCapacitiesTableName, " +
+            "deliveryDriverUsedCapacitiesTableName, senderLimitTableName, senderUsedLimitTableName, " +
+            "printCapacityTableName, countersTableName]");
+    }
+
     let INPUT = {
         PAPERDELIVERY_TABLENAME: paperDeliveryTableName, //"pn-DelayerPaperDelivery",
         PAPERDELIVERYDRIVERCAPACITIES_TABLENAME: deliveryDriverCapacitiesTableName, //"pn-PaperDeliveryDriverCapacities",
