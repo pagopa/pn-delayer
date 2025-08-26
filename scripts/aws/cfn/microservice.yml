@@ -1998,22 +1998,23 @@ Resources:
                 - events:ListTagsForResource
                 - events:PutPermission
               Resource: "*"
-  DelayerToPaperChannelDailyScheduleRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
-      ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
-      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
-      Targets:
-        - Id: DelayerToPaperChannelStepFunctionTarget
-          Arn: !Ref DelayerToPaperChannelStateMachine
-          RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
-          Input: !Sub |
-            {
-              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
-              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
-            }
+
+  #DelayerToPaperChannelDailyScheduleRule:
+   # Type: AWS::Events::Rule
+    #Properties:
+     # Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
+      #ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
+      #State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      #Targets:
+       # - Id: DelayerToPaperChannelStepFunctionTarget
+        #  Arn: !Ref DelayerToPaperChannelStateMachine
+         # RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+        #  Input: !Sub |
+         #   {
+         #     "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+          #    "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+          #    "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+         #   }
 
   DelayerToPaperChannelDailyScheduleRuleRole:
     Type: AWS::IAM::Role
