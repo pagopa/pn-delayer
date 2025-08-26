@@ -2112,6 +2112,7 @@ Resources:
                       Payload:
                         input.$: $.entity
                         processType: SEND_TO_NEXT_WEEK
+                        paperDeliveryTableName: $.PAPERDELIVERY_TABLENAME
                     OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:
@@ -2161,7 +2162,7 @@ Resources:
                         sentToNextWeek.$: $.input.sentToNextWeek
                         executionDate.$: $.input.executionDate
                       processType.$: $.processType
-                      paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
+                      paperDeliveryTableName.$: $.paperDeliveryTableName
                     ResultPath: $
                     Next: ToNextWeekSuccessfully
                   ToNextWeekSuccessfully:
@@ -2178,6 +2179,7 @@ Resources:
                       Payload:
                         input.$: $.entity
                         processType: SEND_TO_PHASE_2
+                        paperDeliveryTableName: $.PAPERDELIVERY_TABLENAME
                     OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:
@@ -2224,7 +2226,7 @@ Resources:
                         sendToNextStepCounter.$: $.input.sendToNextStepCounter
                         executionDate.$: $.input.executionDate
                       processType.$: $.processType
-                      paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
+                      paperDeliveryTableName.$: $.paperDeliveryTableName
                     ResultPath: $
                     Next: ToPreparePhase2Successfully
                   ToPreparePhase2Successfully:
