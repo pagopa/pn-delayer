@@ -268,4 +268,35 @@ describe("Lambda Delayer Dispatcher", () => {
         }
     });
 
+   it("DELETE_DATA delete batch record DynamoDB", async () => {
+   const csvPath = path.join(__dirname, "sample.csv");
+       const csvData = fs.readFileSync(csvPath, "utf8");
+       s3Mock.on(GetObjectCommand).resolves({
+           Body: Readable.from([csvData])
+       });
+       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "pk1", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId" }] });
+       ddbMock.on(BatchWriteCommand).resolves({});
+       ddbMock.on(BatchWriteCommand).resolves({});
+
+       const result = await handler({ operationType: "DELETE_DATA", parameters: [] });
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.message, "Delete completed");
+       assert.strictEqual(typeof body.processed, "number");
+   });
+
+   it("DELETE_DATA with custom fileName", async () => {
+       const csvPath = path.join(__dirname, "sample.csv");
+              const csvData = fs.readFileSync(csvPath, "utf8");
+              s3Mock.on(GetObjectCommand).resolves({
+                  Body: Readable.from([csvData])
+              });
+       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "pk2", sk: "sk2", province: "MI", productType: "RS", senderPaId: "PaId" }] });
+       ddbMock.on(BatchWriteCommand).resolves({});
+
+       const result = await handler({ operationType: "DELETE_DATA", parameters: ["custom.csv"] });
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.message, "Delete completed");
+   });
 });
