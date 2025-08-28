@@ -409,7 +409,7 @@ Parameters:
 
   ExportDelayerDataLambdaCron:
     Type: String
-    Default: 0 7 ? * 2 *'
+    Default: '0 7 ? * 2 *'
     Description: 'Cron expression for ExportDelayerDataLambdaRule'
   
   DataAnalysisTopicName:
