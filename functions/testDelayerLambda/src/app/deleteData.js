@@ -74,13 +74,15 @@ exports.deleteData = async (params = []) => {
             }
         }
 
-        await batchDeleteEntities(allEntities);
-        const grouped = groupRecordsByProductAndProvince(allEntities);
-        const deliveryWeek = getDeliveryWeek();
-        await batchDeleteCounters(grouped, deliveryWeek);
-        await batchDeleteUsedSenderLimit(allEntities, deliveryWeek);
-        const printCapacitiesEntities = allEntities.filter(e => e.sk.endsWith('EVALUATE_PRINT_CAPACITY'));
-        await batchDeleteUsedCapacity(printCapacitiesEntities, deliveryWeek);
+        if(allEntities.length > 0){
+            await batchDeleteEntities(allEntities);
+            const grouped = groupRecordsByProductAndProvince(allEntities);
+            const deliveryWeek = getDeliveryWeek();
+            await batchDeleteCounters(grouped, deliveryWeek);
+            await batchDeleteUsedSenderLimit(allEntities, deliveryWeek);
+            const printCapacitiesEntities = allEntities.filter(e => e.sk.endsWith('EVALUATE_PRINT_CAPACITY'));
+            await batchDeleteUsedCapacity(printCapacitiesEntities, deliveryWeek);
+        }
 
         console.log("Processed deletions:", processed);
         return { message: "Delete completed", processed };
@@ -91,79 +93,59 @@ exports.deleteData = async (params = []) => {
 };
 
 async function batchDeleteEntities(entities) {
-    const deleteRequests = entities.map(item => ({
-        Key: {
-            pk: item.pk,
-            sk: item.sk
-            }
-        }));
-    await batchDeleteItems(deleteRequests, PAPER_DELIVERY_TABLE_NAME);
-    console.log(`Deleted ${deleteRequests.length} entities from table pn-DelayerPaperDelivery`);
-}
+    const keys = entities.map(e => ({ pk: e.pk, sk: e.sk }));
+    await batchDeleteItems(keys, PAPER_DELIVERY_TABLE_NAME);
+    console.log(`Deleted ${keys.length} entities from table ${PAPER_DELIVERY_TABLE_NAME}`);
+  }
 
-async function batchDeleteCounters(excludeGroupedRecords, deliveryWeek) {
-    const deleteRequests = Object.keys(excludeGroupedRecords).map(key => ({
-            Key: {
-                pk: deliveryWeek,
-                sk: `EXCLUDE~${key}`
-            }
+  async function batchDeleteCounters(excludeGroupedRecords, deliveryWeek) {
+    const keys = Object.keys(excludeGroupedRecords).map(k => ({
+      pk: deliveryWeek,
+      sk: `EXCLUDE~${k}`,
     }));
-    await batchDeleteItems(deleteRequests, COUNTERS_TABLE_NAME);
-    console.log(`Deleted ${deleteRequests.length} items from table pn-PaperDeliveryCounters`);
-}
+    await batchDeleteItems(keys, COUNTERS_TABLE_NAME);
+    console.log(`Deleted ${keys.length} items from table ${COUNTERS_TABLE_NAME}`);
+  }
 
-async function batchDeleteUsedSenderLimit(entities, deliveryWeek) {
+  async function batchDeleteUsedSenderLimit(entities, deliveryWeek) {
     const grouped = groupRecordsBySenderProductProvince(entities);
+    const keys = Object.keys(grouped).map(k => ({ pk: k, sk: deliveryWeek }));
+    await batchDeleteItems(keys, USED_SENDER_LIMIT_TABLE_NAME);
+    console.log(`Deleted ${keys.length} items from table ${USED_SENDER_LIMIT_TABLE_NAME}`);
+  }
 
-    const deleteRequests = Object.keys(grouped).map(key => ({
-        DeleteRequest: {
-            Key: {
-                pk: key,
-                sk: deliveryWeek
-            }
-        }
-    }));
-    await batchDeleteItems(deleteRequests, USED_SENDER_LIMIT_TABLE_NAME);
-    console.log(`Deleted ${deleteRequests.length} items from table pn-PaperDeliveryUsedSenderLimit`);
-}
-
-async function batchDeleteUsedCapacity(entities, deliveryWeek) {
+  async function batchDeleteUsedCapacity(entities, deliveryWeek) {
     const grouped = groupRecordsByDriverIdProvinceCap(entities);
-
-    const uniqueKeys = getUniqueKeysForDeletion(grouped);
-    const deleteRequests = Object.keys(uniqueKeys).map(key => ({
-            DeleteRequest: {
-                Key: {
-                    pk: key,
-                    sk: deliveryWeek
-                }
-            }
-        }));
-        await batchDeleteItems(deleteRequests, USED_CAPACITY_TABLE_NAME);
-        console.log(`Deleted ${deleteRequests.length} items from table pn-PaperDeliveryUsedCapacities`);
-}
+    const uniqueKeys = getUniqueKeysForDeletion(grouped); // Set di pk
+    const keys = Array.from(uniqueKeys).map(pk => ({ pk, sk: deliveryWeek }));
+    await batchDeleteItems(keys, USED_CAPACITY_TABLE_NAME);
+    console.log(`Deleted ${keys.length} items from table ${USED_CAPACITY_TABLE_NAME}`);
+  }
 
 
-async function batchDeleteItems(deleteRequests, tableName) {
-    let unprocessed = deleteRequests;
+  async function batchDeleteItems(keys, tableName) {
+    if (!keys?.length) return;
+    let pending = keys.filter(k => k?.pk && k?.sk);
     do {
-        const chunk = unprocessed.splice(0, 25);
-        const command = new BatchWriteCommand({
-            RequestItems: {
-                [tableName]: chunk.map((Item) => ({
-                    DeleteRequest: { Item }
-                }))
-            }
-        });
-        const response = await docClient.send(command);
-        unprocessed = response.UnprocessedItems?.[tableName]?.map(
-            (r) => r.DeleteRequest.Item
-        ) || [];
-        if (unprocessed.length) {
-            await new Promise((r) => setTimeout(r, 200));
+      const chunk = pending.splice(0, 25);
+
+      const command = new BatchWriteCommand({
+        RequestItems: {
+          [tableName]: chunk.map(k => ({
+            DeleteRequest: { Key: { pk: k.pk, sk: k.sk } }
+          }))
         }
-    } while (unprocessed.length);
-}
+      });
+
+      const res = await docClient.send(command);
+      const notProcessed = res.UnprocessedItems?.[tableName]?.map(r => r.DeleteRequest.Key) || [];
+      pending.push(...notProcessed);
+
+      if (pending.length) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    } while (pending.length);
+  }
 
 function getDeliveryWeek() {
     const dayOfWeek = 1;
