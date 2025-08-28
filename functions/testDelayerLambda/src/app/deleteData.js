@@ -11,7 +11,7 @@ const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
 const PAPER_DELIVERY_TABLE_NAME = "pn-DelayerPaperDelivery";
-const USED_CAPACITY_TABLE_NAME = "pn-PaperDeliveryUsedCapacities";
+const USED_CAPACITY_TABLE_NAME = "pn-PaperDeliveryDriverUsedCapacities";
 const USED_SENDER_LIMIT_TABLE_NAME = "pn-PaperDeliveryUsedSenderLimit";
 const COUNTERS_TABLE_NAME = "pn-PaperDeliveryCounters";
 
@@ -79,8 +79,8 @@ exports.deleteData = async (params = []) => {
             const grouped = groupRecordsByProductAndProvince(allEntities);
             const deliveryWeek = getDeliveryWeek();
             await batchDeleteCounters(grouped, deliveryWeek);
-            await batchDeleteUsedSenderLimit(allEntities, deliveryWeek);
-            const printCapacitiesEntities = allEntities.filter(e => e.sk.endsWith('EVALUATE_PRINT_CAPACITY'));
+            await batchDeleteUsedSenderLimit(allEntities);
+            const printCapacitiesEntities = allEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
             await batchDeleteUsedCapacity(printCapacitiesEntities, deliveryWeek);
         }
 
@@ -107,18 +107,19 @@ async function batchDeleteEntities(entities) {
     console.log(`Deleted ${keys.length} items from table ${COUNTERS_TABLE_NAME}`);
   }
 
-  async function batchDeleteUsedSenderLimit(entities, deliveryWeek) {
+  async function batchDeleteUsedSenderLimit(entities) {
+    const week = getPreviousWeek();
     const grouped = groupRecordsBySenderProductProvince(entities);
-    const keys = Object.keys(grouped).map(k => ({ pk: k, sk: deliveryWeek }));
-    await batchDeleteItems(keys, USED_SENDER_LIMIT_TABLE_NAME);
+    const keys = Object.keys(grouped).map(k => ({ pk: k, sk: week }));
+    await batchDeleteUsedSenderLimitItems(keys, USED_SENDER_LIMIT_TABLE_NAME);
     console.log(`Deleted ${keys.length} items from table ${USED_SENDER_LIMIT_TABLE_NAME}`);
   }
 
   async function batchDeleteUsedCapacity(entities, deliveryWeek) {
     const grouped = groupRecordsByDriverIdProvinceCap(entities);
-    const uniqueKeys = getUniqueKeysForDeletion(grouped); // Set di pk
-    const keys = Array.from(uniqueKeys).map(pk => ({ pk, sk: deliveryWeek }));
-    await batchDeleteItems(keys, USED_CAPACITY_TABLE_NAME);
+    const uniqueKeys = getUniqueKeysForDeletion(grouped);
+    const keys = Array.from(uniqueKeys).map(pk => ({ pk: pk, sk: deliveryWeek }));
+    await batchDeleteUsedCapacityItems(keys, USED_CAPACITY_TABLE_NAME);
     console.log(`Deleted ${keys.length} items from table ${USED_CAPACITY_TABLE_NAME}`);
   }
 
@@ -147,9 +148,63 @@ async function batchDeleteEntities(entities) {
     } while (pending.length);
   }
 
+  async function batchDeleteUsedSenderLimitItems(keys, tableName) {
+    if (!keys?.length) return;
+    let pending = keys.filter(k => k?.pk && k?.sk);
+    do {
+      const chunk = pending.splice(0, 25);
+
+      const command = new BatchWriteCommand({
+        RequestItems: {
+          [tableName]: chunk.map(k => ({
+            DeleteRequest: { Key: { pk: k.pk, deliveryDate: k.sk } }
+          }))
+        }
+      });
+
+      const res = await docClient.send(command);
+      const notProcessed = res.UnprocessedItems?.[tableName]?.map(r => r.DeleteRequest.Key) || [];
+      pending.push(...notProcessed);
+
+      if (pending.length) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    } while (pending.length);
+  }
+
+  async function batchDeleteUsedCapacityItems(keys, tableName) {
+    if (!keys?.length) return;
+    let pending = keys.filter(k => k?.pk && k?.sk);
+    do {
+      const chunk = pending.splice(0, 25);
+
+      const command = new BatchWriteCommand({
+        RequestItems: {
+          [tableName]: chunk.map(k => ({
+            DeleteRequest: { Key: { unifiedDeliveryDriverGeokey: k.pk, deliveryDate: k.sk } }
+          }))
+        }
+      });
+
+      const res = await docClient.send(command);
+      const notProcessed = res.UnprocessedItems?.[tableName]?.map(r => r.DeleteRequest.Key) || [];
+      pending.push(...notProcessed);
+
+      if (pending.length) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    } while (pending.length);
+  }
+
+
 function getDeliveryWeek() {
     const dayOfWeek = 1;
     return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
+}
+
+function getPreviousWeek() {
+  const dayOfWeek = 1;
+  return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).minusWeeks(1).toString();
 }
 
 const groupRecordsByProductAndProvince = (records) => {
