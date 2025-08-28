@@ -27,7 +27,7 @@ public class PaperDeliverySenderLimit {
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_WEEKLY_ESTIMATE)}))
     private int weeklyEstimate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_MONTHLY_ESTIMATE)}))
-    private int monthlyEstimate;
+    private double monthlyEstimate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PAID)}))
     private String paId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PRODUCT_TYPE)}))
