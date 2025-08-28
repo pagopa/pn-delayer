@@ -1555,6 +1555,10 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}/*"
               - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
               - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+              - !Sub "${PaperDeliveryCounterTableArn}"
+              - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
           - Effect: Allow
             Action:
               - dynamodb:UpdateItem
