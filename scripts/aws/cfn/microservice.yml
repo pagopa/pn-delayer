@@ -1709,12 +1709,12 @@ Resources:
             Action:
               - sns:Publish
             Resource:
-              - !Sub arn:aws:sns:${AWS::Region}::${AWS::AccountId}:${DataAnalysisTopicName}
+              - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${DataAnalysisTopicName}
           - Effect: Allow
             Action:
               - s3:PutObject
             Resource:
-              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}:${AWS::AccountId}/postalizzazione/*"
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/postalizzazione/*"
               
   ExportDelayerDataLambdaAlarms:
     DependsOn:

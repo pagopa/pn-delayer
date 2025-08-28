@@ -1,5 +1,3 @@
-const fs = require('fs');
-
 function getCurrentMonday() {
   const now = new Date();
   const day = now.getDay(); 
@@ -23,7 +21,7 @@ async function getAllElements(func, ...args) {
 }
 
 function extractValue(field) {
-  return field?.S || field?.N || '';
+  return field?.S || field?.N;
 }
 
 function prepareCsv(data) {
