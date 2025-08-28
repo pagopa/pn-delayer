@@ -406,6 +406,11 @@ Parameters:
   ExportDelayerDataLambdaName:
     Type: String
     Description: 'ExportDelayerData function name'
+
+  ExportDelayerDataLambdaCron:
+    Type: String
+    Default: 0 7 ? * 2 *'
+    Description: 'Cron expression for ExportDelayerDataLambdaRule'
   
   DataAnalysisTopicName:
     Type: String
@@ -1725,6 +1730,24 @@ Resources:
       Parameters:
         FunctionName: !Ref ExportDelayerDataLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ExportDelayerDataLambdaSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: ExportDelayerDataRule
+      ScheduleExpression: !Sub cron(${ExportDelayerDataLambdaCron})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ExportDelayerDataLambda.Arn
+          Id: "ExportDelayerDataLambdaTarget"
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ExportDelayerDataLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
