@@ -1568,6 +1568,10 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}/*"
               - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
               - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+              - !Sub "${PaperDeliveryCounterTableArn}"
+              - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
           - Effect: Allow
             Action:
               - dynamodb:UpdateItem
@@ -2094,6 +2098,7 @@ Resources:
                 - events:ListTagsForResource
                 - events:PutPermission
               Resource: "*"
+
   DelayerToPaperChannelDailyScheduleRule:
     Type: AWS::Events::Rule
     Properties:
@@ -2207,6 +2212,7 @@ Resources:
                       Payload:
                         input.$: $.entity
                         processType: SEND_TO_NEXT_WEEK
+                        paperDeliveryTableName: $.PAPERDELIVERY_TABLENAME
                     OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:
@@ -2256,7 +2262,7 @@ Resources:
                         sentToNextWeek.$: $.input.sentToNextWeek
                         executionDate.$: $.input.executionDate
                       processType.$: $.processType
-                      paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
+                      paperDeliveryTableName.$: $.paperDeliveryTableName
                     ResultPath: $
                     Next: ToNextWeekSuccessfully
                   ToNextWeekSuccessfully:
@@ -2273,6 +2279,7 @@ Resources:
                       Payload:
                         input.$: $.entity
                         processType: SEND_TO_PHASE_2
+                        paperDeliveryTableName: $.PAPERDELIVERY_TABLENAME
                     OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:
@@ -2319,7 +2326,7 @@ Resources:
                         sendToNextStepCounter.$: $.input.sendToNextStepCounter
                         executionDate.$: $.input.executionDate
                       processType.$: $.processType
-                      paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
+                      paperDeliveryTableName.$: $.paperDeliveryTableName
                     ResultPath: $
                     Next: ToPreparePhase2Successfully
                   ToPreparePhase2Successfully:

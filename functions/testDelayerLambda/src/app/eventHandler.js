@@ -1,5 +1,6 @@
 "use strict";
 const { importData } = require('./importData.js');
+const { deleteData } = require('./deleteData.js');
 const { getUsedCapacity } = require("./getUsedCapacity.js");
 const { getDelayerPaperDeliveriesByRequestId } = require("./getDelayerPaperDeliveriesByRequestId.js");
 const { runAlgorithm } = require("./runAlgorithm.js");
@@ -12,6 +13,7 @@ const { runDelayerToPaperChannelWorkflow } = require("./runDelayerToPaperChannel
 
 const OPERATIONS = {
     IMPORT_DATA: importData,
+    DELETE_DATA: deleteData,
     GET_USED_CAPACITY: getUsedCapacity,
     GET_BY_REQUEST_ID: getDelayerPaperDeliveriesByRequestId,
     RUN_ALGORITHM: runAlgorithm,
