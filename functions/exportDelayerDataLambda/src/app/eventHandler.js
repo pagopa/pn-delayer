@@ -19,7 +19,7 @@ exports.handleEvent = async (event) => {
   const fileName = `${mDate}_DeliveryDriverUsed.csv`;
 
   try {
-    res = await getAllElements(
+    const res = await getAllElements(
       queryRequestByIndex,
       pdDriverUsedCapacitiesTableName,
       deliveryDateIndex,
@@ -27,15 +27,22 @@ exports.handleEvent = async (event) => {
       mDate
     );
 
-    const csv = prepareCsv(res);
+    let text = ''
+    let messageId = 'not enabled'
+
+    if(res.length > 0) {
+      const csv = prepareCsv(res);
+      await putObject(monitoringBucket, `postalizzazione/${fileName}`, csv);
+      const downloadUrl = await getpresigneUrlObject(monitoringBucket, `postalizzazione/${fileName}`);
+      text = `Il tuo file è pronto. Puoi scaricarlo qui ${downloadUrl}`
+    }
+    else {
+      text = `Non ci sono informazioni per la data ${mDate}.`
+    }
     
-    await putObject(monitoringBucket, `postalizzazione/${fileName}`, csv);
-    const downloadUrl = await getpresigneUrlObject(monitoringBucket, `postalizzazione/${fileName}`);
-    const messageId = 'not enabled'
     if(snsTopicName) {
-      const text = `Il tuo file è pronto. Puoi scaricarlo qui ${downloadUrl}`
       console.log(text)
-      messageId = await publishToSnsTopic(snsTopicName, text, 'capacity delivery')
+      messageId = await publishToSnsTopic(snsTopicName, text, `CSV Delivery Used Capacities ${mDate}`)
     }
 
     return {
