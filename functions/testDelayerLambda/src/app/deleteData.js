@@ -101,6 +101,7 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
       pk: deliveryWeek,
       sk: `EXCLUDE~${k}`,
     }));
+    keys.push({ pk: 'PRINT', sk: deliveryWeek });
     await batchDeleteItems(keys, countersTableName);
     console.log(`Deleted ${keys.length} items from table ${countersTableName}`);
   }
