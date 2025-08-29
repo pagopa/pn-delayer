@@ -70,7 +70,7 @@ async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, input, toSen
                     dailyPrintCapacity: input.dailyPrintCapacity,
                     weeklyPrintCapacity: input.weeklyPrintCapacity,
                     numberOfShipments: input.numberOfShipments,
-                    lastEvaluatedKeyNextWeek: remapLastEvaluatedKey(result.lastEvaluatedKey),
+                    lastEvaluatedKeyNextWeek: remapLastEvaluatedKeyForNextWeek(result.lastEvaluatedKey, result.toHandle, result.dailyCounter),
                     sendToNextWeekCounter: result.dailyCounter,
                     sentToNextWeek: input.sentToNextWeek,
                     executionDate: input.executionDate
@@ -98,12 +98,12 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
     toHandle -= itemsProcessed;
     executionCounter += itemsProcessed;
 
-    if (
+     if (
+        toHandle > 0 &&
         response.LastEvaluatedKey &&
         Object.keys(response.LastEvaluatedKey).length > 0 &&
-        executionCounter < 4000 &&
-        toHandle > dailyCounter
-    ) {
+        executionCounter < 4000
+      ) {
         return retrieveAndProcessItems(
             paperDeliveryTableName,
             deliveryWeek,
@@ -111,13 +111,15 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
             dailyCounter,
             toHandle,
             executionCounter,
-            step
+            step,
+            scanIndexForward
         );
     }
 
     return {
         lastEvaluatedKey: response.LastEvaluatedKey,
-        dailyCounter: dailyCounter
+        dailyCounter: dailyCounter,
+        toHandle: toHandle
     };
 }
 
@@ -129,6 +131,15 @@ function remapLastEvaluatedKey(lastEvaluatedKey){
         };
     }
     return null;
+}
+
+function remapLastEvaluatedKeyForNextWeek(lastEvaluatedKey, toHandle, dailyCounter){
+  const done = (toHandle <= 0) || (toHandle <= dailyCounter);
+  if (done) return null;
+  if (lastEvaluatedKey) {
+    return { pk: { S: lastEvaluatedKey.pk }, sk: { S: lastEvaluatedKey.sk } };
+  }
+  return null;
 }
 
 async function processItems(paperDeliveryTableName, deliveryWeek, items, step) {

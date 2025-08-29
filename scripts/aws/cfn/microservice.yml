@@ -2170,74 +2170,87 @@ Resources:
         Comment: Delayer to paper channel State Machine
         StartAt: RetrieveCounter
         States:
-          RetrieveCounter:
-            Type: Task
-            Resource: arn:aws:states:::aws-sdk:dynamodb:query
-            Parameters:
-              ExpressionAttributeValues:
-                ":pk":
-                  S: PRINT
-              KeyConditionExpression: pk = :pk
-              Limit: 1
-              ScanIndexForward: false
-              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
-            ResultPath: $.queryResult
-            Retry:
-              - ErrorEquals:
-                  - States.ALL
-                IntervalSeconds: 1
-                BackoffRate: 2
-                MaxAttempts: !Ref StepFunctionStateMaxAttempts
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: DynamoDbOperationFail
-            Next: CheckIfCounterExists
           CheckIfCounterExists:
             Type: Choice
             Choices:
-              - Variable: '$.queryResult.Count'
+              - Variable: $.queryResult.Count
                 NumericGreaterThan: 0
                 Next: MapItem
             Default: NoItemToProcess
-          NoItemToProcess:
-            Type: Succeed
-          MapItem:
-            Type: Pass
-            Parameters:
-              dailyPrintCapacity.$: $.queryResult.Items[0].dailyPrintCapacity.N
-              executionDate.$: $$.Execution.StartTime
-              lastEvaluatedKeyNextWeek.$: $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
-              lastEvaluatedKeyPhase2.$: $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
-              numberOfShipments.$: $.queryResult.Items[0].numberOfShipments.N
-              pk.$: $.queryResult.Items[0].pk.S
-              sendToNextStepCounter: 0
-              sendToNextWeekCounter: 0
-              sentToNextWeek.$: $.queryResult.Items[0].sentToNextWeek.N
-              sk.$: $.queryResult.Items[0].sk.S
-              weeklyPrintCapacity.$: $.queryResult.Items[0].weeklyPrintCapacity.N
-            ResultPath: $.entity
-            Next: Parallel
           DynamoDbOperationFail:
             Type: Fail
+          MapItem:
+            Type: Pass
+            ResultPath: $.entity
+            Parameters:
+              "dailyPrintCapacity.$": $.queryResult.Items[0].dailyPrintCapacity.N
+              "executionDate.$": $$.Execution.StartTime
+              "lastEvaluatedKeyNextWeek.$": $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
+              "lastEvaluatedKeyPhase2.$": $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
+              "numberOfShipments.$": $.queryResult.Items[0].numberOfShipments.N
+              "pk.$": $.queryResult.Items[0].pk.S
+              sendToNextStepCounter: 0
+              sendToNextWeekCounter: 0
+              "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
+              "sk.$": $.queryResult.Items[0].sk.S
+              "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
+            Next: Parallel
+          NoItemToProcess:
+            Type: Succeed
+
           Parallel:
             Type: Parallel
             ResultPath: $.parallelResult
-            Next: UpdatePaperDeliveryCounter
             Branches:
               # ──────────────────────────────── BRANCH 1 ────────────────────────────────
               - StartAt: SendPrintCapacityExceedToNextWeek
                 States:
+                  IsLastEvaluatedKeyNextWeekNull:
+                    Type: Choice
+                    OutputPath: $.lambdaResponse.Payload
+                    Choices:
+                      - Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyNextWeek
+                        IsNull: true
+                        Next: PatchNextWeekNull
+                    Default: ToNextWeekSuccessfully
+
+                  MoreItemsToSendToNextWeek:
+                    Type: Choice
+                    Choices:
+                      - And:
+                          - Not:
+                              Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyNextWeek
+                              IsNull: true
+                          - Variable: $.lambdaResponse.Payload.input.sendToNextWeekCounter
+                            NumericLessThan: 250000
+                        Next: SendPrintCapacityExceedToNextWeek
+                    Default: IsLastEvaluatedKeyNextWeekNull
+
+                  PatchNextWeekNull:
+                    Type: Pass
+                    ResultPath: $
+                    Parameters:
+                      input:
+                        "dailyPrintCapacity.$": $.input.dailyPrintCapacity
+                        "executionDate.$": $.input.executionDate
+                        lastEvaluatedKeyNextWeek: { }
+                        "numberOfShipments.$": $.input.numberOfShipments
+                        "sendToNextWeekCounter.$": $.input.sendToNextWeekCounter
+                        "sentToNextWeek.$": $.input.sentToNextWeek
+                        "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
+                      "processType.$": $.processType
+                    Next: ToNextWeekSuccessfully
+
                   SendPrintCapacityExceedToNextWeek:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
+                    ResultPath: $.lambdaResponse
                     Parameters:
-                      FunctionName: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
+                      FunctionName: arn:aws:lambda:eu-south-1:830192246553:function:pn-delayerToPaperChannelLambda
                       Payload:
-                        input.$: $.entity
+                        "input.$": $.entity
+                        "paperDeliveryTableName.$": $.PAPERDELIVERY_TABLENAME
                         processType: SEND_TO_NEXT_WEEK
-                        paperDeliveryTableName: $.PAPERDELIVERY_TABLENAME
-                    OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:
                           - Lambda.ServiceException
@@ -2245,8 +2258,8 @@ Resources:
                           - Lambda.SdkClientException
                           - Lambda.TooManyRequestsException
                         IntervalSeconds: 1
+                        MaxAttempts: 2
                         BackoffRate: 2
-                        MaxAttempts: !Ref StepFunctionStateMaxAttempts
                         JitterStrategy: FULL
                     Catch:
                       - ErrorEquals:
@@ -2255,56 +2268,56 @@ Resources:
                     Next: MoreItemsToSendToNextWeek
                   SendPrintCapacityExceedToNextWeekFail:
                     Type: Fail
-                  MoreItemsToSendToNextWeek:
-                    Type: Choice
-                    Choices:
-                      - And:
-                          - Variable: $.lastEvaluatedKeyNextWeek
-                            IsPresent: true
-                          - Variable: $.sendToNextWeekCounter
-                            NumericLessThan: 250000
-                          - Variable: $.sentToNextWeek
-                            StringLessThanPath: $.toSendToNextWeek
-                        Next: SendPrintCapacityExceedToNextWeek
-                    Default: IsLastEvaluatedKeyNextWeekNull
-                  IsLastEvaluatedKeyNextWeekNull:
-                    Type: Choice
-                    Choices:
-                      - Variable: $.input.lastEvaluatedKeyNextWeek
-                        IsNull: true
-                        Next: PatchNextWeekNull
-                    Default: ToNextWeekSuccessfully
-                  PatchNextWeekNull:
-                    Type: Pass
-                    Parameters:
-                      input:
-                        dailyPrintCapacity.$: $.input.dailyPrintCapacity
-                        weeklyPrintCapacity.$: $.input.weeklyPrintCapacity
-                        numberOfShipments.$: $.input.numberOfShipments
-                        lastEvaluatedKeyNextWeek: { }
-                        sendToNextWeekCounter.$: $.input.sendToNextWeekCounter
-                        sentToNextWeek.$: $.input.sentToNextWeek
-                        executionDate.$: $.input.executionDate
-                      processType.$: $.processType
-                      paperDeliveryTableName.$: $.paperDeliveryTableName
-                    ResultPath: $
-                    Next: ToNextWeekSuccessfully
                   ToNextWeekSuccessfully:
                     Type: Succeed
-
               # ──────────────────────────────── BRANCH 2 ────────────────────────────────
               - StartAt: SendPaperDeliveryToPreparePhase2
                 States:
+                  IsLastEvaluatedPhase2Null:
+                    Type: Choice
+                    OutputPath: $.lambdaResponse.Payload
+                    Choices:
+                      - Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyPhase2
+                        IsNull: true
+                        Next: PatchPhase2Null
+                    Default: ToPreparePhase2Successfully
+
+                  MoreItemsToSendToPreparePhase2:
+                    Type: Choice
+                    Choices:
+                      - And:
+                          - Not:
+                              Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyPhase2
+                              IsNull: true
+                          - Variable: $.lambdaResponse.Payload.input.sendToNextStepCounter
+                            NumericLessThanPath: $.lambdaResponse.Payload.input.dailyPrintCapacity
+                        Next: SendPaperDeliveryToPreparePhase2
+                    Default: IsLastEvaluatedPhase2Null
+
+                  PatchPhase2Null:
+                    Type: Pass
+                    ResultPath: $
+                    Parameters:
+                      input:
+                        "dailyPrintCapacity.$": $.input.dailyPrintCapacity
+                        "executionDate.$": $.input.executionDate
+                        lastEvaluatedKeyPhase2: { }
+                        "numberOfShipments.$": $.input.numberOfShipments
+                        "sendToNextStepCounter.$": $.input.sendToNextStepCounter
+                        "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
+                      "processType.$": $.processType
+                    Next: ToPreparePhase2Successfully
+
                   SendPaperDeliveryToPreparePhase2:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
+                    ResultPath: $.lambdaResponse
                     Parameters:
-                      FunctionName: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
+                      FunctionName: arn:aws:lambda:eu-south-1:830192246553:function:pn-delayerToPaperChannelLambda
                       Payload:
-                        input.$: $.entity
+                        "input.$": $.entity
+                        "paperDeliveryTableName.$": $.PAPERDELIVERY_TABLENAME
                         processType: SEND_TO_PHASE_2
-                        paperDeliveryTableName: $.PAPERDELIVERY_TABLENAME
-                    OutputPath: $.Payload
                     Retry:
                       - ErrorEquals:
                           - Lambda.ServiceException
@@ -2312,79 +2325,76 @@ Resources:
                           - Lambda.SdkClientException
                           - Lambda.TooManyRequestsException
                         IntervalSeconds: 1
+                        MaxAttempts: 2
                         BackoffRate: 2
-                        MaxAttempts: !Ref StepFunctionStateMaxAttempts
                         JitterStrategy: FULL
                     Catch:
                       - ErrorEquals:
                           - States.ALL
                         Next: SendPaperDeliveryToPreparePhase2Fail
                     Next: MoreItemsToSendToPreparePhase2
+
                   SendPaperDeliveryToPreparePhase2Fail:
                     Type: Fail
-                  MoreItemsToSendToPreparePhase2:
-                    Type: Choice
-                    Choices:
-                      - And:
-                          - Variable: $.lastEvaluatedKeyPhase2
-                            IsPresent: true
-                          - Variable: $.sendToNextStepCounter
-                            NumericLessThanPath: $.dailyPrintCapacity
-                        Next: SendPaperDeliveryToPreparePhase2
-                    Default: IsLastEvaluatedPhase2Null
-                  IsLastEvaluatedPhase2Null:
-                    Type: Choice
-                    Choices:
-                      - Variable: $.input.lastEvaluatedKeyPhase2
-                        IsNull: true
-                        Next: PatchPhase2Null
-                    Default: ToPreparePhase2Successfully
-                  PatchPhase2Null:
-                    Type: Pass
-                    Parameters:
-                      input:
-                        dailyPrintCapacity.$: $.input.dailyPrintCapacity
-                        weeklyPrintCapacity.$: $.input.weeklyPrintCapacity
-                        numberOfShipments.$: $.input.numberOfShipments
-                        lastEvaluatedKeyPhase2: { }
-                        sendToNextStepCounter.$: $.input.sendToNextStepCounter
-                        executionDate.$: $.input.executionDate
-                      processType.$: $.processType
-                      paperDeliveryTableName.$: $.paperDeliveryTableName
-                    ResultPath: $
-                    Next: ToPreparePhase2Successfully
+
                   ToPreparePhase2Successfully:
                     Type: Succeed
 
-          UpdatePaperDeliveryCounter:
+            Next: UpdatePaperDeliveryCounter
+
+          RetrieveCounter:
             Type: Task
-            Resource: arn:aws:states:::aws-sdk:dynamodb:updateItem
+            Resource: arn:aws:states:::aws-sdk:dynamodb:query
+            ResultPath: $.queryResult
             Parameters:
-              Key:
-                pk:
-                  S.$: $.entity.pk
-                sk:
-                  S.$: $.entity.sk
-              TableName.$: $.PAPERDELIVERYCOUNTER_TABLENAME
               ExpressionAttributeValues:
-                ":nextWeekVal":
-                  M.$: $.parallelResult[0].input.lastEvaluatedKeyNextWeek
-                ":phase2Val":
-                  M.$: $.parallelResult[1].input.lastEvaluatedKeyPhase2
-                ":sentToNextWeekInc":
-                  N.$: States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)
-              UpdateExpression: 'SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal  ADD sentToNextWeek :sentToNextWeekInc'
+                ":pk":
+                  S: PRINT
+              KeyConditionExpression: "pk = :pk"
+              Limit: 1
+              ScanIndexForward: false
+              "TableName.$": $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
             Retry:
               - ErrorEquals:
                   - States.ALL
                 IntervalSeconds: 1
+                MaxAttempts: 2
                 BackoffRate: 2
-                MaxAttempts: !Ref StepFunctionStateMaxAttempts
             Catch:
               - ErrorEquals:
                   - States.ALL
                 Next: DynamoDbOperationFail
+            Next: CheckIfCounterExists
+
+          UpdatePaperDeliveryCounter:
+            Type: Task
             End: true
+            Resource: arn:aws:states:::aws-sdk:dynamodb:updateItem
+            Parameters:
+              ExpressionAttributeValues:
+                ":nextWeekVal":
+                  "M.$": $.parallelResult[0].input.lastEvaluatedKeyNextWeek
+                ":phase2Val":
+                  "M.$": $.parallelResult[1].input.lastEvaluatedKeyPhase2
+                ":sentToNextWeekInc":
+                  "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
+              Key:
+                pk:
+                  "S.$": $.entity.pk
+                sk:
+                  "S.$": $.entity.sk
+              "TableName.$": $.PAPERDELIVERYCOUNTER_TABLENAME
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal  ADD sentToNextWeek :sentToNextWeekInc"
+            Retry:
+              - ErrorEquals:
+                  - States.ALL
+                IntervalSeconds: 1
+                MaxAttempts: 2
+                BackoffRate: 2
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: DynamoDbOperationFail
 
 
   DelayerToPaperChannelStateMachineRole:
