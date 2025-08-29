@@ -6,14 +6,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 ## Operazioni disponibili
 
-| Nome                         | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                         |
-|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["fileName"]` opzionale                                               |
-| **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["fileName"]` opzionale                                               |
-| **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]` |
-| **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                        |
-| **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["printCapacity", "deliveryDateDayOfWeek"]` entrambi opzionali        |
-| **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["deliveryDateDayOfWeek"]` opzionale                                  |
+| Nome                         | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                                                                                                                                                                                           |
+|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                      |
+| **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                    |
+| **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                                   |
+| **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
+| **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
+| **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
 
 ### Esempi di payload
 
@@ -22,7 +22,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "IMPORT_DATA",
-  "parameters": ["example.csv"]
+  "parameters": ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters","example.csv"]
 }
 ```
 
@@ -44,7 +44,8 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "DELETE_DATA",
-  "parameters": ["example.csv"]
+  "parameters": ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverUsedCapacities",
+    "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters","example.csv"]
 }
 ```
 
@@ -84,9 +85,8 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "RUN_ALGORITHM",
-  "parameters": ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverCapacities","pn-PaperDeliveryDriverUsedCapacities",
-    "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit","pn-PaperDeliveryPrintCapacity",
-    "pn-PaperDeliveryCounters","180000","1"]
+  "parameters": ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities", 
+    "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters","180000"]
 }
 ```
 
@@ -108,7 +108,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "DELAYER_TO_PAPER_CHANNEL",
-  "parameters": ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters","1"]
+  "parameters": ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters"]
 }
 ```
 #### Parametri in input di DELAYER_TO_PAPER_CHANNEL

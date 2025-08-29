@@ -10,9 +10,6 @@ const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
-const TABLE_NAME = "pn-DelayerPaperDelivery";
-const COUNTER_TABLE_NAME = "pn-PaperDeliveryCounters";
-
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
@@ -25,7 +22,10 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 exports.importData = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
     let OBJECT_KEY = process.env.OBJECT_KEY;
-    const [fileName] = params
+    let [paperDeliveryTableName, countersTableName, fileName] = params;
+     if (!paperDeliveryTableName || !countersTableName) {
+            throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName]");
+        }
 
     if(fileName){
         OBJECT_KEY = fileName;
@@ -53,40 +53,40 @@ exports.importData = async (params = []) => {
         const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);
         itemsBuffer.push(paperDelivery);
         if (itemsBuffer.length === 25) {
-            await processBatch(itemsBuffer.splice(0,itemsBuffer.length), deliveryWeek);
+            await processBatch(paperDeliveryTableName, countersTableName, itemsBuffer.splice(0,itemsBuffer.length), deliveryWeek);
         }
     }
     if (itemsBuffer.length) {
-        await processBatch(itemsBuffer, deliveryWeek);
+        await processBatch(paperDeliveryTableName, countersTableName, itemsBuffer, deliveryWeek);
     }
 
     console.log("Processed data:", processed);
     return { message: "CSV imported successfully", processed };
 };
 
-async function processBatch(items, deliveryWeek) {
+async function processBatch(paperDeliveryTableName, countersTableName, items, deliveryWeek) {
   const grouped = groupRecordsByProductAndProvince(items);
-  await batchWriteItems(items);
-  await updateExcludeCounter(grouped, deliveryWeek);
+  await batchWriteItems(paperDeliveryTableName, items);
+  await updateExcludeCounter(countersTableName, grouped, deliveryWeek);
 }
 
 /**
  * Utility that performs a BatchWriteCommand and retries unprocessed items.
  * @param {Array<Object>} items
  */
-async function batchWriteItems(items) {
+async function batchWriteItems(paperDeliveryTableName, items) {
     let unprocessed = items;
     do {
         const chunk = unprocessed.splice(0, 25);
         const command = new BatchWriteCommand({
             RequestItems: {
-                [TABLE_NAME]: chunk.map((Item) => ({
+                [paperDeliveryTableName]: chunk.map((Item) => ({
                     PutRequest: { Item }
                 }))
             }
         });
         const response = await docClient.send(command);
-        unprocessed = response.UnprocessedItems?.[TABLE_NAME]?.map(
+        unprocessed = response.UnprocessedItems?.[paperDeliveryTableName]?.map(
             (r) => r.PutRequest.Item
         ) || [];
         if (unprocessed.length) {
@@ -126,13 +126,13 @@ function calculateTtl(){
   return Math.floor(expireDate.getTime() / 1000);
 }
 
-async function updateExcludeCounter(excludeGroupedRecords, deliveryWeek) {
+async function updateExcludeCounter(countersTableName, excludeGroupedRecords, deliveryWeek) {
     const ttl = calculateTtl();
     const counterMap = retrieveCounterMap(excludeGroupedRecords);
     for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
         const sk = `EXCLUDE~${productTypeProvince}`;
         const input = {
-            TableName: COUNTER_TABLE_NAME,
+            TableName: countersTableName,
             Key: {
                 pk: deliveryWeek,
                 sk: sk
