@@ -73,13 +73,13 @@ exports.deleteData = async (params = []) => {
         }
 
         if(allEntities.length > 0){
-            await batchDeleteEntities(allEntities);
+            await batchDeleteEntities(paperDeliveryTableName, allEntities);
             const grouped = groupRecordsByProductAndProvince(allEntities);
             const deliveryWeek = getDeliveryWeek();
-            await batchDeleteCounters(grouped, deliveryWeek);
-            await batchDeleteUsedSenderLimit(allEntities);
+            await batchDeleteCounters(countersTableName, grouped, deliveryWeek);
+            await batchDeleteUsedSenderLimit(senderUsedLimitTableName, allEntities);
             const printCapacitiesEntities = allEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
-            await batchDeleteUsedCapacity(printCapacitiesEntities, deliveryWeek);
+            await batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, printCapacitiesEntities, deliveryWeek);
         }
 
         console.log("Processed deletions:", processed);
@@ -90,13 +90,13 @@ exports.deleteData = async (params = []) => {
     }
 };
 
-async function batchDeleteEntities(entities) {
+async function batchDeleteEntities(paperDeliveryTableName, entities) {
     const keys = entities.map(e => ({ pk: e.pk, sk: e.sk }));
     await batchDeleteItems(keys, paperDeliveryTableName);
     console.log(`Deleted ${keys.length} entities from table ${paperDeliveryTableName}`);
   }
 
-  async function batchDeleteCounters(excludeGroupedRecords, deliveryWeek) {
+  async function batchDeleteCounters(countersTableName, excludeGroupedRecords, deliveryWeek) {
     const keys = Object.keys(excludeGroupedRecords).map(k => ({
       pk: deliveryWeek,
       sk: `EXCLUDE~${k}`,
@@ -105,7 +105,7 @@ async function batchDeleteEntities(entities) {
     console.log(`Deleted ${keys.length} items from table ${countersTableName}`);
   }
 
-  async function batchDeleteUsedSenderLimit(entities) {
+  async function batchDeleteUsedSenderLimit(senderUsedLimitTableName, entities) {
     const week = getPreviousWeek();
     const grouped = groupRecordsBySenderProductProvince(entities);
     const keys = Object.keys(grouped).map(k => ({ pk: k, sk: week }));
@@ -113,7 +113,7 @@ async function batchDeleteEntities(entities) {
     console.log(`Deleted ${keys.length} items from table ${senderUsedLimitTableName}`);
   }
 
-  async function batchDeleteUsedCapacity(entities, deliveryWeek) {
+  async function batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, entities, deliveryWeek) {
     const grouped = groupRecordsByDriverIdProvinceCap(entities);
     const uniqueKeys = getUniqueKeysForDeletion(grouped);
     const keys = Array.from(uniqueKeys).map(pk => ({ pk: pk, sk: deliveryWeek }));

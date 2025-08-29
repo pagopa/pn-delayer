@@ -53,28 +53,28 @@ exports.importData = async (params = []) => {
         const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);
         itemsBuffer.push(paperDelivery);
         if (itemsBuffer.length === 25) {
-            await processBatch(itemsBuffer.splice(0,itemsBuffer.length), deliveryWeek);
+            await processBatch(paperDeliveryTableName, countersTableName, itemsBuffer.splice(0,itemsBuffer.length), deliveryWeek);
         }
     }
     if (itemsBuffer.length) {
-        await processBatch(itemsBuffer, deliveryWeek);
+        await processBatch(paperDeliveryTableName, countersTableName, itemsBuffer, deliveryWeek);
     }
 
     console.log("Processed data:", processed);
     return { message: "CSV imported successfully", processed };
 };
 
-async function processBatch(items, deliveryWeek) {
+async function processBatch(paperDeliveryTableName, countersTableName, items, deliveryWeek) {
   const grouped = groupRecordsByProductAndProvince(items);
-  await batchWriteItems(items);
-  await updateExcludeCounter(grouped, deliveryWeek);
+  await batchWriteItems(paperDeliveryTableName, items);
+  await updateExcludeCounter(countersTableName, grouped, deliveryWeek);
 }
 
 /**
  * Utility that performs a BatchWriteCommand and retries unprocessed items.
  * @param {Array<Object>} items
  */
-async function batchWriteItems(items) {
+async function batchWriteItems(paperDeliveryTableName, items) {
     let unprocessed = items;
     do {
         const chunk = unprocessed.splice(0, 25);
@@ -126,7 +126,7 @@ function calculateTtl(){
   return Math.floor(expireDate.getTime() / 1000);
 }
 
-async function updateExcludeCounter(excludeGroupedRecords, deliveryWeek) {
+async function updateExcludeCounter(countersTableName, excludeGroupedRecords, deliveryWeek) {
     const ttl = calculateTtl();
     const counterMap = retrieveCounterMap(excludeGroupedRecords);
     for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
