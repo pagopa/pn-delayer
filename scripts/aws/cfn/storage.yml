@@ -374,6 +374,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  ExportDelayerDataLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-exportDelayerDataLambda"
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   DelayerReceiverOrdersSendersLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -519,6 +530,9 @@ Outputs:
 
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
+
+  ExportDelayerDataLambdaName:
+    Value: !Sub "${ProjectName}-exportDelayerDataLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
