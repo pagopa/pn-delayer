@@ -40,7 +40,7 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: [] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
@@ -53,7 +53,7 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["fileName"] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters", "fileName"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
@@ -137,8 +137,8 @@ describe("Lambda Delayer Dispatcher", () => {
 
         const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
                 "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
-                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit","pn-PaperDeliveryPrintCapacity",
-                "pn-PaperDeliveryCounters", printCapacity, deliveryDay] });
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
         const body = JSON.parse(result.body);
@@ -162,7 +162,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
         const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
                 "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
-                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit","pn-PaperDeliveryPrintCapacity",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
                 "pn-PaperDeliveryCounters"] });
 
         assert.strictEqual(result.statusCode, 200);
@@ -189,7 +189,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
         const result = await handler({operationType: "RUN_ALGORITHM",parameters: ["pn-DelayerPaperDelivery",
                 "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
-                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit","pn-PaperDeliveryPrintCapacity",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
@@ -225,7 +225,7 @@ describe("Lambda Delayer Dispatcher", () => {
          const deliveryDay = "1";
 
         const result = await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: ["pn-DelayerPaperDelivery",
-                "pn-PaperDeliveryCounters", deliveryDay] });
+                "pn-PaperDeliveryCounters"] });
         assert.strictEqual(result.statusCode, 200);
     
         const body = JSON.parse(result.body);
@@ -274,11 +274,14 @@ describe("Lambda Delayer Dispatcher", () => {
        s3Mock.on(GetObjectCommand).resolves({
            Body: Readable.from([csvData])
        });
-       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "pk1", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId" }] });
+       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "20100" }] });
        ddbMock.on(BatchWriteCommand).resolves({});
        ddbMock.on(BatchWriteCommand).resolves({});
 
-       const result = await handler({ operationType: "DELETE_DATA", parameters: [] });
+       const result = await handler({ operationType: "DELETE_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverUsedCapacities", "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters"] });
        assert.strictEqual(result.statusCode, 200);
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
@@ -291,10 +294,14 @@ describe("Lambda Delayer Dispatcher", () => {
               s3Mock.on(GetObjectCommand).resolves({
                   Body: Readable.from([csvData])
               });
-       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "pk2", sk: "sk2", province: "MI", productType: "RS", senderPaId: "PaId" }] });
+        ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "20100" }] });
        ddbMock.on(BatchWriteCommand).resolves({});
 
-       const result = await handler({ operationType: "DELETE_DATA", parameters: ["custom.csv"] });
+       const result = await handler({ operationType: "DELETE_DATA", parameters: ["pn-DelayerPaperDelivery",
+       "pn-PaperDeliveryDriverUsedCapacities", "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters", "curstom.csv"] });
        assert.strictEqual(result.statusCode, 200);
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");

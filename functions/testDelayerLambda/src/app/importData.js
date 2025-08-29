@@ -10,9 +10,6 @@ const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
-const TABLE_NAME = "pn-DelayerPaperDelivery";
-const COUNTER_TABLE_NAME = "pn-PaperDeliveryCounters";
-
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
@@ -25,7 +22,10 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 exports.importData = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
     let OBJECT_KEY = process.env.OBJECT_KEY;
-    const [fileName] = params
+    let [paperDeliveryTableName, countersTableName, fileName] = params;
+     if (!paperDeliveryTableName || !countersTableName) {
+            throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName]");
+        }
 
     if(fileName){
         OBJECT_KEY = fileName;
@@ -80,13 +80,13 @@ async function batchWriteItems(items) {
         const chunk = unprocessed.splice(0, 25);
         const command = new BatchWriteCommand({
             RequestItems: {
-                [TABLE_NAME]: chunk.map((Item) => ({
+                [paperDeliveryTableName]: chunk.map((Item) => ({
                     PutRequest: { Item }
                 }))
             }
         });
         const response = await docClient.send(command);
-        unprocessed = response.UnprocessedItems?.[TABLE_NAME]?.map(
+        unprocessed = response.UnprocessedItems?.[paperDeliveryTableName]?.map(
             (r) => r.PutRequest.Item
         ) || [];
         if (unprocessed.length) {
@@ -132,7 +132,7 @@ async function updateExcludeCounter(excludeGroupedRecords, deliveryWeek) {
     for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
         const sk = `EXCLUDE~${productTypeProvince}`;
         const input = {
-            TableName: COUNTER_TABLE_NAME,
+            TableName: countersTableName,
             Key: {
                 pk: deliveryWeek,
                 sk: sk

@@ -10,11 +10,6 @@ const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
-const PAPER_DELIVERY_TABLE_NAME = "pn-DelayerPaperDelivery";
-const USED_CAPACITY_TABLE_NAME = "pn-PaperDeliveryDriverUsedCapacities";
-const USED_SENDER_LIMIT_TABLE_NAME = "pn-PaperDeliveryUsedSenderLimit";
-const COUNTERS_TABLE_NAME = "pn-PaperDeliveryCounters";
-
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
@@ -27,8 +22,12 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 exports.deleteData = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
     let OBJECT_KEY = process.env.OBJECT_KEY;
-    const [fileName] = params;
+    let [paperDeliveryTableName, deliveryDriverUsedCapacitiesTableName, senderUsedLimitTableName, countersTableName, fileName] = params;
 
+    if (!paperDeliveryTableName || !deliveryDriverUsedCapacitiesTableName || !senderUsedLimitTableName || !countersTableName) {
+        throw new Error("Required parameters must be [paperDeliveryTableName, " +
+            "deliveryDriverUsedCapacitiesTableName, senderUsedLimitTableName, countersTableName]");
+    }
     if (fileName) {
         OBJECT_KEY = fileName;
     }
@@ -40,7 +39,6 @@ exports.deleteData = async (params = []) => {
     }
 
     let processed = 0;
-    let entitiesBuffer = [];
     let allEntities = [];
 
     try {
@@ -55,7 +53,7 @@ exports.deleteData = async (params = []) => {
             if (!requestId) continue;
 
             const queryInput = {
-                TableName: PAPER_DELIVERY_TABLE_NAME,
+                TableName: paperDeliveryTableName,
                 IndexName: "requestId-CreatedAt-index",
                 KeyConditionExpression: "requestId = :id",
                 ExpressionAttributeValues: { ":id": requestId }
@@ -94,8 +92,8 @@ exports.deleteData = async (params = []) => {
 
 async function batchDeleteEntities(entities) {
     const keys = entities.map(e => ({ pk: e.pk, sk: e.sk }));
-    await batchDeleteItems(keys, PAPER_DELIVERY_TABLE_NAME);
-    console.log(`Deleted ${keys.length} entities from table ${PAPER_DELIVERY_TABLE_NAME}`);
+    await batchDeleteItems(keys, paperDeliveryTableName);
+    console.log(`Deleted ${keys.length} entities from table ${paperDeliveryTableName}`);
   }
 
   async function batchDeleteCounters(excludeGroupedRecords, deliveryWeek) {
@@ -103,24 +101,24 @@ async function batchDeleteEntities(entities) {
       pk: deliveryWeek,
       sk: `EXCLUDE~${k}`,
     }));
-    await batchDeleteItems(keys, COUNTERS_TABLE_NAME);
-    console.log(`Deleted ${keys.length} items from table ${COUNTERS_TABLE_NAME}`);
+    await batchDeleteItems(keys, countersTableName);
+    console.log(`Deleted ${keys.length} items from table ${countersTableName}`);
   }
 
   async function batchDeleteUsedSenderLimit(entities) {
     const week = getPreviousWeek();
     const grouped = groupRecordsBySenderProductProvince(entities);
     const keys = Object.keys(grouped).map(k => ({ pk: k, sk: week }));
-    await batchDeleteUsedSenderLimitItems(keys, USED_SENDER_LIMIT_TABLE_NAME);
-    console.log(`Deleted ${keys.length} items from table ${USED_SENDER_LIMIT_TABLE_NAME}`);
+    await batchDeleteUsedSenderLimitItems(keys, senderUsedLimitTableName);
+    console.log(`Deleted ${keys.length} items from table ${senderUsedLimitTableName}`);
   }
 
   async function batchDeleteUsedCapacity(entities, deliveryWeek) {
     const grouped = groupRecordsByDriverIdProvinceCap(entities);
     const uniqueKeys = getUniqueKeysForDeletion(grouped);
     const keys = Array.from(uniqueKeys).map(pk => ({ pk: pk, sk: deliveryWeek }));
-    await batchDeleteUsedCapacityItems(keys, USED_CAPACITY_TABLE_NAME);
-    console.log(`Deleted ${keys.length} items from table ${USED_CAPACITY_TABLE_NAME}`);
+    await batchDeleteUsedCapacityItems(keys, deliveryDriverUsedCapacitiesTableName);
+    console.log(`Deleted ${keys.length} items from table ${deliveryDriverUsedCapacitiesTableName}`);
   }
 
 
