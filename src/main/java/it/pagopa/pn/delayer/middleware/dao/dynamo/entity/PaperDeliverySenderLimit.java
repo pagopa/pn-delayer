@@ -14,6 +14,7 @@ public class PaperDeliverySenderLimit {
     public static final String COL_DELIVERY_DATE = "deliveryDate";
     public static final String COL_WEEKLY_ESTIMATE = "weeklyEstimate";
     public static final String COL_MONTHLY_ESTIMATE = "monthlyEstimate";
+    public static final String COL_ORIGINAL_ESTIMATE = "originalEstimate";
     public static final String COL_PAID = "paId";
     public static final String COL_PRODUCT_TYPE = "productType";
     public static final String COL_PROVINCE = "province";
@@ -28,6 +29,8 @@ public class PaperDeliverySenderLimit {
     private int weeklyEstimate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_MONTHLY_ESTIMATE)}))
     private double monthlyEstimate;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_ORIGINAL_ESTIMATE)}))
+    private Integer originalEstimate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PAID)}))
     private String paId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PRODUCT_TYPE)}))

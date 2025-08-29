@@ -45,10 +45,12 @@ class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
             paperDeliveriesSenderLimit.setPk(i + "~RS~RM");
             paperDeliveriesSenderLimit.setDeliveryDate("2025-04-07");
             paperDeliveriesSenderLimit.setMonthlyEstimate(2.6);
+            paperDeliveriesSenderLimit.setOriginalEstimate(1000);
             Map<String, AttributeValue> itemMap = new HashMap<>();
             itemMap.put("pk", AttributeValue.builder().s(paperDeliveriesSenderLimit.getPk()).build());
             itemMap.put("deliveryDate", AttributeValue.builder().s(paperDeliveriesSenderLimit.getDeliveryDate()).build());
             itemMap.put("monthlyEstimate", AttributeValue.builder().n(String.valueOf(paperDeliveriesSenderLimit.getMonthlyEstimate())).build());
+            itemMap.put("originalEstimate", AttributeValue.builder().n(String.valueOf(paperDeliveriesSenderLimit.getOriginalEstimate())).build());
             Mono.fromFuture(dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliverySenderLimitTableName()).build())).block();
         });
 
