@@ -403,6 +403,24 @@ Parameters:
     Type: String
     Description: daily print capacity
 
+  ExportDelayerDataLambdaName:
+    Type: String
+    Description: 'ExportDelayerData function name'
+
+  ExportDelayerDataLambdaCron:
+    Type: String
+    Default: '0 7 ? * 2 *'
+    Description: 'Cron expression for ExportDelayerDataLambdaRule'
+  
+  DataAnalysisTopicName:
+    Type: String
+    Description: data analysis topic to send mail on slack
+
+  SignUrlExpiration:
+    Type: Number
+    Description: 'Time available for downloading the data in minutes'
+    Default: 4320 #3 days
+
 Resources:
   SenderLimitComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
@@ -1630,6 +1648,108 @@ Resources:
                 Action:
                   - states:StartExecution
                 Resource: !Ref PaperDeliveryStateMachine
+
+  #########################################################
+  ###             ExportDelayerDataLambda               ###
+  #########################################################
+  # Lambda function
+  ExportDelayerDataLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref ExportDelayerDataLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/exportDelayerDataLambda.zip"
+      Role: !GetAtt ExportDelayerDataLambdaRole.Arn
+      Environment:
+        Variables:
+          PAPER_DELIVERY_DRIVER_USED_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          DELIVERY_DATE_INDEX: deliveryDate-index
+          SNS_TOPIC_NAME: !Sub arn:aws:sns:${AWS::Region}::${AWS::AccountId}:${DataAnalysisTopicName}
+          MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}:${AWS::AccountId}"
+          SIGN_URL_EXPIRATION: !Ref SignUrlExpiration
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 15
+
+  # Lambda function role
+  ExportDelayerDataLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-ExportDelayerDataLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  ExportDelayerDataLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-ExportDelayerDataLambdaPolicy
+      Roles:
+        - !Ref ExportDelayerDataLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+            Resource:
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+          - Effect: Allow
+            Action:
+              - sns:Publish
+            Resource:
+              - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${DataAnalysisTopicName}
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+            Resource:
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/postalizzazione/*"
+              
+  ExportDelayerDataLambdaAlarms:
+    DependsOn:
+      - ExportDelayerDataLambda
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref ExportDelayerDataLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ExportDelayerDataLambdaSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: ExportDelayerDataRule
+      ScheduleExpression: !Sub cron(${ExportDelayerDataLambdaCron})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ExportDelayerDataLambda.Arn
+          Id: "ExportDelayerDataLambdaTarget"
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ExportDelayerDataLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
+
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
     DependsOn:
