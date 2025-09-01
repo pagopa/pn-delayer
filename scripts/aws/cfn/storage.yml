@@ -86,8 +86,6 @@ Resources:
       BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
-      KinesisStreamSpecification:
-        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryDriverUsedCapacitiesTable:
     Type: AWS::DynamoDB::Table
@@ -118,6 +116,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryKinesisEventTable:
     Type: AWS::DynamoDB::Table
@@ -160,8 +160,6 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
-      KinesisStreamSpecification:
-        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryUsedSenderLimitTable:
     Type: AWS::DynamoDB::Table
@@ -185,6 +183,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   ProvinceTable:
     Type: AWS::DynamoDB::Table
