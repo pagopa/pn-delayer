@@ -1688,6 +1688,9 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
