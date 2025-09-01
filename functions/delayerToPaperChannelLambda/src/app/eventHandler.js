@@ -19,14 +19,17 @@ exports.handleEvent = async (event) => {
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = event.input.dailyPrintCapacity - event.input.sendToNextStepCounter;
+            console.log(`To send to phase 2: ${toSendToNextStep}`);
             return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextStep);
         }
         case "SEND_TO_NEXT_WEEK": {
             const exceed = event.input.numberOfShipments - event.input.weeklyPrintCapacity;
             const toSendToNextWeek = exceed - event.input.sentToNextWeek - event.input.sendToNextWeekCounter;
             if (toSendToNextWeek > 0) {
+                console.log(`To send to next week: ${toSendToNextWeek}`);
                 return sendToNextWeek(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextWeek);
             }
+            console.log("No shipments to send to next week");
             return {
                 input: {
                     dailyPrintCapacity: event.input.dailyPrintCapacity,
@@ -85,6 +88,7 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
     const response = await dynamo.retrieveItems(paperDeliveryTableName, deliveryWeek, lastEvaluatedKey, limit, scanIndexForward);
 
     if (!response.Items || response.Items.length === 0) {
+        console.log(`No more items to send to step ${step}`);
         return {
             lastEvaluatedKey: null,
             dailyCounter: dailyCounter
@@ -97,6 +101,7 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
     dailyCounter += itemsProcessed;
     toHandle -= itemsProcessed;
     executionCounter += itemsProcessed;
+    console.log(`Items processed so far for step ${step}: ${dailyCounter}, items still to handle: ${toHandle}, executionCounter: ${executionCounter}`);
 
      if (
         toHandle > 0 &&
@@ -143,6 +148,7 @@ function remapLastEvaluatedKeyForNextWeek(lastEvaluatedKey, toHandle, dailyCount
 }
 
 async function processItems(paperDeliveryTableName, deliveryWeek, items, step) {
+    console.log(`Processing ${items.length} items for step ${step}`);
     const paperDeliveries = items.map(item =>
         utils.mapToPaperDeliveryForGivenStep(item, deliveryWeek, step)
     );
