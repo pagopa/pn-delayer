@@ -122,7 +122,7 @@ Resources:
             createdAt:struct<S:string>,
             geoKey:struct<S:string>,
             peakCapacity:struct<N:string>,
-            products:struct<L:array<struct<S:string>>,NULL:boolean>,
+            products:struct<L:array<struct<S:string>>>,
             tenderId:struct<S:string>,
             tenderIdGeoKey:struct<S:string>,
             unifiedDeliveryDriver:struct<S:string>
