@@ -95,7 +95,7 @@ Resources:
             senderPaId:struct<S:string>,
             tenderId:struct<S:string>,
             unifiedDeliveryDriver:struct<S:string>,
-            priority:struct<N:string>
+            priority:struct<N:string>,
             deliveryDate:struct<S:string>
           >
 
