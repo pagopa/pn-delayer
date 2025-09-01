@@ -73,7 +73,6 @@ Resources:
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName
-        #GenerateCdcView: false
         DynamoDBKeysStructure: |
           struct<
             pk:struct<S:string>,
@@ -108,7 +107,6 @@ Resources:
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName
-        #GenerateCdcView: false
         DynamoDBKeysStructure: |
           struct<
             pk:struct<S:string>,
@@ -138,7 +136,6 @@ Resources:
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName
-        #GenerateCdcView: false
         DynamoDBKeysStructure: |
           struct<
             pk:struct<S:string>,
@@ -166,7 +163,6 @@ Resources:
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName
-        #GenerateCdcView: false
         DynamoDBKeysStructure: |
             struct<
               pk:struct<S:string>,
