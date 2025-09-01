@@ -1,0 +1,8 @@
+{
+  "Parameters" : {
+    "PaperDeliveryGlueTableName": "pn_delayer_paper_delivery",
+    "PaperDeliveryDriverCapacitiesGlueTableName": "pn_paper_delivery_driver_capacities",
+    "PaperDeliverySenderLimitGlueTableName": "pn_paper_delivery_sender_limit",
+    "PaperDeliveryCounterGlueTableName": "pn_paper_delivery_counters"
+  }
+}

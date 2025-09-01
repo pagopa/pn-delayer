@@ -1748,6 +1748,7 @@ Resources:
       FunctionName: !Ref ExportDelayerDataLambda
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
+      SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
 
   PaperDeliveryStateMachine:

@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Data quality template, creates a nested stack for Glue Table and Crawler
+
+Parameters:
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: The S3 bucket from which to fetch the templates used by this stack.
+  
+  GlueServiceRoleArn:
+    Type: String
+    Description: Service role for the Glue Crawler.
+  
+  LogsBucketName:
+    Type: String
+    Description: Logs bucket name
+  
+  GlueDatabaseName:
+    Type: String
+    Description: Name of the Glue Database
+  
+  PaperDeliveryTableName:
+    Type: String
+    Description: DynamoDB table name for delayer paper delivery
+
+  PaperDeliveryGlueTableName:
+    Type: String
+    Description: Glue table name for delayer paper delivery
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_delayer_paper_delivery
+
+  PaperDeliveryDriverCapacitiesTableName:
+    Type: String
+    Description: DynamoDB table name for paper delivery driver capacities
+
+  PaperDeliveryDriverCapacitiesGlueTableName:
+    Type: String
+    Description: Glue table name for paper delivery driver capacities
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_driver_capacities
+
+  PaperDeliverySenderLimitTableName:
+    Type: String
+    Description: DynamoDB table name for paper delivery sender limits
+
+  PaperDeliverySenderLimitGlueTableName:
+    Type: String
+    Description: Glue table name for paper delivery sender limits
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_sender_limit
+
+  PaperDeliveryCounterTableName:
+    Type: String
+    Description: DynamoDB table name for paper delivery counters
+
+  PaperDeliveryCounterGlueTableName:
+    Type: String
+    Description: Glue table name for paper delivery counters
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_counters
+
+Resources:
+  PaperDeliveryDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryTableName
+        GlueTableName: !Ref PaperDeliveryGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        #GenerateCdcView: false
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>,
+            attempt:struct<N:string>,
+            cap:struct<S:string>,
+            createdAt:struct<S:string>,
+            iun:struct<S:string>,
+            notificationSentAt:struct<S:string>,
+            prepareRequestDate:struct<S:string>,
+            productType:struct<S:string>,
+            province:struct<S:string>,
+            recipientId:struct<S:string>,
+            requestId:struct<S:string>,
+            senderPaId:struct<S:string>,
+            tenderId:struct<S:string>,
+            unifiedDeliveryDriver:struct<S:string>
+          >
+
+  PaperDeliveryDriverCapacitiesDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryDriverCapacitiesTableName
+        GlueTableName: !Ref PaperDeliveryDriverCapacitiesGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        #GenerateCdcView: false
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            activationDateFrom:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            activationDateFrom:struct<S:string>,
+            capacity:struct<N:string>,
+            createdAt:struct<S:string>,
+            geoKey:struct<S:string>,
+            peakCapacity:struct<N:string>,
+            products:struct<L:array<struct<S:string>>,NULL:boolean>,
+            tenderId:struct<S:string>,
+            tenderIdGeoKey:struct<S:string>,
+            unifiedDeliveryDriver:struct<S:string>
+          >
+
+  PaperDeliverySenderLimitDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliverySenderLimitTableName
+        GlueTableName: !Ref PaperDeliverySenderLimitGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        #GenerateCdcView: false
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            deliveryDate:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            deliveryDate:struct<S:string>,
+            monthlyEstimate:struct<N:string>,
+            paId:struct<S:string>,
+            productType:struct<S:string>,
+            province:struct<S:string>,
+            ttl:struct<N:string>,
+            weeklyEstimate:struct<N:string>
+          >
+        
+  PaperDeliveryCounterGlueDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryCounterTableName
+        GlueTableName: !Ref PaperDeliveryCounterGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        #GenerateCdcView: false
+        DynamoDBKeysStructure: |
+            struct<
+              pk:struct<S:string>,
+              sk:struct<S:string>
+            >
+        DynamoDBNewImageStructure: |
+            struct<
+              pk:struct<S:string>,
+              sk:struct<S:string>,
+              numberOfShipments:struct<N:string>,
+              ttl:struct<N:string>
+            >

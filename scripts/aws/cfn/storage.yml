@@ -86,6 +86,8 @@ Resources:
       BillingMode: "PAY_PER_REQUEST"
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryDriverUsedCapacitiesTable:
     Type: AWS::DynamoDB::Table
@@ -158,6 +160,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryUsedSenderLimitTable:
     Type: AWS::DynamoDB::Table
@@ -224,6 +228,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryTable:
     Type: AWS::DynamoDB::Table
@@ -262,6 +268,8 @@ Resources:
         PointInTimeRecoveryEnabled: true
       StreamSpecification:
         StreamViewType: NEW_IMAGE
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   ### Kinesis Data Stream: kinesis data stream for pn-delayer-inputs
   PnDelayerInputsKinesisDataStream:
