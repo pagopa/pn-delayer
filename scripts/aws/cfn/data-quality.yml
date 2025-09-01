@@ -38,7 +38,7 @@ Parameters:
     Description: Glue table name for paper delivery driver used capacities
     AllowedPattern: ^[a-z_]+$
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
-    Default: pn_paper_delivery_driver_capacities
+    Default: pn_paper_delivery_driver_used_capacities
 
   PaperDeliveryUsedSenderLimitTableName:
     Type: String
@@ -49,7 +49,7 @@ Parameters:
     Description: Glue table name for paper delivery used sender limits
     AllowedPattern: ^[a-z_]+$
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
-    Default: pn_paper_delivery_sender_limit
+    Default: pn_paper_delivery_used_sender_limit
 
   PaperDeliveryCounterTableName:
     Type: String
