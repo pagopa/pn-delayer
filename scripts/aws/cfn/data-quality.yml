@@ -171,8 +171,8 @@ Resources:
               pk:struct<S:string>,
               sk:struct<S:string>,
               numberOfShipments:struct<N:string>,
-              dailyPrintCapacity:struct<N:string>
-              weeklyPrintCapacity:struct<N:string>
-              sentToNextWeek:struct<N:string>
+              dailyPrintCapacity:struct<N:string>,
+              weeklyPrintCapacity:struct<N:string>,
+              sentToNextWeek:struct<N:string>,
               ttl:struct<N:string>
             >
