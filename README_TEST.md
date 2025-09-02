@@ -43,6 +43,42 @@ Prima di eseguire un test completo è necessario lanciare lo script `src/test/re
     con il giorno precedente all'esecuzione dello script per facilitare il test. se necessario è possibile inserire tale valore nel csv per avere una data custom.
 
 
+2. **Inserimento capacità dei recapitisti**
+
+    È necessario caricare manualmente i record sulle tabelle `pn-PaperDeliverySenderLimit` e `pn-PaperDeliveryCounters`.
+
+- **Tabella `pn-PaperDeliverySenderLimit`**
+
+  Esempio di record:
+  ```
+  {
+    "pk": "senderPaId1~890~PE",
+    "deliveryDate": "2025-07-28",
+    "paId": "senderPaId1",
+    "productType": "890",
+    "province": "PE",
+    "ttl": 1787926340,
+    "weeklyEstimate": 0
+  }
+  ```
+
+- **Tabella `pn-PaperDeliveryCounters`**  
+    
+   La chiave di ordinamento (**sk**) deve seguire il formato:
+
+   ```
+   SUM_ESTIMATES~<productType>~<province>~<timestamp>
+   ```
+
+   Esempio di record:
+   ```
+   {
+     "pk": "2025-08-18",
+     "sk": "SUM_ESTIMATES~890~AN~2025-01-01T00:00:00Z",
+     "numberOfShipments": 2
+   }
+   ```
+
 ### Step
 #### 1. Esecuzione della lambda `Pn-delayer-kinesisPaperDeliveryLambda`
 **Premessa**
@@ -85,7 +121,8 @@ Prima di eseguire un test completo è necessario lanciare lo script `src/test/re
   AWS_SECRET_ACCESS_KEY=PN-TEST
   AWS_ACCESS_KEY_ID=PN-TEST
   AWS_ENDPOINT_URL=http://localhost:4566
-  HIGH_PRIORITY_TABLE_NAME=pn-PaperDeliveryHighPriority
+  KINESIS_PAPER_DELIVERY_TABLE_NAME=pn-DelayerPaperDelivery
+  KINESIS_PAPER_DELIVERY_COUNTER_TABLE_NAME=pn-PaperDeliveryDriverCounters
   KINESIS_PAPER_DELIVERY_EVENT_TABLE_NAME=pn-PaperDeliveryKinesisEvent
   ```
 - Modifica del file integration.test.js rimuovendo `.skip` alla riga 5
@@ -100,75 +137,158 @@ Prima di eseguire un test completo è necessario lanciare lo script `src/test/re
   ```
   npm run integrazione
   ```
-**Verifiche**
-- Accedere dalla console di localstack (https://app.localstack.cloud/inst/default/resources/dynamodb) alla tabella pn-PaperDeliveryHighPriority e verificare
-   l'inserimento degli item e il popolamento dei seguenti attributi:
-  ```
-  {
-    pk: <event.unifiedDeliveryDriver>##<message.recipientNormalizedAddress.pr>
-    createdAt: Instant.now,
-    requestId: <message.requestId>,
-    productType: <message.productType>,
-    cap: <message.recipientNormalizedAddress.cap>,
-    province: <message.recipientNormalizedAddress.pr>,
-    senderPaId: <message.senderPaId>,
-    recipientId: <message.recipientId>,
-    unifieddeliveryDriver: <message.unifiedDeliveryDriver>,
-    tenderId: <message.tenderId>,
-    iun: <message.iun>
-  } 
-  ```
-#### 2. Esecuzione della lambda `Pn-delayer-submitPaperDeliveryJobLambda`
 
-Questa lambda non può essere testata in locale.
-
-#### 3. Avvio del microservizio `Pn-delayer`
+#### 3. Test dell'algoritmo di pianificazione con i vari step `Pn-delayer`
+N.B Poichè non è possibile eseguire l'algoritmo di pianificazione automatico lanciando le step function
+sarà necessario avviare manualmente il microservizio `pn-delayer` in locale passando le env necessarie per l'esecuzione
+di tutti e 3 gli step di pianificazione.
 
 N.B.
-- Per poter eseguire questo test in locale è necessaria la presenza di item relativi alla capacità sulla tabella pn-PaperDeliveryDriverCapacities basati sui cap e le province presenti nelle spedizioni della tabella Pn-PaperDeliveryHighPriority.
-- Se si vuole effettuare il test senza cut-off sarà necessario popolare la env `PN_DELAYER_PAPERDELIVERYCUTOFFDURATION` specificando il valore 0
+- Per poter eseguire questo test in locale è necessaria la presenza di item relativi alla capacità sulla tabella
+  pn-PaperDeliveryDriverCapacities basati sui cap e le province presenti nelle spedizioni della tabella Pn-DelayerPaperDelivery,
+- la presenza dei contatori di RS e secondi tentativi, e delle somme delle stime dei mittenti sulla tabella
+  pn-PaperDeliveryDriverCounters
+
+### Step 1 - Evaluate Sender Limit - valutazione dei limiti dei mittenti
 
 **Prerequisiti**:
 - Popolare le seguenti env:
-  ```
-  AWS_REGIONCODE=us-east-1
-  AWS_SECRET_ACCESS_KEY=PN-TEST
-  AWS_ACCESS_KEY_ID=PN-TEST
-  AWS_ENDPOINT_URL=http://localhost:4566
-  PAPERDELIVERYREADYTOSEND_TABLENAME=pn-PaperDeliveryReadyToSend
-  PN_DELAYER_DAO_PAPERDELIVERYHIGHPRIORITYTABLENAME=Pn-PaperDeliveryHighPriority
-  PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME=pn-PaperDeliveryDriverUsedCapacities
-  PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=pn-PaperDeliveryDriverCapacities
-  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/local-delayer_to_paperchannel
-  PN_DELAYER_JOBINPUT_UNIFIEDDELIVERYDRIVER=<specificare un unified deliver driver presente nelle spedizioni della tabella Pn-PaperDeliveryHighPriority>
-  PN_DELAYER_JOBINPUT_PROVINCELIST=<specificare una lista di province (sigla) contenente necessariamente le province presenti nelle spedizioni della tabella Pn-PaperDeliveryHighPriority ma anche province per le quali non sono presenti spedizioni per testare i vari scenari>
-  ```
+```
+PN_DELAYER_PAPERDELIVERYPRIORITYPARAMETERNAME=/config/pn-delayer/paper-delivery-priority                                                                                  
+PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT=1000                                                                                        
+PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME=pn-PaperDeliveryDriverCounters      
+PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME=pn-PaperDeliverySenderLimit                                      
+PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME=pn-PaperDeliveryUsedSenderLimit      
+PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=pn-PaperDeliveryDriverCapacities                              
+PN_DELAYER_DAO_PAPERDELIVERYTABLENAME=pn-DelayerPaperDelivery                                                          
+PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCE= <SIGLA DELLA PROVINCIA PER LA QUALE SI VUOLE LANCIARE IL JOB>                                                                                
+PN_DELAYER_ACTUALTENDERI= <id della gara attiva>                                                                                                                          
+PN_DELAYER_WORKFLOWSTEP=EVALUATE_SENDER_LIMIT
+PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN=arn:aws:lambda:eu-south-1:830192246553:function:pn-paper-channel-TenderAPI                                          
+PN_DELAYER_DELIVERYDATEDAYOFWEEK=1
+```
 
 **Esecuzione del test**
 - eseguire il run dell'applicativo
 
 **Verifiche**
-- Le spedizioni presenti nella tabella pn-PaperDeliveryHighPriority per le quali è presente capacità dovranno essere spostate nella tabella pn-PaperDeliveryReadyToSend impostando la data di spedizione basata sulle env PN_DELAYER_DELIVERYDATEDAYOFWEEK, PN_DELAYER_DELIVERYDATEINTERVAL e PN_DELAYER_PAPERDELIVERYCUTOFFDURATION
-- Le spedizioni presenti nella tabella pn-PaperDeliveryHighPriority per le quali non è presente capacità non dovranno subire modifiche e rimarranno sulla tabella fino a che non sarà possibile schedularle.
+- Le spedizioni che sono nello step EVALUATE_SENDER_LIMIT che rientrano nei limiti garantiti ai mittenti
+  dovranno essere inserite nello step EVALUATE_DRIVER_CAPACITY
+- Le spedizioni che sono nello step EVALUATE_SENDER_LIMIT che rientrano nei limiti garantiti ai mittenti
+  dovranno essere inserite nello step EVALUATE_RESIDUAL_CAPACITY
+
+### Step 2 - Evaluate Driver Capacity - valutazione delle capacità di recapito
+
+**Prerequisiti**:
+- Popolare le seguenti env:
+```
+  PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=pn-PaperDeliveryDriverCapacities                                                                                               
+  PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME=pn-PaperDeliveryDriverUsedCapacities                                                                     
+  PN_DELAYER_DAO_PAPERDELIVERYTABLENAME=pn-DelayerPaperDelivery                                                                                      
+  PN_DELAYER_DELIVERYDATEDAYOFWEEK=1                                                                                                        
+  PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER= <recapitistas per il quale si vuole effettuare il test>                                         
+  PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST= <lista contenente la provincia per la quale si vuole effettuare il test                                                           
+  PN_DELAYER_ACTUALTENDERID= <id della gara attiva>                                                                                                                                
+  PN_DELAYER_WORKFLOWSTEP=EVALUATE_DRIVER_CAPACITY                                                                                                 
+  PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS=7                                                                                           
+  PN_DELAYER_PRINTCOUNTERTTLDURATION=2d                                                                                          
+  PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT=1000                                                                                                         
+  PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME=pn-PaperDeliveryDriverCounters
+  AWS_BATCH_JOB_ARRAY_INDEX=0
+```
+
+**Esecuzione del test**
+- eseguire il run dell'applicativo
+
+**Verifiche**
+- Le spedizioni che sono nello step EVALUATE_DRIVER_CAPACITY che rientrano nella capacità del recapitista
+  dovranno essere inserite nello step EVALUATE_PRINT_CAPACITY
+- Le spedizioni che sono nello step EVALUATE_DRIVER_CAPACITY che non rientrano nella capacità del recapitista
+  dovranno essere inserite nello step EVALUATE_SENDER_LIMIT ma con deliveryDate alla settimana successiva
+
+### Step 2 - Evaluate Residual Capacity - valutazione dei residui delle capacità di recapito
+
+**Prerequisiti**:
+- Popolare le seguenti env:
+```
+  PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME=pn-PaperDeliveryDriverCapacities                                                                                               
+  PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME=pn-PaperDeliveryDriverUsedCapacities                                                                     
+  PN_DELAYER_DAO_PAPERDELIVERYTABLENAME=pn-DelayerPaperDelivery                                                                                      
+  PN_DELAYER_DELIVERYDATEDAYOFWEEK=1                                                                                                        
+  PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER= <recapitistas per il quale si vuole effettuare il test>                                         
+  PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_PROVINCELIST  = <lista contenente la provincia per la quale si vuole effettuare il test                                                           
+  PN_DELAYER_ACTUALTENDERID= <id della gara attiva>                                                                                                                                
+  PN_DELAYER_WORKFLOWSTEP=EVALUATE_DRIVER_CAPACITY                                                                                                 
+  PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS=7                                                                                           
+  PN_DELAYER_PRINTCOUNTERTTLDURATION=2d                                                                                          
+  PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT=1000                                                                                                         
+  PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME=pn-PaperDeliveryDriverCounters
+  AWS_BATCH_JOB_ARRAY_INDEX=0
+```
+
+**Esecuzione del test**
+- eseguire il run dell'applicativo
+
+**Verifiche**
+- Le spedizioni che sono nello step EVALUATE_SENDER_LIMIT che rientrano nei residui di capacità del recapitista
+  dovranno essere inserite nello step EVALUATE_PRINT_CAPACITY
+- Le spedizioni che sono nello step EVALUATE_SENDER_LIMIT che non rientrano nei residui di capacità del recapitista
+  dovranno essere inserite nello step EVALUATE_SENDER_LIMIT ma con deliveryDate alla settimana successiva
+
 
 #### 4. Esecuzione della lambda `Pn-delayerToPaperChannelLambda`
-N.B. il json event.json contiene un evento vuoto in quanto tale lambda è schedulata e non lavora con eventi specifici
+N.B. La lambda ha 2 possibili modalità di esecuzione:
+- invio alla prepare fase 2
+- invio degli eccessi della capacità di stampa allo step EVALUATE_SENDER_LIMIT della settimana successiva
 
 Passaggi necessari per eseguire i test di integrazione:
 
 **Prerequisiti**:
 - Aggiungere il file `.env` nella root della lambda:
-  ```
-  AWS_REGION=us-east-1
-  REGION=us-east-1
-  AWS_SECRET_ACCESS_KEY=PN-TEST
-  AWS_ACCESS_KEY_ID=PN-TEST
-  AWS_ENDPOINT_URL=http://localhost:4566
-  PAPERDELIVERYREADYTOSEND_TABLENAME=pn-PaperDeliveryReadyToSend
-  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/local-delayer_to_paperchannel
-  ```
+    ```
+      AWS_REGION=us-east-1
+      REGION=us-east-1
+      AWS_SECRET_ACCESS_KEY=PN-TEST
+      AWS_ACCESS_KEY_ID=PN-TEST
+      AWS_ENDPOINT_URL=http://localhost:4566
+      PAPER_DELIVERY_QUERYLIMIT=1000
+      PN_DELAYER_DELIVERYDATEDAYOFWEEK=1
+      PAPERDELIVERY_TABLENAME=pn-DelayerPaperDelivery
+    ```
+
+    - Popolare il file event.json con il payload necessario per eseguire la lambda in una delle 2 modalità:
+    - Invio alla prepare fase 2
+      ```
+      {
+        "processType":"SEND_TO_PHASE_2",
+        "paperDeliveryTableName": "Pn-DelayerPaperDelivery",
+        "input": {
+            "sendToNextWeekCounter": "0",
+            "lastEvaluatedKeyPhase2": {},
+            "lastEvaluatedKeyNextWeek": {},
+            "executionDate": "2025-01-01T00:00:00Z",
+            "toNextWeekIncrementCounter": "0",
+            "toNextStepIncrementCounter": "0"
+        }
+      }
+      ```
+    - Invio degli eccessi della capacità di stampa allo step EVALUATE_SENDER_LIMIT della settimana successiva
+      ```
+      {
+        "processType":"SEND_TO_NEXT_WEEK",
+        "paperDeliveryTableName": "Pn-DelayerPaperDelivery",
+        "input": {
+            "sendToNextWeekCounter": "0",
+            "lastEvaluatedKeyPhase2": {},
+            "lastEvaluatedKeyNextWeek": {},
+            "executionDate": "2025-01-01T00:00:00Z",
+            "toNextWeekIncrementCounter": "0",
+            "toNextStepIncrementCounter": "0"
+        }
+      }
+      ```
 - Aggiungere il seguente script all'interno del file `package.json`:
-  
+
 - Modifica del file integration.test.js rimuovendo `.skip` alla riga 5
 
 **Installazione delle dipendenze**:
@@ -182,60 +302,22 @@ Passaggi necessari per eseguire i test di integrazione:
   npm run integrazione
   ```
 **Verifiche**
-- Accedere dalla console di localstack (https://app.localstack.cloud/inst/default/resources/dynamodb) alla tabella pn-PaperDeliveryReadyToSend e verificare che tutti gli item aventi pk(deliveryDate) pari alla data di esecuzione della lambda siano stati correttamente cancellati.
-- Verificare sempre sulla console di localstack (https://app.localstack.cloud/inst/default/resources/sqs) la presenza di un numero di messaggi sulla coda local-delayer_to_paperchannel pari al numero di item cancellati. il payload dei messaggi dovrà avere la seguente struttura:
+- Accedere dalla console di localstack (https://app.localstack.cloud/inst/default/resources/dynamodb) alla tabella
+- pn-DelayerPaperDelivery e verificare che le spedizioni che:
+    - Le spedizioni che sono nello step EVALUATE_PRINT_CAPACITY che rientrano nella capacità di stampa giornaliera
+      dovranno essere inserite nello step SENT_TO_PREPARE_PHASE_2
+    - Le spedizioni che sono nello step EVALUATE_PRINT_CAPACITY che rientrano non nella capacità di stampa settimanale
+      dovranno essere inserite nello step EVALUATE_SENDER_LIMIT ma con deliveryDate alla settimana successiva
+- Verificare sempre sulla console di localstack (https://app.localstack.cloud/inst/default/resources/sqs) la presenza
+  di un numero di messaggi sulla coda local-delayer_to_paperchannel pari al numero di spedizioni <= alla capacità di stampa
+  giornaliera.
+- il payload dei messaggi dovrà avere la seguente struttura:
   ```
   {
     requestId: <item.requestId>,
     iun: <item.iun>
   }
   ```
-
-#### 5. Esecuzione della lambda `Pn-delayerToPaperChannelRecoveryLambda`
-N.B il json event.json contiene un evento vuoto in quanto tale lambda è schedulata e non lavora con eventi specifici
-Per questa lambda è possibile simulare due scenari:
-- env `PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE` popolata per indicare quali spedizioni recuperare e inviare alla fase due
-- env `PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE` non popolata, per recuperare le spedizioni schedulate un giorno prima della data di esecuzione della lambda non correttamente elaborate dalla lambda `Pn-delayerToPaperChannelLambda`
-
-Passaggi necessari per eseguire i test di integrazione:
-
-**Prerequisiti**:
-- Aggiungere il file `.env` nella root della lambda:
-  ```
-  AWS_REGION=us-east-1
-  REGION=us-east-1
-  AWS_SECRET_ACCESS_KEY=PN-TEST
-  AWS_ACCESS_KEY_ID=PN-TEST
-  AWS_ENDPOINT_URL=http://localhost:4566
-  PAPERDELIVERYREADYTOSEND_TABLENAME=pn-PaperDeliveryReadyToSend
-  DELAYERTOPAPERCHANNEL_QUEUEURL=http://localstack:4566/000000000000/local-delayer_to_paperchannel
-  ?PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE=2025-01-01T00:00:00Z
-  ```
-- Aggiungere il seguente script all'interno del file `package.json`:
-  
-- Modifica del file integration.test.js rimuovendo `.skip` alla riga 5
-
-**Installazione delle dipendenze**:
-- Spostarsi nella directory del modulo contenente la Lambda e installare le dipendenze:
-  ```
-  npm install
-  ```
-**Esecuzione del test**
-- eseguire il comando
-  ```
-  npm run integrazione
-  ```
-
-**Verifiche**
-- Accedere dalla console di localstack (https://app.localstack.cloud/inst/default/resources/dynamodb) alla tabella pn-PaperDeliveryReadyToSend e verificare che tutti gli item aventi pk(deliveryDate) pari a `PAPERDELIVERYREADYTOSEND_RECOVERYDELIVERYDATE` o a `Date.now() - 1d` siano stati correttamente cancellati.
-- Verificare sempre sulla console di localstack (https://app.localstack.cloud/inst/default/resources/sqs) la presenza di un numero di messaggi sulla coda local-delayer_to_paperchannel pari al numero di item cancellati. il payload dei messaggi dovrà avere la seguente struttura:
-  ```
-  {
-    requestId: <item.requestId>,
-    iun: <item.iun>
-  }
-  ```
-
 
 
  
