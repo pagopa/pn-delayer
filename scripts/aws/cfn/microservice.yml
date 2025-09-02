@@ -1688,6 +1688,9 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
@@ -1748,6 +1751,7 @@ Resources:
       FunctionName: !Ref ExportDelayerDataLambda
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
+      SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
 
   PaperDeliveryStateMachine:
