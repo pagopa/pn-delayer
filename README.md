@@ -1,5 +1,9 @@
 # pn-delayer
-Repository contenente i componenti realizzati per gestire in modo efficiente i picchi di recapito in modo tale da non appesantire i recapitisti sulla base di spedizioni ricevute dalle notifiche create dagli enti mittenti.
+Repository contenente i componenti realizzati per gestire in modo efficiente i picchi di recapito in modo tale da:
+- Non appesantire i recapitisti sulla base di spedizioni ricevute dalle notifiche create dagli enti mittenti.
+- Far rispettare le stime dichiarate dai mittenti, in modo tale da dare priorità alle spedizioni che rispettano le stime.
+- Non appesantire lo "stampatore" garantendo al massimo 180 mila spedizioni (configurabile) inviate giornalmente al consolidatore.
+
 
 ## Panoramica
 Si compone di:
@@ -9,8 +13,9 @@ Si compone di:
     - **DelayerToPaperChannelStateMachine**: definisce il workflow di valutazione della capacità di stampa giornaliera e l'invio delle spedizioni alla prepare fase 2. (tutti i giorni 1 volta al giorno)
 - AWS **Lambda**:
     - **pn-delayer-kinesisPaperDeliveryLambda**: gestisce la ricezione degli eventi Kinesis relativi alla prepare fase 1 e la scrittura sulle tabelle `pn-DelayerPaperDelivery` e `pn-PaperDeliveryCounters`.
-    - **pn-delayer-submitPaperDeliveryJobLambda**: Si occupa della submit dei Job di schedulazione spedizioni
-    - **pn-delayerToPaperChannelLambda**: responsabile della lettura dalla tabella `pn-PaperDeliveryReadyToSend` e scrittura sulla coda `pn-delayer_to_paperchannel`.
+    - **pn-delayer-submitPaperDeliveryJobLambda**: Si occupa della submit dei Job di schedulazione spedizioni.  Viene lanciata dalla Step Function `BatchWorkflowStateMachine`.
+    - **pn-delayerToPaperChannelLambda**: responsabile della lettura delle spedizioni con `workflowStep = EVALUATE_PRINT_CAPACITY` dalla tabella `pn-DelayerPaperDelivery` e scrittura sulla coda `pn-delayer_to_paperchannel`.
+        Viene lanciata dalla Step Function `DelayerToPaperChannelStateMachine`.
 - Microservizio Spring Boot 3
     - **pn-delayer**: Contiene i job di valutazione dei limiti garantiti al mittente, della capacità di recapito  settimanali.
       A seconda del valore della variabile `PN_DELAYER_WORKFLOWSTEP` avvia il job corrispondente.
@@ -20,6 +25,24 @@ Si compone di:
   | `EVALUATE_SENDER_LIMIT`      | Avvia il job di valutazione limite settimanale garantito al mittente        | 
   | `EVALUATE_DRIVER_CAPACITY`   | Avvia il job di valutazione della capacità di recapito settimanale          | 
   | `EVALUATE_RESIDUAL_CAPACITY` | Avvia il job di valutazione dei residui di capacità di recapito settimanale | 
+
+Per le spedizioni in eccesso, cioè che superano:
+- "definitivamente" i limiti garantiti (cioè, che non possono essere recuperate dal batch dei residui perché non vi è capacità di recapito residua)
+- le capacità di recapito
+- "definitivamente" le capacità di stampa (cioè, non c'è capacità di stampa nell'ultimo giorno della settimana)
+
+vengono creati i record nella tabella `pn-DelayerPaperDelivery` con `workflowStep = EVALUATE_SENDER_LIMIT` e deliveryDate alla settimana successiva, in modo tale da essere valutati
+alla prossima esecuzione settimanale della Step Function `BatchWorkflowStateMachine`.
+
+### Workflow delle spedizione nell’algoritmo di pianificazione
+
+Siccome l’algoritmo prevede la valutazione dei seguenti step:
+- Valutazione limite settimanale garantito al mittente.
+- Valutazione capacità di recapito settimanale.
+- Valutazione capacità di stampa giornaliera.
+
+ogni spedizione potrà subire i seguenti i cambi di stati durante l’esecuzione dell’algoritmo:
+![workflow_step_picchi.webp](workflow_step_picchi.webp)
 
 
 ### Architettura
