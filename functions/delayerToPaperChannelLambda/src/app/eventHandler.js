@@ -19,8 +19,22 @@ exports.handleEvent = async (event) => {
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = event.input.dailyPrintCapacity - event.input.sendToNextStepCounter;
-            console.log(`To send to phase 2: ${toSendToNextStep}`);
-            return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextStep);
+            if (toSendToNextStep > 0) {
+                console.log(`To send to phase 2: ${toSendToNextStep}`);
+                return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextStep);
+            }
+            console.log("No shipments to send to next step")
+            return {
+                input: {
+                    dailyPrintCapacity: event.input.dailyPrintCapacity,
+                    weeklyPrintCapacity: event.input.weeklyPrintCapacity,
+                    numberOfShipments: event.input.numberOfShipments,
+                    lastEvaluatedKeyPhase2: null,
+                    sendToNextStepCounter: event.input.sendToNextStepCounter,
+                    executionDate: event.input.executionDate
+                },
+                processType: "SEND_TO_PHASE_2"
+            };
         }
         case "SEND_TO_NEXT_WEEK": {
             const exceed = event.input.numberOfShipments - event.input.weeklyPrintCapacity;
