@@ -360,9 +360,10 @@ Parameters:
     Type: String
     Description: 'ARN of DynamoDB table containing Province'
 
-  PaperChannelTenderApiLambdaArn:
+  PaperChannelTenderApiLambdaName:
     Type: String
     Description: 'PaperChannelTenderApiLambda function name'
+    Default: 'pn-paper-channel-TenderAPI'
 
   DelayerReceiverOrdersSendersLambdaName:
     Type: String
@@ -487,7 +488,7 @@ Resources:
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
           - Name: PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN
-            Value: !Ref PaperChannelTenderApiLambdaArn
+            Value: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
           - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
             Value: !Ref DeliveryDateDayOfWeek
           - Name: PN_DELAYER_PRINTCAPACITY
@@ -576,7 +577,7 @@ Resources:
                 Action:
                   - lambda:InvokeFunction
                 Resource:
-                  - !Ref PaperChannelTenderApiLambdaArn
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
@@ -1773,7 +1774,7 @@ Resources:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
             Parameters:
-              FunctionName: !Ref PaperChannelTenderApiLambdaArn
+              FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
               Payload:
                 operation: GET_TENDER_ACTIVE
             Retry:
@@ -2118,7 +2119,7 @@ Resources:
               Action:
                 - lambda:InvokeFunction
               Resource:
-                - !Ref PaperChannelTenderApiLambdaArn
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
             - Effect: Allow
               Action:
                 - events:PutRule
