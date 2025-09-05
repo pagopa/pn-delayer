@@ -2256,7 +2256,7 @@ Resources:
                     Resource: arn:aws:states:::lambda:invoke
                     ResultPath: $.lambdaResponse
                     Parameters:
-                      FunctionName: arn:aws:lambda:eu-south-1:830192246553:function:pn-delayerToPaperChannelLambda
+                      FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
                       Payload:
                         "input.$": $.entity
                         "paperDeliveryTableName.$": $.PAPERDELIVERY_TABLENAME
@@ -2323,7 +2323,7 @@ Resources:
                     Resource: arn:aws:states:::lambda:invoke
                     ResultPath: $.lambdaResponse
                     Parameters:
-                      FunctionName: arn:aws:lambda:eu-south-1:830192246553:function:pn-delayerToPaperChannelLambda
+                      FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
                       Payload:
                         "input.$": $.entity
                         "paperDeliveryTableName.$": $.PAPERDELIVERY_TABLENAME
