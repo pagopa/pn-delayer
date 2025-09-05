@@ -2,13 +2,14 @@ const { expect } = require('chai');
 const sinon = require('sinon');
 const proxyquire = require('proxyquire');
 
+const paperDeliveryTableName = 'pn-DelayerPaperDelivery';
+
 describe('dynamo.js', () => {
   let dynamo;
   let mockSend;
   let BatchWriteCommand;
   let QueryCommand;
   let DynamoDBDocumentClient;
-  const paperDeliveryTableName = 'paperDeliveryTable';
 
   beforeEach(() => {
     mockSend = sinon.stub();
@@ -46,7 +47,7 @@ describe('dynamo.js', () => {
       mockSend.resolves(mockResult);
 
       const deliveryWeek = '2025-W30';
-      const result = await dynamo.retrieveItems(deliveryWeek, null, 10, true);
+      const result = await dynamo.retrieveItems('pn-DelayerPaperDelivery', deliveryWeek, null, 10, true);
 
       expect(mockSend.calledOnce).to.be.true;
       expect(result).to.deep.equal(mockResult);
@@ -65,7 +66,7 @@ describe('dynamo.js', () => {
       const items = [{ pk: '1' }, { pk: '2' }];
       mockSend.resolves({ UnprocessedItems: {} });
 
-      const result = await dynamo.insertItems(items);
+      const result = await dynamo.insertItems('pn-DelayerPaperDelivery', items);
 
       expect(mockSend.calledOnce).to.be.true;
       expect(result).to.deep.equal([]);
@@ -88,7 +89,7 @@ describe('dynamo.js', () => {
         }
       });
 
-      const result = await dynamo.insertItems([{ pk: '1' }]);
+      const result = await dynamo.insertItems('pn-DelayerPaperDelivery', [{ pk: '1' }]);
 
       expect(mockSend.callCount).to.equal(3);
       expect(result).to.deep.equal([{ pk: '1' }]);

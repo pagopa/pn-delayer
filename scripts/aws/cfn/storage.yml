@@ -116,6 +116,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryKinesisEventTable:
     Type: AWS::DynamoDB::Table
@@ -181,6 +183,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   ProvinceTable:
     Type: AWS::DynamoDB::Table
@@ -224,6 +228,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryTable:
     Type: AWS::DynamoDB::Table
@@ -262,6 +268,8 @@ Resources:
         PointInTimeRecoveryEnabled: true
       StreamSpecification:
         StreamViewType: NEW_IMAGE
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   ### Kinesis Data Stream: kinesis data stream for pn-delayer-inputs
   PnDelayerInputsKinesisDataStream:
@@ -371,6 +379,17 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Sub ${ProjectName}-testDelayerLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  ExportDelayerDataLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-exportDelayerDataLambda"
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
@@ -519,6 +538,9 @@ Outputs:
 
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
+
+  ExportDelayerDataLambdaName:
+    Value: !Sub "${ProjectName}-exportDelayerDataLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN

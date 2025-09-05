@@ -7,16 +7,21 @@ const sfnClient = new SFNClient({});
 
 /**
  * DELAYER_TO_PAPER_CHANNEL operation: run delayerToPaperChannel Step Function
- * @param {Array<string>} params[deliveryDateDayOfWeek]
+ * @param {Array<string>} params[paperDeliveryTableName, countersTableName]
  */
 async function runDelayerToPaperChannelWorkflow(params) {
     const { DELAYERTOPAPERCHANNEL_SFN_ARN } = process.env;
-    const [deliveryDateDayOfWeek] = params;
+    const [paperDeliveryTableName, countersTableName] = params;
     if (!DELAYERTOPAPERCHANNEL_SFN_ARN) throw new Error("Missing environment variable DELAYERTOPAPERCHANNEL_SFN_ARN");
 
+    if (!paperDeliveryTableName || !countersTableName) {
+        throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName]");
+    }
+
     let INPUT = {
-        PAPERDELIVERYCOUNTER_TABLENAME: "pn-PaperDeliveryCounters",
-        PN_DELAYER_DELIVERYDATEDAYOFWEEK: deliveryDateDayOfWeek || "1"
+        PAPERDELIVERY_TABLENAME: paperDeliveryTableName, //"pn-DelayerPaperDelivery",
+        PAPERDELIVERYCOUNTER_TABLENAME: countersTableName, //"pn-PaperDeliveryCounters",
+        PN_DELAYER_DELIVERYDATEDAYOFWEEK: "1"
     };
 
 

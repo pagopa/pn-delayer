@@ -51,6 +51,7 @@ async function persistWeeklyEstimates(estimates) {
                         deliveryDate: item.deliveryDate,
                         weeklyEstimate: item.weeklyEstimate,
                         monthlyEstimate: item.monthlyEstimate,
+                        originalEstimate: item.originalEstimate,
                         paId: item.paId,
                         productType: item.productType,
                         province: item.province,

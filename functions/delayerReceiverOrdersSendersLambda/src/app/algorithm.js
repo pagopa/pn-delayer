@@ -115,7 +115,8 @@ function buildProvinceRecords({
                 provinceSigla,
                 monday,
                 weeklyEstimate: weeklyProvEstimate,
-                monthlyEstimate: monthlyProvEstimate
+                monthlyEstimate: monthlyProvEstimate,
+                originalEstimate: monthlyRegionalEstimate
             }));
         }
 
@@ -146,6 +147,7 @@ function buildRecord({
                          monday,
                          weeklyEstimate,
                          monthlyEstimate,
+                         originalEstimate,
                          isPartialWeek = false
                      }) {
     return {
@@ -155,6 +157,7 @@ function buildRecord({
         deliveryDate: formatISO(monday, { representation: 'date' }), // YYYY‑MM‑DD
         weeklyEstimate,
         monthlyEstimate,
+        originalEstimate,
         lastUpdate: commessa.last_update,
         ...(isPartialWeek ? { isPartialWeek: true } : {})
     };

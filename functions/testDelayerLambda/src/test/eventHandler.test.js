@@ -40,7 +40,7 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: [] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
@@ -53,7 +53,7 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["fileName"] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters", "fileName"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
@@ -135,7 +135,10 @@ describe("Lambda Delayer Dispatcher", () => {
         const printCapacity = "180000";
         const deliveryDay = "1";
 
-        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: [printCapacity, deliveryDay] });
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
         const body = JSON.parse(result.body);
@@ -157,7 +160,10 @@ describe("Lambda Delayer Dispatcher", () => {
             startDate: fakeStartDate 
         });
 
-        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: [] });
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters"] });
 
         assert.strictEqual(result.statusCode, 200);
         const body = JSON.parse(result.body);
@@ -171,7 +177,7 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1"); //default
     });
 
-    it("starts the step function with partial parameters (only printCapacity)", async () => {
+    it("starts the step function with partial optional parameters (only printCapacity)", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec789";
         const fakeStartDate = new Date();
         sfnMock.on(StartExecutionCommand).resolves({ 
@@ -181,7 +187,10 @@ describe("Lambda Delayer Dispatcher", () => {
 
         const printCapacity = "180000";
 
-        const result = await handler({operationType: "RUN_ALGORITHM",parameters: [printCapacity] });
+        const result = await handler({operationType: "RUN_ALGORITHM",parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
         const body = JSON.parse(result.body);
@@ -195,6 +204,19 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1"); // default
     });
 
+    it("error the step function with no required parameters provided", async () => {
+        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({
+            executionArn: fakeArn,
+            startDate: fakeStartDate
+        });
+
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery"] });
+
+        assert.strictEqual(result.statusCode, 500);
+    });
+
         it("starts the step function and returns executionArn", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
         const fakeStartDate = new Date();
@@ -202,7 +224,8 @@ describe("Lambda Delayer Dispatcher", () => {
 
          const deliveryDay = "1";
 
-        const result = await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: [deliveryDay] });
+        const result = await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryCounters"] });
         assert.strictEqual(result.statusCode, 200);
     
         const body = JSON.parse(result.body);
@@ -222,7 +245,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const fakeStartDate = new Date();
         sfnMock.on(StartExecutionCommand).resolves({ executionArn: fakeArn, startDate: fakeStartDate });
 
-        const result = await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: [] });
+        const result = await handler({ operationType: "DELAYER_TO_PAPER_CHANNEL", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters"] });
 
         const body = JSON.parse(result.body);
         assert.strictEqual(body.executionArn, fakeArn);
@@ -245,4 +268,42 @@ describe("Lambda Delayer Dispatcher", () => {
         }
     });
 
+   it("DELETE_DATA delete batch record DynamoDB", async () => {
+   const csvPath = path.join(__dirname, "sample.csv");
+       const csvData = fs.readFileSync(csvPath, "utf8");
+       s3Mock.on(GetObjectCommand).resolves({
+           Body: Readable.from([csvData])
+       });
+       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "20100" }] });
+       ddbMock.on(BatchWriteCommand).resolves({});
+       ddbMock.on(BatchWriteCommand).resolves({});
+
+       const result = await handler({ operationType: "DELETE_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverUsedCapacities", "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters"] });
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.message, "Delete completed");
+       assert.strictEqual(typeof body.processed, "number");
+   });
+
+   it("DELETE_DATA with custom fileName", async () => {
+       const csvPath = path.join(__dirname, "sample.csv");
+              const csvData = fs.readFileSync(csvPath, "utf8");
+              s3Mock.on(GetObjectCommand).resolves({
+                  Body: Readable.from([csvData])
+              });
+        ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
+        unifiedDeliveryDriver: "driver1", cap: "20100" }] });
+       ddbMock.on(BatchWriteCommand).resolves({});
+
+       const result = await handler({ operationType: "DELETE_DATA", parameters: ["pn-DelayerPaperDelivery",
+       "pn-PaperDeliveryDriverUsedCapacities", "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters", "curstom.csv"] });
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.message, "Delete completed");
+   });
 });

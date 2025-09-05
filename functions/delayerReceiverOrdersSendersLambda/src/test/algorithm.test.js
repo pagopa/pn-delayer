@@ -62,6 +62,7 @@ describe('calculateWeeklyEstimates', () => {
 
         // Lombardia AR 1000 mensile -> Milano 60% di 1000 -> 600 -> 600:28 giorni di feb = 21,4285714 -> x 7 giorni -> 150
         assert.strictEqual(miArFeb.weeklyEstimate, 150);
+        assert.strictEqual(miArFeb.originalEstimate, 1000);
 
         // 21,4285714 x 2 giorni di febbraio -> 42,85 -> 43
         assert.strictEqual(miArJanLastWeek.weeklyEstimate, 43);
