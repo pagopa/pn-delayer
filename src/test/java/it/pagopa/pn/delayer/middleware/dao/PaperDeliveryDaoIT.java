@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 @Slf4j
-public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
+class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
 
     @Autowired
     PaperDeliveryDAO paperDeliveryDAO;
@@ -38,6 +38,7 @@ public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
             PaperDelivery paperDelivery = new PaperDelivery();
             paperDelivery.setPk("2025-04-07~" + WorkflowStepEnum.EVALUATE_SENDER_LIMIT);
             paperDelivery.setSk("RM~"+now+"~" + i);
+            paperDelivery.setWorkflowStep(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name());
             paperDeliveryList.add(paperDelivery);
         });
 
@@ -45,11 +46,13 @@ public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
         PaperDelivery paperDeliveryWithOtherProvince = new PaperDelivery();
         paperDeliveryWithOtherProvince.setPk("2025-04-07~" + WorkflowStepEnum.EVALUATE_SENDER_LIMIT);
         paperDeliveryWithOtherProvince.setSk("NA~"+now+"~TestProvince");
+        paperDeliveryWithOtherProvince.setWorkflowStep(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name());
         paperDeliveryList.add(paperDeliveryWithOtherProvince);
 
         PaperDelivery paperDeliveryWithOtherStep = new PaperDelivery();
         paperDeliveryWithOtherStep.setPk("2025-04-07~" + WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY);
         paperDeliveryWithOtherStep.setSk("RM~"+now+"~TestStep");
+        paperDeliveryWithOtherStep.setWorkflowStep(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY.name());
         paperDeliveryList.add(paperDeliveryWithOtherStep);
 
         paperDeliveryDAO.insertPaperDeliveries(paperDeliveryList).block();
@@ -59,7 +62,7 @@ public class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
         Assertions.assertNotNull(result);
         Assertions.assertEquals(5, result.items().size());
         Assertions.assertTrue(result.items().stream().allMatch(paperDelivery -> paperDelivery.getPk().equalsIgnoreCase("2025-04-07~" + WorkflowStepEnum.EVALUATE_SENDER_LIMIT)
-         && paperDelivery.getSk().startsWith("RM~")));
+         && paperDelivery.getSk().startsWith("RM~") && paperDelivery.getWorkflowStep().equals(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name())));
         Assertions.assertNotNull(result.lastEvaluatedKey());
 
         Page<PaperDelivery> resultWithLastEvaluated = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse("2025-04-07"), "RM", result.lastEvaluatedKey(), 5).block();

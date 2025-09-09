@@ -29,6 +29,7 @@ public class PaperDelivery {
     public static final String COL_PRIORITY = "priority";
     public static final String COL_RECIPIENT_ID = "recipientId";
     public static final String COL_DELIVERY_DATE = "deliveryDate";
+    public static final String COL_WORKFLOW_STEP = "workflowStep";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
@@ -64,6 +65,8 @@ public class PaperDelivery {
     private String recipientId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELIVERY_DATE)}))
     private String deliveryDate;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_WORKFLOW_STEP)}))
+    private String workflowStep;
 
     public PaperDelivery(){}
 
@@ -85,6 +88,7 @@ public class PaperDelivery {
         this.priority = paperDelivery.getPriority();
         this.recipientId = paperDelivery.getRecipientId();
         this.deliveryDate = paperDelivery.getDeliveryDate();
+        this.workflowStep = workflowStepEnum.name();
     }
 
     @DynamoDbIgnore
