@@ -17,9 +17,10 @@ const { persistWeeklyEstimates } = require('./dynamo');
  * @param {object}  commessa                Parsed JSON of the commessa.
  * @param {function(region:string):Promise<Array<{province:string, percentageDistribution:number}>>} getProvinceDistribution
  *                                          Async function returning province distribution for a region.
+ * @param fileKey fileKey of Safe Storage
  * @returns {Promise<Array<Object>>}        List of weekly‑granularity records.
  */
-async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
+async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey) {
     const { weekNotInTheMonth, weeks, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
     console.debug(
         `[ALGO] Month context – weeks in month: ${weeks}, partialWeek: ${weekNotInTheMonth}, daysInMonth: ${daysInMonth}`
@@ -46,13 +47,13 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
                     commessa,
                     daysInMonth,
                     weeks,
-                    weekNotInTheMonth
+                    weekNotInTheMonth,
                 });
 
                 results.push(...provinceRecords);
 
                 if (provinceRecords.length > 0) {
-                    await persistWeeklyEstimates(provinceRecords);
+                    await persistWeeklyEstimates(provinceRecords, fileKey);
                 }
             }
         }
