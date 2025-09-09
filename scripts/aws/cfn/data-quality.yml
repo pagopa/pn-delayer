@@ -96,7 +96,8 @@ Resources:
             tenderId:struct<S:string>,
             unifiedDeliveryDriver:struct<S:string>,
             priority:struct<N:string>,
-            deliveryDate:struct<S:string>
+            deliveryDate:struct<S:string>,
+            workflowStep:struct<S:string>
           >
 
   PaperDeliveryDriverUsedCapacitiesDataQualityStack:

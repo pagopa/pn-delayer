@@ -27,7 +27,8 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
       unifiedDeliveryDriver: item.unifiedDeliveryDriver,
       tenderId: item.tenderId,
       recipientId: item.recipientId,
-      priority: item.priority
+      priority: item.priority,
+      workflowStep: `${step}`
   };
 
   return Object.fromEntries(

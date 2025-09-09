@@ -18,6 +18,7 @@ public class PaperDeliverySenderLimit {
     public static final String COL_PAID = "paId";
     public static final String COL_PRODUCT_TYPE = "productType";
     public static final String COL_PROVINCE = "province";
+    public static final String COL_FILE_KEY = "fileKey";
     public static final String COL_TTL = "ttl";
 
 
@@ -37,6 +38,8 @@ public class PaperDeliverySenderLimit {
     private String productType;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PROVINCE)}))
     private String province;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_FILE_KEY)}))
+    private String fileKey;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TTL)}))
     private int ttl;
 }
