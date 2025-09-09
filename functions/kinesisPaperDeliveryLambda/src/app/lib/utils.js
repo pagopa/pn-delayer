@@ -16,6 +16,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
     tenderId: payload.tenderId,
     recipientId: payload.recipientId,
+    workflowStep: 'EVALUATE_SENDER_LIMIT',
   };
 };
 
