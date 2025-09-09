@@ -1,0 +1,259 @@
+{
+  "idEnte": "senderPaId101",
+  "contractId": "5678abcftrs43d23el4",
+  "periodo_riferimento": "9-2025",
+  "last_update": "2025-01-01T00:00:00Z",
+  "prodotti": [
+    {
+      "id": "AR",
+      "nome": "AR",
+      "valore_totale": 5700,
+      "varianti": [
+        {
+          "codice": "NZ",
+          "nome": "NZ",
+          "valore_totale": 5000,
+          "distribuzione": {
+            "regionale": [
+              {
+                "regione": "Abruzzo",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Basilicata",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Calabria",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Campania",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Emilia-Romagna",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Friuli-Venezia Giulia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Lazio",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Liguria",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Lombardia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Marche",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Molise",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Piemonte",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Puglia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Sardegna",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Sicilia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Toscana",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Trentino-Alto Adige",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Umbria",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Valle d'Aosta",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Veneto",
+                "valore": 250,
+                "province": null
+              }
+            ]
+          }
+        },
+        {
+          "codice": "INT",
+          "nome": "INT",
+          "valore_totale": 700,
+          "distribuzione": null
+        }
+      ]
+    },
+    {
+      "id": "890",
+      "nome": "890",
+      "valore_totale": 5000,
+      "varianti": [
+        {
+          "codice": "NZ",
+          "nome": "NZ",
+          "valore_totale": 5000,
+          "distribuzione": {
+            "regionale": [
+              {
+                "regione": "Abruzzo",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Basilicata",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Calabria",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Campania",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Emilia-Romagna",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Friuli-Venezia Giulia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Lazio",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Liguria",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Lombardia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Marche",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Molise",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Piemonte",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Puglia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Sardegna",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Sicilia",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Toscana",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Trentino-Alto Adige",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Umbria",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Valle d'Aosta",
+                "valore": 250,
+                "province": null
+              },
+              {
+                "regione": "Veneto",
+                "valore": 250,
+                "province": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "digitale",
+      "nome": "digitale",
+      "valore_totale": 1200,
+      "varianti": [
+        {
+          "codice": "PEC",
+          "nome": "PEC",
+          "valore_totale": 1200,
+          "distribuzione": null
+        }
+      ]
+    }
+  ]
+}
