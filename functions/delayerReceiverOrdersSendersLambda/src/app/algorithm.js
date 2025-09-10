@@ -65,7 +65,7 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileK
 
 /**
  * Compute month context (first day, ISO‑weeks and days in month) from “mm‑YYYY” string.
- * @param {string} periodo_riferimento e.g. "07-2025"
+ * @param {string} periodoRiferimento e.g. "07-2025"
  */
 function getMonthContext(periodoRiferimento) {
     const [monthStr, yearStr] = periodoRiferimento.split('-');
@@ -106,10 +106,11 @@ function buildProvinceRecords({
         const perc = percentage ?? 100;          // default a 100%
         const monthlyProvEstimate = (monthlyRegionalEstimate * perc) / 100;
         const dailyProvEstimate   = monthlyProvEstimate / daysInMonth;
-        const weeklyProvEstimate  = Math.round(dailyProvEstimate * 7);
 
         // full weeks inside the month
         for (const monday of weeks) {
+            const numberOfDaysInMonth= Math.min(7, differenceInCalendarDays(endOfMonth(monday), monday) + 1);
+            const weeklyProvEstimate  = Math.round(dailyProvEstimate * numberOfDaysInMonth);
             records.push(buildRecord({
                 commessa,
                 productType,

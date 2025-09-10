@@ -2,7 +2,7 @@
 
 const { downloadJson } = require('./safeStorage');
 const { calculateWeeklyEstimates } = require('./algorithm');
-const { getProvinceDistribution, persistWeeklyEstimates } = require('./dynamo');
+const { getProvinceDistribution } = require('./dynamo');
 
 /**
  * Handler per eventi SQS (bacth size 1 consigliata)
@@ -27,7 +27,8 @@ exports.handleEvent = async (event = {}) => {
 
         const estimates = await calculateWeeklyEstimates(
             estimateJson,
-            region => getProvinceDistribution(region)
+            region => getProvinceDistribution(region),
+            fileKey
         );
         allEstimates.push(...estimates);
     }
