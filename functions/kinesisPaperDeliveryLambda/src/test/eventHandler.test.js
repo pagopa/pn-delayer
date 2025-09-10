@@ -327,4 +327,47 @@ describe("Lambda Handler Tests", () => {
     );
   });
 
+    it("should skip without attempt", async () => {
+        mockDynamoDBClient
+            .resolvesOnce({ Responses:{}  })
+            .resolvesOnce({ Responses:{} })
+            .resolvesOnce({ UnprocessedItems: {} })
+            .resolvesOnce({ UnprocessedItems: {} });
+
+        const event = {
+            mockKinesisData: [
+                {
+                    kinesisSeqNumber: '1234567890',
+                    unifiedDeliveryDriver: 'driver1',
+                    recipientNormalizedAddress: { pr: 'RM', cap: '12345', region: 'region2' },
+                    requestId: 'request1',
+                    productType: 'AR',
+                    senderPaId: 'sender1',
+                    tenderId: 'tender1',
+                    iun: 'iun1',
+                    notificationSentAt: '2023-10-01T00:00:00Z',
+                    prepareRequestDate: '2024-10-01T00:00:00Z',
+                    attempt: '0'
+                },
+                {
+                    kinesisSeqNumber: '1234567891',
+                    unifiedDeliveryDriver: 'driver2',
+                    recipientNormalizedAddress: { pr: 'RM', cap: '54321', region: 'region2' },
+                    requestId: 'request2',
+                    productType: 'AR',
+                    senderPaId: 'sender2',
+                    tenderId: 'tender2',
+                    iun: 'iun2',
+                    notificationSentAt: '2023-10-01T00:00:00Z',
+                    prepareRequestDate: '2024-10-01T00:00:00Z',
+                }
+            ],
+        };
+
+        const result = await lambda.handleEvent(event);
+        expect(result.batchItemFailures).to.deep.equal(
+            [ { itemIdentifier: '1234567890' }]
+        );
+    });
+
 });

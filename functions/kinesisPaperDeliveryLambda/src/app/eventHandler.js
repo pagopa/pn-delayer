@@ -21,13 +21,20 @@ exports.handleEvent = async (event) => {
     return { batchItemFailures: [] };
   }
 
+  const filteredData = filterInvalidRecords(kinesisData);
+
+  if (filteredData.length === 0) {
+    console.log("No valid event to process");
+    return { batchItemFailures: [] };
+  }
+
   let batchItemFailures = [];
   let paperDeliveryRecords = [];
   const requestIds = new Set();
   const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
   const deliveryWeek = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
 
-  for (const eventItem of kinesisData) {
+  for (const eventItem of filteredData) {
     const record = {
       entity: { ...buildPaperDeliveryRecord(eventItem, deliveryWeek) },
       kinesisSeqNumber: eventItem.kinesisSeqNumber
@@ -82,4 +89,16 @@ function filterFailedRecords(records, failures) {
   return records.filter(record =>
     !failures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber)
   );
+}
+
+function filterInvalidRecords(records) {
+    const filteredData = [];
+    for (const item of records) {
+        if (item.attempt && item.prepareRequestDate && item.notificationSentAt) {
+            filteredData.push(item);
+        } else {
+            console.warn(`Skipping invalid event: ${item.requestId}`);
+        }
+    }
+    return filteredData;
 }

@@ -17,9 +17,10 @@ const { persistWeeklyEstimates } = require('./dynamo');
  * @param {object}  commessa                Parsed JSON of the commessa.
  * @param {function(region:string):Promise<Array<{province:string, percentageDistribution:number}>>} getProvinceDistribution
  *                                          Async function returning province distribution for a region.
+ * @param fileKey fileKey of Safe Storage
  * @returns {Promise<Array<Object>>}        List of weekly‑granularity records.
  */
-async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
+async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey) {
     const { weekNotInTheMonth, weeks, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
     console.debug(
         `[ALGO] Month context – weeks in month: ${weeks}, partialWeek: ${weekNotInTheMonth}, daysInMonth: ${daysInMonth}`
@@ -46,13 +47,13 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
                     commessa,
                     daysInMonth,
                     weeks,
-                    weekNotInTheMonth
+                    weekNotInTheMonth,
                 });
 
                 results.push(...provinceRecords);
 
                 if (provinceRecords.length > 0) {
-                    await persistWeeklyEstimates(provinceRecords);
+                    await persistWeeklyEstimates(provinceRecords, fileKey);
                 }
             }
         }
@@ -64,7 +65,7 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution) {
 
 /**
  * Compute month context (first day, ISO‑weeks and days in month) from “mm‑YYYY” string.
- * @param {string} periodo_riferimento e.g. "07-2025"
+ * @param {string} periodoRiferimento e.g. "07-2025"
  */
 function getMonthContext(periodoRiferimento) {
     const [monthStr, yearStr] = periodoRiferimento.split('-');
@@ -105,10 +106,11 @@ function buildProvinceRecords({
         const perc = percentage ?? 100;          // default a 100%
         const monthlyProvEstimate = (monthlyRegionalEstimate * perc) / 100;
         const dailyProvEstimate   = monthlyProvEstimate / daysInMonth;
-        const weeklyProvEstimate  = Math.round(dailyProvEstimate * 7);
 
         // full weeks inside the month
         for (const monday of weeks) {
+            const numberOfDaysInMonth= Math.min(7, differenceInCalendarDays(endOfMonth(monday), monday) + 1);
+            const weeklyProvEstimate  = Math.round(dailyProvEstimate * numberOfDaysInMonth);
             records.push(buildRecord({
                 commessa,
                 productType,
