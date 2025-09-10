@@ -172,6 +172,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
         cap: payload.cap,
         attempt: payload.attempt,
         iun: payload.iun,
+        workflowStep: 'EVALUATE_SENDER_LIMIT',
     };
 }
 

@@ -29,8 +29,9 @@ async function getProvinceDistribution(region) {
  * Uses BatchWrite for new items and UpdateCommand for partial‑week adjustments.
  *
  * @param {Array<object>} estimates result of calculateWeeklyEstimates
+ * @param fileKey fileKey of Safe Storage
  */
-async function persistWeeklyEstimates(estimates) {
+async function persistWeeklyEstimates(estimates, fileKey) {
     // Separate puts vs updates
     const newItems = estimates.filter(e => !e.isPartialWeek);
     const partials = estimates.filter(e => e.isPartialWeek);
@@ -55,6 +56,7 @@ async function persistWeeklyEstimates(estimates) {
                         paId: item.paId,
                         productType: item.productType,
                         province: item.province,
+                        fileKey: fileKey,
                         ttl: ttlValue
                     }
                 }
