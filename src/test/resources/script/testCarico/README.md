@@ -40,9 +40,9 @@ Questa cartella contiene script Node.js per la generazione e l'importazione mass
 
 ## Parametri
 
-- È possibile specificare l'ambiente (`local`, `dev`, `test`) tramite parametro:
+- È possibile specificare il profilo AWS tramite parametro:
     ```
-     node index.js --env <env>
+     node index.js --profile <profile>
     ```
   Se non specificato, lo script verrà eseguito in modalità locale.
 

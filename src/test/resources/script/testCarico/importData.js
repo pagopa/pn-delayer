@@ -12,7 +12,7 @@ const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
  * @param {string|Buffer} csvContent
  * @returns {Promise<{message:string, processed:number}>}
  */
-exports.importData = async (params = [], csvContent, env) => {
+exports.importData = async (params = [], csvContent, profile) => {
     let [paperDeliveryTableName, countersTableName] = params;
     if (!paperDeliveryTableName || !countersTableName) {
         throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName]");
@@ -23,14 +23,10 @@ exports.importData = async (params = [], csvContent, env) => {
 
     // Aws configuration
     let ddbConfig;
-    if (env === "local") {
+    if (profile === "local") {
         ddbConfig = { endpoint: "http://localhost:4566", region: "us-east-1" };
-    } else if (env === "dev") {
-        ddbConfig = { region: "eu-south-1", credentials: fromIni({ profile: "dev" }) };
-    } else if (env === "test") {
-        ddbConfig = { region: "eu-south-1", credentials: fromIni({ profile: "test" }) };
     } else {
-        throw new Error("Ambiente non valido");
+        ddbConfig = { region: "eu-south-1", credentials: fromIni({ profile: profile }) };
     }
 
     const ddbClient = new DynamoDBClient(ddbConfig);

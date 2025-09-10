@@ -7,16 +7,16 @@ const { SafeStorageClient } = require('./SafeStorageClient');
 
 const options = {
     options: {
-        env: { type: 'string', short: 'e', default: 'local' }
+        profile: { type: 'string', short: 'e', default: 'local' }
     }
 };
 const parsedArgs = parseArgs(options);
-const env = parsedArgs.values.env;
+const profile = parsedArgs.values.profile;
 
 const folderPath = path.join(__dirname, "spedizioni");
 const paperDeliveryTableName = "pn-DelayerPaperDelivery";
 const countersTableName = "pn-PaperDeliveryCounters";
-const SAFE_STORAGE_URL = env === 'test' ? 'http://localhost:8889' : 'http://localhost:8888';
+const SAFE_STORAGE_URL = 'http://localhost:8889';
 const MODULI_COMMESSA_FOLDER = './moduliCommessa';
 
 async function processCsvFiles() {
@@ -26,7 +26,7 @@ async function processCsvFiles() {
         const filePath = path.join(folderPath, file);
         const csvContent = fs.readFileSync(filePath, "utf8");
         try {
-            const result = await importData([paperDeliveryTableName, countersTableName], csvContent, env);
+            const result = await importData([paperDeliveryTableName, countersTableName], csvContent, profile);
             console.log(`File ${file} importato:`, result);
         } catch (err) {
             console.error(`Errore importando ${file}:`, err);
@@ -123,13 +123,13 @@ async function processJsonFiles() {
 async function main() {
     try {
         console.log("=== GENERAZIONE FILE CSV E JSON ===");
-         //await csvGenerator.main();
+         await csvGenerator.main();
 
         console.log("\n=== UPLOAD JSON SU SAFESTORAGE ===");
         await processJsonFiles();
 
         console.log("\n=== IMPORT CSV SU DYNAMODB ===");
-        //processCsvFiles();
+        await processCsvFiles();
 
         console.log('\nTutte le operazioni completate!');
     } catch (error) {
