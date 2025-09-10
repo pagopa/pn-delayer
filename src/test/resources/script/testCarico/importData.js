@@ -1,37 +1,18 @@
 "use strict";
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const {
-    DynamoDBDocumentClient,
-    BatchWriteCommand,
-    UpdateCommand
-} = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const { fromIni } = require("@aws-sdk/credential-provider-ini");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
-const LOCALSTACK_ENDPOINT = "http://localhost:4566";
-const LOCALSTACK_REGION = "us-east-1";
-const ddbClient = new DynamoDBClient({
-    endpoint: LOCALSTACK_ENDPOINT,
-    region: LOCALSTACK_REGION
-});
-const docClient = DynamoDBDocumentClient.from(ddbClient);
-
-/**
- * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
- * @param {Array<string>} params[fileName]
- * @returns {Promise<{message:string, processed:number}>}
-
- const ddbClient = new DynamoDBClient({});
- const docClient = DynamoDBDocumentClient.from(ddbClient);
- */
 /**
  * IMPORT_DATA operation: riceve il contenuto CSV e scrive le righe su DynamoDB.
  * @param {Array<string>} params[fileName]
  * @param {string|Buffer} csvContent
  * @returns {Promise<{message:string, processed:number}>}
  */
-exports.importData = async (params = [], csvContent) => {
+exports.importData = async (params = [], csvContent, env) => {
     let [paperDeliveryTableName, countersTableName] = params;
     if (!paperDeliveryTableName || !countersTableName) {
         throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName]");
@@ -40,42 +21,59 @@ exports.importData = async (params = [], csvContent) => {
         throw new Error("csvContent deve essere fornito come parametro");
     }
 
-    // Crea uno stream dal contenuto CSV
+    // Aws configuration
+    let ddbConfig;
+    if (env === "local") {
+        ddbConfig = { endpoint: "http://localhost:4566", region: "us-east-1" };
+    } else if (env === "dev") {
+        ddbConfig = { region: "eu-south-1", credentials: fromIni({ profile: "dev" }) };
+    } else if (env === "test") {
+        ddbConfig = { region: "eu-south-1", credentials: fromIni({ profile: "test" }) };
+    } else {
+        throw new Error("Ambiente non valido");
+    }
+
+    const ddbClient = new DynamoDBClient(ddbConfig);
+    const docClient = DynamoDBDocumentClient.from(ddbClient);
+
     const stream = typeof csvContent === "string" || Buffer.isBuffer(csvContent)
         ? Readable.from([csvContent])
         : csvContent;
 
     let processed = 0;
     const itemsBuffer = [];
-    const dayOfWeek = 1; // lunedì
+    const dayOfWeek = 1;
     const deliveryWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
+
     for await (const record of stream.pipe(csv({ separator: ";" }))) {
         processed += 1;
         const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);
         itemsBuffer.push(paperDelivery);
         if (itemsBuffer.length === 25) {
-            await processBatch(paperDeliveryTableName, countersTableName, itemsBuffer.splice(0, itemsBuffer.length), deliveryWeek);
+            await processBatch(docClient, paperDeliveryTableName, countersTableName, itemsBuffer.splice(0, itemsBuffer.length), deliveryWeek);
         }
     }
     if (itemsBuffer.length) {
-        await processBatch(paperDeliveryTableName, countersTableName, itemsBuffer, deliveryWeek);
+        await processBatch(docClient, paperDeliveryTableName, countersTableName, itemsBuffer, deliveryWeek);
     }
 
     console.log("Processed data:", processed);
     return { message: "CSV imported successfully", processed };
 };
 
-async function processBatch(paperDeliveryTableName, countersTableName, items, deliveryWeek) {
-  const grouped = groupRecordsByProductAndProvince(items);
-  await batchWriteItems(paperDeliveryTableName, items);
-  await updateExcludeCounter(countersTableName, grouped, deliveryWeek);
+async function processBatch(docClient, paperDeliveryTableName, countersTableName, items, deliveryWeek) {
+    const grouped = groupRecordsByProductAndProvince(items);
+    await batchWriteItems(docClient, paperDeliveryTableName, items);
+    await updateExcludeCounter(docClient, countersTableName, grouped, deliveryWeek);
 }
 
 /**
  * Utility that performs a BatchWriteCommand and retries unprocessed items.
+ * @param {DynamoDBDocumentClient} docClient
+ * @param {string} paperDeliveryTableName
  * @param {Array<Object>} items
  */
-async function batchWriteItems(paperDeliveryTableName, items) {
+async function batchWriteItems(docClient, paperDeliveryTableName, items) {
     let unprocessed = items;
     do {
         const chunk = unprocessed.splice(0, 25);
@@ -98,36 +96,36 @@ async function batchWriteItems(paperDeliveryTableName, items) {
 }
 
 function retrieveCounterMap(excludeGroupedRecords) {
-  const result = {};
-  for (const key of Object.keys(excludeGroupedRecords)) {
-    const records = excludeGroupedRecords[key];
-    const productTypeKey = key.split("~")[1];
+    const result = {};
+    for (const key of Object.keys(excludeGroupedRecords)) {
+        const records = excludeGroupedRecords[key];
+        const productTypeKey = key.split("~")[1];
 
-    let filteredRecords;
+        let filteredRecords;
 
-    if (productTypeKey === "RS") {
-      filteredRecords = records;
-    } else {
-      filteredRecords = records.filter(
-        record => record.attempt && parseInt(record.attempt, 10) === 1
-      );
+        if (productTypeKey === "RS") {
+            filteredRecords = records;
+        } else {
+            filteredRecords = records.filter(
+                record => record.attempt && parseInt(record.attempt, 10) === 1
+            );
+        }
+
+        if (filteredRecords.length > 0) {
+            result[key] = filteredRecords.length;
+        }
     }
-
-    if (filteredRecords.length > 0) {
-      result[key] = filteredRecords.length;
-    }
-  }
-  return result;
+    return result;
 }
 
-function calculateTtl(){
-  const ttlDays = 14;
-  const expireDate = new Date();
-  expireDate.setDate(expireDate.getDate() + ttlDays);
-  return Math.floor(expireDate.getTime() / 1000);
+function calculateTtl() {
+    const ttlDays = 14;
+    const expireDate = new Date();
+    expireDate.setDate(expireDate.getDate() + ttlDays);
+    return Math.floor(expireDate.getTime() / 1000);
 }
 
-async function updateExcludeCounter(countersTableName, excludeGroupedRecords, deliveryWeek) {
+async function updateExcludeCounter(docClient, countersTableName, excludeGroupedRecords, deliveryWeek) {
     const ttl = calculateTtl();
     const counterMap = retrieveCounterMap(excludeGroupedRecords);
     for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
@@ -177,9 +175,9 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
 }
 
 function retrieveDate(payload) {
-    if(payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
+    if (payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
         return payload.prepareRequestDate;
-    }else{
+    } else {
         return payload.notificationSentAt;
     }
 }
@@ -193,13 +191,12 @@ function buildSk(province, date, requestId) {
 }
 
 const groupRecordsByProductAndProvince = (records) => {
-  return records.reduce((acc, record) => {
-    const key = `${record.province}~${record.productType}`;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(record);
-    return acc;
-  }, {});
+    return records.reduce((acc, record) => {
+        const key = `${record.province}~${record.productType}`;
+        if (!acc[key]) {
+            acc[key] = [];
+        }
+        acc[key].push(record);
+        return acc;
+    }, {});
 };
-

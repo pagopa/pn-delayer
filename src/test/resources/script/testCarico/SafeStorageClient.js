@@ -11,8 +11,8 @@ class SafeStorageClient {
     }
 
     /**
-     * Calcola lo SHA-256 in base64 di un contenuto JSON
-     * @param {string|object} jsonContent - Contenuto JSON (stringa o oggetto)
+     * Calculates the SHA-256 in base64 of a JSON content
+     * @param {string|object} jsonContent - JSON content (string or object)
      * @returns {string}
      */
     computeSha256Base64(jsonContent) {
@@ -29,7 +29,7 @@ class SafeStorageClient {
     }
 
     /**
-     * Effettua la POST per caricare i metadati del file su Safe Storage
+     * Performs a POST to upload the file metadata to Safe Storage
      * @param {string} sha256Base64 - SHA-256 in base64
      * @returns {Promise<any>}
      */
@@ -58,15 +58,14 @@ class SafeStorageClient {
     }
 
     /**
-     * Effettua la PUT per caricare il file effettivo
-     * @param {string} uploadUrl - URL presigned per l'upload
-     * @param {string} secret - Secret da includere negli headers
-     * @param {string|object} jsonContent - Contenuto JSON da caricare
+     * Performs a PUT to upload the file
+     * @param {string} uploadUrl - Presigned URL for upload
+     * @param {string} secret - Secret to include in headers
+     * @param {string|object} jsonContent - JSON content to upload
      * @param {string} sha256Base64 - SHA-256 in base64
      * @returns {Promise<any>}
      */
     async uploadFileContent(uploadUrl, secret, jsonContent, sha256Base64) {
-        // Prepara il contenuto da inviare nel body
         let bodyContent;
         if (typeof jsonContent === 'object') {
             bodyContent = JSON.stringify(jsonContent, null, 2);
@@ -83,7 +82,6 @@ class SafeStorageClient {
 
         try {
             console.log(`Uploading file content to: ${uploadUrl}`);
-            console.log(`Body content length: ${Buffer.byteLength(bodyContent, 'utf8')} bytes`);
 
             const response = await axios.put(uploadUrl, bodyContent, {
                 headers,
@@ -104,27 +102,26 @@ class SafeStorageClient {
     }
 
     /**
-     * Processa un singolo file JSON
-     * @param {string} filePath - Path del file JSON
+     * Processes a single JSON file
+     * @param {string} filePath - Path of the JSON file
      * @returns {Promise<object>}
      */
     async processJsonFile(filePath) {
         try {
             console.log(`Processing file: ${filePath}`);
 
-            // Leggi il file JSON
             const fileContent = fs.readFileSync(filePath, 'utf8');
             const jsonData = JSON.parse(fileContent);
 
-            // Calcola SHA-256 sul contenuto che verrà effettivamente inviato
+            // Evaluate SHA-256
             const contentToSend = JSON.stringify(jsonData, null, 2);
             const sha256Base64 = this.computeSha256Base64(contentToSend);
             console.log(`SHA-256 calculated: ${sha256Base64}`);
 
-            // Effettua la POST per ottenere i metadati di upload
+            // POST to retrieve upload metadata
             const uploadMetadata = await this.uploadFileMetadata(sha256Base64);
 
-            // Effettua la PUT per caricare il file con il contenuto nel body
+            // PUT to upload the file
             await this.uploadFileContent(
                 uploadMetadata.uploadUrl,
                 uploadMetadata.secret,
@@ -148,27 +145,6 @@ class SafeStorageClient {
             };
         }
     }
-
-    /**
-     * Metodo helper per verificare che lo SHA-256 del contenuto raw corrisponda
-     * @param {string} rawContent - Contenuto raw da verificare
-     * @param {string} expectedSha256 - SHA-256 atteso
-     * @returns {boolean}
-     */
-    validateBodyChecksum(rawContent, expectedSha256) {
-        const computedSha256 = this.computeSha256Base64(rawContent);
-        return computedSha256 === expectedSha256;
-    }
-}
-
-// Aggiungi import per path se non presente
-const path = require('path');
-
-// Controllo per impedire esecuzione diretta
-if (require.main === module) {
-    console.error('SafeStorageClient non può essere eseguito direttamente!');
-    console.log('Utilizza invece: node index.js');
-    process.exit(1);
-}
+  }
 
 exports.SafeStorageClient = SafeStorageClient;

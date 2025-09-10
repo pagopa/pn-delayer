@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// Definizione delle regioni italiane con province e CAP
+// Italian regions with provinces and postal codes
 const regioni = {
     'Abruzzo': [['AQ', ['67100', '67039', '67051']], ['CH', ['66100', '66034', '66041']], ['PE', ['65100', '65121', '65129']], ['TE', ['64100', '64011', '64020']]],
     'Basilicata': [['MT', ['75100', '75011', '75019']], ['PZ', ['85100', '85020', '85030']]],
@@ -26,7 +26,7 @@ const regioni = {
 };
 
 /**
- * Genera un codice IUN casuale nel formato specificato
+ * Generate a random IUN code in the specified format
  */
 function generaIun() {
     const lettere = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -46,32 +46,32 @@ function generaIun() {
 }
 
 /**
- * Genera 375 spedizioni per regione secondo le specifiche
+ * Generate 375 shipments per region according to specifications
  */
 function generaSpedizioniPerRegione() {
     const spedizioni = [];
 
-    // 182 spedizioni AR con attempt=0
+    // 182 AR shipments with attempt=0
     for (let i = 0; i < 182; i++) {
         spedizioni.push(['AR', 0]);
     }
 
-    // 182 spedizioni 890 con attempt=0
+    // 182 890 shipments with attempt=0
     for (let i = 0; i < 182; i++) {
         spedizioni.push(['890', 0]);
     }
 
-    // 2 spedizioni AR con attempt=1
+    // 2 AR shipments with attempt=1
     for (let i = 0; i < 2; i++) {
         spedizioni.push(['AR', 1]);
     }
 
-    // 2 spedizioni 890 con attempt=1
+    // 2 890 shipments with attempt=1
     for (let i = 0; i < 2; i++) {
         spedizioni.push(['890', 1]);
     }
 
-    // 7 spedizioni RS con attempt=0
+    // 7 RS shipments with attempt=0
     for (let i = 0; i < 7; i++) {
         spedizioni.push(['RS', 0]);
     }
@@ -150,7 +150,6 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
         ]
     };
 
-    // Lista delle regioni
     const listaRegioni = [
         "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
         "Friuli-Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
@@ -158,16 +157,16 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
         "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"
     ];
 
-    // Aggiungi distribuzione regionale per AR NZ - ogni regione ha il valore fisso
+    // Add regional distribution for AR NZ - each region has a fixed value
     for (const regione of listaRegioni) {
         modulo.prodotti[0].varianti[0].distribuzione.regionale.push({
             "regione": regione,
-            "valore": valorePerRegione,  // Valore fisso per ogni regione
+            "valore": valorePerRegione,
             "province": null
         });
     }
 
-    // Aggiungi distribuzione regionale per 890 NZ - ogni regione ha il valore fisso
+    // Add regional distribution for 890 NZ - each region has a fixed value
     for (const regione of listaRegioni) {
         modulo.prodotti[1].varianti[0].distribuzione.regionale.push({
             "regione": regione,
@@ -179,22 +178,18 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
     return modulo;
 }
 
-/**
- * Funzione principale
- */
 async function main() {
-    // Header del CSV
+    // CSV header
     const header = ['requestId', 'notificationSentAt', 'prepareRequestDate', 'productType', 'senderPaId', 'province', 'cap', 'attempt', 'iun'];
 
-    // Lista di tutte le regioni
     const listaRegioni = Object.keys(regioni);
 
-    // Parametri per la generazione
+    // Generation parameters
     const paPerFile = 4;  // Massimo 4 PA per file (30.000 spedizioni)
     const totalePa = 400;
     const totaleFile = Math.floor(totalePa / paPerFile);  // 100 file
 
-    // Data di partenza per i timestamp
+    // Starting date for timestamps
     const baseDateTime = new Date(2025, 8, 1, 1, 0, 0);  // Settembre = 8 (0-based)
     let timestampCounter = 0;
     let requestIdCounter = 1;
@@ -202,7 +197,7 @@ async function main() {
     const spedizioniDir = path.join(__dirname, 'spedizioni');
     const moduliCommessaDir = path.join(__dirname, 'moduliCommessa');
 
-    // Genera i file CSV multipli
+    // Generate multiple CSV files
     for (let fileNum = 1; fileNum <= totaleFile; fileNum++) {
         const nomeFile = path.join(spedizioniDir, `spedizioni_pa_${fileNum.toString().padStart(3, '0')}.csv`);
 
@@ -210,23 +205,22 @@ async function main() {
 
         let csvContent = header.join(';') + '\n';
 
-        // Calcola range PA per questo file
+        // Calculate PA range for this file
         const paStart = (fileNum - 1) * paPerFile + 1;
         const paEnd = fileNum * paPerFile;
 
-        // Per ogni PA in questo file (4 PA)
+        // For each PA in this file (4 PAs)
         for (let paNum = paStart; paNum <= paEnd; paNum++) {
-            const senderPaId = `senderPaId${paNum}`;
+            const senderPaId = `loadTest_PaId${paNum}`;
 
             console.log(`  Generando dati per ${senderPaId}...`);
 
-            // Genera modulo commessa per PA dalla 101esima in poi
+            // Generate from 101st onwards
             if (paNum >= 101) {
-                // Determina il valore fisso per regione
                 let valorePerRegione;
-                if (paNum <= 200) {  // PA 101-200: primi 100
+                if (paNum <= 200) {  // PA 101-200: first 100
                     valorePerRegione = 250;
-                } else {  // PA 201-400: ultimi 200
+                } else {  // PA 201-400: last 200
                     valorePerRegione = 10000;
                 }
 
@@ -237,27 +231,21 @@ async function main() {
                 console.log(`  Creato modulo commessa: ${nomeJson} (valore per regione: ${valorePerRegione})`);
             }
 
-            // Per ogni regione (20 regioni)
             for (const regione of listaRegioni) {
                 const provinceRegione = regioni[regione];
                 const spedizioniRegione = generaSpedizioniPerRegione();
 
-                // Per ogni spedizione nella regione
                 for (const [productType, attempt] of spedizioniRegione) {
-                    // Scegli una provincia e CAP casuale dalla regione
                     const [provincia, capList] = provinceRegione[Math.floor(Math.random() * provinceRegione.length)];
                     const cap = capList[Math.floor(Math.random() * capList.length)];
 
-                    // Genera timestamp incrementali
                     const notificationSentAt = new Date(baseDateTime.getTime() + timestampCounter * 1000).toISOString();
                     const prepareRequestDate = new Date(baseDateTime.getTime() + (timestampCounter + 1) * 1000).toISOString();
                     timestampCounter += 2;
 
-                    // Genera dati per la riga
                     const requestId = `RequestId${requestIdCounter}`;
                     const iun = generaIun();
 
-                    // Aggiungi la riga al CSV
                     const row = [
                         requestId,
                         notificationSentAt,
@@ -276,7 +264,6 @@ async function main() {
             }
         }
 
-        // Scrivi il file CSV
         fs.writeFileSync(nomeFile, csvContent, 'utf8');
         console.log(`  File '${nomeFile}' completato (30.000 spedizioni)\n`);
     }
@@ -290,11 +277,6 @@ async function main() {
     console.log('PA per file CSV: 4');
     console.log(`Totale PA: ${totalePa}`);
     console.log(`Totale spedizioni: ${(totalePa * 7500).toLocaleString()}`);
-}
-
-// Esegui solo se il file viene eseguito direttamente
-if (require.main === module) {
-    main().catch(console.error);
 }
 
 module.exports = {
