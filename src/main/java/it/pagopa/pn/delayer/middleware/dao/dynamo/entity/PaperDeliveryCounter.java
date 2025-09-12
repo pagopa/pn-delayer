@@ -67,7 +67,7 @@ public class PaperDeliveryCounter {
     @DynamoDbIgnore
     public static String buildSkPrefix(SkPrefix skPrefix, String... attribute) {
         if(Objects.nonNull(skPrefix)) {
-            return skPrefix.value + String.join("~", attribute);
+            return skPrefix.value + String.join("~", attribute).concat("~");
         }
         return String.join("~", attribute);
     }
