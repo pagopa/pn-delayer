@@ -10,7 +10,7 @@
     "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60",
     "DelayerStartWorkflowCron": "0 3 ? * MON *",
     "DelayerToPaperChannelLambdaCron": "0 9 * * ? *",
-    "DelayerToPaperChannelRuleState": "DISABLED",
+    "DelayerToPaperChannelPipeState": "STOPPED",
     "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
     "PaperDeliveryPrintCapacityCounterTtlDays": "60",
     "PrintCapacityWeeklyWorkingDays": "7",
