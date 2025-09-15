@@ -289,13 +289,13 @@ Parameters:
     Type: String
     Description: Events from pn-delayer TO pn-paper-channel queue URL
 
-  DelayerToPaperChannelRuleState:
+  DelayerToPaperChannelPipeState:
     Type: String
-    Default: DISABLED
+    Default: 'RUNNING'
+    Description: 'Desired state of the DelayerStartWorkflowPipe'
     AllowedValues:
-      - ENABLED
-      - DISABLED
-    Description: 'State of the DelayerToPaperChannelRule'
+      - 'RUNNING'
+      - 'STOPPED'
 
   PaperDeliveryPriorityParameterName:
     Type: String
@@ -2449,6 +2449,7 @@ Resources:
       Name: !Sub '${ProjectName}-delayerToPaperChannelPipe'
       RoleArn: !GetAtt DelayerToPaperChannelPipeExecutionRole.Arn
       Source: !Ref PaperDeliveryTableStreamArn
+      DesiredState: !Ref DelayerToPaperChannelPipeState
       SourceParameters:
         DynamoDBStreamParameters:
           StartingPosition: LATEST
