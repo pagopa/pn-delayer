@@ -291,7 +291,7 @@ Parameters:
 
   DelayerToPaperChannelPipeState:
     Type: String
-    Default: 'RUNNING'
+    Default: 'STOPPED'
     Description: 'Desired state of the DelayerStartWorkflowPipe'
     AllowedValues:
       - 'RUNNING'
