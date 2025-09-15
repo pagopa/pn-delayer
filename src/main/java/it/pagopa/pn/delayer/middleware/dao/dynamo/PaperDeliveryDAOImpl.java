@@ -81,7 +81,7 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
                         log.info("Retrying batch write for {} unprocessed items, {} retries left", unprocessed.size(), retriesLeft - 1);
                         return insertWithRetry(unprocessed, retriesLeft - 1);
                     } else {
-                        log.error("Failed to insert PaperDelivery after 3 attempts, unprocessed items remain: {}", unprocessed.size());
+                        log.error("Failed to insert PaperDelivery after 3 attempts, unprocessed items remain: {}", unprocessed);
                         return Mono.error(new PnInternalException("Error during insert PaperDelivery, Unprocessed items remain after 3 attempts", ERROR_CODE_INSERT_PAPER_DELIVERY_ENTITY));
                     }
                 }
