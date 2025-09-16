@@ -1825,7 +1825,7 @@ Resources:
             Type: Map
             ItemsPath: $.provinces.Items
             InputPath: $
-            MaxConcurrency: 40
+            MaxConcurrency: 20
             Parameters:
               province.$: $$.Map.Item.Value.province.S
               actualTenderId.$: $.actualTenderId

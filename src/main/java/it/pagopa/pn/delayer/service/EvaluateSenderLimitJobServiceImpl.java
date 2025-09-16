@@ -54,10 +54,12 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
         return senderLimitUtils.retrieveTotalEstimateCounter(deliveryWeek, province)
                 .flatMap(totalCounterMap -> paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek, sortkeyPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
                         .flatMap(paperDeliveryPage -> processItems(paperDeliveryPage.items(), tenderId, deliveryWeek, driversTotalCapacity, priorityMap, totalCounterMap)
-                                .flatMap(sentToNextStepItemsCount -> {
+                                .flatMap(senderLimitJobProcessObjects -> {
                                     if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {
+                                        log.info("Processed items for province: {}, tenderId: {}, deliveryWeek: {}. Continuing with lastEvaluatedKey: {}", province, tenderId, deliveryWeek, paperDeliveryPage.lastEvaluatedKey());
                                         return retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, paperDeliveryPage.lastEvaluatedKey(), driversTotalCapacity, priorityMap);
                                     }
+                                    log.info("Processed items for province: {}, tenderId: {}, deliveryWeek: {}. No more items to process.", province, tenderId, deliveryWeek);
                                     return Mono.empty();
                                 }))
                         .then());
@@ -81,7 +83,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      * @param priorityMap Map containing priority information for paper deliveries
      * @return Mono<Long> indicating the count of items sent to the next step
      */
-    private Mono<Long> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap, Map<String,Integer> totalCounterMap) {
+    private Mono<SenderLimitJobProcessObjects> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap, Map<String, Integer> totalCounterMap) {
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setTotalEstimateCounter(totalCounterMap);
         return retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(items, tenderId, driversTotalCapacity, priorityMap)
@@ -90,8 +92,9 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, driversTotalCapacity, senderLimitJobProcessObjects))
                 .flatMap(deliveries -> paperDeliveryUtils.insertPaperDeliveries(deliveries, deliveryWeek))
                 .filter(paperDeliveries -> !CollectionUtils.isEmpty(paperDeliveries))
-                .doOnDiscard(Integer.class, item -> log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek))
-                .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitJobProcessObjects.getSenderLimitMap()));
+                .doOnDiscard(Object.class, item -> log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek))
+                .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitJobProcessObjects.getSenderLimitMap()))
+                .thenReturn(senderLimitJobProcessObjects);
     }
 
     /**
@@ -103,7 +106,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      */
     private Mono<List<PaperDelivery>> retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(List<PaperDelivery> paperDelivery, String tenderId, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap) {
         List<PaperDelivery> toSenderLimitEvaluation = new ArrayList<>();
-        if (driversTotalCapacity.size() == 1 && driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().size() == 1){
+        if (driversTotalCapacity.size() == 1 && driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().size() == 1) {
             String unifiedDeliveryDriver = driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().getFirst();
             return Mono.just(pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDelivery, unifiedDeliveryDriver, tenderId, priorityMap));
         } else {
