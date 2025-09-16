@@ -83,14 +83,27 @@ public class DeliveryDriverUtils {
     }
 
     public Mono<Void> updateCounters(List<IncrementUsedCapacityDto> incrementCapacities) {
-        return Flux.fromIterable(incrementCapacities)
-                .flatMap(incrementUsedCapacityDto ->
+        if (incrementCapacities == null || incrementCapacities.isEmpty()) {
+            return Mono.empty();
+        }
+
+        var exemplar = incrementCapacities.get(0); // campi uguali per tutti
+        Map<String, Integer> totalsByGeo = incrementCapacities.stream()
+                .collect(Collectors.groupingBy(
+                        IncrementUsedCapacityDto::geoKey,
+                        Collectors.summingInt(dto -> dto.numberOfDeliveries() == null ? 0 : dto.numberOfDeliveries())
+                ));
+
+        log.info("Total used capacities to update: {}", totalsByGeo.size());
+
+        return Flux.fromIterable(totalsByGeo.entrySet())
+                .flatMap(incrementUsedCapacityEntry ->
                         paperDeliveryUsedCapacityDAO.updateCounter(
-                                incrementUsedCapacityDto.unifiedDeliveryDriver(),
-                                incrementUsedCapacityDto.geoKey(),
-                                incrementUsedCapacityDto.numberOfDeliveries(),
-                                incrementUsedCapacityDto.deliveryWeek(),
-                                incrementUsedCapacityDto.declaredCapacity()))
+                               exemplar.unifiedDeliveryDriver(),
+                                incrementUsedCapacityEntry.getKey(), // geokey
+                                incrementUsedCapacityEntry.getValue(), // somma numberOfDeliveries per geoKey
+                                exemplar.deliveryWeek(),
+                                exemplar.declaredCapacity()))
                 .then();
     }
 

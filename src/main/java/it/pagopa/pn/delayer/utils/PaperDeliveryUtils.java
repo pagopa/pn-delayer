@@ -57,8 +57,9 @@ public class PaperDeliveryUtils {
                         return sendToNextWeek(workflowStepEnum, sortKeyPrefix, new HashMap<>(), deliveryWeek);
                     } else {
                         AtomicInteger printCounter = new AtomicInteger(0);
+                        List<IncrementUsedCapacityDto> incrementCapacities = new ArrayList<>();
                         return Mono.just(pnDelayerUtils.retrieveActualPrintCapacity(deliveryWeek))
-                                .flatMap(dailyPrintCapacity -> sendToNextStep(workflowStepEnum, sortKeyPrefix, new HashMap<>(), tenderId, deliveryWeek, residualCapacity, tuple.getT1(), dailyPrintCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays(), printCounter));
+                                .flatMap(dailyPrintCapacity -> sendToNextStep(workflowStepEnum, sortKeyPrefix, new HashMap<>(), tenderId, deliveryWeek, residualCapacity, tuple.getT1(), dailyPrintCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays(), printCounter, incrementCapacities));
                     }
                 })
                 .then();
@@ -99,35 +100,35 @@ public class PaperDeliveryUtils {
      * @param declaredCapacity the declared capacity for the province
      * @return a Mono containing the number of deliveries sent to the next step
      */
-    private Mono<Integer> sendToNextStep(WorkflowStepEnum workflowStepEnum, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, String tenderId, LocalDate deliveryWeek, Integer residualCapacity, Integer declaredCapacity, Integer weeklyPrintCapacity, AtomicInteger printCounter) {
+    private Mono<Integer> sendToNextStep(WorkflowStepEnum workflowStepEnum, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, String tenderId, LocalDate deliveryWeek, Integer residualCapacity, Integer declaredCapacity, Integer weeklyPrintCapacity, AtomicInteger printCounter, List<IncrementUsedCapacityDto> incrementUsedCapacities) {
         return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, Math.min(residualCapacity, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
-                .flatMap(paperDeliveryPage -> processChunkToSendToNextStep(paperDeliveryPage.items(), sortKeyPrefix, tenderId, deliveryWeek, declaredCapacity, printCounter)
+                .flatMap(paperDeliveryPage -> processChunkToSendToNextStep(paperDeliveryPage.items(), sortKeyPrefix, tenderId, deliveryWeek, declaredCapacity, printCounter, incrementUsedCapacities)
                         .flatMap(sentToNextStep -> {
                             int residualCapacityAfterSending = residualCapacity - sentToNextStep;
                             if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {
                                 return residualCapacityAfterSending <= 0 ?
                                         sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek).thenReturn(sentToNextStep) :
-                                        sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacity - sentToNextStep, declaredCapacity, weeklyPrintCapacity, printCounter);
+                                        sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacity - sentToNextStep, declaredCapacity, weeklyPrintCapacity, printCounter, incrementUsedCapacities);
                             }
                             return paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryWeek, printCounter.get(), weeklyPrintCapacity)
+                                    .then(deliveryDriverUtils.updateCounters(incrementUsedCapacities))
                                     .then(Mono.empty());
                         }));
     }
 
-    private Mono<Integer> processChunkToSendToNextStep(List<PaperDelivery> chunk, String sortKeyPrefix, String tenderId, LocalDate deliveryWeek, Integer provinceDeclaredCapacity, AtomicInteger printCounter) {
-        List<IncrementUsedCapacityDto> incrementCapacities = new ArrayList<>();
+    private Mono<Integer> processChunkToSendToNextStep(List<PaperDelivery> chunk, String sortKeyPrefix, String tenderId, LocalDate deliveryWeek, Integer provinceDeclaredCapacity, AtomicInteger printCounter, List<IncrementUsedCapacityDto> incrementUsedCapacities) {
         List<PaperDelivery> deliveriesToSend = new ArrayList<>();
         String unifiedDeliveryDriver = sortKeyPrefix.split("~")[0];
         String province = sortKeyPrefix.split("~")[1];
 
-        return evaluateCapCapacity(chunk, unifiedDeliveryDriver, tenderId, deliveryWeek, deliveriesToSend, incrementCapacities)
-                .doOnNext(unused -> incrementCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, province, deliveriesToSend.size(), deliveryWeek, provinceDeclaredCapacity)))
+        return evaluateCapCapacity(chunk, unifiedDeliveryDriver, tenderId, deliveryWeek, deliveriesToSend, incrementUsedCapacities)
+                .doOnNext(unused -> incrementUsedCapacities.add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, province, deliveriesToSend.size(), deliveryWeek, provinceDeclaredCapacity)))
                 .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(deliveriesToSend).thenReturn(deliveriesToSend.size())
-                        .doOnNext(printCounter::addAndGet)
+                        .doOnNext(printCounter::addAndGet));
 //                        .flatMap(sentToNextStepCounter -> paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryWeek, sentToNextStepCounter, weeklyPrintCapacity)
 //                                .thenReturn(sentToNextStepCounter))
-                        .flatMap(sentToNextStepCounter -> deliveryDriverUtils.updateCounters(incrementCapacities)
-                                .thenReturn(sentToNextStepCounter)));
+//                        .flatMap(sentToNextStepCounter -> deliveryDriverUtils.updateCounters(incrementCapacities)
+                               // .thenReturn(sentToNextStepCounter)));
     }
 
     public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
