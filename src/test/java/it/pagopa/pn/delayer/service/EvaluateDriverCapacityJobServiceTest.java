@@ -36,12 +36,6 @@ import static org.mockito.Mockito.*;
 class EvaluateDriverCapacityJobServiceTest {
 
     @Mock
-    private PaperDeliveryDriverUsedCapacitiesDAO paperDeliveryUsedCapacityDAO;
-
-    @Mock
-    private PaperDeliveryDriverCapacitiesDAO paperDeliveryCapacityDAO;
-
-    @Mock
     private DeliveryDriverUtils deliveryDriverUtils;
 
     @Mock
@@ -286,7 +280,6 @@ class EvaluateDriverCapacityJobServiceTest {
 
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
-        when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
 
         StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
