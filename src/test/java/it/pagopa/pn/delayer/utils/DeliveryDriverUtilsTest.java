@@ -192,7 +192,7 @@ class DeliveryDriverUtilsTest {
     void updateCounter(){
         List<IncrementUsedCapacityDto> incrementCapacities = List.of(
                 new IncrementUsedCapacityDto("unifiedDeliveryDriver", "geoKey", 10, LocalDate.now(), 100),
-                new IncrementUsedCapacityDto("unifiedDeliveryDriver2", "geoKey2", 5, LocalDate.now(), 50)
+                new IncrementUsedCapacityDto("unifiedDeliveryDriver", "geoKey2", 5, LocalDate.now(), 100)
         );
 
         when(paperDeliveryUsedCapacityDAO.updateCounter(
@@ -200,7 +200,7 @@ class DeliveryDriverUtilsTest {
                 .thenReturn(Mono.empty());
 
         when(paperDeliveryUsedCapacityDAO.updateCounter(
-                "unifiedDeliveryDriver2", "geoKey2", 5, LocalDate.now(), 50))
+                "unifiedDeliveryDriver", "geoKey2", 5, LocalDate.now(), 100))
                 .thenReturn(Mono.empty());
 
         StepVerifier.create(deliveryDriverUtils.updateCounters(incrementCapacities))

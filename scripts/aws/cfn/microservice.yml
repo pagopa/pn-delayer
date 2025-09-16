@@ -189,7 +189,7 @@ Parameters:
 
   VCPU:     ##TODEFINE in order to set the max number of parallel jobs
     Type: String
-    Default: 0.25
+    Default: 1
     Description: The number of vCPUs reserved for the container.
 
   ComputeResourceType:
@@ -202,7 +202,7 @@ Parameters:
 
   Memory:
     Type: String
-    Default: 2048
+    Default: 4096
     Description: The memory hard limit (in MiB) present to the container.
 
   PnDelayerInputsKinesisDataStreamArn:
@@ -447,6 +447,8 @@ Resources:
       Type: container
       PropagateTags: true
       JobDefinitionName: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
+      RetryStrategy:
+        Attempts: 3
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -617,6 +619,8 @@ Resources:
       Type: container
       PropagateTags: true
       JobDefinitionName: !Sub '${ProjectName}-delayer-residual-capacity-job-definition'
+      RetryStrategy:
+        Attempts: 3
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -774,6 +778,8 @@ Resources:
       Type: container
       PropagateTags: true
       JobDefinitionName: !Sub '${ProjectName}-delayer-driver-capacity-job-definition'
+      RetryStrategy:
+        Attempts: 3
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -1825,7 +1831,7 @@ Resources:
             Type: Map
             ItemsPath: $.provinces.Items
             InputPath: $
-            MaxConcurrency: 20
+            MaxConcurrency: 5
             Parameters:
               province.$: $$.Map.Item.Value.province.S
               actualTenderId.$: $.actualTenderId
@@ -1869,12 +1875,12 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
-                  Retry:
-                    - ErrorEquals:
-                        - States.ALL
-                      IntervalSeconds: 1
-                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
-                      BackoffRate: 2
+#                  Retry:
+#                    - ErrorEquals:
+#                        - States.ALL
+#                      IntervalSeconds: 1
+#                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
+#                      BackoffRate: 2
                   Catch:
                     - ErrorEquals:
                         - States.ALL
@@ -1974,12 +1980,12 @@ Resources:
                           Value.$: $.actualTenderId
                         - Name: PN_DELAYER_WORKFLOWSTEP
                           Value: EVALUATE_DRIVER_CAPACITY
-                  Retry:
-                    - ErrorEquals:
-                        - States.ALL
-                      IntervalSeconds: 1
-                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
-                      BackoffRate: 2
+#                  Retry:
+#                    - ErrorEquals:
+#                        - States.ALL
+#                      IntervalSeconds: 1
+#                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
+#                      BackoffRate: 2
                   Catch:
                     - ErrorEquals:
                         - States.ALL
@@ -2045,12 +2051,12 @@ Resources:
                           Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
-                  Retry:
-                    - ErrorEquals:
-                        - States.ALL
-                      IntervalSeconds: 1
-                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
-                      BackoffRate: 2
+#                  Retry:
+#                    - ErrorEquals:
+#                        - States.ALL
+#                      IntervalSeconds: 1
+#                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
+#                      BackoffRate: 2
                   Catch:
                     - ErrorEquals:
                         - States.ALL
