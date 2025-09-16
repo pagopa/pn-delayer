@@ -52,8 +52,14 @@ public class DeliveryDriverUtils {
                             .payload(SdkBytes.fromByteArray(objectMapper.writeValueAsBytes(new PaperChannelDeliveryDriverRequest(deliveryDriverRequests, tenderId, "GET_UNIFIED_DELIVERY_DRIVERS"))))
                             .build())
                     .payload();
-            return objectMapper.readValue(sdkBytesResponse.asByteArray(), PaperChannelDeliveryDriverResponse.class).getBody();
+            var response = objectMapper.readValue(sdkBytesResponse.asByteArray(), PaperChannelDeliveryDriverResponse.class).getBody();
+            if(deliveryDriverRequests.size() != response.size()) {
+                log.error("CAP without delivery driver from Paper Channel. Request: {}. Response: {}", deliveryDriverRequests, response);
+            }
+            return response;
+
         } catch (IOException e) {
+            log.error("Error in retrieveUnifiedDeliveryDriversFromPaperChannel with requests: {}", deliveryDriverRequests, e);
             throw new RuntimeException(e);
         }
     }
