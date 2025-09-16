@@ -140,6 +140,74 @@ class EvaluateSenderLimitJobServiceTest {
     }
 
     @Test
+    void startSenderLimitJob_singleDriver_withLastEvaluatedKeyAndWithoutSenderLimit() {
+
+        DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS", "AR"), 2, List.of("POSTE"));
+        when(deliveryDriverUtils.retrieveDriversCapacityOnProvince(any(), eq(tenderId), eq(province)))
+                .thenReturn(Mono.just(List.of(capacity)));
+
+        List<PaperDelivery> deliveries = new ArrayList<>();
+        deliveries.addAll(getPaperDeliveries(false));
+        deliveries.addAll(getPaperDeliveries(false));
+        Page<PaperDelivery> page = mock(Page.class);
+        when(page.items()).thenReturn(deliveries);
+        Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
+        lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_SENDER_LIMIT).build());
+        lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
+        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);;
+
+        List<PaperDelivery> deliveries2 = new ArrayList<>();
+        deliveries2.addAll(getPaperDeliveries(false));
+        deliveries2.addAll(getPaperDeliveries(false));
+        Page<PaperDelivery> page2 = mock(Page.class);
+        when(page2.items()).thenReturn(deliveries2);
+        when(page2.lastEvaluatedKey()).thenReturn(new HashMap<>());
+
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+                .thenReturn(Mono.just(page))
+                .thenReturn(Mono.just(page2));
+
+        PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
+        paperDeliverySenderLimit.setPk("paId2~AR~RM");
+        paperDeliverySenderLimit.setProductType("AR");
+        paperDeliverySenderLimit.setWeeklyEstimate(5);
+
+        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
+        usedSenderLimit.setPk("paId2~AR~RM");
+        usedSenderLimit.setSenderLimit(5);
+        usedSenderLimit.setNumberOfShipment(4);
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.empty());
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
+                .thenReturn(Flux.empty());
+
+        ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
+        when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
+                .thenReturn(Mono.empty());
+
+        PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
+        paperDeliveryCounter.setNumberOfShipments(10);
+
+        List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
+
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
+                .thenReturn(Mono.just(paperDeliveryCounterList));
+
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
+                .verifyComplete();
+
+        List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
+        Assertions.assertEquals(2, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(2, capturedDeliveries.get(1).size());
+        Assertions.assertEquals(2, capturedDeliveries.get(2).size());
+        Assertions.assertEquals(2, capturedDeliveries.getLast().size());
+        verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+    }
+
+    @Test
     void startSenderLimitJob_singleDriver_withLastEvaluatedKey() {
 
         DriversTotalCapacity capacity = new DriversTotalCapacity(List.of("RS", "AR"), 2, List.of("POSTE"));
