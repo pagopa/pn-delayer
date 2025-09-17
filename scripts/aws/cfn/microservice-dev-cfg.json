@@ -23,6 +23,5 @@
     "ExportDelayerDataLambdaCron": "0 7 ? * 3 *",
     "VCPU": "1",
     "Memory": "4096"
-
   }
 }
