@@ -37,12 +37,6 @@ import static org.mockito.Mockito.*;
 class EvaluateResidualCapacityJobServiceTest {
 
     @Mock
-    private PaperDeliveryDriverUsedCapacitiesDAO paperDeliveryUsedCapacityDAO;
-
-    @Mock
-    private PaperDeliveryDriverCapacitiesDAO paperDeliveryCapacityDAO;
-
-    @Mock
     private DeliveryDriverUtils deliveryDriverUtils;
 
     @Mock
@@ -240,10 +234,9 @@ class EvaluateResidualCapacityJobServiceTest {
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any());
         verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity( eq("00184"), any(), any(), any());
-        verify(deliveryDriverUtils, times(2)).updateCounters(anyList());
+        verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
         List<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptured = incrementUsedCapacityCaptor.getAllValues();
-        Assertions.assertEquals(2, incrementUsedCapacityCaptured.getFirst().size());
-        Assertions.assertEquals(2, incrementUsedCapacityCaptured.getFirst().size());
+        Assertions.assertEquals(4, incrementUsedCapacityCaptured.getFirst().size());
     }
 
     @Test
@@ -320,8 +313,8 @@ class EvaluateResidualCapacityJobServiceTest {
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any());
         verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any());
-        verify(deliveryDriverUtils, times(2)).updateCounters(anyList());
-       verify(paperDeliveryDAO, times(4)).insertPaperDeliveries(anyList());
+        verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
+        verify(paperDeliveryDAO, times(4)).insertPaperDeliveries(anyList());
     }
 
     private static @NotNull List<PaperDelivery> getPaperDeliveries(boolean sameCap) {

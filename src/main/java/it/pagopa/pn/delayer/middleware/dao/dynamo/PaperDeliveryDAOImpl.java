@@ -17,6 +17,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.*;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,7 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     public Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveries) {
         if(!CollectionUtils.isEmpty(paperDeliveries)) {
             return Flux.fromIterable(paperDeliveries).buffer(25)
-                    .flatMap(chunk -> insertWithRetry(chunk, 3))
+                    .flatMap(chunk -> insertWithRetry(chunk, 10))
                     .then();
         }
         return Mono.empty();
@@ -79,7 +80,7 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
                 if (unprocessed != null && !unprocessed.isEmpty()) {
                     if (retriesLeft > 1) {
                         log.info("Retrying batch write for {} unprocessed items, {} retries left", unprocessed.size(), retriesLeft - 1);
-                        return insertWithRetry(unprocessed, retriesLeft - 1);
+                        return Mono.delay(Duration.ofSeconds(3)).then(insertWithRetry(unprocessed, retriesLeft - 1));
                     } else {
                         log.error("Failed to insert PaperDelivery after 3 attempts, unprocessed items remain: {}", unprocessed);
                         return Mono.error(new PnInternalException("Error during insert PaperDelivery, Unprocessed items remain after 3 attempts", ERROR_CODE_INSERT_PAPER_DELIVERY_ENTITY));
