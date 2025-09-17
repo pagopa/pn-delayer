@@ -20,6 +20,9 @@
     "PaperDeliveryPrintCapacityCounterTtlDuration": "60d",
     "SafeStorageCxId":"pn-delayer",
     "PrintCounterTtlDuration": "30d",
-    "ExportDelayerDataLambdaCron": "0 7 ? * 3 *"
+    "ExportDelayerDataLambdaCron": "0 7 ? * 3 *",
+    "VCPU": "1",
+    "Memory": "4096"
+
   }
 }
