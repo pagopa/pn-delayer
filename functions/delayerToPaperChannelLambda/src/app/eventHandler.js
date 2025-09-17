@@ -19,7 +19,7 @@ exports.handleEvent = async (event) => {
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = event.input.dailyPrintCapacity - event.input.sendToNextStepCounter;
-            if (toSendToNextStep > 0) {
+            if (toSendToNextStep > 0 && event.input.stopSendToPhaseTwo == "false") {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
                 return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextStep);
             }
