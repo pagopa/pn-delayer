@@ -106,15 +106,33 @@ public class PaperDeliveryUtils {
                         .flatMap(sentToNextStep -> {
                             int residualCapacityAfterSending = residualCapacity - sentToNextStep;
                             if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {
-                                return residualCapacityAfterSending <= 0 ?
-                                        sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek).thenReturn(sentToNextStep) :
-                                        sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacity - sentToNextStep, declaredCapacity, weeklyPrintCapacity, printCounter, incrementUsedCapacities);
+                                if (residualCapacityAfterSending <= 0) {
+                                    return flushCounters(deliveryWeek, weeklyPrintCapacity, printCounter, incrementUsedCapacities)
+                                            .then(sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek))
+                                            .thenReturn(sentToNextStep);
+                                } else {
+                                    return sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(),
+                                            tenderId, deliveryWeek, residualCapacityAfterSending, declaredCapacity,
+                                            weeklyPrintCapacity, printCounter, incrementUsedCapacities);
+                                }
                             }
-                            return paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryWeek, printCounter.get(), weeklyPrintCapacity)
-                                    .then(deliveryDriverUtils.updateCounters(incrementUsedCapacities))
+                            return flushCounters(deliveryWeek, weeklyPrintCapacity, printCounter, incrementUsedCapacities)
                                     .then(Mono.empty());
                         }));
     }
+
+    private Mono<Void> flushCounters(LocalDate deliveryWeek,
+                                     Integer weeklyPrintCapacity,
+                                     AtomicInteger printCounter,
+                                     List<IncrementUsedCapacityDto> incrementUsedCapacities) {
+        if (printCounter.get() == 0 && (incrementUsedCapacities == null || incrementUsedCapacities.isEmpty())) {
+            return Mono.empty();
+        }
+
+        return paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryWeek, printCounter.get(), weeklyPrintCapacity)
+                .then(deliveryDriverUtils.updateCounters(incrementUsedCapacities));
+    }
+
 
     private Mono<Integer> processChunkToSendToNextStep(List<PaperDelivery> chunk, String sortKeyPrefix, String tenderId, LocalDate deliveryWeek, Integer provinceDeclaredCapacity, AtomicInteger printCounter, List<IncrementUsedCapacityDto> incrementUsedCapacities) {
         List<PaperDelivery> deliveriesToSend = new ArrayList<>();
