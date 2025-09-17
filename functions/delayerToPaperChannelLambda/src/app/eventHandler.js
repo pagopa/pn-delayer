@@ -26,11 +26,11 @@ exports.handleEvent = async (event) => {
             console.log("No shipments to send to next step")
             return {
                 input: {
-                    dailyPrintCapacity: event.input.dailyPrintCapacity,
-                    weeklyPrintCapacity: event.input.weeklyPrintCapacity,
-                    numberOfShipments: event.input.numberOfShipments,
+                    dailyPrintCapacity: parseInt(event.input.dailyPrintCapacity),
+                    weeklyPrintCapacity: parseInt(event.input.weeklyPrintCapacity),
+                    numberOfShipments: parseInt(event.input.numberOfShipments),
                     lastEvaluatedKeyPhase2: null,
-                    sendToNextStepCounter: event.input.sendToNextStepCounter,
+                    sendToNextStepCounter: parseInt(event.input.sendToNextStepCounter),
                     executionDate: event.input.executionDate
                 },
                 processType: "SEND_TO_PHASE_2"
@@ -46,12 +46,12 @@ exports.handleEvent = async (event) => {
             console.log("No shipments to send to next week");
             return {
                 input: {
-                    dailyPrintCapacity: event.input.dailyPrintCapacity,
-                    weeklyPrintCapacity: event.input.weeklyPrintCapacity,
-                    numberOfShipments: event.input.numberOfShipments,
+                    dailyPrintCapacity: parseInt(event.input.dailyPrintCapacity),
+                    weeklyPrintCapacity: parseInt(event.input.weeklyPrintCapacity),
+                    numberOfShipments: parseInt(event.input.numberOfShipments),
                     lastEvaluatedKeyNextWeek: null,
-                    sendToNextWeekCounter: event.input.sendToNextWeekCounter,
-                    sentToNextWeek: event.input.sentToNextWeek,
+                    sendToNextWeekCounter: parseInt(event.input.sendToNextWeekCounter),
+                    sentToNextWeek: parseInt(event.input.sentToNextWeek),
                     executionDate: event.input.executionDate
                 },
                 processType: "SEND_TO_NEXT_WEEK"
@@ -67,11 +67,11 @@ async function sendToPhase2(paperDeliveryTableName, deliveryWeek, input, toSendT
         .then(result => {
             return {
                 input: {
-                    dailyPrintCapacity: input.dailyPrintCapacity,
-                    weeklyPrintCapacity: input.weeklyPrintCapacity,
-                    numberOfShipments: input.numberOfShipments,
+                    dailyPrintCapacity: parseInt(input.dailyPrintCapacity),
+                    weeklyPrintCapacity: parseInt(input.weeklyPrintCapacity),
+                    numberOfShipments: parseInt(input.numberOfShipments),
                     lastEvaluatedKeyPhase2: remapLastEvaluatedKey(result.lastEvaluatedKey),
-                    sendToNextStepCounter: result.dailyCounter,
+                    sendToNextStepCounter: parseInt(result.dailyCounter),
                     executionDate: input.executionDate
                 },
                 processType: "SEND_TO_PHASE_2"
@@ -84,12 +84,12 @@ async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, input, toSen
         .then(result => {
             return {
                 input: {
-                    dailyPrintCapacity: input.dailyPrintCapacity,
-                    weeklyPrintCapacity: input.weeklyPrintCapacity,
-                    numberOfShipments: input.numberOfShipments,
+                    dailyPrintCapacity: parseInt(input.dailyPrintCapacity),
+                    weeklyPrintCapacity: parseInt(input.weeklyPrintCapacity),
+                    numberOfShipments: parseInt(input.numberOfShipments),
                     lastEvaluatedKeyNextWeek: remapLastEvaluatedKeyForNextWeek(result.lastEvaluatedKey, result.toHandle, result.dailyCounter),
-                    sendToNextWeekCounter: result.dailyCounter,
-                    sentToNextWeek: input.sentToNextWeek,
+                    sendToNextWeekCounter: parseInt(result.dailyCounter),
+                    sentToNextWeek: parseInt(input.sentToNextWeek),
                     executionDate: input.executionDate
                 },
                 processType: "SEND_TO_NEXT_WEEK"
@@ -126,7 +126,7 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
         return retrieveAndProcessItems(
             paperDeliveryTableName,
             deliveryWeek,
-            response.LastEvaluatedKey,
+            remapLastEvaluatedKey(response.LastEvaluatedKey),
             dailyCounter,
             toHandle,
             executionCounter,
