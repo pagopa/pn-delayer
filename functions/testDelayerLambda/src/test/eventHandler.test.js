@@ -306,4 +306,36 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
    });
+
+       it("GET_SENDER_LIMIT returns the item", async () => {
+
+           const fakeItem = {
+               pk: "PA1~PT1~RM",
+               deliveryDate: "2025-06-30T00:00:00Z",
+               limit: 100
+           };
+           ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+           const params = ["PA1", "PT1", "RM", "2025-06-30T00:00:00Z"];
+           const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+
+            assert.strictEqual(result.statusCode, 200);
+            const body = JSON.parse(result.body);
+            assert.strictEqual(body.limit, 100);
+       });
+
+       it("GET_SENDER_LIMIT if item not found", async () => {
+
+           ddbMock.on(GetCommand).resolves({});
+           const params = ["PA1", "PT1", "RM", "2025-06-30T00:00:00Z"];
+
+           const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+           assert.strictEqual(JSON.parse(result.body).message, "Item not found");
+       });
+
+       it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
+
+          const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
+          assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [paId, productType, province, deliveryDate]");
+       });
 });
