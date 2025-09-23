@@ -15,21 +15,23 @@ async function getDeclaredCapacity(params = []) {
     if (!tenderId || !unifiedDeliveryDriver || !geoKey || !deliveryDate) {
         throw new Error("Parameters must be [tenderId, unifiedDeliveryDriver, geoKey, deliveryDate]");
     }
+
     const partitionKey = `${tenderId}~${unifiedDeliveryDriver}~${geoKey}`;
+
     const command = new QueryCommand({
         TableName: TABLE_NAME,
-        KeyConditionExpression: "pk = :pk",
+        KeyConditionExpression: "pk = :pk AND activationDateFrom <= :deliveryDate",
+        FilterExpression: "attribute_not_exists(activationDateTo) OR activationDateTo >= :now",
         ExpressionAttributeValues: {
-            ":pk": partitionKey
-        }
+            ":pk": partitionKey,
+            ":deliveryDate": deliveryDate,
+            ":now": deliveryDate
+        },
+        Limit: 1,
+        ScanIndexForward: false
     });
-    const { Items } = await docClient.send(command);
 
-    const filtered = (Items || []).filter(item =>
-        item.activationDateFrom < deliveryDate &&
-        (!item.activationDateTo || item.activationDateTo > deliveryDate)
-    );
-    return filtered;
+    return docClient.send(command);
 }
 
 module.exports = { getDeclaredCapacity };
