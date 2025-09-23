@@ -1679,8 +1679,8 @@ Resources:
         Variables:
           PAPER_DELIVERY_DRIVER_USED_TABLENAME: !Ref PaperDeliveryDriverUsedCapacitiesTableName
           DELIVERY_DATE_INDEX: deliveryDate-index
-          SNS_TOPIC_NAME: !Sub arn:aws:sns:${AWS::Region}::${AWS::AccountId}:${DataAnalysisTopicName}
-          MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}:${AWS::AccountId}"
+          SNS_TOPIC_NAME: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${DataAnalysisTopicName}
+          MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
           SIGN_URL_EXPIRATION: !Ref SignUrlExpiration
       TracingConfig:
         Mode: Active
