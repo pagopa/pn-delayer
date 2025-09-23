@@ -306,4 +306,88 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
    });
+
+   it("GET_DECLARED_CAPACITY returns filtered items based on date range", async () => {
+       const fakeItems = [
+           {
+               pk: "tender1~driver1~geo1",
+               activationDateFrom: "2024-01-01T00:00:00Z",
+               activationDateTo: "2024-12-31T00:00:00Z",
+               capacity: 1000
+           },
+           {
+               pk: "tender1~driver1~geo1",
+               activationDateFrom: "2025-06-01T00:00:00Z",
+               activationDateTo: "2025-06-30T00:00:00Z",
+               capacity: 500
+           },
+           {
+               pk: "tender1~driver1~geo1",
+               activationDateFrom: "2025-01-01T00:00:00Z",
+               activationDateTo: null, // No end date
+               capacity: 2000
+           }
+       ];
+
+       ddbMock.on(QueryCommand).resolves({ Items: fakeItems });
+       const params = ["tender1", "driver1", "geo1", "2025-06-15T00:00:00Z"];
+
+       const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       // Should return 2 items: the one with no end date and the one covering June
+       assert.strictEqual(body.length, 2);
+       assert.strictEqual(body.some(item => item.capacity === 500), true);
+       assert.strictEqual(body.some(item => item.capacity === 2000), true);
+   });
+
+   it("GET_DECLARED_CAPACITY returns empty array when no items match date range", async () => {
+       const fakeItems = [
+           {
+               pk: "tender1~driver1~geo1",
+               activationDateFrom: "2025-01-01T00:00:00Z",
+               activationDateTo: "2025-05-31T00:00:00Z",
+               capacity: 1000
+           }
+       ];
+
+       ddbMock.on(QueryCommand).resolves({ Items: fakeItems });
+       const params = ["tender1", "driver1", "geo1", "2025-06-15T00:00:00Z"];
+
+       const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.length, 0);
+   });
+
+   it("GET_DECLARED_CAPACITY returns empty array when no items found in DynamoDB", async () => {
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+       const params = ["tender1", "driver1", "geo1", "2025-06-15T00:00:00Z"];
+
+       const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.length, 0);
+   });
+
+   it("GET_DECLARED_CAPACITY error when missing required parameters", async () => {
+       const params = [];
+
+       const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+
+       assert.strictEqual(result.statusCode, 500);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.message.includes("Parameters must be"), true);
+   });
+
+   it("GET_DECLARED_CAPACITY error when empty parameters array", async () => {
+       const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: [] });
+
+       assert.strictEqual(result.statusCode, 500);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [tenderId, unifiedDeliveryDriver, geoKey, deliveryDate]");
+   });
 });
