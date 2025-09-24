@@ -6,27 +6,28 @@ const { SFNClient, DescribeExecutionCommand } = require("@aws-sdk/client-sfn");
  * @param {Array<string>} params [executionArn]
  */
 async function getStatusExecution(params = []) {
-    const [executionArn] = params;
-    if (!executionArn) {
-        throw new Error("Parameter must be [executionArn]");
-    }
+  const [executionArn] = params;
+  if (!executionArn) {
+    throw new Error("Parameter must be [executionArn]");
+  }
 
-    const sfnClient = new SFNClient({});
-    const command = new DescribeExecutionCommand({ executionArn });
-    const response = await sfnClient.send(command);
+  const sfnClient = new SFNClient({});
+  const command = new DescribeExecutionCommand({ executionArn });
+  const response = await sfnClient.send(command);
 
-    const result = {
-        executionId: executionArn,
-        status: response.status,
-        startDate: response.startDate,
-        endDate: response.stopDate,
-    };
+  const result = {
+    executionArn: executionArn,
+    status: response.status,
+    startDate: response.startDate,
+    stopDate: response.stopDate,
+  };
 
-    if (response.status === "FAILED" && response.cause) {
-        result.error = response.cause;
-    }
+  if (response.status === "FAILED") {
+    result.error = response.error || null;
+    result.cause = response.cause || null;
+  }
 
-    return result;
+  return result;
 }
 
 module.exports = { getStatusExecution };

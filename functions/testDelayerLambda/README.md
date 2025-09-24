@@ -178,11 +178,12 @@ Viene restituito un oggetto con i dettagli dell’esecuzione della Step Function
 Un esempio di risposta è il seguente:
 ```json
 {
-  "executionId": "arn:aws:states:<REGIONE>:<ACCOUNT_ID>:execution:<NOME_STATE_MACHINE>:<NOME_ESECUZIONE>",
+  "executionArn": "arn:aws:states:<REGIONE>:<ACCOUNT_ID>:execution:<NOME_STATE_MACHINE>:<NOME_ESECUZIONE>",
   "status": "FAILED",
   "startDate": "2025-09-24T08:27:46.279Z",
-  "endDate": "2025-09-24T08:32:10.123Z",
-  "error": "Process exited with error code 1: Unexpected input format"
+  "stopDate": "2025-09-24T08:32:10.123Z",
+  "error": "Process exited with error code 1",
+  "cause": "Unexpected input format"
 }
 ```
 
