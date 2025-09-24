@@ -1,11 +1,22 @@
 "use strict";
 
-const { SFNClient, StartExecutionCommand } = require("@aws-sdk/client-sfn");
+const { SFNClient, StartExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
 const sfnClient = new SFNClient({});
 
+    async function getLastExecution(stateMachineArn) {
+        const resp = await sfnClient.send(
+            new ListExecutionsCommand({
+                stateMachineArn,
+                maxResults: 1,
+                sortOrder: "DESCENDING"
+            })
+        );
+        return resp.executions?.[0] || null;
+    }
+
 /**
- *RUN_ALGORITHM operation – avvia la Step Function configurata.
+ *RUN_ALGORITHM operation – launches the configured Step Function only if there are no active runs.
  * @param {Array<string>} params[paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName,
  *         senderLimitTableName, senderUsedLimitTableName, countersTableName, printCapacity]
  */
@@ -24,6 +35,15 @@ async function runAlgorithm(params) {
         !senderLimitTableName || !senderUsedLimitTableName || !countersTableName) {
         throw new Error("Required parameters must be [paperDeliveryTableName, deliveryDriverCapacitiesTableName, " +
             "deliveryDriverUsedCapacitiesTableName, senderLimitTableName, senderUsedLimitTableName, countersTableName]");
+    }
+
+    const lastExecution = await getLastExecution(SFN_ARN);
+    if (lastExecution && (lastExecution.status === "RUNNING" || lastExecution.status === "PENDING_REDRIVE")) {
+        return {
+            message: "There is already an active execution of the Step Function",
+            executionArn: lastExecution.executionArn,
+            status: lastExecution.status
+        };
     }
 
     let INPUT = {
