@@ -14,6 +14,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
+| **GET_STATUS_EXECUTION**     | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                               | `["executionArn"]`                                                                                                                                                                                                                       |
 
 ### Esempi di payload
 
@@ -78,6 +79,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 {
   "operationType": "GET_BY_REQUEST_ID",
   "parameters": ["PREPARE_ANALOG_DOMICILE.IUN_ADTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0"]
+}
+```
+
+*GET_STATUS_EXECUTION*
+```json
+{
+  "operationType": "GET_STATUS_EXECUTION",
+  "parameters": ["executionArn"]
 }
 ```
 
@@ -163,6 +172,21 @@ Un esempio di risposta è il seguente:
 ]
 ```
 
+### Output GET_STATUS_EXECUTION
+Viene restituito un oggetto con i dettagli dell’esecuzione della Step Function.
+
+Un esempio di risposta è il seguente:
+```json
+{
+  "executionArn": "arn:aws:states:<REGIONE>:<ACCOUNT_ID>:execution:<NOME_STATE_MACHINE>:<NOME_ESECUZIONE>",
+  "status": "FAILED",
+  "startDate": "2025-09-24T08:27:46.279Z",
+  "stopDate": "2025-09-24T08:32:10.123Z",
+  "error": "Process exited with error code 1",
+  "cause": "Unexpected input format"
+}
+```
+
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 
 ## Struttura del progetto
@@ -178,6 +202,7 @@ Un esempio di risposta è il seguente:
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
+│       ├── getStatusExecution.js                       # Implementazione operazione GET_STATUS_EXECUTION
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
