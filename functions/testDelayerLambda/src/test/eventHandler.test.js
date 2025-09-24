@@ -320,10 +320,10 @@ describe("Lambda Delayer Dispatcher", () => {
        const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
        const body = JSON.parse(result.body);
 
-       assert.strictEqual(body.executionId, fakeArn);
+       assert.strictEqual(body.executionArn, fakeArn);
        assert.strictEqual(body.status, "SUCCEEDED");
        assert.strictEqual(new Date(body.startDate).toISOString(), fakeStartDate.toISOString());
-       assert.strictEqual(new Date(body.endDate).toISOString(), fakeEndDate.toISOString());
+       assert.strictEqual(new Date(body.stopDate).toISOString(), fakeEndDate.toISOString());
        assert.strictEqual(body.error, undefined);
    });
 
@@ -335,7 +335,7 @@ describe("Lambda Delayer Dispatcher", () => {
            status: "FAILED",
            startDate: fakeStartDate,
            stopDate: fakeEndDate,
-           cause: "Some error"
+           error: "Some error"
        });
 
        const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
