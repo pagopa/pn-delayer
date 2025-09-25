@@ -2191,10 +2191,34 @@ Resources:
             Choices:
               - Variable: $.queryResult.Count
                 NumericGreaterThan: 0
-                Next: MapItem
+                Next: CheckIfStopFlagExists
             Default: NoItemToProcess
           DynamoDbOperationFail:
             Type: Fail
+          CheckIfStopFlagExists:
+            Type: Choice
+            Choices:
+              - Variable: $.queryResult.Items[0].stopSendToPhaseTwo.S
+                IsPresent: false
+                Next: SetStopSendToPhaseTwoAndMapItem
+            Default: MapItem
+          SetStopSendToPhaseTwoAndMapItem:
+            Type: Pass
+            ResultPath: $.lambdaResponse.Payload.input
+            Parameters:
+              "dailyPrintCapacity.$": $.queryResult.Items[0].dailyPrintCapacity.N
+              "executionDate.$": $$.Execution.StartTime
+              "lastEvaluatedKeyNextWeek.$": $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
+              "lastEvaluatedKeyPhase2.$": $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
+              "numberOfShipments.$": $.queryResult.Items[0].numberOfShipments.N
+              "pk.$": $.queryResult.Items[0].pk.S
+              sendToNextStepCounter: 0
+              sendToNextWeekCounter: 0
+              "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
+              "sk.$": $.queryResult.Items[0].sk.S
+              "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
+              "stopSendToPhaseTwo": "false"
+            Next: Parallel
           MapItem:
             Type: Pass
             ResultPath: $.lambdaResponse.Payload.input
@@ -2210,6 +2234,7 @@ Resources:
               "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
               "sk.$": $.queryResult.Items[0].sk.S
               "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
+              "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.S
             Next: Parallel
           NoItemToProcess:
             Type: Succeed
@@ -2321,6 +2346,7 @@ Resources:
                         "numberOfShipments.$": $.input.numberOfShipments
                         "sendToNextStepCounter.$": $.input.sendToNextStepCounter
                         "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
+                        "stopSendToPhaseTwo": "true"
                       "processType.$": $.processType
                     Next: ToPreparePhase2Successfully
 
@@ -2394,13 +2420,15 @@ Resources:
                   "M.$": $.parallelResult[1].input.lastEvaluatedKeyPhase2
                 ":sentToNextWeekInc":
                   "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
+                ":stopSendToPhaseTwoVal":
+                  "S.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
               Key:
                 pk:
                   "S.$": $.lambdaResponse.Payload.input.pk
                 sk:
                   "S.$": $.lambdaResponse.Payload.input.sk
               "TableName.$": $.PAPERDELIVERYCOUNTER_TABLENAME
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal  ADD sentToNextWeek :sentToNextWeekInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal  ADD sentToNextWeek :sentToNextWeekInc"
             Retry:
               - ErrorEquals:
                   - States.ALL

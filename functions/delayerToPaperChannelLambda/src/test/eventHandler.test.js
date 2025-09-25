@@ -65,7 +65,8 @@ describe('handleEvent', () => {
         numberOfShipments: 100,
         lastEvaluatedKeyPhase2: {},
         sendToNextStepCounter: 0,
-        executionDate: '2025-07-01T00:00:00Z'
+        executionDate: '2025-07-01T00:00:00Z',
+        stopSendToPhaseTwo: 'false'
       }
     });
 
@@ -74,6 +75,33 @@ describe('handleEvent', () => {
     expect(insertStub.calledOnce).to.be.true;
     expect(result.input).to.deep.include({
       sendToNextStepCounter: 1,
+      lastEvaluatedKeyPhase2: null,
+      dailyPrintCapacity: 10,
+      weeklyPrintCapacity: 70,
+      numberOfShipments: 100,
+      executionDate: '2025-07-01T00:00:00Z'
+    });
+  });
+
+  it('should handle SEND_TO_PHASE_2 when stopSendToPhaseTwo is true', async () => {
+    const result = await handler.handleEvent({
+      processType: 'SEND_TO_PHASE_2',
+      input: {
+        dailyPrintCapacity: 10,
+        weeklyPrintCapacity: 70,
+        numberOfShipments: 100,
+        lastEvaluatedKeyPhase2: {},
+        sendToNextStepCounter: 0,
+        executionDate: '2025-07-01T00:00:00Z',
+        stopSendToPhaseTwo: 'true'
+      }
+    });
+
+    expect(retrieveStub.notCalled).to.be.true;
+    expect(mapStub.notCalled).to.be.true;
+    expect(insertStub.notCalled).to.be.true;
+    expect(result.input).to.deep.include({
+      sendToNextStepCounter: 0,
       lastEvaluatedKeyPhase2: null,
       dailyPrintCapacity: 10,
       weeklyPrintCapacity: 70,
@@ -91,7 +119,8 @@ describe('handleEvent', () => {
         numberOfShipments: 100,
         lastEvaluatedKeyPhase2: {},
         sendToNextStepCounter: 0,
-        executionDate: '2025-07-01T00:00:00Z'
+        executionDate: '2025-07-01T00:00:00Z',
+        stopSendToPhaseTwo: 'false'
       }
     });
 
