@@ -144,7 +144,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -177,7 +178,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.message, "There is already an active execution of the Step Function");
         assert.strictEqual(body.executionArn, fakeArn);
     });
@@ -199,7 +201,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters"] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -229,7 +232,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -240,18 +244,27 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1"); // default
     });
 
-    it("error the step function with no required parameters provided", async () => {
-        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
+    it("error the step function with no required SFN_ARN provided", async () => {
         const fakeStartDate = new Date();
         sfnMock.on(StartExecutionCommand).resolves({
-            executionArn: fakeArn,
             startDate: fakeStartDate
         });
 
-        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery"] });
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters"] });
 
-        assert.strictEqual(result.statusCode, 500);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.statusCode, 500);
     });
+
+        it("error the step function with no required parameters provided", async () => {
+
+            const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery"] });
+            const body = JSON.parse(result.body);
+            assert.strictEqual(body.statusCode, 400);
+        });
 
         it("starts the step function and returns executionArn", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
