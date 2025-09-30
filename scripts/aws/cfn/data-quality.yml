@@ -182,9 +182,9 @@ Resources:
           struct<
             pk:struct<S:string>,
             deliveryDate:struct<S:string>,
-            weeklyEstimate:struct<N:string>
-            monthlyEstimate:struct<N:string>
-            originalEstimate:struct<N:string>
+            weeklyEstimate:struct<N:string>,
+            monthlyEstimate:struct<N:string>,
+            originalEstimate:struct<N:string>,
             paId:struct<S:string>,
             productType:struct<S:string>,
             province:struct<S:string>,
