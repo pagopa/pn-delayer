@@ -92,7 +92,10 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, driversTotalCapacity, senderLimitJobProcessObjects))
                 .flatMap(deliveries -> paperDeliveryUtils.insertPaperDeliveries(deliveries, deliveryWeek))
                 .filter(paperDeliveries -> !CollectionUtils.isEmpty(paperDeliveries))
-                .doOnDiscard(List.class, item -> log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek);
+                    return Mono.empty();
+                }))
                 .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitJobProcessObjects.getSenderLimitMap()))
                 .thenReturn(senderLimitJobProcessObjects);
     }
@@ -111,6 +114,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
             return Mono.just(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDelivery, unifiedDeliveryDriver, tenderId, priorityMap));
         } else {
             Map<String, List<PaperDelivery>> groupedByCapProductType = pnDelayerUtils.groupByCapAndProductType(paperDelivery);
+            log.info("Number of CAP and Product Type groups to process for tenderId {}: {}", tenderId, groupedByCapProductType.size());
             Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache = new HashMap<>();
             List<DeliveryDriverRequest> deliveryDriverRequest = new ArrayList<>();
             return Flux.fromIterable(groupedByCapProductType.entrySet())
@@ -121,6 +125,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                                         groupedByCapProductTypeNotInCache.put(capProductTypeEntry.getKey(), capProductTypeEntry.getValue());
                                     }))
                     .then(Mono.just(deliveryDriverRequest))
+                    .doOnNext(deliveryDriverRequests -> log.info("Number of driver requests for paper channel for tenderId {}: {}", tenderId, deliveryDriverRequests.size()))
                     .filter(deliveryDriverRequests -> !CollectionUtils.isEmpty(deliveryDriverRequests))
                     .map(deliveryDriverRequests -> deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(deliveryDriverRequests, tenderId))
                     .doOnNext(deliveryDriverUtils::insertInCache)
