@@ -11,6 +11,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                      |
 | **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                    |
 | **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                                   |
+| **GET_SENDER_LIMIT**         | Restituisce le stime dei limiti mittente per una data e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                                                      | `[ "deliveryDate (ISO‑8601 UTC)", "province" ]`                                                                                                                                                                                          |
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
@@ -70,6 +71,15 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 {
   "operationType": "GET_USED_CAPACITY",
   "parameters": ["Sailpost", "87100", "2025-06-30T00:00:00Z"]
+}
+```
+
+*GET_SENDER_LIMIT*
+
+```json
+{
+  "operationType": "GET_SENDER_LIMIT",
+  "parameters": ["2025-06-30T00:00:00Z", "RM"]
 }
 ```
 
@@ -135,6 +145,25 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   ```
 * Item assente → `{ "message": "Item not found" }`
 
+### Output GET_SENDER_LIMIT
+
+* Items trovati → array di oggetti, ad esempio:
+  ```json
+  [
+  {
+    "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
+    "deliveryDate": "2025-09-29",
+    "weeklyEstimate": 100,
+    "monthlyEstimate": 400,
+    "originalEstimate": 500,
+    "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
+    "productType": "AR",
+    "province": "RM"
+  }
+  ]
+  ```
+* Item assente → `{ "message": "No items found" }`
+
 ### Output GET_BY_REQUEST_ID
 Se trovate, viene restituito un array di oggetti (tutte le righe con quel requestId); se non ci sono risultati l’array è vuoto ([]).
 
@@ -176,6 +205,7 @@ Un esempio di risposta è il seguente:
 │       ├── eventHandler.js                             # Dispatcher delle operazioni
 │       ├── getDelayerPaperDeliveriesByRequestId.js.js  # Implementazione operazione GET_BY_REQUEST_ID
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
+│       ├── getSenderLimit.js                           # Implementazione operazione GET_SENDER_LIMIT
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
 │   └── test/
