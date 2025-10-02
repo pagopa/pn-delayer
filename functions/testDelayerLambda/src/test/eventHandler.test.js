@@ -307,8 +307,7 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(body.message, "Delete completed");
    });
 
-   it("GET_SENDER_LIMIT returns the items", async () => {
-
+   it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
        const fakeItems = [
            {
                pk: "PA1~PT1~RM",
@@ -331,16 +330,19 @@ describe("Lambda Delayer Dispatcher", () => {
                province: "RM"
            }
        ];
-       ddbMock.on(QueryCommand).resolves({ Items: fakeItems });
+
+       const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30T00:00:00Z" };
+       ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
 
        const params = ["2025-06-30T00:00:00Z", "RM"];
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
 
        assert.strictEqual(result.statusCode, 200);
        const body = JSON.parse(result.body);
-       assert.strictEqual(body.length, 2);
-       assert.strictEqual(body[0].weeklyEstimate, 100);
-       assert.strictEqual(body[1].weeklyEstimate, 150);
+       assert.strictEqual(body.items.length, 2);
+       assert.strictEqual(body.items[0].weeklyEstimate, 100);
+       assert.strictEqual(body.items[1].weeklyEstimate, 150);
+       assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
    });
 
    it("GET_SENDER_LIMIT if no items found", async () => {

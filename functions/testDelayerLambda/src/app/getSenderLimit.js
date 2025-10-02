@@ -9,13 +9,15 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 /**
  * GET_SENDER_LIMIT operation
- * @param {Array<string>} params [deliveryDate, province]
+ * @param {Array<string>} params [deliveryDate, province, lastEvaluatedKey]
  */
 async function getSenderLimit(params = []) {
-    const [deliveryDate, province] = params;
+    const [deliveryDate, province, lastEvaluatedKey] = params;
     if (!deliveryDate || !province) {
         throw new Error("Parameters must be [deliveryDate, province]");
     }
+
+    const limit = parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10);
     const command = new QueryCommand({
         TableName: TABLE_NAME,
         IndexName: GSI_NAME,
@@ -24,12 +26,15 @@ async function getSenderLimit(params = []) {
             ":deliveryDate": deliveryDate,
             ":province": province,
         },
+        Limit: limit,
+        ExclusiveStartKey: lastEvaluatedKey,
     });
-    const { Items } = await docClient.send(command);
+
+    const { Items, LastEvaluatedKey } = await docClient.send(command);
     if (!Items || Items.length === 0) {
         return { message: "No items found" };
     }
-    return Items;
+    return { items: Items, lastEvaluatedKey: LastEvaluatedKey };
 }
 
 module.exports = { getSenderLimit };
