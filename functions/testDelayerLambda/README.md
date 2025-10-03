@@ -8,7 +8,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 | Nome                         | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                                                                                                                                                                                           |
 |------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                      |
+| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename, deliveryWeekInput"]` filename e deliveryWeekInput opzionali                                                                                               |
 | **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                    |
 | **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                                   |
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
@@ -22,7 +22,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "IMPORT_DATA",
-  "parameters": ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters","example.csv"]
+  "parameters": ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters","example.csv, 2025-10-03"]
 }
 ```
 
