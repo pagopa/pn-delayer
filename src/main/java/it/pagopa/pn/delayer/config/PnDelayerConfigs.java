@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 
 @Configuration
@@ -30,6 +31,7 @@ public class PnDelayerConfigs {
     private Integer printCapacityWeeklyWorkingDays;
     private String paperDeliveryPriorityParameterName;
     private String PaperChannelTenderApiLambdaArn;
+    private LocalDate deliveryWeek;
 
 
     @Data

@@ -141,6 +141,10 @@ Parameters:
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
     Default: 1
 
+  DeliveryWeek:
+    Type: String
+    Description: 'Week for deliveryDate setting'
+
   PrintCapacityWeeklyWorkingDays:
     Type: Number
     Description: 'Number of working days in a week'
@@ -1637,7 +1641,8 @@ Resources:
               "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
               "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
               "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}",
-              "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}"
+              "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}",
+              "PN_DELAYER_DELIVERYWEEK": "${DeliveryWeek}"
             }
 
   DelayerStartWorkflowScheduleRuleRole:
@@ -1801,6 +1806,7 @@ Resources:
             Next: retrieveProvince
             ResultSelector:
               actualTenderId.$: $.Payload.body.tenderId
+              deliveryWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYWEEK
               paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
               paperDeliveryDriverCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERCAPACITIES_TABLENAME
               paperDeliveryDriverUsedCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME
@@ -1835,6 +1841,7 @@ Resources:
             Parameters:
               province.$: $$.Map.Item.Value.province.S
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
@@ -1875,6 +1882,8 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELIVERYWEEK
+                          Value.$: $.deliveryWeek
 #                  Retry:
 #                    - ErrorEquals:
 #                        - States.ALL
@@ -1922,6 +1931,7 @@ Resources:
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
@@ -1938,6 +1948,7 @@ Resources:
               driver.$: $$.Map.Item.Value.driver
               provinces.$: $$.Map.Item.Value.provinces
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
@@ -1980,6 +1991,8 @@ Resources:
                           Value.$: $.actualTenderId
                         - Name: PN_DELAYER_WORKFLOWSTEP
                           Value: EVALUATE_DRIVER_CAPACITY
+                        - Name: PN_DELAYER_DELIVERYWEEK
+                          Value.$: $.deliveryWeek
 #                  Retry:
 #                    - ErrorEquals:
 #                        - States.ALL
@@ -2009,6 +2022,7 @@ Resources:
               driver.$: $$.Map.Item.Value.driver
               provinces.$: $$.Map.Item.Value.provinces
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
@@ -2051,6 +2065,8 @@ Resources:
                           Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELIVERYWEEK
+                          Value.$: $.deliveryWeek
 #                  Retry:
 #                    - ErrorEquals:
 #                        - States.ALL
