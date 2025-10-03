@@ -14,6 +14,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
+| **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                                       |
 
 ### Esempi di payload
 
@@ -78,6 +79,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 {
   "operationType": "GET_BY_REQUEST_ID",
   "parameters": ["PREPARE_ANALOG_DOMICILE.IUN_ADTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0"]
+}
+```
+
+*GET_PAPER_DELIVERY*
+```json
+{
+  "operationType": "GET_PAPER_DELIVERY",
+  "parameters": ["pn-DelayerPaperDelivery", "2025-07-07", "EVALUATE_SENDER_LIMIT"]
 }
 ```
 
@@ -163,6 +172,37 @@ Un esempio di risposta è il seguente:
 ]
 ```
 
+### Output GET_PAPER_DELIVERY
+
+* Items presenti →
+  ```json
+  {
+    "items":[{
+      "iun": "AUTJ-PUKM-KDAJ-250017-T-1",
+      "notificationSentAt": "2025-07-01T00:17:00Z",
+      "workflowStep": "EVALUATE_PRINT_CAPACITY",
+      "priority": 1,
+      "tenderId": "20250319",
+      "attempt": 0,
+      "createdAt": "2025-09-10T17:05:48.240305919Z",
+      "senderPaId": "rankingRS_2nd",
+      "cap": "CAP5",
+      "province": "P2",
+      "requestId": "tcRanking_RS_2nd_1",
+      "sk": "1~2025-07-01T00:17:05Z~tcRanking_RS_2nd_1",
+      "pk": "2025-09-08~EVALUATE_PRINT_CAPACITY",
+      "prepareRequestDate": "2025-07-01T00:17:04Z",
+      "productType": "RS",
+      "unifiedDeliveryDriver": "driverRankingRS_2nd"
+    }],
+  "lastEvaluatedKey":{}
+  }
+  ```
+* Items assente →
+  ```json
+  { "items": [] }
+  ```
+
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 
 ## Struttura del progetto
@@ -178,6 +218,7 @@ Un esempio di risposta è il seguente:
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
+│       ├── getPaperDelivery.js                         # Implementazione operazione GET_PAPER_DELIVERY
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio

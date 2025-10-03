@@ -306,4 +306,66 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
    });
+
+   it("should throw error when parameter is missing", async () => {
+
+        const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: [] });
+        assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, workflowStep]");
+   });
+
+   it("should return items when query finds data", async () => {
+       const mockItems = [
+           { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29", province: "RM", productType: "RS" },
+           { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29", province: "MI", productType: "AR" }
+       ];
+
+       ddbMock.on(QueryCommand).resolves({ Items: mockItems });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(Array.isArray(body.items), true);
+       assert.strictEqual(body.items.length, 2);
+       assert.deepStrictEqual(body.items, mockItems);
+       assert.strictEqual(body.lastEvaluatedKey, undefined);
+   });
+
+   it("should return message when no items found", async () => {
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(body.message, "No items found");
+       assert.strictEqual(body.items, undefined);
+   });
+
+   it("should use custom limit from environment variable", async () => {
+       process.env.PAPER_DELIVERY_QUERYLIMIT = "500";
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+       await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+
+       const calls = ddbMock.commandCalls(QueryCommand);
+       const queryParams = calls[0].args[0].input;
+       assert.strictEqual(queryParams.Limit, 500);
+   });
+
+   it("should return LastEvaluatedKey when pagination is needed", async () => {
+       const mockItems = [
+           { pk: "2025-09-29~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29" }
+       ];
+       const mockLastKey = { pk: "2025-09-29~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29" };
+
+       ddbMock.on(QueryCommand).resolves({
+           Items: mockItems,
+           LastEvaluatedKey: mockLastKey
+       });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.deepStrictEqual(body.items, mockItems);
+       assert.deepStrictEqual(body.lastEvaluatedKey, mockLastKey);
+   });
 });
