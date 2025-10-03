@@ -7,6 +7,7 @@ import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
 import it.pagopa.pn.delayer.model.*;
@@ -65,12 +66,48 @@ public class DeliveryDriverUtils {
     }
 
     public void insertInCache(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriver) {
-        Map<String, String> map = pnDelayerUtils.groupByGeoKeyAndProduct(paperChannelDeliveryDriver);
-        map.forEach(cacheService::addToCache);
+        if(!CollectionUtils.isEmpty(paperChannelDeliveryDriver)) {
+            Map<String, String> map = pnDelayerUtils.groupByGeoKeyAndProduct(paperChannelDeliveryDriver);
+            map.forEach(cacheService::addToCache);
+        }
     }
 
     public Optional<String> retrieveFromCache(String capProductTypeKey) {
         return cacheService.getFromCache(capProductTypeKey);
+    }
+
+    public List<PaperDelivery> assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache, String tenderId, Map<Integer, List<String>> priorityMap) {
+        return groupedByCapProductTypeNotInCache.entrySet().stream()
+                .map(entry -> {
+                    Optional<String> driver = retrieveFromCache(entry.getKey());
+                    if(driver.isEmpty()){
+                        throw new PnInternalException(String.format("UnifiedDeliveryDriver not found for geoKey and product key [%s]", entry.getKey()), 404, ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND);
+                    }else {
+                        enrichWithPriorityAndUnifiedDeliveryDriver(entry.getValue(), driver.get(), tenderId, priorityMap);
+                        return entry.getValue();
+                    }
+                })
+                .flatMap(List::stream)
+                .toList();
+    }
+
+    public List<PaperDelivery> enrichWithPriorityAndUnifiedDeliveryDriver(List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, Map<Integer, List<String>> priorityMap) {
+        deliveries.forEach(paperDelivery -> {
+            Integer priority = findPriorityOnMap(priorityMap, paperDelivery);
+            paperDelivery.setUnifiedDeliveryDriver(unifiedDeliveryDriver);
+            paperDelivery.setTenderId(tenderId);
+            paperDelivery.setPriority(priority);
+        });
+        return deliveries;
+    }
+
+    private static Integer findPriorityOnMap(Map<Integer, List<String>> priorityMap, PaperDelivery paperDelivery) {
+        String key = "PRODUCT_" + paperDelivery.getProductType() + ".ATTEMPT_" + paperDelivery.getAttempt();
+        return priorityMap.entrySet().stream()
+                .filter(entry -> entry.getValue().contains(key))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(3);
     }
 
     public Mono<Tuple2<Integer, Integer>> retrieveDeclaredAndUsedCapacity(String geoKey, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {

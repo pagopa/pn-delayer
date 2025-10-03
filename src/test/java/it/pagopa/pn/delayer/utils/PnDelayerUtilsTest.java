@@ -199,35 +199,6 @@ class PnDelayerUtilsTest {
         assertEquals(2, result);
     }
 
-    @Test
-    void assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(){
-        List<PaperChannelDeliveryDriver> driverResponses = new ArrayList<>();
-        driverResponses.add(createPaperChannelDeliveryDriver("00178", "AR", "driverX"));
-        driverResponses.add(createPaperChannelDeliveryDriver("00179", "RS", "driverY"));
-
-        List<PaperDelivery> deliveries1 = new ArrayList<>();
-        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
-        List<PaperDelivery> deliveries2 = new ArrayList<>();
-        deliveries2.add(createPaperDelivery("RS", "00179", "RM", "paId2", 1));
-
-        Map<String, List<PaperDelivery>> grouped = Map.of(
-                "00178~AR", deliveries1,
-                "00179~RS", deliveries2
-        );
-
-        Map<Integer, List<String>> priorityMap = Map.of(
-                1, List.of("PRODUCT_AR.ATTEMPT_0"),
-                2, List.of("PRODUCT_RS.ATTEMPT_1")
-        );
-
-        List<PaperDelivery> result = pnDelayerUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(
-                driverResponses, grouped, "tenderTest", priorityMap
-        );
-
-        assertEquals(2, result.size());
-        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverX") && d.getPriority() == 1));
-        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverY") && d.getPriority() == 2));
-    }
 
     @Test
     void evaluateSenderLimitAndFilterDeliveries(){
@@ -263,31 +234,6 @@ class PnDelayerUtilsTest {
                 .filter(d -> d.getSenderPaId().equals("paId2")).count());
         assertEquals(0, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
                 .filter(d -> d.getSenderPaId().equals("paId2")).count());
-    }
-
-    @Test
-    void enrichWithPriorityAndUnifiedDeliveryDriver(){
-        List<PaperDelivery> paperDeliveries = new ArrayList<>();
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1));
-        paperDeliveries.add(createPaperDelivery("RS","00179", "RM", "paId2", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
-        Map<Integer, List<String>> priorityMap = Map.of(
-                1, List.of("PRODUCT_RS.ATTEMPT_0"),
-                2, List.of("PRODUCT_AR.ATTEMPT_1","PRODUCT_890.ATTEMPT_1"),
-                3, List.of("PRODUCT_AR.ATTEMPT_0","PRODUCT_890.ATTEMPT_0"));
-
-        List<PaperDelivery> result = pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDeliveries, "driver2", "tenderId", priorityMap);
-
-        assertEquals(3, result.size());
-        assertEquals(2, result.get(0).getPriority());
-        assertEquals("driver2", result.get(0).getUnifiedDeliveryDriver());
-        assertEquals("tenderId", result.get(0).getTenderId());
-        assertEquals(1, result.get(1).getPriority());
-        assertEquals("driver2", result.get(1).getUnifiedDeliveryDriver());
-        assertEquals("tenderId", result.get(1).getTenderId());
-        assertEquals(3, result.get(2).getPriority());
-        assertEquals("driver2", result.get(2).getUnifiedDeliveryDriver());
-        assertEquals("tenderId", result.get(2).getTenderId());
     }
 
     @Test

@@ -109,21 +109,6 @@ public class PnDelayerUtils {
         return filteredList.size();
     }
 
-    public List<PaperDelivery> assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriverResponses, Map<String, List<PaperDelivery>> groupedByCapProductType, String tenderId, Map<Integer, List<String>> priorityMap) {
-        Map<String, String> driverMap = groupByGeoKeyAndProduct(paperChannelDeliveryDriverResponses);
-        return groupedByCapProductType.entrySet().stream()
-                .map(entry -> {
-                    String driver = driverMap.get(entry.getKey());
-                    if (driver != null) {
-                        enrichWithPriorityAndUnifiedDeliveryDriver(entry.getValue(), driver, tenderId, priorityMap);
-                        return entry.getValue();
-                    } else {
-                        throw new PnInternalException(String.format("UnifiedDeliveryDriver not found for geoKey and product key [%s]", entry.getKey()), 404, ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND);
-                    }
-                })
-                .flatMap(List::stream)
-                .toList();
-    }
 
     /**
      * Evaluates the sender limit for each product type and PaId.
@@ -135,34 +120,19 @@ public class PnDelayerUtils {
      * @param senderLimitJobProcessObjects Object containing the lists to which the deliveries will be
      */
     public void evaluateSenderLimitAndFilterDeliveries(Map<String, Tuple2<Integer, Integer>> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+        List<PaperDelivery> sendToDriverCapacityStep = new ArrayList<>();
+        List<PaperDelivery> sendToResidualCapacityStep = new ArrayList<>();
         deliveriesGroupedByProductTypePaId.forEach((key, deliveries) -> {
             int limit = Optional.ofNullable(senderLimitMap.get(key))
                     .map(senderLimits -> senderLimits.getT1() - senderLimits.getT2())
                     .orElse(0);
 
             int actualLimit = Math.min(limit, deliveries.size());
-            senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
-            senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
+            sendToDriverCapacityStep.addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
+            sendToResidualCapacityStep.addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
         });
-    }
-
-    public List<PaperDelivery> enrichWithPriorityAndUnifiedDeliveryDriver(List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, Map<Integer, List<String>> priorityMap) {
-        deliveries.forEach(paperDelivery -> {
-            Integer priority = findPriorityOnMap(priorityMap, paperDelivery);
-            paperDelivery.setUnifiedDeliveryDriver(unifiedDeliveryDriver);
-            paperDelivery.setTenderId(tenderId);
-            paperDelivery.setPriority(priority);
-        });
-        return deliveries;
-    }
-
-    private static Integer findPriorityOnMap(Map<Integer, List<String>> priorityMap, PaperDelivery paperDelivery) {
-        String key = "PRODUCT_" + paperDelivery.getProductType() + ".ATTEMPT_" + paperDelivery.getAttempt();
-        return priorityMap.entrySet().stream()
-                .filter(entry -> entry.getValue().contains(key))
-                .map(Map.Entry::getKey)
-                .findFirst()
-                .orElse(3);
+        senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(sendToResidualCapacityStep);
+        senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(sendToDriverCapacityStep);
     }
 
     /**
