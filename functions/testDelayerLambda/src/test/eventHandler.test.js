@@ -307,35 +307,56 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(body.message, "Delete completed");
    });
 
-       it("GET_SENDER_LIMIT returns the item", async () => {
-
-           const fakeItem = {
+   it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
+       const fakeItems = [
+           {
                pk: "PA1~PT1~RM",
                deliveryDate: "2025-06-30T00:00:00Z",
-               limit: 100
-           };
-           ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+               weeklyEstimate: 100,
+               monthlyEstimate: 400,
+               originalEstimate: 500,
+               paId: "PA1",
+               productType: "PT1",
+               province: "RM"
+           },
+           {
+               pk: "PA2~PT2~RM",
+               deliveryDate: "2025-06-30T00:00:00Z",
+               weeklyEstimate: 150,
+               monthlyEstimate: 600,
+               originalEstimate: 700,
+               paId: "PA2",
+               productType: "PT2",
+               province: "RM"
+           }
+       ];
 
-           const params = ["PA1", "PT1", "RM", "2025-06-30T00:00:00Z"];
-           const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+       const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30T00:00:00Z" };
+       ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
 
-            assert.strictEqual(result.statusCode, 200);
-            const body = JSON.parse(result.body);
-            assert.strictEqual(body.limit, 100);
-       });
+       const params = ["2025-06-30T00:00:00Z", "RM"];
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
 
-       it("GET_SENDER_LIMIT if item not found", async () => {
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.items.length, 2);
+       assert.strictEqual(body.items[0].weeklyEstimate, 100);
+       assert.strictEqual(body.items[1].weeklyEstimate, 150);
+       assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
+   });
 
-           ddbMock.on(GetCommand).resolves({});
-           const params = ["PA1", "PT1", "RM", "2025-06-30T00:00:00Z"];
+   it("GET_SENDER_LIMIT if no items found", async () => {
 
-           const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
-           assert.strictEqual(JSON.parse(result.body).message, "Item not found");
-       });
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+       const params = ["2025-06-30T00:00:00Z", "RM"];
 
-       it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+       assert.strictEqual(JSON.parse(result.body).message, "No items found");
+   });
 
-          const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
-          assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [paId, productType, province, deliveryDate]");
-       });
+   it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
+
+      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
+      assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, province]");
+   });
 });

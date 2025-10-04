@@ -1,33 +1,40 @@
 "use strict";
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, GetCommand } = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 
 const TABLE_NAME = "pn-PaperDeliverySenderLimit";
+const GSI_NAME = "deliveryDateProvince-index";
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 /**
  * GET_SENDER_LIMIT operation
- * @param {Array<string>} params [paId, productType, province, deliveryDate]
+ * @param {Array<string>} params [deliveryDate, province, lastEvaluatedKey]
  */
 async function getSenderLimit(params = []) {
-    const [paId, productType, province, deliveryDate] = params;
-    if (!paId || !productType || !province || !deliveryDate) {
-        throw new Error("Parameters must be [paId, productType, province, deliveryDate]");
+    const [deliveryDate, province, lastEvaluatedKey] = params;
+    if (!deliveryDate || !province) {
+        throw new Error("Parameters must be [deliveryDate, province]");
     }
-    const partitionKey = `${paId}~${productType}~${province}`;
-    const command = new GetCommand({
+
+    const limit = parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10);
+    const command = new QueryCommand({
         TableName: TABLE_NAME,
-        Key: {
-            unifiedDeliveryDriverGeokey: partitionKey,
-            deliveryDate: deliveryDate,
+        IndexName: GSI_NAME,
+        KeyConditionExpression: "deliveryDate = :deliveryDate AND province = :province",
+        ExpressionAttributeValues: {
+            ":deliveryDate": deliveryDate,
+            ":province": province,
         },
+        Limit: limit,
+        ExclusiveStartKey: lastEvaluatedKey,
     });
-    const { Item } = await docClient.send(command);
-    if (!Item) {
-        return { message: "Item not found" };
+
+    const { Items, LastEvaluatedKey } = await docClient.send(command);
+    if (!Items || Items.length === 0) {
+        return { message: "No items found" };
     }
-    return Item;
+    return { items: Items, lastEvaluatedKey: LastEvaluatedKey };
 }
 
 module.exports = { getSenderLimit };

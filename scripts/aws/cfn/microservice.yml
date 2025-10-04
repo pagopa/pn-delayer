@@ -1542,6 +1542,7 @@ Resources:
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
           DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
+          PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
       TracingConfig:
         Mode: Active
       Layers:
