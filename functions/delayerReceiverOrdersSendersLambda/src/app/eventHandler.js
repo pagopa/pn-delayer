@@ -2,7 +2,7 @@
 
 const { downloadJson } = require('./safeStorage');
 const { calculateWeeklyEstimates } = require('./algorithm');
-const { getProvinceDistribution } = require('./dynamo');
+const { getProvinceDistribution, getSenderLimitItem } = require('./dynamo');
 
 /**
  * Handler per eventi SQS (bacth size 1 consigliata)
@@ -19,6 +19,15 @@ exports.handleEvent = async (event = {}) => {
         console.debug(`[HANDLER] Raw SQS record: ${JSON.stringify(record)}`);
         const body = JSON.parse(record.body);
         const fileKey = body.key;
+
+        const { Count = 0 } = await getSenderLimitItem(fileKey);
+        if (Count > 0) {
+            console.info(`[HANDLER] Duplicato: fileKey "${fileKey}" già presente su ${FILEKEY_GSI}. Skip & exit.`);
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ processed: 0, skipped: 1, reason: "duplicate", fileKey }),
+            };
+        }
 
         console.debug(`[HANDLER] fileKey="${fileKey}"`);
 

@@ -7,7 +7,7 @@ const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const PROVINCE_TABLE = process.env.PROVINCE_TABLE || 'pn-PaperChannelProvince';
 const LIMIT_TABLE = process.env.LIMIT_TABLE || 'pn-PaperDeliverySenderLimit';
 const COUNTERS_TABLE = process.env.COUNTERS_TABLE || 'pn-PaperDeliveryCounters';
-
+const GSI_NAME = "fileKey-index";
 /**
  * Query pn-PaperChannelProvince to get provinces and their percentage distribution for a region.
  * @param {string} region
@@ -22,6 +22,25 @@ async function getProvinceDistribution(region) {
     };
     const resp = await client.send(new QueryCommand(params));
     return resp.Items || [];
+}
+
+/**
+ * Query pn-PaperDeliverySenderLimit to verify if items with same fileKey exists.
+ * @param {string} fileKey
+ * @returns {Promise<Array<PaperDeliverySenderLimitEntity>>}
+ */
+async function getSenderLimitItem(fileKey) {
+    const params = {
+     TableName: TABLE_NAME,
+     IndexName: FILEKEY_GSI,
+     KeyConditionExpression: "#fk = :fk",
+     ExpressionAttributeNames: { "#fk": "fileKey" },
+     ExpressionAttributeValues: { ":fk": fileKey },
+     Limit: 1,
+     Select: "COUNT",
+    };
+
+    return await docClient.send(new QueryCommand(params));
 }
 
 /**
@@ -131,4 +150,4 @@ async function batchWriteWithRetry(requestItems, maxRetries = 5) {
 
 
 
-module.exports = { getProvinceDistribution, persistWeeklyEstimates };
+module.exports = { getProvinceDistribution, persistWeeklyEstimates, getSenderLimitItem };
