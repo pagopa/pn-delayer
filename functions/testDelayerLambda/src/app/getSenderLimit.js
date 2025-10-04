@@ -18,21 +18,27 @@ async function getSenderLimit(params = []) {
     }
 
     const limit = parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10);
-    const command = new QueryCommand({
-        TableName: TABLE_NAME,
-        IndexName: GSI_NAME,
-        KeyConditionExpression: "deliveryDate = :deliveryDate AND province = :province",
-        ExpressionAttributeValues: {
-            ":deliveryDate": deliveryDate,
-            ":province": province,
-        },
-        Limit: limit,
-        ExclusiveStartKey: lastEvaluatedKey,
-    });
+    const params = {
+      TableName: TABLE_NAME,
+      IndexName: GSI_NAME,
+      KeyConditionExpression: "deliveryDate = :deliveryDate AND province = :province",
+      ExpressionAttributeValues: {
+        ":deliveryDate": deliveryDate,
+        ":province": province,
+      },
+      Limit: limit,
+    };
+
+    if (lastEvaluatedKey) {
+      params.ExclusiveStartKey = lastEvaluatedKey;
+    }
+
+    const command = new QueryCommand(params);
+
 
     const { Items, LastEvaluatedKey } = await docClient.send(command);
     if (!Items || Items.length === 0) {
-        return { message: "No items found" };
+        return { items: [] };
     }
     return { items: Items, lastEvaluatedKey: LastEvaluatedKey };
 }

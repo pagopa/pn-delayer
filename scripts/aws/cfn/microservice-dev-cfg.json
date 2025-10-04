@@ -12,15 +12,15 @@
     "DelayerToPaperChannelLambdaCron": "0 9 * * ? *",
     "DelayerToPaperChannelPipeState": "STOPPED",
     "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
-    "PaperDeliveryPrintCapacityCounterTtlDays": "60",
     "PrintCapacityWeeklyWorkingDays": "7",
     "PaperDeliveryCounterTtlDays": "14",
     "PaperDeliveryPriorityParameterName":"/config/pn-delayer/paper-delivery-priority",
     "UnifiedDeliveryDriverProvinceParameter": "/config/pn-delayer/unifiedDeliveryDriver-province",
-    "PaperDeliveryPrintCapacityCounterTtlDuration": "60d",
     "SafeStorageCxId":"pn-delayer",
     "PrintCounterTtlDuration": "30d",
     "ExportDelayerDataLambdaCron": "0 7 ? * 3 *",
+    "DelayerStartWorkflowRuleState": "DISABLED",
+    "DelayerToPaperChannelDailyScheduleRuleState": "DISABLED",
     "VCPU": "1",
     "Memory": "4096"
   }

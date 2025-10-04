@@ -311,7 +311,7 @@ describe("Lambda Delayer Dispatcher", () => {
        const fakeItems = [
            {
                pk: "PA1~PT1~RM",
-               deliveryDate: "2025-06-30T00:00:00Z",
+               deliveryDate: "2025-06-30",
                weeklyEstimate: 100,
                monthlyEstimate: 400,
                originalEstimate: 500,
@@ -321,7 +321,7 @@ describe("Lambda Delayer Dispatcher", () => {
            },
            {
                pk: "PA2~PT2~RM",
-               deliveryDate: "2025-06-30T00:00:00Z",
+               deliveryDate: "2025-06-30",
                weeklyEstimate: 150,
                monthlyEstimate: 600,
                originalEstimate: 700,
@@ -331,10 +331,10 @@ describe("Lambda Delayer Dispatcher", () => {
            }
        ];
 
-       const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30T00:00:00Z" };
+       const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30" };
        ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
 
-       const params = ["2025-06-30T00:00:00Z", "RM"];
+       const params = ["2025-06-30", "RM"];
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
 
        assert.strictEqual(result.statusCode, 200);
@@ -348,7 +348,7 @@ describe("Lambda Delayer Dispatcher", () => {
    it("GET_SENDER_LIMIT if no items found", async () => {
 
        ddbMock.on(QueryCommand).resolves({ Items: [] });
-       const params = ["2025-06-30T00:00:00Z", "RM"];
+       const params = ["2025-06-30", "RM"];
 
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
        assert.strictEqual(JSON.parse(result.body).message, "No items found");

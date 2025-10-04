@@ -11,7 +11,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                      |
 | **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                    |
 | **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                                   |
-| **GET_SENDER_LIMIT**         | Restituisce le stime dei limiti mittente per una data e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                                                      | `[ "deliveryDate (ISO‑8601 UTC)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                           |
+| **GET_SENDER_LIMIT**         | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                             |
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
@@ -81,14 +81,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "GET_SENDER_LIMIT",
-  "parameters": ["2025-06-30T00:00:00Z", "RM"]
+  "parameters": ["2025-06-30", "RM"]
 }
 ```
 - Con lastEvaluatedKey
 ```json
 {
   "operationType": "GET_SENDER_LIMIT",
-  "parameters": ["2025-06-30T00:00:00Z", "RM", "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM"]
+  "parameters": ["2025-06-30", "RM", "<lek>"]
 }
 ```
 *GET_BY_REQUEST_ID*
