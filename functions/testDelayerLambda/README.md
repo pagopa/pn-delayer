@@ -14,6 +14,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
+| **GET_PRESIGNED_URL**        | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                         | `["filename","checksum"]`                                                                                                                                                                                                                |
 
 ### Esempi di payload
 
@@ -118,7 +119,13 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **countersTableName**                     | Indica il nome della [tabella](https://pagopa.atlassian.net/wiki/spaces/PN/pages/1783628166/SRS+Picchi+di+recapito+microservizio+ritardatore+-+Fase+2#Tabella-pn-PaperDeliveriesCounter) su cui l’algoritmo: 1. salve le coppie Province~UnifiedDeliveryDriver (prefisso chiave EXCEED~) per le quali esistono delle eccedenze. 2. legge il numero di spedizioni che devono essere escluse dal check dei limiti del mittente per la coppa ProductType~Province (prefisso chiave EXCLUDE~). L’algoritmo si aspetta che la tabella sia già  - eventualmente - valorizzata per il caso 2 (righe con prefisso EXCLUDE~.. | operaz. IMPORT_DATA per quanto riguarda RS e secondo tentativi. |
 | **deliveryDateDayOfWeek**                 | Intero che indica il giorno della settimana su cui l'algoritmo di pianificazione deve partire (default = 1, cioè lunedì).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | ---                                                             |
 
-
+*GET_PRESIGNED_URL*
+```json
+{
+  "operationType": "GET_PRESIGNED_URL",
+  "parameters": ["example.csv","abcd1234efgh5678ijkl9012mnop3456"]
+}
+```
 
 ### Output GET_USED_CAPACITY
 
@@ -163,6 +170,20 @@ Un esempio di risposta è il seguente:
 ]
 ```
 
+### Output GET_PRESIGNED_URL
+
+  ```json
+  {
+    "uploadUrl": "",
+    "key" :  "<filename>",
+    "requiredHeaders": {
+      "Content-Type": "text/csv",
+      "x-amz-checksum-sha256": "abcd1234efgh5678ijkl9012mnop3456"
+    },
+   "expiresIn": 300
+  }
+  ```
+
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 
 ## Struttura del progetto
@@ -178,6 +199,7 @@ Un esempio di risposta è il seguente:
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
+        ├── getPresignedUrl.js                          # Implementazione operazione GET_PRESIGNED_URL
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
