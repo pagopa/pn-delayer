@@ -1607,6 +1607,7 @@ Resources:
           SFN_ARN: !Ref PaperDeliveryStateMachine
           DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
+          PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
       TracingConfig:
         Mode: Active
       Layers:
@@ -1712,6 +1713,11 @@ Resources:
             Resource:
               - !Ref PaperDeliveryStateMachine
               - !Ref DelayerToPaperChannelStateMachine
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule

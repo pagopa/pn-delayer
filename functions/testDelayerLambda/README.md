@@ -15,9 +15,10 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
 | **GET_STATUS_EXECUTION**     | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                               | `["executionArn"]`                                                                                                                                                                                                                       |
-| **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                                       |
+| **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                                      |
 | **GET_SENDER_LIMIT**         | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                             |
 | **GET_PRESIGNED_URL**        | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                         | `["filename","checksum"]`                                                                                                                                                                                                                |
+| **INSERT_MOCK_CAPACITIES**   | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                          | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                         |
 
 ### Esempi di payload
 
@@ -42,6 +43,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **cap**                | Cap della spedizione.                                                                                       |
 | **attempt**            | Intero che indica il numero di tentativo della spedizione (0=primo, 1=secondo).                             |
 | **iun**                | Identificativo della notifica.                                                                              |
+
 
 *DELETE_DATA*
 
@@ -159,6 +161,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 {
   "operationType": "GET_PRESIGNED_URL",
   "parameters": ["example.csv","abcd1234efgh5678ijkl9012mnop3456"]
+}
+```
+
+*INSERT_MOCK_CAPACITIES*
+```json
+{
+  "operationType": "INSERT_MOCK_CAPACITIES",
+  "parameters": ["pn-PaperDeliveryDriverCapacitiesMock","example.csv"]
 }
 ```
 
@@ -310,6 +320,7 @@ Un esempio di risposta è il seguente:
 │       ├── getPaperDelivery.js                         # Implementazione operazione GET_PAPER_DELIVERY
         ├── getPresignedUrl.js                          # Implementazione operazione GET_PRESIGNED_URL
 │       ├── getStatusExecution.js                       # Implementazione operazione GET_STATUS_EXECUTION
+│       ├── insertMockCapacities.js                     # Implementazione operazione INSERT_MOCK_CAPACITIES
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
