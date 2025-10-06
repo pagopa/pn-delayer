@@ -53,10 +53,10 @@ describe("Lambda Delayer Dispatcher", () => {
             });
             ddbMock.on(BatchWriteCommand).resolves({});
 
-            const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters, 2025-10-03"] });
+            const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "", "2025-08-04"] });
             assert.strictEqual(result.statusCode, 200);
             assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
-            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk,"2025-09-29~EVALUATE_SENDER_LIMIT");});
+            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk,"2025-08-04~EVALUATE_SENDER_LIMIT");});
 
     it("should batch-write items to DynamoDB with custom fileName", async () => {
         const csvPath = path.join(__dirname, "sample.csv");
