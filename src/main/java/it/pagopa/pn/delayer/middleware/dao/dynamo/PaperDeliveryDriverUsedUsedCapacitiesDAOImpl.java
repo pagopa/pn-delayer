@@ -43,7 +43,7 @@ public class PaperDeliveryDriverUsedUsedCapacitiesDAOImpl implements PaperDelive
     @Override
     public Mono<Integer> updateCounter(String unifiedDeliveryDriver, String geoKey, Integer increment, LocalDate deliveryDate, Integer declaredCapacity) {
         String pk = PaperDeliveryDriverUsedCapacities.buildPk(unifiedDeliveryDriver, geoKey);
-        log.info("update pk={} increment={}", pk, increment);
+        log.info("update pk={} increment={}, declaredCapacity={}", pk, increment, declaredCapacity);
 
         Map<String, AttributeValue> key = new HashMap<>();
         key.put(PaperDeliveryDriverUsedCapacities.COL_UNIFIED_DELIVERY_DRIVER_GEOKEY, AttributeValue.builder().s(pk).build());

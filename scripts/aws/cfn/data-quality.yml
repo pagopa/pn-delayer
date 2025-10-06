@@ -51,6 +51,17 @@ Parameters:
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_paper_delivery_used_sender_limit
 
+  PaperDeliverySenderLimitTableName:
+    Type: String
+    Description: DynamoDB table name for paper delivery used sender limits
+
+  PaperDeliverySenderLimitGlueTableName:
+    Type: String
+    Description: Glue table name for paper delivery sender limits
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_sender_limit
+
   PaperDeliveryCounterTableName:
     Type: String
     Description: DynamoDB table name for paper delivery counters
@@ -149,6 +160,35 @@ Resources:
             productType:struct<S:string>,
             province:struct<S:string>,
             senderLimit:struct<N:string>,
+            ttl:struct<N:string>
+          >
+
+  PaperDeliverySenderLimitDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliverySenderLimitTableName
+        GlueTableName: !Ref PaperDeliverySenderLimitGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            deliveryDate:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            deliveryDate:struct<S:string>,
+            weeklyEstimate:struct<N:string>,
+            monthlyEstimate:struct<N:string>,
+            originalEstimate:struct<N:string>,
+            paId:struct<S:string>,
+            productType:struct<S:string>,
+            province:struct<S:string>,
+            fileKey:struct<S:string>,
             ttl:struct<N:string>
           >
         
