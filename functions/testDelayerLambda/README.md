@@ -19,6 +19,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_SENDER_LIMIT**         | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                             |
 | **GET_PRESIGNED_URL**        | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                         | `["filename","checksum"]`                                                                                                                                                                                                                |
 | **GET_DECLARED_CAPACITY**    | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                         | 
+| **INSERT_MOCK_CAPACITIES**   | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                          | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                         |
 
 ### Esempi di payload
 
@@ -43,6 +44,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **cap**                | Cap della spedizione.                                                                                       |
 | **attempt**            | Intero che indica il numero di tentativo della spedizione (0=primo, 1=secondo).                             |
 | **iun**                | Identificativo della notifica.                                                                              |
+
 
 *DELETE_DATA*
 
@@ -187,6 +189,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   ```
 * Item not trovati → `{ "items": [] }`
 * 
+*INSERT_MOCK_CAPACITIES*
+```json
+{
+  "operationType": "INSERT_MOCK_CAPACITIES",
+  "parameters": ["pn-PaperDeliveryDriverCapacitiesMock","example.csv"]
+}
+```
+
 ### Output GET_USED_CAPACITY
 
 * Item trovato → oggetto completo, ad esempio:
@@ -336,6 +346,7 @@ Un esempio di risposta è il seguente:
 │       ├── getPaperDelivery.js                         # Implementazione operazione GET_PAPER_DELIVERY
         ├── getPresignedUrl.js                          # Implementazione operazione GET_PRESIGNED_URL
 │       ├── getStatusExecution.js                       # Implementazione operazione GET_STATUS_EXECUTION
+│       ├── insertMockCapacities.js                     # Implementazione operazione INSERT_MOCK_CAPACITIES
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
