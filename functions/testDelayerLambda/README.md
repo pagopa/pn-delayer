@@ -6,14 +6,15 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 ## Operazioni disponibili
 
-| Nome                         | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                                                                                                                                                                                           |
-|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                      |
-| **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                    |
+| Nome                         | Descrizione                                                                                                                                                        | Parametri (`event.parameters`)                                                                                                                                                                                                           |
+|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                       | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                      |
+| **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                           | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                    |
 | **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                                   |
-| **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
-| **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
-| **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
+| **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.           | `[ requestId ]`                                                                                                                                                                                                                          |
+| **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                          | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
+| **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                  | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
+| **IMPORT_MOCK_CAPACITIES**   | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                          | `["filename"]`                                                                                                                                                                                                                           |
 
 ### Esempi di payload
 
@@ -38,6 +39,15 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **cap**                | Cap della spedizione.                                                                                       |
 | **attempt**            | Intero che indica il numero di tentativo della spedizione (0=primo, 1=secondo).                             |
 | **iun**                | Identificativo della notifica.                                                                              |
+
+*IMPORT_MOCK_CAPACITIES*
+
+```json
+{
+  "operationType": "IMPORT_MOCK_CAPACITIES",
+  "parameters": ["driverCapacities.csv"]
+}
+```
 
 *DELETE_DATA*
 
@@ -178,6 +188,7 @@ Un esempio di risposta è il seguente:
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
+│       ├── insertMockCapacities.js                     # Implementazione operazione INSERT_MOCK_CAPACITIES
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
