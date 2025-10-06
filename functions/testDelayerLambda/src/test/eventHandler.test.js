@@ -310,7 +310,7 @@ describe("Lambda Delayer Dispatcher", () => {
    it("should throw error when parameter is missing", async () => {
 
         const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: [] });
-        assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, workflowStep]");
+        assert.strictEqual(JSON.parse(result.body).message, "Required parameters are [paperDeliveryTableName, deliveryDate, workflowStep]");
    });
 
    it("should return items when query finds data", async () => {
@@ -321,7 +321,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
        ddbMock.on(QueryCommand).resolves({ Items: mockItems });
 
-       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
        const body = JSON.parse(result.body);
 
        assert.strictEqual(Array.isArray(body.items), true);
@@ -333,18 +333,17 @@ describe("Lambda Delayer Dispatcher", () => {
    it("should return message when no items found", async () => {
        ddbMock.on(QueryCommand).resolves({ Items: [] });
 
-       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
        const body = JSON.parse(result.body);
 
-       assert.strictEqual(body.message, "No items found");
-       assert.strictEqual(body.items, undefined);
+       assert.deepStrictEqual(body, { items: [] });
    });
 
    it("should use custom limit from environment variable", async () => {
        process.env.PAPER_DELIVERY_QUERYLIMIT = "500";
        ddbMock.on(QueryCommand).resolves({ Items: [] });
 
-       await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
 
        const calls = ddbMock.commandCalls(QueryCommand);
        const queryParams = calls[0].args[0].input;
@@ -362,7 +361,7 @@ describe("Lambda Delayer Dispatcher", () => {
            LastEvaluatedKey: mockLastKey
        });
 
-       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
        const body = JSON.parse(result.body);
 
        assert.deepStrictEqual(body.items, mockItems);

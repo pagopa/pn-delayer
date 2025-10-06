@@ -18,7 +18,7 @@ async function getPaperDelivery(params = []) {
 
     const pk = `${deliveryDate}~${workflowStep}`;
     const limit = parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10);
-    const params = {
+    const queryParams = {
       TableName: TABLE_NAME,
       KeyConditionExpression: "pk = :pk",
       ExpressionAttributeValues: {
@@ -28,10 +28,10 @@ async function getPaperDelivery(params = []) {
     };
 
     if (lastEvaluatedKey) {
-      params.ExclusiveStartKey = lastEvaluatedKey;
+      queryParams.ExclusiveStartKey = lastEvaluatedKey;
     }
 
-    const command = new QueryCommand(params);
+    const command = new QueryCommand(queryParams);
 
     const { Items, LastEvaluatedKey } = await docClient.send(command);
     if (!Items || Items.length === 0) {
