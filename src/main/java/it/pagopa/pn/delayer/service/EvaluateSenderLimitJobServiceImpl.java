@@ -85,12 +85,15 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setTotalEstimateCounter(totalCounterMap);
         return retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(items, tenderId, driversTotalCapacity, priorityMap)
-                .map(paperDeliveryList -> pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects))
+                .map(paperDeliveryList -> pnDelayerUtils.excludeRsAndSecondAttempt(paperDeliveryList, senderLimitJobProcessObjects))
                 .map(pnDelayerUtils::groupByPaIdProductTypeProvince)
                 .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, driversTotalCapacity, senderLimitJobProcessObjects))
                 .flatMap(deliveries -> paperDeliveryUtils.insertPaperDeliveries(deliveries, deliveryWeek))
                 .filter(paperDeliveries -> !CollectionUtils.isEmpty(paperDeliveries))
-                .doOnDiscard(Object.class, item -> log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek);
+                    return Mono.empty();
+                }))
                 .flatMap(paperDeliveryList -> senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryWeek, senderLimitJobProcessObjects.getSenderLimitMap()))
                 .thenReturn(senderLimitJobProcessObjects);
     }
@@ -106,19 +109,25 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
         List<PaperDelivery> toSenderLimitEvaluation = new ArrayList<>();
         if (driversTotalCapacity.size() == 1 && driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().size() == 1) {
             String unifiedDeliveryDriver = driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().getFirst();
-            return Mono.just(pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDelivery, unifiedDeliveryDriver, tenderId, priorityMap));
+            return Mono.just(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDelivery, unifiedDeliveryDriver, tenderId, priorityMap));
         } else {
             Map<String, List<PaperDelivery>> groupedByCapProductType = pnDelayerUtils.groupByCapAndProductType(paperDelivery);
+            log.info("Number of CAP and Product Type groups to process for tenderId {}: {}", tenderId, groupedByCapProductType.size());
+            Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache = new HashMap<>();
             List<DeliveryDriverRequest> deliveryDriverRequest = new ArrayList<>();
             return Flux.fromIterable(groupedByCapProductType.entrySet())
                     .doOnNext(capProductTypeEntry -> deliveryDriverUtils.retrieveFromCache(capProductTypeEntry.getKey())
-                            .ifPresentOrElse(unifiedDeliveryDriver -> toSenderLimitEvaluation.addAll(pnDelayerUtils.enrichWithPriorityAndUnifiedDeliveryDriver(capProductTypeEntry.getValue(), unifiedDeliveryDriver, tenderId, priorityMap)),
-                                    () -> deliveryDriverRequest.add(new DeliveryDriverRequest(capProductTypeEntry.getKey().split("~")[0], capProductTypeEntry.getKey().split("~")[1]))))
+                            .ifPresentOrElse(unifiedDeliveryDriver -> toSenderLimitEvaluation.addAll(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(capProductTypeEntry.getValue(), unifiedDeliveryDriver, tenderId, priorityMap)),
+                                    () -> {
+                                        deliveryDriverRequest.add(new DeliveryDriverRequest(capProductTypeEntry.getKey().split("~")[0], capProductTypeEntry.getKey().split("~")[1]));
+                                        groupedByCapProductTypeNotInCache.put(capProductTypeEntry.getKey(), capProductTypeEntry.getValue());
+                                    }))
                     .then(Mono.just(deliveryDriverRequest))
+                    .doOnNext(deliveryDriverRequests -> log.info("Number of driver requests for paper channel for tenderId {}: {}", tenderId, deliveryDriverRequests.size()))
                     .filter(deliveryDriverRequests -> !CollectionUtils.isEmpty(deliveryDriverRequests))
                     .map(deliveryDriverRequests -> deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(deliveryDriverRequests, tenderId))
                     .doOnNext(deliveryDriverUtils::insertInCache)
-                    .map(paperChannelDeliveryDriverResponses -> pnDelayerUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(paperChannelDeliveryDriverResponses, groupedByCapProductType, tenderId, priorityMap))
+                    .map(paperChannelDeliveryDriverResponses -> deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(groupedByCapProductTypeNotInCache, tenderId, priorityMap))
                     .doOnNext(toSenderLimitEvaluation::addAll)
                     .thenReturn(toSenderLimitEvaluation);
         }
