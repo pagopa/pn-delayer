@@ -18,7 +18,7 @@ const OPERATIONS = {
     GET_USED_CAPACITY: getUsedCapacity,
     GET_BY_REQUEST_ID: getDelayerPaperDeliveriesByRequestId,
     RUN_ALGORITHM: runAlgorithm,
-    DELAYER_TO_PAPER_CHANNEL: runDelayerToPaperChannelWorkflow
+    DELAYER_TO_PAPER_CHANNEL: runDelayerToPaperChannelWorkflow,
     GET_PRESIGNED_URL: getPresignedUrl
 };
 

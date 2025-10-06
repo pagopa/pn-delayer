@@ -1,7 +1,7 @@
 "use strict";
 
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const s3Presigner = require("@aws-sdk/s3-request-presigner");
 
 const s3 = new S3Client({});
 
@@ -33,7 +33,7 @@ exports.getPresignedUrl = async (params = []) => {
   });
 
   const expiresIn = 300;
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn });
+  const uploadUrl = await s3Presigner.getSignedUrl(s3, command, { expiresIn });
 
   return {
     uploadUrl,

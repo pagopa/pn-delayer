@@ -1601,6 +1601,7 @@ Resources:
               - s3:HeadObject
               - s3:ListBucket
               - s3:GetObjectTagging
+              - s3:PutObject
             Resource:
               - !Sub "${TestDelayerBucketArn}"
               - !Sub "${TestDelayerBucketArn}/*"
