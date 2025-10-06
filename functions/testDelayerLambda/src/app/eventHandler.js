@@ -6,6 +6,8 @@ const { getDelayerPaperDeliveriesByRequestId } = require("./getDelayerPaperDeliv
 const { runAlgorithm } = require("./runAlgorithm.js");
 const { runDelayerToPaperChannelWorkflow } = require("./runDelayerToPaperChannelWorkflow.js");
 const { getPresignedUrl } = require("./getPresignedUrl.js");
+const { getSenderLimit } = require("./getSenderLimit.js");
+const { getPaperDelivery } = require("./getPaperDelivery.js");
 
 
 /***************************************
@@ -19,6 +21,8 @@ const OPERATIONS = {
     GET_BY_REQUEST_ID: getDelayerPaperDeliveriesByRequestId,
     RUN_ALGORITHM: runAlgorithm,
     DELAYER_TO_PAPER_CHANNEL: runDelayerToPaperChannelWorkflow,
+    GET_PAPER_DELIVERY: getPaperDelivery,
+    GET_SENDER_LIMIT: getSenderLimit,
     GET_PRESIGNED_URL: getPresignedUrl
 };
 
