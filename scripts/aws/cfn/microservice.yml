@@ -79,6 +79,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryDriverCapacities'
 
+  PaperDeliveryDriverCapacitiesMockTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryDriverCapacitiesMock'
+
+  PaperDeliveryDriverCapacitiesMockTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryDriverCapacitiesMock'
+
   PaperDeliveryDriverUsedCapacitiesTableName:
     Type: String
     Description: 'DynamoDB table name for  PaperDeliveryDriverUsedCapacities'
@@ -86,6 +94,14 @@ Parameters:
   PaperDeliveryDriverUsedCapacitiesTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing  PaperDeliveryDriverUsedCapacities'
+
+  PaperDeliveryDriverUsedCapacitiesMockTableName:
+    Type: String
+    Description: 'DynamoDB table name for  PaperDeliveryDriverUsedCapacitiesMock'
+
+  PaperDeliveryDriverUsedCapacitiesMockTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing  PaperDeliveryDriverUsedCapacitiesMock'
 
   PaperDeliveryKinesisEventTableName:
     Type: String
@@ -99,6 +115,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryCounter'
 
+  PaperDeliveryCounterMockTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryCounterMock'
+
+  PaperDeliveryCounterMockTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryCounterMock'
+
   PaperDeliveryKinesisEventTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryKinesisEvent'
@@ -110,6 +134,14 @@ Parameters:
   PaperDeliveryTableArn:
     Type: String
     Description: ARN of dynamodb table containing paper deliveries workflow
+
+  PaperDeliveryMockTableName:
+    Type: String
+    Description: Name of dynamodb table containing mock paper deliveries workflow
+
+  PaperDeliveryMockTableArn:
+    Type: String
+    Description: ARN of dynamodb table containing mock paper deliveries workflow
 
   PaperDeliveryTableStreamArn:
     Type: String
@@ -135,6 +167,14 @@ Parameters:
   PaperDeliveryUsedSenderLimitTableArn:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliveryUsedSenderLimit'
+
+  PaperDeliveryUsedSenderLimitMockTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliveryUsedSenderLimitMock'
+
+  PaperDeliveryUsedSenderLimitMockTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliveryUsedSenderLimitMock'
 
   DeliveryDateDayOfWeek:
     Type: Number
@@ -579,6 +619,14 @@ Resources:
                   - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
                   - !Sub "${PaperDeliveryTableArn}"
                   - !Sub "${PaperDeliveryTableArn}/*"
+                  - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
+                  - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterMockTableArn}"
+                  - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+                  - !Sub "${PaperDeliveryMockTableArn}"
+                  - !Sub "${PaperDeliveryMockTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction
@@ -749,6 +797,14 @@ Resources:
                   - !Sub "${PaperDeliveryTableArn}/*"
                   - !Sub "${PaperDeliveryCounterTableArn}"
                   - !Sub "${PaperDeliveryCounterTableArn}/*"
+                  - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
+                  - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}"
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
+                  - !Sub "${PaperDeliveryMockTableArn}"
+                  - !Sub "${PaperDeliveryMockTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterMockTableArn}"
+                  - !Sub "${PaperDeliveryCounterMockTableArn}/*"
 
   ResidualCapacitySecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -909,6 +965,14 @@ Resources:
                 - !Sub "${PaperDeliveryTableArn}/*"
                 - !Sub "${PaperDeliveryCounterTableArn}"
                 - !Sub "${PaperDeliveryCounterTableArn}/*"
+                - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
+                - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+                - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}"
+                - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
+                - !Sub "${PaperDeliveryMockTableArn}"
+                - !Sub "${PaperDeliveryMockTableArn}/*"
+                - !Sub "${PaperDeliveryCounterMockTableArn}"
+                - !Sub "${PaperDeliveryCounterMockTableArn}/*"
 
   DriverCapacitySecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -1546,6 +1610,7 @@ Resources:
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
           DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
+          PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
       TracingConfig:
         Mode: Active
       Layers:
@@ -1582,6 +1647,19 @@ Resources:
           - Effect: Allow
             Action:
               - dynamodb:BatchWriteItem
+            Resource:
+              - !Sub "${PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}/*"
+              - !Sub "${PaperDeliveryCounterTableArn}"
+              - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - !Sub "${PaperDeliveryMockTableArn}"
+              - !Sub "${PaperDeliveryMockTableArn}/*"
+              - !Sub "${PaperDeliveryCounterMockTableArn}"
+              - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+              - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
+              - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+          - Effect: Allow
+            Action:
               - dynamodb:Query
               - dynamodb:GetItem
             Resource:
@@ -1593,18 +1671,35 @@ Resources:
               - !Sub "${PaperDeliveryCounterTableArn}/*"
               - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
               - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+              - !Sub "${PaperDeliverySenderLimitTableArn}"
+              - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+              - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
+              - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
+              - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+              - !Sub "${PaperDeliveryMockTableArn}"
+              - !Sub "${PaperDeliveryMockTableArn}/*"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
+              - !Sub "${PaperDeliveryCounterMockTableArn}"
+              - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}"
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
           - Effect: Allow
             Action:
               - dynamodb:UpdateItem
             Resource:
               - !Sub "${PaperDeliveryCounterTableArn}"
               - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - !Sub "${PaperDeliveryCounterMockTableArn}"
+              - !Sub "${PaperDeliveryCounterMockTableArn}/*"
           - Effect: Allow
             Action:
               - s3:GetObject
               - s3:HeadObject
               - s3:ListBucket
               - s3:GetObjectTagging
+              - s3:PutObject
             Resource:
               - !Sub "${TestDelayerBucketArn}"
               - !Sub "${TestDelayerBucketArn}/*"
@@ -2226,6 +2321,7 @@ Resources:
               "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
               "sk.$": $.queryResult.Items[0].sk.S
               "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
+              "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.BOOL
             Next: Parallel
           NoItemToProcess:
             Type: Succeed
@@ -2337,6 +2433,7 @@ Resources:
                         "numberOfShipments.$": $.input.numberOfShipments
                         "sendToNextStepCounter.$": $.input.sendToNextStepCounter
                         "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
+                        "stopSendToPhaseTwo": "true"
                       "processType.$": $.processType
                     Next: ToPreparePhase2Successfully
 
@@ -2410,13 +2507,15 @@ Resources:
                   "M.$": $.parallelResult[1].input.lastEvaluatedKeyPhase2
                 ":sentToNextWeekInc":
                   "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
+                ":stopSendToPhaseTwoVal":
+                  "BOOL.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
               Key:
                 pk:
                   "S.$": $.lambdaResponse.Payload.input.pk
                 sk:
                   "S.$": $.lambdaResponse.Payload.input.sk
               "TableName.$": $.PAPERDELIVERYCOUNTER_TABLENAME
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal  ADD sentToNextWeek :sentToNextWeekInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal  ADD sentToNextWeek :sentToNextWeekInc"
             Retry:
               - ErrorEquals:
                   - States.ALL
