@@ -42,7 +42,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
 
 function getDeliveryWeek() {
   const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
-  return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
+  return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
 }
 
 async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {

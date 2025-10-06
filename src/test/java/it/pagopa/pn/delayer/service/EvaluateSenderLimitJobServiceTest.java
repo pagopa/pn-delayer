@@ -102,6 +102,8 @@ class EvaluateSenderLimitJobServiceTest {
         when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
         when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
                 .thenReturn(Mono.just(page));
+        when(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(anyList(), any(), any(), any()))
+                .thenReturn(deliveries);
 
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("paId2~AR~RM");
@@ -193,6 +195,9 @@ class EvaluateSenderLimitJobServiceTest {
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
+        when(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(anyList(), any(), any(), any()))
+                .thenReturn(deliveries)
+                .thenReturn(deliveries2);
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
                 .verifyComplete();
@@ -230,6 +235,10 @@ class EvaluateSenderLimitJobServiceTest {
         Page<PaperDelivery> page2 = mock(Page.class);
         when(page2.items()).thenReturn(deliveries2);
         when(page2.lastEvaluatedKey()).thenReturn(new HashMap<>());
+
+        when(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(anyList(), any(), any(), any()))
+                .thenReturn(deliveries)
+                .thenReturn(deliveries2);
 
         when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
                 .thenReturn(Mono.just(page))
@@ -300,6 +309,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
         when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
                 .thenReturn(Mono.just(page));
+        when(deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(any(), any(), any())).thenReturn(deliveries);
 
         PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
         usedSenderLimit.setPk("paId2~AR~RM");
@@ -351,11 +361,13 @@ class EvaluateSenderLimitJobServiceTest {
 
         when(deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString()))
                 .thenReturn(List.of(new PaperChannelDeliveryDriver("00184", "AR", "driver1"),
-                        new PaperChannelDeliveryDriver("00185", "RS", "driver2")));
+                        new PaperChannelDeliveryDriver("00184", "RS", "driver2")))
+                .thenReturn(List.of(new PaperChannelDeliveryDriver("00185", "RS", "driver2")));
+
 
         List<PaperDelivery> deliveries = new ArrayList<>();
-        deliveries.addAll(getPaperDeliveries(false));
-        deliveries.addAll(getPaperDeliveries(false));
+        deliveries.addAll(getPaperDeliveries(true));
+        deliveries.addAll(getPaperDeliveries(true));
         Page<PaperDelivery> page = mock(Page.class);
         when(page.items()).thenReturn(deliveries);
         Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
@@ -364,7 +376,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);;
 
         List<PaperDelivery> deliveries2 = new ArrayList<>();
-        deliveries2.addAll(getPaperDeliveries(false));
+        deliveries2.addAll(getPaperDeliveries(true));
         deliveries2.addAll(getPaperDeliveries(false));
         Page<PaperDelivery> page2 = mock(Page.class);
         when(page2.items()).thenReturn(deliveries2);
@@ -403,9 +415,12 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.retrieveFromCache("00184~AR"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of("driver1"));
-        when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
+        when(deliveryDriverUtils.retrieveFromCache("00184~RS"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of("driver2"));
+        when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
+                .thenReturn(Optional.empty());
+        when(deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(any(), any(), any())).thenReturn(deliveries2);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(List.of(paperDeliveryCounter1)));
 
@@ -421,9 +436,9 @@ class EvaluateSenderLimitJobServiceTest {
         verify(paperDeliverySenderLimitDAO, times(2)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
-        verify(deliveryDriverUtils, times(4)).retrieveFromCache(anyString());
-        verify(deliveryDriverUtils, times(1)).insertInCache(anyList());
-        verify(deliveryDriverUtils, times(1)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());
+        verify(deliveryDriverUtils, times(5)).retrieveFromCache(anyString());
+        verify(deliveryDriverUtils, times(2)).insertInCache(anyList());
+        verify(deliveryDriverUtils, times(2)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());
 
     }
 
