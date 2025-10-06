@@ -3,6 +3,7 @@ const { Readable } = require("stream");
 const { handler } = require("../../index");
 const fs = require("fs");
 const path = require("path");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
 process.env.BUCKET_NAME = "test-bucket";
 process.env.OBJECT_KEY = "test-key.csv";
@@ -17,12 +18,14 @@ const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutio
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
+const lambdaMock = mockClient(LambdaClient);
 
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
         s3Mock.reset();
         ddbMock.reset();
         sfnMock.reset();
+        lambdaMock.reset();
     });
 
     it("Unsupported operation returns 400", async () => {
@@ -540,5 +543,40 @@ describe("Lambda Delayer Dispatcher", () => {
 
       const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [] });
       assert.strictEqual(JSON.parse(result.body).message, "Parameter must be [executionArn]");
+   });
+
+   it("INSERT_MOCK_CAPACITIES should batch-write items to DynamoDB", async () => {
+      const csvPath = path.join(__dirname, "capacitySample.csv");
+      const csvData = fs.readFileSync(csvPath, "utf8");
+      s3Mock.on(GetObjectCommand).resolves({
+          Body: Readable.from([csvData])
+      });
+      ddbMock.on(BatchWriteCommand).resolves({});
+      lambdaMock.on(InvokeCommand).resolves({
+          Payload: Buffer.from(JSON.stringify({ body: { tenderId: "20250319" } }))
+      });
+
+      const result = await handler({ operationType: "INSERT_MOCK_CAPACITIES", parameters: ["pn-PaperDeliveryDriverCapacities","file.csv"] });
+      const body = JSON.parse(result.body);
+      assert.strictEqual(result.statusCode, 200);
+      assert.strictEqual(body.message, "CSV imported successfully");
+      assert.strictEqual(body.processed, 4);
+      assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
+   });
+
+   it("INSERT_MOCK_CAPACITIES salta i record non validi", async () => {
+       const csvData = "unifiedDeliveryDriver;geoKey;activationDateFrom;capacity;peakCapacity;products\n ;87100;2024-06-01;10;20;[\"AR\"]";
+       s3Mock.on(GetObjectCommand).resolves({
+           Body: Readable.from([csvData])
+       });
+       ddbMock.on(BatchWriteCommand).resolves({});
+       lambdaMock.on(InvokeCommand).resolves({
+           Payload: Buffer.from(JSON.stringify({ body: { tenderId: "20250319" } }))
+       });
+
+       const result = await handler({ operationType: "INSERT_MOCK_CAPACITIES", parameters: ["pn-paperDeliveryDriverCapacityMock", "file.csv"] });
+       const body = JSON.parse(result.body);
+       assert.strictEqual(result.statusCode,500);
+       assert.strictEqual(body.message, "Field unifiedDeliveryDriver is required and cannot be empty");
    });
 });

@@ -11,11 +11,15 @@ const { Readable } = require("stream");
 
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(ddbClient);
+const docClient = DynamoDBDocumentClient.from(ddbClient, {
+                    marshallOptions: {
+                      removeUndefinedValues: true,
+                      convertEmptyValues: true
+                    }
+                  });
 const lambdaClient = new LambdaClient({});
 
-const TABLE_NAME = "pn-PaperDeliveryDriverCapacitiesMock";
-const TENDER_API_LAMBDA_ARN = process.env.PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN;
+const TENDER_API_LAMBDA_ARN = process.env.PAPERCHANNELTENDERAPI_LAMBDA_ARN;
 
 /**
  * INSERT_MOCK_CAPACITIES operation: downloads the CSV and writes rows to DynamoDB.
@@ -24,16 +28,14 @@ const TENDER_API_LAMBDA_ARN = process.env.PN_DELAYER_PAPERCHANNELTENDERAPILAMBDA
  */
 exports.insertMockCapacities = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
-    let OBJECT_KEY = process.env.OBJECT_KEY;
-    let [fileName] = params;
-    if (!fileName) {
-        throw new Error("Required parameter must be [fileName]");
+    let [paperDeliveryDriverCapacitiesTableName, fileName] = params;
+    if (!paperDeliveryDriverCapacitiesTableName || !fileName) {
+        throw new Error("Required parameter must be [paperDeliveryDriverCapacitiesTableName, fileName]");
     }
 
-    OBJECT_KEY = fileName;
-    if (!BUCKET_NAME || !OBJECT_KEY) {
+    if (!BUCKET_NAME) {
         throw new Error(
-            "Environment variables BUCKET_NAME and OBJECT_KEY must be defined"
+            "Environment variable BUCKET_NAME must be defined"
         );
     }
 
@@ -43,61 +45,50 @@ exports.insertMockCapacities = async (params = []) => {
     }
 
     const { Body } = await s3Client.send(
-        new GetObjectCommand({ Bucket: BUCKET_NAME, Key: OBJECT_KEY })
+        new GetObjectCommand({ Bucket: BUCKET_NAME, Key: fileName })
     );
 
     // Ensure we have a Node.js Readable stream
     const stream = Body instanceof Readable ? Body : Readable.from(Body);
 
     let processed = 0;
-    let skipped = 0;
     const itemsBuffer = [];
 
     for await (const record of stream.pipe(csv({ separator: ";" }))) {
-        try {
-            const driverCapacity = buildDriverCapacityRecord(record, tenderId);
-            itemsBuffer.push(driverCapacity);
-            processed += 1;
-
-            if (itemsBuffer.length === 25) {
-                await batchWriteItems(itemsBuffer.splice(0, itemsBuffer.length));
-            }
-        } catch (error) {
-            console.warn(`Skipping invalid record: ${error.message}`, record);
-            skipped += 1;
+        processed += 1;
+        const driverCapacity = buildDriverCapacityRecord(record, tenderId);
+        itemsBuffer.push(driverCapacity);
+        if (itemsBuffer.length === 25) {
+            await batchWriteItems(paperDeliveryDriverCapacitiesTableName, itemsBuffer.splice(0, itemsBuffer.length));
         }
     }
-
     if (itemsBuffer.length) {
-        await batchWriteItems(itemsBuffer);
+        await batchWriteItems(paperDeliveryDriverCapacitiesTableName, itemsBuffer);
     }
 
-    console.log("Processed driver capacities:", processed);
-    console.log("Skipped invalid records:", skipped);
-    return {
-        message: "Driver capacities CSV imported successfully",
-        processed,
-        skipped
-    };
-};
+    console.log("Processed data:", processed);
+    return { message: "CSV imported successfully", processed };
+
+ }
+
 
 /**
  * Utility that performs a BatchWriteCommand and retries unprocessed items.
  * @param {Array<Object>} items
  */
-async function batchWriteItems(items) {
+async function batchWriteItems(paperDeliveryDriverCapacitiesTableName, items) {
     let unprocessed = items;
     do {
         const chunk = unprocessed.splice(0, 25);
         const command = new BatchWriteCommand({
             RequestItems: {
-                [TABLE_NAME]: chunk.map((Item) => ({
+                [paperDeliveryDriverCapacitiesTableName]: chunk.map((Item) => ({
                     PutRequest: { Item }
                 }))
             }
         });
         const response = await docClient.send(command);
-        unprocessed = response.UnprocessedItems?.[TABLE_NAME]?.map(
+        unprocessed = response.UnprocessedItems?.[paperDeliveryDriverCapacitiesTableName]?.map(
             (r) => r.PutRequest.Item
         ) || [];
         if (unprocessed.length) {
@@ -121,28 +112,25 @@ function buildDriverCapacityRecord(record, tenderId) {
     if (!record.geoKey || record.geoKey.trim() === '') {
         throw new Error('Field geoKey is required and cannot be empty');
     }
-    if (!record.activationDateFrom || record.activationDateFrom.trim() === '') {
-        throw new Error('Field activationDateFrom is required and cannot be empty');
+    if (!record.capacity || record.capacity.trim() === '') {
+        throw new Error('Field capacity is required and cannot be empty');
     }
 
     const mappedRecord = {
         pk: `${tenderId}~${record.unifiedDeliveryDriver}~${record.geoKey}`,
-        activationDateFrom: record.activationDateFrom,
+        activationDateFrom: record.activationDateFrom === ''
+              ? new Date().toISOString()
+              : record.activationDateFrom,
+        activationDateTo: record.activationDateTo === '' ? undefined : record.activationDateTo,
         capacity: parseInt(record.capacity, 10),
         createdAt: new Date().toISOString(),
         geoKey: record.geoKey,
         peakCapacity: parseInt(record.peakCapacity, 10),
-        products: Array.isArray(record.products)
-            ? record.products
-            : JSON.parse(record.products || "[]"),
+        products: record.products === '' ? undefined : record.products.split(',').map((product) => product.trim()),
         tenderId: tenderId,
         tenderIdGeoKey: `${tenderId}~${record.geoKey}`,
         unifiedDeliveryDriver: record.unifiedDeliveryDriver
     };
-
-    if (record.activationDateTo && record.activationDateTo.trim() !== '') {
-        mappedRecord.activationDateTo = record.activationDateTo;
-    }
 
     return mappedRecord;
 }
