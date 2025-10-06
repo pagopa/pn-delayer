@@ -434,4 +434,18 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.deepStrictEqual(body.items, mockItems);
        assert.deepStrictEqual(body.lastEvaluatedKey, mockLastKey);
    });
+
+   it("GET_PRESIGNED_URL without checksum", async () => {
+     const params = ["example.csv"];
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 500);
+     assert.strictEqual(JSON.parse(result.body).message, "Required parameters are [fileName, checksumSha256B64]");
+   });
+
+   it("GET_PRESIGNED_URL with different file type", async () => {
+     const params = ["example.json",  "sha256checksumB64"];
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 500);
+     assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv");
+   });
 });
