@@ -12,7 +12,7 @@ process.env.DELAYERTOPAPERCHANNEL_SFN_ARN = "arn:aws:states:eu-south-1:123456789
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
-const { SFNClient, StartExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
+const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
@@ -496,5 +496,49 @@ describe("Lambda Delayer Dispatcher", () => {
      const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
      assert.strictEqual(result.statusCode, 500);
      assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv");
+   });
+
+   it("GET_STATUS_EXECUTION returns the status of a successful execution", async () => {
+       const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
+       const fakeStartDate = new Date();
+       const fakeEndDate = new Date();
+       sfnMock.on(DescribeExecutionCommand).resolves({
+           status: "SUCCEEDED",
+           startDate: fakeStartDate,
+           stopDate: fakeEndDate
+       });
+
+       const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(body.executionArn, fakeArn);
+       assert.strictEqual(body.status, "SUCCEEDED");
+       assert.strictEqual(new Date(body.startDate).toISOString(), fakeStartDate.toISOString());
+       assert.strictEqual(new Date(body.stopDate).toISOString(), fakeEndDate.toISOString());
+       assert.strictEqual(body.error, undefined);
+   });
+
+   it("GET_STATUS_EXECUTION Returns an error if execution fails", async () => {
+       const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
+       const fakeStartDate = new Date();
+       const fakeEndDate = new Date();
+       sfnMock.on(DescribeExecutionCommand).resolves({
+           status: "FAILED",
+           startDate: fakeStartDate,
+           stopDate: fakeEndDate,
+           error: "Some error"
+       });
+
+       const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(body.status, "FAILED");
+       assert.strictEqual(body.error, "Some error");
+   });
+
+   it("GET_STATUS_EXECUTION throws error if parameters are missing", async () => {
+
+      const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [] });
+      assert.strictEqual(JSON.parse(result.body).message, "Parameter must be [executionArn]");
    });
 });
