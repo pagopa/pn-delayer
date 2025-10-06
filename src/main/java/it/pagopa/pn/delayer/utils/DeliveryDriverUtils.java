@@ -124,10 +124,10 @@ public class DeliveryDriverUtils {
             return Mono.empty();
         }
 
-        var exemplar = incrementCapacities.get(0); // campi uguali per tutti
-        Map<String, Integer> totalsByGeo = incrementCapacities.stream()
+        var exemplar = incrementCapacities.getFirst(); // campi uguali per tutti
+        Map<GeoCapKey, Integer> totalsByGeo = incrementCapacities.stream()
                 .collect(Collectors.groupingBy(
-                        IncrementUsedCapacityDto::geoKey,
+                        dto -> new GeoCapKey(dto.geoKey(), dto.declaredCapacity()),
                         Collectors.summingInt(dto -> dto.numberOfDeliveries() == null ? 0 : dto.numberOfDeliveries())
                 ));
 
@@ -137,10 +137,10 @@ public class DeliveryDriverUtils {
                 .flatMap(incrementUsedCapacityEntry ->
                         paperDeliveryUsedCapacityDAO.updateCounter(
                                exemplar.unifiedDeliveryDriver(),
-                                incrementUsedCapacityEntry.getKey(), // geokey
+                                incrementUsedCapacityEntry.getKey().geoKey(), // geokey
                                 incrementUsedCapacityEntry.getValue(), // somma numberOfDeliveries per geoKey
                                 exemplar.deliveryWeek(),
-                                exemplar.declaredCapacity()))
+                                incrementUsedCapacityEntry.getKey().declaredCapacity())) // declaredCapacity
                 .then();
     }
 
@@ -217,4 +217,6 @@ public class DeliveryDriverUtils {
 
         return groups.stream().collect(Collectors.toMap(e -> e.getKey().stream().sorted().toList(), Map.Entry::getValue));
     }
+
+    record GeoCapKey(String geoKey, Integer declaredCapacity) {}
 }

@@ -14,6 +14,8 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
+| **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                                       |
+| **GET_SENDER_LIMIT**         | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                             |
 
 ### Esempi di payload
 
@@ -22,7 +24,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "IMPORT_DATA",
-  "parameters": ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters","example.csv"]
+  "parameters": ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters","example.csv, 2025-10-03"]
 }
 ```
 
@@ -73,11 +75,36 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 }
 ```
 
+*GET_SENDER_LIMIT*
+
+- Senza lastEvaluatedKey
+
+```json
+{
+  "operationType": "GET_SENDER_LIMIT",
+  "parameters": ["2025-06-30", "RM"]
+}
+```
+- Con lastEvaluatedKey
+```json
+{
+  "operationType": "GET_SENDER_LIMIT",
+  "parameters": ["2025-06-30", "RM", "<lek>"]
+}
+```
 *GET_BY_REQUEST_ID*
 ```json
 {
   "operationType": "GET_BY_REQUEST_ID",
   "parameters": ["PREPARE_ANALOG_DOMICILE.IUN_ADTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0"]
+}
+```
+
+*GET_PAPER_DELIVERY*
+```json
+{
+  "operationType": "GET_PAPER_DELIVERY",
+  "parameters": ["pn-DelayerPaperDelivery", "2025-07-07", "EVALUATE_SENDER_LIMIT"]
 }
 ```
 
@@ -135,6 +162,32 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   ```
 * Item assente → `{ "message": "Item not found" }`
 
+### Output GET_SENDER_LIMIT
+
+* Items trovati → array di oggetti, ad esempio:
+  ```json
+  {
+    "items":[
+      {
+        "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
+        "deliveryDate": "2025-09-29",
+        "weeklyEstimate": 100,
+        "monthlyEstimate": 400,
+        "originalEstimate": 500,
+        "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
+        "productType": "AR",
+        "province": "RM"
+      }
+    ],
+    "lastEvaluatedKey": {}
+  }
+  ```
+
+* Item assente → 
+```json
+ { "items": [] }
+```
+
 ### Output GET_BY_REQUEST_ID
 Se trovate, viene restituito un array di oggetti (tutte le righe con quel requestId); se non ci sono risultati l’array è vuoto ([]).
 
@@ -163,6 +216,37 @@ Un esempio di risposta è il seguente:
 ]
 ```
 
+### Output GET_PAPER_DELIVERY
+
+* Items presenti →
+  ```json
+  {
+    "items":[{
+      "iun": "AUTJ-PUKM-KDAJ-250017-T-1",
+      "notificationSentAt": "2025-07-01T00:17:00Z",
+      "workflowStep": "EVALUATE_PRINT_CAPACITY",
+      "priority": 1,
+      "tenderId": "20250319",
+      "attempt": 0,
+      "createdAt": "2025-09-10T17:05:48.240305919Z",
+      "senderPaId": "rankingRS_2nd",
+      "cap": "CAP5",
+      "province": "P2",
+      "requestId": "tcRanking_RS_2nd_1",
+      "sk": "1~2025-07-01T00:17:05Z~tcRanking_RS_2nd_1",
+      "pk": "2025-09-08~EVALUATE_PRINT_CAPACITY",
+      "prepareRequestDate": "2025-07-01T00:17:04Z",
+      "productType": "RS",
+      "unifiedDeliveryDriver": "driverRankingRS_2nd"
+    }],
+  "lastEvaluatedKey":{}
+  }
+  ```
+* Items assente →
+  ```json
+  { "items": [] }
+  ```
+
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 
 ## Struttura del progetto
@@ -176,8 +260,10 @@ Un esempio di risposta è il seguente:
 │       ├── eventHandler.js                             # Dispatcher delle operazioni
 │       ├── getDelayerPaperDeliveriesByRequestId.js.js  # Implementazione operazione GET_BY_REQUEST_ID
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
+│       ├── getSenderLimit.js                           # Implementazione operazione GET_SENDER_LIMIT
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
+│       ├── getPaperDelivery.js                         # Implementazione operazione GET_PAPER_DELIVERY
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
