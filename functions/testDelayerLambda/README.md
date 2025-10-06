@@ -15,6 +15,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
 | **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                                       |
+| **GET_SENDER_LIMIT**         | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                             |
 
 ### Esempi di payload
 
@@ -23,7 +24,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "IMPORT_DATA",
-  "parameters": ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters","example.csv"]
+  "parameters": ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters","example.csv, 2025-10-03"]
 }
 ```
 
@@ -74,6 +75,23 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 }
 ```
 
+*GET_SENDER_LIMIT*
+
+- Senza lastEvaluatedKey
+
+```json
+{
+  "operationType": "GET_SENDER_LIMIT",
+  "parameters": ["2025-06-30", "RM"]
+}
+```
+- Con lastEvaluatedKey
+```json
+{
+  "operationType": "GET_SENDER_LIMIT",
+  "parameters": ["2025-06-30", "RM", "<lek>"]
+}
+```
 *GET_BY_REQUEST_ID*
 ```json
 {
@@ -143,6 +161,32 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   }
   ```
 * Item assente → `{ "message": "Item not found" }`
+
+### Output GET_SENDER_LIMIT
+
+* Items trovati → array di oggetti, ad esempio:
+  ```json
+  {
+    "items":[
+      {
+        "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
+        "deliveryDate": "2025-09-29",
+        "weeklyEstimate": 100,
+        "monthlyEstimate": 400,
+        "originalEstimate": 500,
+        "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
+        "productType": "AR",
+        "province": "RM"
+      }
+    ],
+    "lastEvaluatedKey": {}
+  }
+  ```
+
+* Item assente → 
+```json
+ { "items": [] }
+```
 
 ### Output GET_BY_REQUEST_ID
 Se trovate, viene restituito un array di oggetti (tutte le righe con quel requestId); se non ci sono risultati l’array è vuoto ([]).
@@ -216,6 +260,7 @@ Un esempio di risposta è il seguente:
 │       ├── eventHandler.js                             # Dispatcher delle operazioni
 │       ├── getDelayerPaperDeliveriesByRequestId.js.js  # Implementazione operazione GET_BY_REQUEST_ID
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
+│       ├── getSenderLimit.js                           # Implementazione operazione GET_SENDER_LIMIT
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
 │       ├── getPaperDelivery.js                         # Implementazione operazione GET_PAPER_DELIVERY

@@ -16,13 +16,13 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
- * @param {Array<string>} params[fileName]
+ * @param {Array<string>} params[paperDeliveryTableName, countersTableName, fileName, deliveryWeek]
  * @returns {Promise<{message:string, processed:number}>}
  */
 exports.importData = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
     let OBJECT_KEY = process.env.OBJECT_KEY;
-    let [paperDeliveryTableName, countersTableName, fileName] = params;
+    let [paperDeliveryTableName, countersTableName, fileName, deliveryWeek] = params;
      if (!paperDeliveryTableName || !countersTableName) {
             throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName]");
         }
@@ -47,7 +47,9 @@ exports.importData = async (params = []) => {
     let processed = 0;
     const itemsBuffer = [];
     const dayOfWeek = 1; //lunedì
-    const deliveryWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
+    if(!deliveryWeek) {
+      deliveryWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
+    }
     for await (const record of stream.pipe(csv({ separator: ";" }))) {
         processed += 1;
         const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek);

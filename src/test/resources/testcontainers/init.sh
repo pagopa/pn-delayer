@@ -107,9 +107,27 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
     --attribute-definitions \
         AttributeName=pk,AttributeType=S \
         AttributeName=deliveryDate,AttributeType=S \
+        AttributeName=province,AttributeType=S \
     --key-schema \
         AttributeName=pk,KeyType=HASH \
         AttributeName=deliveryDate,KeyType=RANGE \
+    --global-secondary-indexes \
+        "[
+            {
+                \"IndexName\": \"deliveryDateProvince-index\",
+                \"KeySchema\": [
+                    {\"AttributeName\": \"deliveryDate\", \"KeyType\": \"HASH\"},
+                    {\"AttributeName\": \"province\", \"KeyType\": \"RANGE\"}
+                ],
+                \"Projection\": {
+                    \"ProjectionType\": \"ALL\"
+                },
+                \"ProvisionedThroughput\": {
+                    \"ReadCapacityUnits\": 10,
+                    \"WriteCapacityUnits\": 5
+                }
+            }
+        ]" \
     --provisioned-throughput \
         ReadCapacityUnits=10,WriteCapacityUnits=5
 
