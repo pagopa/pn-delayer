@@ -94,7 +94,9 @@ function filterFailedRecords(records, failures) {
 function filterInvalidRecords(records) {
     const filteredData = [];
     for (const item of records) {
-        if (item.attempt && item.prepareRequestDate && item.notificationSentAt) {
+        if (item.attempt !== undefined && item.attempt !== null
+            && item.prepareRequestDate
+            && item.notificationSentAt) {
             filteredData.push(item);
         } else {
             console.warn(`Skipping invalid event: ${item.requestId}`);

@@ -7,6 +7,7 @@ import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
+import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
 import it.pagopa.pn.delayer.model.*;
@@ -73,6 +74,40 @@ public class DeliveryDriverUtils {
         return cacheService.getFromCache(capProductTypeKey);
     }
 
+    public List<PaperDelivery> assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache, String tenderId, Map<Integer, List<String>> priorityMap) {
+        return groupedByCapProductTypeNotInCache.entrySet().stream()
+                .map(entry -> {
+                    Optional<String> driver = retrieveFromCache(entry.getKey());
+                    if(driver.isEmpty()){
+                        throw new PnInternalException(String.format("UnifiedDeliveryDriver not found for geoKey and product key [%s]", entry.getKey()), 404, ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND);
+                    }else {
+                        enrichWithPriorityAndUnifiedDeliveryDriver(entry.getValue(), driver.get(), tenderId, priorityMap);
+                        return entry.getValue();
+                    }
+                })
+                .flatMap(List::stream)
+                .toList();
+    }
+
+    public List<PaperDelivery> enrichWithPriorityAndUnifiedDeliveryDriver(List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, Map<Integer, List<String>> priorityMap) {
+        deliveries.forEach(paperDelivery -> {
+            Integer priority = findPriorityOnMap(priorityMap, paperDelivery);
+            paperDelivery.setUnifiedDeliveryDriver(unifiedDeliveryDriver);
+            paperDelivery.setTenderId(tenderId);
+            paperDelivery.setPriority(priority);
+        });
+        return deliveries;
+    }
+
+    private static Integer findPriorityOnMap(Map<Integer, List<String>> priorityMap, PaperDelivery paperDelivery) {
+        String key = "PRODUCT_" + paperDelivery.getProductType() + ".ATTEMPT_" + paperDelivery.getAttempt();
+        return priorityMap.entrySet().stream()
+                .filter(entry -> entry.getValue().contains(key))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(3);
+    }
+
     public Mono<Tuple2<Integer, Integer>> retrieveDeclaredAndUsedCapacity(String geoKey, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {
         return paperDeliveryUsedCapacityDAO.get(unifiedDeliveryDriver, geoKey, deliveryWeek)
                 .switchIfEmpty(Mono.defer(() -> {
@@ -87,10 +122,10 @@ public class DeliveryDriverUtils {
             return Mono.empty();
         }
 
-        var exemplar = incrementCapacities.get(0); // campi uguali per tutti
-        Map<String, Integer> totalsByGeo = incrementCapacities.stream()
+        var exemplar = incrementCapacities.getFirst(); // campi uguali per tutti
+        Map<GeoCapKey, Integer> totalsByGeo = incrementCapacities.stream()
                 .collect(Collectors.groupingBy(
-                        IncrementUsedCapacityDto::geoKey,
+                        dto -> new GeoCapKey(dto.geoKey(), dto.declaredCapacity()),
                         Collectors.summingInt(dto -> dto.numberOfDeliveries() == null ? 0 : dto.numberOfDeliveries())
                 ));
 
@@ -100,10 +135,10 @@ public class DeliveryDriverUtils {
                 .flatMap(incrementUsedCapacityEntry ->
                         paperDeliveryUsedCapacityDAO.updateCounter(
                                exemplar.unifiedDeliveryDriver(),
-                                incrementUsedCapacityEntry.getKey(), // geokey
+                                incrementUsedCapacityEntry.getKey().geoKey(), // geokey
                                 incrementUsedCapacityEntry.getValue(), // somma numberOfDeliveries per geoKey
                                 exemplar.deliveryWeek(),
-                                exemplar.declaredCapacity()))
+                                incrementUsedCapacityEntry.getKey().declaredCapacity())) // declaredCapacity
                 .then();
     }
 
@@ -180,4 +215,6 @@ public class DeliveryDriverUtils {
 
         return groups.stream().collect(Collectors.toMap(e -> e.getKey().stream().sorted().toList(), Map.Entry::getValue));
     }
+
+    record GeoCapKey(String geoKey, Integer declaredCapacity) {}
 }
