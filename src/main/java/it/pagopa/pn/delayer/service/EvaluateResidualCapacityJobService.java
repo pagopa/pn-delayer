@@ -1,14 +1,11 @@
 package it.pagopa.pn.delayer.service;
 
-
 import reactor.core.publisher.Mono;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
-import java.time.Instant;
-import java.util.Map;
+import java.time.LocalDate;
 
 public interface EvaluateResidualCapacityJobService {
 
-    Mono<Void> startEvaluateResidualCapacityJob(String unifiedDeliveryDriver, String province, Instant startExecutionBatch, String tenderId);
+    Mono<Void> startEvaluateResidualCapacityJob(String unifiedDeliveryDriver, String province, LocalDate deliveryWeek, String tenderId);
 
 }

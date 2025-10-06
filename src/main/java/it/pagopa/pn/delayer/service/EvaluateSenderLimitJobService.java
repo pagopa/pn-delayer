@@ -2,9 +2,9 @@ package it.pagopa.pn.delayer.service;
 
 import reactor.core.publisher.Mono;
 
-import java.time.Instant;
+import java.time.LocalDate;
 
 public interface EvaluateSenderLimitJobService {
 
-    Mono<Void> startSenderLimitJob(String province, String tenderId, Instant startExecution);
+    Mono<Void> startSenderLimitJob(String province, String tenderId, LocalDate deliveryWeek);
 }
