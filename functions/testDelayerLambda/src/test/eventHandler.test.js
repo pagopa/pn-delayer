@@ -12,7 +12,7 @@ process.env.DELAYERTOPAPERCHANNEL_SFN_ARN = "arn:aws:states:eu-south-1:123456789
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
-const { SFNClient, StartExecutionCommand } = require("@aws-sdk/client-sfn");
+const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
@@ -44,6 +44,19 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
+
+    it("should batch-write items to DynamoDB with deliveryWeekInput", async () => {
+            const csvPath = path.join(__dirname, "sample.csv");
+            const csvData = fs.readFileSync(csvPath, "utf8");
+            s3Mock.on(GetObjectCommand).resolves({
+                Body: Readable.from([csvData])
+            });
+            ddbMock.on(BatchWriteCommand).resolves({});
+
+            const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "", "2025-08-04"] });
+            assert.strictEqual(result.statusCode, 200);
+            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
+            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk,"2025-08-04~EVALUATE_SENDER_LIMIT");});
 
     it("should batch-write items to DynamoDB with custom fileName", async () => {
         const csvPath = path.join(__dirname, "sample.csv");
@@ -131,6 +144,9 @@ describe("Lambda Delayer Dispatcher", () => {
             executionArn: fakeArn, 
             startDate: fakeStartDate 
         });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: []
+        });
 
         const printCapacity = "180000";
         const deliveryDay = "1";
@@ -141,7 +157,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -152,12 +169,43 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, deliveryDay);
     });
 
+    it("starts the step function while there is another one executing", async () => {
+        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({
+            executionArn: fakeArn,
+            startDate: fakeStartDate,
+        });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: [{ executionArn: fakeArn,
+            status: "RUNNING"
+             }]
+        });
+
+        const printCapacity = "180000";
+        const deliveryDay = "1";
+
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters", printCapacity] });
+
+        assert.strictEqual(result.statusCode, 200);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
+        assert.strictEqual(body.message, "There is already an active execution of the Step Function");
+        assert.strictEqual(body.executionArn, fakeArn);
+    });
+
       it("starts the step function with default parameters when none are provided", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
         const fakeStartDate = new Date();
         sfnMock.on(StartExecutionCommand).resolves({ 
             executionArn: fakeArn, 
             startDate: fakeStartDate 
+        });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: []
         });
 
         const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
@@ -166,7 +214,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters"] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -184,6 +233,9 @@ describe("Lambda Delayer Dispatcher", () => {
             executionArn: fakeArn, 
             startDate: fakeStartDate 
         });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: []
+        });
 
         const printCapacity = "180000";
 
@@ -193,7 +245,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -204,18 +257,27 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1"); // default
     });
 
-    it("error the step function with no required parameters provided", async () => {
-        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
+    it("error the step function with no required SFN_ARN provided", async () => {
         const fakeStartDate = new Date();
         sfnMock.on(StartExecutionCommand).resolves({
-            executionArn: fakeArn,
             startDate: fakeStartDate
         });
 
-        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery"] });
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters"] });
 
-        assert.strictEqual(result.statusCode, 500);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.statusCode, 500);
     });
+
+        it("error the step function with no required parameters provided", async () => {
+
+            const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery"] });
+            const body = JSON.parse(result.body);
+            assert.strictEqual(body.statusCode, 400);
+        });
 
         it("starts the step function and returns executionArn", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
@@ -305,5 +367,178 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(result.statusCode, 200);
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
+   });
+
+   it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
+       const fakeItems = [
+           {
+               pk: "PA1~PT1~RM",
+               deliveryDate: "2025-06-30",
+               weeklyEstimate: 100,
+               monthlyEstimate: 400,
+               originalEstimate: 500,
+               paId: "PA1",
+               productType: "PT1",
+               province: "RM"
+           },
+           {
+               pk: "PA2~PT2~RM",
+               deliveryDate: "2025-06-30",
+               weeklyEstimate: 150,
+               monthlyEstimate: 600,
+               originalEstimate: 700,
+               paId: "PA2",
+               productType: "PT2",
+               province: "RM"
+           }
+       ];
+
+       const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30" };
+       ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
+
+       const params = ["2025-06-30", "RM"];
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.items.length, 2);
+       assert.strictEqual(body.items[0].weeklyEstimate, 100);
+       assert.strictEqual(body.items[1].weeklyEstimate, 150);
+       assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
+   });
+
+   it("GET_SENDER_LIMIT if no items found", async () => {
+
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+       const params = ["2025-06-30", "RM"];
+
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+       const body = JSON.parse(result.body);
+       assert.deepStrictEqual(body, { items: [] });
+   });
+
+   it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
+
+      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
+      assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, province]");
+   });
+
+   it("should throw error when parameter is missing", async () => {
+
+        const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: [] });
+        assert.strictEqual(JSON.parse(result.body).message, "Required parameters are [paperDeliveryTableName, deliveryDate, workflowStep]");
+   });
+
+   it("should return items when query finds data", async () => {
+       const mockItems = [
+           { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29", province: "RM", productType: "RS" },
+           { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29", province: "MI", productType: "AR" }
+       ];
+
+       ddbMock.on(QueryCommand).resolves({ Items: mockItems });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(Array.isArray(body.items), true);
+       assert.strictEqual(body.items.length, 2);
+       assert.deepStrictEqual(body.items, mockItems);
+       assert.strictEqual(body.lastEvaluatedKey, undefined);
+   });
+
+   it("should return message when no items found", async () => {
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.deepStrictEqual(body, { items: [] });
+   });
+
+   it("should use custom limit from environment variable", async () => {
+       process.env.PAPER_DELIVERY_QUERYLIMIT = "500";
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+       await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+
+       const calls = ddbMock.commandCalls(QueryCommand);
+       const queryParams = calls[0].args[0].input;
+       assert.strictEqual(queryParams.Limit, 500);
+   });
+
+   it("should return LastEvaluatedKey when pagination is needed", async () => {
+       const mockItems = [
+           { pk: "2025-09-29~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29" }
+       ];
+       const mockLastKey = { pk: "2025-09-29~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29" };
+
+       ddbMock.on(QueryCommand).resolves({
+           Items: mockItems,
+           LastEvaluatedKey: mockLastKey
+       });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.deepStrictEqual(body.items, mockItems);
+       assert.deepStrictEqual(body.lastEvaluatedKey, mockLastKey);
+   });
+
+   it("GET_PRESIGNED_URL without checksum", async () => {
+     const params = ["example.csv"];
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 500);
+     assert.strictEqual(JSON.parse(result.body).message, "Required parameters are [fileName, checksumSha256B64]");
+   });
+
+   it("GET_PRESIGNED_URL with different file type", async () => {
+     const params = ["example.json",  "sha256checksumB64"];
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 500);
+     assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv");
+   });
+
+   it("GET_STATUS_EXECUTION returns the status of a successful execution", async () => {
+       const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
+       const fakeStartDate = new Date();
+       const fakeEndDate = new Date();
+       sfnMock.on(DescribeExecutionCommand).resolves({
+           status: "SUCCEEDED",
+           startDate: fakeStartDate,
+           stopDate: fakeEndDate
+       });
+
+       const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(body.executionArn, fakeArn);
+       assert.strictEqual(body.status, "SUCCEEDED");
+       assert.strictEqual(new Date(body.startDate).toISOString(), fakeStartDate.toISOString());
+       assert.strictEqual(new Date(body.stopDate).toISOString(), fakeEndDate.toISOString());
+       assert.strictEqual(body.error, undefined);
+   });
+
+   it("GET_STATUS_EXECUTION Returns an error if execution fails", async () => {
+       const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
+       const fakeStartDate = new Date();
+       const fakeEndDate = new Date();
+       sfnMock.on(DescribeExecutionCommand).resolves({
+           status: "FAILED",
+           startDate: fakeStartDate,
+           stopDate: fakeEndDate,
+           error: "Some error"
+       });
+
+       const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(body.status, "FAILED");
+       assert.strictEqual(body.error, "Some error");
+   });
+
+   it("GET_STATUS_EXECUTION throws error if parameters are missing", async () => {
+
+      const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [] });
+      assert.strictEqual(JSON.parse(result.body).message, "Parameter must be [executionArn]");
    });
 });
