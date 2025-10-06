@@ -45,6 +45,19 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
 
+    it("should batch-write items to DynamoDB with deliveryWeekInput", async () => {
+            const csvPath = path.join(__dirname, "sample.csv");
+            const csvData = fs.readFileSync(csvPath, "utf8");
+            s3Mock.on(GetObjectCommand).resolves({
+                Body: Readable.from([csvData])
+            });
+            ddbMock.on(BatchWriteCommand).resolves({});
+
+            const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "", "2025-08-04"] });
+            assert.strictEqual(result.statusCode, 200);
+            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
+            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk,"2025-08-04~EVALUATE_SENDER_LIMIT");});
+
     it("should batch-write items to DynamoDB with custom fileName", async () => {
         const csvPath = path.join(__dirname, "sample.csv");
         const csvData = fs.readFileSync(csvPath, "utf8");
@@ -305,6 +318,135 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(result.statusCode, 200);
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
+   });
+
+   it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
+       const fakeItems = [
+           {
+               pk: "PA1~PT1~RM",
+               deliveryDate: "2025-06-30",
+               weeklyEstimate: 100,
+               monthlyEstimate: 400,
+               originalEstimate: 500,
+               paId: "PA1",
+               productType: "PT1",
+               province: "RM"
+           },
+           {
+               pk: "PA2~PT2~RM",
+               deliveryDate: "2025-06-30",
+               weeklyEstimate: 150,
+               monthlyEstimate: 600,
+               originalEstimate: 700,
+               paId: "PA2",
+               productType: "PT2",
+               province: "RM"
+           }
+       ];
+
+       const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30" };
+       ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
+
+       const params = ["2025-06-30", "RM"];
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.items.length, 2);
+       assert.strictEqual(body.items[0].weeklyEstimate, 100);
+       assert.strictEqual(body.items[1].weeklyEstimate, 150);
+       assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
+   });
+
+   it("GET_SENDER_LIMIT if no items found", async () => {
+
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+       const params = ["2025-06-30", "RM"];
+
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
+       const body = JSON.parse(result.body);
+       assert.deepStrictEqual(body, { items: [] });
+   });
+
+   it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
+
+      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
+      assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, province]");
+   });
+
+   it("should throw error when parameter is missing", async () => {
+
+        const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: [] });
+        assert.strictEqual(JSON.parse(result.body).message, "Required parameters are [paperDeliveryTableName, deliveryDate, workflowStep]");
+   });
+
+   it("should return items when query finds data", async () => {
+       const mockItems = [
+           { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29", province: "RM", productType: "RS" },
+           { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29", province: "MI", productType: "AR" }
+       ];
+
+       ddbMock.on(QueryCommand).resolves({ Items: mockItems });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.strictEqual(Array.isArray(body.items), true);
+       assert.strictEqual(body.items.length, 2);
+       assert.deepStrictEqual(body.items, mockItems);
+       assert.strictEqual(body.lastEvaluatedKey, undefined);
+   });
+
+   it("should return message when no items found", async () => {
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.deepStrictEqual(body, { items: [] });
+   });
+
+   it("should use custom limit from environment variable", async () => {
+       process.env.PAPER_DELIVERY_QUERYLIMIT = "500";
+       ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+       await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+
+       const calls = ddbMock.commandCalls(QueryCommand);
+       const queryParams = calls[0].args[0].input;
+       assert.strictEqual(queryParams.Limit, 500);
+   });
+
+   it("should return LastEvaluatedKey when pagination is needed", async () => {
+       const mockItems = [
+           { pk: "2025-09-29~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29" }
+       ];
+       const mockLastKey = { pk: "2025-09-29~EVALUATE_PRINT_CAPACITY", sk: "2025-09-29" };
+
+       ddbMock.on(QueryCommand).resolves({
+           Items: mockItems,
+           LastEvaluatedKey: mockLastKey
+       });
+
+       const result = await handler({ operationType: "GET_PAPER_DELIVERY", parameters: ["pn-DelayerPaperDelivery","2025-10-03","EVALUATE_PRINT_CAPACITY"]});
+       const body = JSON.parse(result.body);
+
+       assert.deepStrictEqual(body.items, mockItems);
+       assert.deepStrictEqual(body.lastEvaluatedKey, mockLastKey);
+   });
+
+   it("GET_PRESIGNED_URL without checksum", async () => {
+     const params = ["example.csv"];
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 500);
+     assert.strictEqual(JSON.parse(result.body).message, "Required parameters are [fileName, checksumSha256B64]");
+   });
+
+   it("GET_PRESIGNED_URL with different file type", async () => {
+     const params = ["example.json",  "sha256checksumB64"];
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 500);
+     assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv");
    });
 
    it("GET_STATUS_EXECUTION returns the status of a successful execution", async () => {
