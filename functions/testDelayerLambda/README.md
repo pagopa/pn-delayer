@@ -8,17 +8,17 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 | Nome                         | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                                                                                                                                                                                           |
 |------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                                                                               |
+| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                                                                                      |
 | **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename"]` filename opzionale                                                                    |
 | **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                                   |
 | **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                          |
 | **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity"]` printCapacity opzionale |
 | **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                                     |
 | **GET_STATUS_EXECUTION**     | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                               | `["executionArn"]`                                                                                                                                                                                                                       |
-| **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                                       |
+| **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                                      |
 | **GET_SENDER_LIMIT**         | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                             |
 | **GET_PRESIGNED_URL**        | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                         | `["filename","checksum"]`                                                                                                                                                                                                                |
-| **GET_DECLARED_CAPACITY**    | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                | `["province", "deliveryDate"]`                                                                                                                                                                                                           | 
+| **GET_DECLARED_CAPACITY**    | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                         | 
 
 ### Esempi di payload
 
@@ -123,7 +123,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "GET_DECLARED_CAPACITY",
-  "parameters": ["province", "deliveryDate"]
+  "parameters": ["pn-PaperDeliveryDriverCapacities","province", "deliveryDate"]
 }
 ```
 
@@ -170,7 +170,23 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   "parameters": ["example.csv","abcd1234efgh5678ijkl9012mnop3456"]
 }
 ```
+### Output GET_DECLARED_CAPACITY
 
+* Items trovati → 
+  ```json
+  {
+    "items":[{
+      "unifiedDeliveryDriverGeokey": "Sailpost~87100",
+      "deliveryDate": "2025-06-30T00:00:00Z",
+      "geoKey": "87100",
+      "unifiedDeliveryDriver": "Sailpost",
+      "usedCapacity": 572,
+      "capacity": 1000
+    }]
+  }
+  ```
+* Item not trovati → `{ "items": [] }`
+* 
 ### Output GET_USED_CAPACITY
 
 * Item trovato → oggetto completo, ad esempio:

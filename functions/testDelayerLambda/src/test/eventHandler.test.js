@@ -564,7 +564,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
         ddbMock.on(QueryCommand).resolves({ Items: [fakeItem] });
 
-        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
         const body = JSON.parse(result.body);
 
@@ -591,7 +591,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
         ddbMock.on(QueryCommand).resolves({ Items: [fakeItem] });
 
-        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
         const body = JSON.parse(result.body);
 
@@ -608,7 +608,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
         ddbMock.on(QueryCommand).resolves({ Items: [] });
 
-        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
 
         const body = JSON.parse(result.body);
@@ -617,7 +617,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
     it("GET_DECLARED_CAPACITY throws error if parameters are missing", async () => {
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: [] });
-        assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [province, deliveryDate]");
+        assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [paperDeliveryDriverCapacitiesTabelName, province, deliveryDate]");
     });
 
     it("GET_DECLARED_CAPACITY throws error if no active tender found", async () => {
@@ -627,7 +627,7 @@ describe("Lambda Delayer Dispatcher", () => {
             }))
         });
 
-        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
         assert.strictEqual(JSON.parse(result.body).message, "No active tender found");
     });
@@ -673,7 +673,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
         ddbMock.on(QueryCommand).resolves({ Items: fakeItems });
 
-        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
         const body = JSON.parse(result.body);
 

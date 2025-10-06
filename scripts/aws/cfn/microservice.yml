@@ -1712,11 +1712,6 @@ Resources:
             Resource:
               - !Ref PaperDeliveryStateMachine
               - !Ref DelayerToPaperChannelStateMachine
-          - Effect: Allow
-            Action:
-              - lambda:InvokeFunction
-            Resource:
-              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule

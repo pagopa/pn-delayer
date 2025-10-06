@@ -3,21 +3,20 @@ const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
-const TABLE_NAME = "pn-PaperDeliveryDriverCapacities";
-const GSI_NAME = " tenderIdGeoKey-index";
-const TENDER_API_LAMBDA_ARN = process.env.PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN;
+const GSI_NAME = "tenderIdGeoKey-index";
+const TENDER_API_LAMBDA_ARN = process.env.PAPERCHANNELTENDERAPI_LAMBDA_ARN;
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 const lambdaClient = new LambdaClient({});
 
 /**
  * GET_DECLARED_CAPACITY operation
- * @param {Array<string>} params [province, deliveryDate]
+ * @param {Array<string>} params [paperDeliveryDriverCapacitiesTabelName, province, deliveryDate]
  */
 async function getDeclaredCapacity(params = []) {
-    const [province, deliveryDate] = params;
-    if (!province || !deliveryDate) {
-        throw new Error("Parameters must be [province, deliveryDate]");
+    const [paperDeliveryDriverCapacitiesTabelName, province, deliveryDate] = params;
+    if (!paperDeliveryDriverCapacitiesTabelName || !province || !deliveryDate) {
+        throw new Error("Parameters must be [paperDeliveryDriverCapacitiesTabelName, province, deliveryDate]");
     }
 
     const tenderId = await getActiveTender();
@@ -27,7 +26,7 @@ async function getDeclaredCapacity(params = []) {
     const partitionKey = `${tenderId}~${province}`;
 
     const command = new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: paperDeliveryDriverCapacitiesTabelName,
         IndexName: GSI_NAME,
         KeyConditionExpression: "tenderIdGeoKey = :pk AND activationDateFrom < :deliveryDate",
         FilterExpression: "attribute_not_exists(activationDateTo) OR activationDateTo > :deliveryDate",
