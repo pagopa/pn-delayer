@@ -12,7 +12,7 @@ process.env.DELAYERTOPAPERCHANNEL_SFN_ARN = "arn:aws:states:eu-south-1:123456789
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
-const { SFNClient, StartExecutionCommand, DescribeExecutionCommand } = require("@aws-sdk/client-sfn");
+const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
@@ -144,6 +144,9 @@ describe("Lambda Delayer Dispatcher", () => {
             executionArn: fakeArn, 
             startDate: fakeStartDate 
         });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: []
+        });
 
         const printCapacity = "180000";
         const deliveryDay = "1";
@@ -154,7 +157,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -165,12 +169,43 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, deliveryDay);
     });
 
+    it("starts the step function while there is another one executing", async () => {
+        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
+        const fakeStartDate = new Date();
+        sfnMock.on(StartExecutionCommand).resolves({
+            executionArn: fakeArn,
+            startDate: fakeStartDate,
+        });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: [{ executionArn: fakeArn,
+            status: "RUNNING"
+             }]
+        });
+
+        const printCapacity = "180000";
+        const deliveryDay = "1";
+
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters", printCapacity] });
+
+        assert.strictEqual(result.statusCode, 200);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
+        assert.strictEqual(body.message, "There is already an active execution of the Step Function");
+        assert.strictEqual(body.executionArn, fakeArn);
+    });
+
       it("starts the step function with default parameters when none are provided", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
         const fakeStartDate = new Date();
         sfnMock.on(StartExecutionCommand).resolves({ 
             executionArn: fakeArn, 
             startDate: fakeStartDate 
+        });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: []
         });
 
         const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
@@ -179,7 +214,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters"] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -197,6 +233,9 @@ describe("Lambda Delayer Dispatcher", () => {
             executionArn: fakeArn, 
             startDate: fakeStartDate 
         });
+        sfnMock.on(ListExecutionsCommand).resolves({
+            executions: []
+        });
 
         const printCapacity = "180000";
 
@@ -206,7 +245,8 @@ describe("Lambda Delayer Dispatcher", () => {
                 "pn-PaperDeliveryCounters", printCapacity] });
 
         assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
+        const outerBodyParse = JSON.parse(result.body);
+        const body = JSON.parse(outerBodyParse.body);
         assert.strictEqual(body.executionArn, fakeArn);
         
         const calls = sfnMock.commandCalls(StartExecutionCommand);
@@ -217,18 +257,27 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(input.PN_DELAYER_DELIVERYDATEDAYOFWEEK, "1"); // default
     });
 
-    it("error the step function with no required parameters provided", async () => {
-        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec456";
+    it("error the step function with no required SFN_ARN provided", async () => {
         const fakeStartDate = new Date();
         sfnMock.on(StartExecutionCommand).resolves({
-            executionArn: fakeArn,
             startDate: fakeStartDate
         });
 
-        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery"] });
+        const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
+                "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
+                "pn-PaperDeliveryCounters"] });
 
-        assert.strictEqual(result.statusCode, 500);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.statusCode, 500);
     });
+
+        it("error the step function with no required parameters provided", async () => {
+
+            const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery"] });
+            const body = JSON.parse(result.body);
+            assert.strictEqual(body.statusCode, 400);
+        });
 
         it("starts the step function and returns executionArn", async () => {
         const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
