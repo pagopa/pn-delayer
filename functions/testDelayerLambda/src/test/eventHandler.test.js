@@ -13,10 +13,12 @@ const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 const { SFNClient, StartExecutionCommand } = require("@aws-sdk/client-sfn");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
+const lambdaMock = mockClient(LambdaClient);
 
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
@@ -308,9 +310,9 @@ describe("Lambda Delayer Dispatcher", () => {
    });
 
     it("GET_DECLARED_CAPACITY returns the item close range", async () => {
-        const fakeItem =
-        {
+        const fakeItem = {
             pk: "tenderId1~unifiedDeliveryDriver1~geoKey1",
+            tenderIdGeoKey: "tenderId1~geoKey1",
             activationDateFrom: "2025-01-01T00:00:00Z",
             activationDateTo: "2025-12-31T00:00:00Z",
             tenderId: "tenderId1",
@@ -318,47 +320,134 @@ describe("Lambda Delayer Dispatcher", () => {
             geoKey: "geoKey1",
             capacity: 100
         };
-        ddbMock.on(QueryCommand).resolves({ Items: fakeItem });
 
-        const params = ["tenderId1", "unifiedDeliveryDriver1", "geoKey1", "2025-06-30T00:00:00Z"];
-        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
-        const body = JSON.parse(result.body);
-
-        assert.deepStrictEqual(body.Items.capacity, 100);
-    });
-
-        it("GET_DECLARED_CAPACITY returns the item open range", async () => {
-            const fakeItem =
-            {
-                pk: "tenderId1~unifiedDeliveryDriver1~geoKey1",
-                activationDateFrom: "2025-01-01T00:00:00Z",
-                tenderId: "tenderId1",
-                unifiedDeliveryDriver: "unifiedDeliveryDriver1",
-                geoKey: "geoKey1",
-                capacity: 50
-            };
-            ddbMock.on(QueryCommand).resolves({ Items: fakeItem });
-
-            const params = ["tenderId1", "unifiedDeliveryDriver1", "geoKey1", "2025-06-30T00:00:00Z"];
-            const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
-            const body = JSON.parse(result.body);
-
-            assert.deepStrictEqual(body.Items.capacity, 50);
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
         });
 
+        ddbMock.on(QueryCommand).resolves({ Items: [fakeItem] });
+
+        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        const body = JSON.parse(result.body);
+
+        assert.strictEqual(body.length, 1);
+        assert.deepStrictEqual(body[0].capacity, 100);
+    });
+
+    it("GET_DECLARED_CAPACITY returns the item open range", async () => {
+        const fakeItem = {
+            pk: "tenderId1~unifiedDeliveryDriver1~geoKey1",
+            tenderIdGeoKey: "tenderId1~geoKey1",
+            activationDateFrom: "2025-01-01T00:00:00Z",
+            tenderId: "tenderId1",
+            unifiedDeliveryDriver: "unifiedDeliveryDriver1",
+            geoKey: "geoKey1",
+            capacity: 50
+        };
+
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
+        });
+
+        ddbMock.on(QueryCommand).resolves({ Items: [fakeItem] });
+
+        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        const body = JSON.parse(result.body);
+
+        assert.strictEqual(body.length, 1);
+        assert.deepStrictEqual(body[0].capacity, 50);
+    });
+
     it("GET_DECLARED_CAPACITY returns empty array if no item found", async () => {
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
+        });
+
         ddbMock.on(QueryCommand).resolves({ Items: [] });
 
-        const params = ["tenderId1", "unifiedDeliveryDriver1", "geoKey1", "2025-06-30T00:00:00Z"];
+        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
 
         const body = JSON.parse(result.body);
-        assert.deepStrictEqual(body.Items, []);
+        assert.deepStrictEqual(body, []);
     });
 
     it("GET_DECLARED_CAPACITY throws error if parameters are missing", async () => {
-
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: [] });
-        assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [tenderId, unifiedDeliveryDriver, geoKey, deliveryDate]");
+        assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [province, deliveryDate]");
+    });
+
+    it("GET_DECLARED_CAPACITY throws error if no active tender found", async () => {
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: null }
+            }))
+        });
+
+        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        assert.strictEqual(JSON.parse(result.body).message, "No active tender found");
+    });
+
+    it("GET_DECLARED_CAPACITY groups by driver and returns most recent activation date", async () => {
+        const fakeItems = [
+            {
+                pk: "tenderId1~driver1~geoKey1",
+                tenderIdGeoKey: "tenderId1~geoKey1",
+                activationDateFrom: "2025-01-01T00:00:00Z",
+                activationDateTo: "2025-12-31T00:00:00Z",
+                tenderId: "tenderId1",
+                unifiedDeliveryDriver: "driver1",
+                geoKey: "geoKey1",
+                capacity: 100
+            },
+            {
+                pk: "tenderId1~driver1~geoKey1",
+                tenderIdGeoKey: "tenderId1~geoKey1",
+                activationDateFrom: "2025-06-01T00:00:00Z",
+                activationDateTo: "2025-12-31T00:00:00Z",
+                tenderId: "tenderId1",
+                unifiedDeliveryDriver: "driver1",
+                geoKey: "geoKey1",
+                capacity: 150
+            },
+            {
+                pk: "tenderId1~driver2~geoKey1",
+                tenderIdGeoKey: "tenderId1~geoKey1",
+                activationDateFrom: "2025-01-01T00:00:00Z",
+                tenderId: "tenderId1",
+                unifiedDeliveryDriver: "driver2",
+                geoKey: "geoKey1",
+                capacity: 200
+            }
+        ];
+
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
+        });
+
+        ddbMock.on(QueryCommand).resolves({ Items: fakeItems });
+
+        const params = ["geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        const body = JSON.parse(result.body);
+
+        assert.strictEqual(body.length, 2);
+        const driver1Item = body.find(item => item.unifiedDeliveryDriver === "driver1");
+        const driver2Item = body.find(item => item.unifiedDeliveryDriver === "driver2");
+
+        assert.deepStrictEqual(driver1Item.capacity, 150);
+        assert.deepStrictEqual(driver1Item.activationDateFrom, "2025-06-01T00:00:00Z");
+        assert.deepStrictEqual(driver2Item.capacity, 200);
     });
 });

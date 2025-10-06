@@ -1,37 +1,76 @@
 "use strict";
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, QueryCommand } = require("@aws-sdk/lib-dynamodb");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
 const TABLE_NAME = "pn-PaperDeliveryDriverCapacities";
+const GSI_NAME = " tenderIdGeoKey-index";
+const TENDER_API_LAMBDA_ARN = process.env.PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN;
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
+const lambdaClient = new LambdaClient({});
 
 /**
  * GET_DECLARED_CAPACITY operation
- * @param {Array<string>} params [tenderId, unifiedDeliveryDriver, geoKey, deliveryDate]
+ * @param {Array<string>} params [province, deliveryDate]
  */
 async function getDeclaredCapacity(params = []) {
-    const [tenderId, unifiedDeliveryDriver, geoKey, deliveryDate] = params;
-    if (!tenderId || !unifiedDeliveryDriver || !geoKey || !deliveryDate) {
-        throw new Error("Parameters must be [tenderId, unifiedDeliveryDriver, geoKey, deliveryDate]");
+    const [province, deliveryDate] = params;
+    if (!province || !deliveryDate) {
+        throw new Error("Parameters must be [province, deliveryDate]");
     }
 
-    const partitionKey = `${tenderId}~${unifiedDeliveryDriver}~${geoKey}`;
+    const tenderId = await getActiveTender();
+    if (!tenderId) {
+        throw new Error("No active tender found");
+    }
+    const partitionKey = `${tenderId}~${province}`;
 
     const command = new QueryCommand({
         TableName: TABLE_NAME,
-        KeyConditionExpression: "pk = :pk AND activationDateFrom <= :deliveryDate",
-        FilterExpression: "attribute_not_exists(activationDateTo) OR activationDateTo >= :now",
+        IndexName: GSI_NAME,
+        KeyConditionExpression: "tenderIdGeoKey = :pk AND activationDateFrom < :deliveryDate",
+        FilterExpression: "attribute_not_exists(activationDateTo) OR activationDateTo > :deliveryDate",
         ExpressionAttributeValues: {
             ":pk": partitionKey,
-            ":deliveryDate": deliveryDate,
-            ":now": deliveryDate
+            ":deliveryDate": deliveryDate
         },
-        Limit: 1,
-        ScanIndexForward: false
+        Limit: 1000
     });
 
-    return docClient.send(command);
+    const result = await docClient.send(command);
+
+    const groupedByDriver = {};
+
+    for (const item of result.Items || []) {
+        const driver = item.unifiedDeliveryDriver;
+
+        if (!groupedByDriver[driver] ||
+            item.activationDateFrom > groupedByDriver[driver].activationDateFrom) {
+            groupedByDriver[driver] = item;
+        }
+    }
+
+    return Object.values(groupedByDriver);
+}
+
+/**
+ * Invoke TenderApiLambda to get tender information
+ * @param {string} operation - The operation to perform (e.g., 'GET_TENDER_ACTIVE')
+ */
+async function getActiveTender() {
+    const command = new InvokeCommand({
+            FunctionName: TENDER_API_LAMBDA_ARN,
+            InvocationType: "RequestResponse",
+            Payload: JSON.stringify({
+                operation: "GET_TENDER_ACTIVE"
+            })
+        });
+
+    const response = await lambdaClient.send(command);
+    const responsePayload = JSON.parse(Buffer.from(response.Payload).toString());
+
+    return responsePayload.body.tenderId;
 }
 
 module.exports = { getDeclaredCapacity };
