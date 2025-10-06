@@ -1,5 +1,6 @@
 "use strict";
 
+const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 const { SFNClient, StartExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
 const sfnClient = new SFNClient({});
@@ -18,7 +19,7 @@ async function getLastExecution(stateMachineArn) {
 /**
  *RUN_ALGORITHM operation – launches the configured Step Function only if there are no active runs.
  * @param {Array<string>} params[paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName,
- *         senderLimitTableName, senderUsedLimitTableName, countersTableName, printCapacity]
+ *         senderLimitTableName, senderUsedLimitTableName, countersTableName, opt <{"printCapacity":"", "deliveryWeek":""}>]
  */
 async function runAlgorithm(params) {
   try {
@@ -27,7 +28,10 @@ async function runAlgorithm(params) {
       return resp(500, { error: "Missing environment variable SFN_ARN" });
     }
     let [paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName,
-        senderLimitTableName, senderUsedLimitTableName, countersTableName, printCapacity] = params;
+        senderLimitTableName, senderUsedLimitTableName, countersTableName, opt] = params;
+
+    let printCapacity = opt?.printCapacity;
+    let deliveryWeek = opt?.deliveryWeek;
 
     if (!printCapacity) {
         printCapacity = "180000"
@@ -40,6 +44,10 @@ async function runAlgorithm(params) {
             error:
               "Required parameters must be [paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName, senderLimitTableName, senderUsedLimitTableName, countersTableName]",
           });
+    }
+
+    if(!deliveryWeek) {
+      deliveryWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).toString();
     }
 
     const lastExecution = await getLastExecution(SFN_ARN);
@@ -59,7 +67,8 @@ async function runAlgorithm(params) {
         PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME: senderUsedLimitTableName, //"pn-PaperDeliveryUsedSenderLimit",
         PAPERDELIVERYCOUNTER_TABLENAME: countersTableName, //"pn-PaperDeliveryCounters",
         PN_DELAYER_DELIVERYDATEDAYOFWEEK: "1",
-        PN_DELAYER_PRINTCAPACITY: printCapacityValue
+        PN_DELAYER_PRINTCAPACITY: printCapacityValue,
+        PN_DELAYER_DELIVERYWEEK: deliveryWeek
     };
 
     const cmd = new StartExecutionCommand({

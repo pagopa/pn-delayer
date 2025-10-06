@@ -181,10 +181,6 @@ Parameters:
     Description: 'Day of the week for capacity (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)'
     Default: 1
 
-  DeliveryWeek:
-    Type: String
-    Description: 'Week for deliveryDate setting'
-
   PrintCapacityWeeklyWorkingDays:
     Type: Number
     Description: 'Number of working days in a week'
@@ -1736,8 +1732,7 @@ Resources:
               "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
               "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
               "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}",
-              "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}",
-              "PN_DELAYER_DELIVERYWEEK": "${DeliveryWeek}"
+              "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}"
             }
 
   DelayerStartWorkflowScheduleRuleRole:
