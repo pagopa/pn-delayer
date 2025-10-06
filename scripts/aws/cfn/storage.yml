@@ -171,6 +171,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryUsedSenderLimitTable:
     Type: AWS::DynamoDB::Table
