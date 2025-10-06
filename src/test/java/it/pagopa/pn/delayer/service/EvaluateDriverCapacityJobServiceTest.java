@@ -25,6 +25,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 import static it.pagopa.pn.delayer.model.WorkflowStepEnum.*;
@@ -58,14 +59,14 @@ class EvaluateDriverCapacityJobServiceTest {
         pnDelayerConfigs.setPrintCapacity(List.of("1970-01-01;180000"));
 
         PaperDeliveryUtils paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, pnDelayerConfigs, new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs)), deliveryDriverUtils, paperDeliveryCounterDAO);
-        evaluateDr = new EvaluateDriverCapacityJobServiceImpl(paperDeliveryUtils, new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs)));
+        evaluateDr = new EvaluateDriverCapacityJobServiceImpl(paperDeliveryUtils);
     }
 
     @Test
     void startEvaluateDriverCapacityJob_NoProvinceCapacity() {
         String unifiedDeliveryDriver = "driver1";
         String province = "RM";
-        Instant startExecutionBatch = Instant.parse("2025-01-06T00:00:00Z");
+        LocalDate deliveryWeek = LocalDate.parse("2025-01-06");
         String tenderId = "tender123";
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
@@ -78,7 +79,7 @@ class EvaluateDriverCapacityJobServiceTest {
                 any(),
                 eq(5))).thenReturn(Mono.just(Page.create(deliveries)));
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
 
         List<PaperDelivery> capturedDeliveries = argumentCaptor.getValue();
@@ -100,7 +101,7 @@ class EvaluateDriverCapacityJobServiceTest {
     void startEvaluateDriverCapacityJob_NoItemsToProcess() {
         String unifiedDeliveryDriver = "driver1";
         String province = "RM";
-        Instant startExecutionBatch = Instant.parse("2023-10-04T10:00:00Z");
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-04");
         String tenderId = "tender123";
         when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(), any(), any(), any())).thenReturn(Mono.just(Tuples.of(10,0)));
 
@@ -112,7 +113,7 @@ class EvaluateDriverCapacityJobServiceTest {
                 eq(5)))
                 .thenReturn(Mono.just(Page.create(Collections.emptyList())));
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
 
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(
@@ -128,7 +129,7 @@ class EvaluateDriverCapacityJobServiceTest {
     void startEvaluateDriverCapacityJob_NoCapCapacityForOneCap_WithoutLastEvaluatedKey() {
         String unifiedDeliveryDriver = "driver1";
         String province = "RM";
-        Instant startExecutionBatch = Instant.parse("2025-01-07T00:00:00Z");
+        LocalDate deliveryWeek = LocalDate.parse("2025-01-06");
         String tenderId = "tender123";
         Tuple2<Integer, Integer> capacityTuple = Tuples.of(10, 0);
         Tuple2<Integer, Integer> capTuple = Tuples.of(5, 5);
@@ -147,7 +148,7 @@ class EvaluateDriverCapacityJobServiceTest {
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
 
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province,  startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province,  deliveryWeek, tenderId))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = argumentCaptor.getAllValues();
@@ -178,7 +179,7 @@ class EvaluateDriverCapacityJobServiceTest {
     void startEvaluateDriverCapacityJob_NoCapCapacityForOneCap_WithLastEvaluatedKey() {
         String unifiedDeliveryDriver = "driver1";
         String province = "RM";
-        Instant startExecutionBatch = Instant.parse("2025-01-07T10:00:00Z");
+        LocalDate deliveryWeek = LocalDate.parse("2025-01-06");
         String tenderId = "tender123";
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
         List<PaperDelivery> deliveries2 = getPaperDeliveries(true);
@@ -209,7 +210,7 @@ class EvaluateDriverCapacityJobServiceTest {
         ArgumentCaptor<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptor = ArgumentCaptor.forClass(List.class);
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = argumentCaptor.getAllValues();
@@ -241,7 +242,7 @@ class EvaluateDriverCapacityJobServiceTest {
     void startEvaluateDriverCapacityJob_NoCapCapacityForOneCap_WithLastEvaluatedKey_WithoutProvinceCapacity() {
         String unifiedDeliveryDriver = "driver1";
         String province = "RM";
-        Instant startExecutionBatch = Instant.parse("2025-01-06T00:00:00Z");
+        LocalDate deliveryWeek = LocalDate.parse("2025-01-06");
         String tenderId = "tender123";
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
         List<PaperDelivery> deliveries2 = getPaperDeliveries(true);
@@ -282,7 +283,7 @@ class EvaluateDriverCapacityJobServiceTest {
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
 
-        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, tenderId))
+        StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = argumentCaptor.getAllValues();
