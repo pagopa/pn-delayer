@@ -351,7 +351,8 @@ describe("Lambda Delayer Dispatcher", () => {
        const params = ["2025-06-30", "RM"];
 
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
-       assert.strictEqual(JSON.parse(result.body).message, "No items found");
+       const body = JSON.parse(result.body);
+       assert.deepStrictEqual(body, { items: [] });
    });
 
    it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {

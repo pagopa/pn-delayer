@@ -157,20 +157,27 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 * Items trovati → array di oggetti, ad esempio:
   ```json
-  [
   {
-    "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
-    "deliveryDate": "2025-09-29",
-    "weeklyEstimate": 100,
-    "monthlyEstimate": 400,
-    "originalEstimate": 500,
-    "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
-    "productType": "AR",
-    "province": "RM"
+    "items":[
+      {
+        "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
+        "deliveryDate": "2025-09-29",
+        "weeklyEstimate": 100,
+        "monthlyEstimate": 400,
+        "originalEstimate": 500,
+        "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
+        "productType": "AR",
+        "province": "RM"
+      }
+    ],
+    "lastEvaluatedKey": {}
   }
-  ]
   ```
-* Item assente → `{ "message": "No items found" }`
+
+* Item assente → 
+```json
+ { "items": [] }
+```
 
 ### Output GET_BY_REQUEST_ID
 Se trovate, viene restituito un array di oggetti (tutte le righe con quel requestId); se non ci sono risultati l’array è vuoto ([]).
