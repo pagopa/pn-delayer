@@ -2304,6 +2304,7 @@ Resources:
               "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
               "sk.$": $.queryResult.Items[0].sk.S
               "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
+              "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.BOOL
             Next: Parallel
           NoItemToProcess:
             Type: Succeed
@@ -2415,6 +2416,7 @@ Resources:
                         "numberOfShipments.$": $.input.numberOfShipments
                         "sendToNextStepCounter.$": $.input.sendToNextStepCounter
                         "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
+                        "stopSendToPhaseTwo": "true"
                       "processType.$": $.processType
                     Next: ToPreparePhase2Successfully
 
@@ -2488,13 +2490,15 @@ Resources:
                   "M.$": $.parallelResult[1].input.lastEvaluatedKeyPhase2
                 ":sentToNextWeekInc":
                   "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
+                ":stopSendToPhaseTwoVal":
+                  "BOOL.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
               Key:
                 pk:
                   "S.$": $.lambdaResponse.Payload.input.pk
                 sk:
                   "S.$": $.lambdaResponse.Payload.input.sk
               "TableName.$": $.PAPERDELIVERYCOUNTER_TABLENAME
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal  ADD sentToNextWeek :sentToNextWeekInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal  ADD sentToNextWeek :sentToNextWeekInc"
             Retry:
               - ErrorEquals:
                   - States.ALL
