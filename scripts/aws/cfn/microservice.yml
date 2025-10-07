@@ -1710,10 +1710,15 @@ Resources:
           - Effect: Allow
             Action:
               - states:StartExecution
-              - states:DescribeExecution
+              - states:ListExecutions
             Resource:
               - !Ref PaperDeliveryStateMachine
               - !Ref DelayerToPaperChannelStateMachine
+          - Effect: Allow
+            Action:
+              - states:DescribeExecution
+            Resource:
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:${BatchWorkflowStateMachine}:*
           - Effect: Allow
             Action:
               - lambda:InvokeFunction
