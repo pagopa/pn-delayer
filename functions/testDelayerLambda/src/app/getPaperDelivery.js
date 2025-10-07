@@ -2,7 +2,6 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 
-const TABLE_NAME = "pn-DelayerPaperDelivery";
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 
@@ -19,7 +18,7 @@ async function getPaperDelivery(params = []) {
     const pk = `${deliveryDate}~${workflowStep}`;
     const limit = parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10);
     const queryParams = {
-      TableName: TABLE_NAME,
+      TableName: paperDeliveryTableName,
       KeyConditionExpression: "pk = :pk",
       ExpressionAttributeValues: {
           ":pk": pk,

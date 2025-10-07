@@ -50,7 +50,7 @@ async function getDeclaredCapacity(params = []) {
         }
     }
 
-    return Object.values(groupedByDriver);
+    return { items: Object.values(groupedByDriver) };
 }
 
 /**

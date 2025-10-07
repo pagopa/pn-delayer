@@ -528,15 +528,13 @@ describe("Lambda Delayer Dispatcher", () => {
        sfnMock.on(DescribeExecutionCommand).resolves({
            status: "FAILED",
            startDate: fakeStartDate,
-           stopDate: fakeEndDate,
-           error: "Some error"
+           stopDate: fakeEndDate
        });
 
        const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
        const body = JSON.parse(result.body);
 
        assert.strictEqual(body.status, "FAILED");
-       assert.strictEqual(body.error, "Some error");
    });
 
    it("GET_STATUS_EXECUTION throws error if parameters are missing", async () => {
@@ -569,8 +567,8 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
         const body = JSON.parse(result.body);
 
-        assert.strictEqual(body.length, 1);
-        assert.deepStrictEqual(body[0].capacity, 100);
+        assert.strictEqual(body.items.length, 1);
+        assert.deepStrictEqual(body.items[0].capacity, 100);
     });
 
     it("GET_DECLARED_CAPACITY returns the item open range", async () => {
@@ -596,8 +594,8 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
         const body = JSON.parse(result.body);
 
-        assert.strictEqual(body.length, 1);
-        assert.deepStrictEqual(body[0].capacity, 50);
+        assert.strictEqual(body.items.length, 1);
+        assert.deepStrictEqual(body.items[0].capacity, 50);
     });
 
     it("GET_DECLARED_CAPACITY returns empty array if no item found", async () => {
@@ -613,7 +611,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
 
         const body = JSON.parse(result.body);
-        assert.deepStrictEqual(body, []);
+        assert.deepStrictEqual(body.items, []);
     });
 
     it("GET_DECLARED_CAPACITY throws error if parameters are missing", async () => {
@@ -678,9 +676,9 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
         const body = JSON.parse(result.body);
 
-        assert.strictEqual(body.length, 2);
-        const driver1Item = body.find(item => item.unifiedDeliveryDriver === "driver1");
-        const driver2Item = body.find(item => item.unifiedDeliveryDriver === "driver2");
+        assert.strictEqual(body.items.length, 2);
+        const driver1Item = body.items.find(item => item.unifiedDeliveryDriver === "driver1");
+        const driver2Item = body.items.find(item => item.unifiedDeliveryDriver === "driver2");
 
         assert.deepStrictEqual(driver1Item.capacity, 150);
         assert.deepStrictEqual(driver1Item.activationDateFrom, "2025-06-01T00:00:00Z");

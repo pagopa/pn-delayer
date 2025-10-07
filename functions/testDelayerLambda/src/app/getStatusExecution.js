@@ -22,11 +22,6 @@ async function getStatusExecution(params = []) {
     stopDate: response.stopDate,
   };
 
-  if (response.status === "FAILED") {
-    result.error = response.error || null;
-    result.cause = response.cause || null;
-  }
-
   return result;
 }
 
