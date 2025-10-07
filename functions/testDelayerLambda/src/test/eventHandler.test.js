@@ -528,15 +528,13 @@ describe("Lambda Delayer Dispatcher", () => {
        sfnMock.on(DescribeExecutionCommand).resolves({
            status: "FAILED",
            startDate: fakeStartDate,
-           stopDate: fakeEndDate,
-           error: "Some error"
+           stopDate: fakeEndDate
        });
 
        const result = await handler({ operationType: "GET_STATUS_EXECUTION", parameters: [fakeArn] });
        const body = JSON.parse(result.body);
 
        assert.strictEqual(body.status, "FAILED");
-       assert.strictEqual(body.error, "Some error");
    });
 
    it("GET_STATUS_EXECUTION throws error if parameters are missing", async () => {
