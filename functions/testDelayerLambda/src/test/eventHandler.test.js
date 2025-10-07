@@ -545,6 +545,148 @@ describe("Lambda Delayer Dispatcher", () => {
       assert.strictEqual(JSON.parse(result.body).message, "Parameter must be [executionArn]");
    });
 
+    it("GET_DECLARED_CAPACITY returns the item close range", async () => {
+        const fakeItem = {
+            pk: "tenderId1~unifiedDeliveryDriver1~geoKey1",
+            tenderIdGeoKey: "tenderId1~geoKey1",
+            activationDateFrom: "2025-01-01T00:00:00Z",
+            activationDateTo: "2025-12-31T00:00:00Z",
+            tenderId: "tenderId1",
+            unifiedDeliveryDriver: "unifiedDeliveryDriver1",
+            geoKey: "geoKey1",
+            capacity: 100
+        };
+
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
+        });
+
+        ddbMock.on(QueryCommand).resolves({ Items: [fakeItem] });
+
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        const body = JSON.parse(result.body);
+
+        assert.strictEqual(body.length, 1);
+        assert.deepStrictEqual(body[0].capacity, 100);
+    });
+
+    it("GET_DECLARED_CAPACITY returns the item open range", async () => {
+        const fakeItem = {
+            pk: "tenderId1~unifiedDeliveryDriver1~geoKey1",
+            tenderIdGeoKey: "tenderId1~geoKey1",
+            activationDateFrom: "2025-01-01T00:00:00Z",
+            tenderId: "tenderId1",
+            unifiedDeliveryDriver: "unifiedDeliveryDriver1",
+            geoKey: "geoKey1",
+            capacity: 50
+        };
+
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
+        });
+
+        ddbMock.on(QueryCommand).resolves({ Items: [fakeItem] });
+
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        const body = JSON.parse(result.body);
+
+        assert.strictEqual(body.length, 1);
+        assert.deepStrictEqual(body[0].capacity, 50);
+    });
+
+    it("GET_DECLARED_CAPACITY returns empty array if no item found", async () => {
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
+        });
+
+        ddbMock.on(QueryCommand).resolves({ Items: [] });
+
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+
+        const body = JSON.parse(result.body);
+        assert.deepStrictEqual(body, []);
+    });
+
+    it("GET_DECLARED_CAPACITY throws error if parameters are missing", async () => {
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: [] });
+        assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [paperDeliveryDriverCapacitiesTabelName, province, deliveryDate]");
+    });
+
+    it("GET_DECLARED_CAPACITY throws error if no active tender found", async () => {
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: null }
+            }))
+        });
+
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        assert.strictEqual(JSON.parse(result.body).message, "No active tender found");
+    });
+
+    it("GET_DECLARED_CAPACITY groups by driver and returns most recent activation date", async () => {
+        const fakeItems = [
+            {
+                pk: "tenderId1~driver1~geoKey1",
+                tenderIdGeoKey: "tenderId1~geoKey1",
+                activationDateFrom: "2025-01-01T00:00:00Z",
+                activationDateTo: "2025-12-31T00:00:00Z",
+                tenderId: "tenderId1",
+                unifiedDeliveryDriver: "driver1",
+                geoKey: "geoKey1",
+                capacity: 100
+            },
+            {
+                pk: "tenderId1~driver1~geoKey1",
+                tenderIdGeoKey: "tenderId1~geoKey1",
+                activationDateFrom: "2025-06-01T00:00:00Z",
+                activationDateTo: "2025-12-31T00:00:00Z",
+                tenderId: "tenderId1",
+                unifiedDeliveryDriver: "driver1",
+                geoKey: "geoKey1",
+                capacity: 150
+            },
+            {
+                pk: "tenderId1~driver2~geoKey1",
+                tenderIdGeoKey: "tenderId1~geoKey1",
+                activationDateFrom: "2025-01-01T00:00:00Z",
+                tenderId: "tenderId1",
+                unifiedDeliveryDriver: "driver2",
+                geoKey: "geoKey1",
+                capacity: 200
+            }
+        ];
+
+        lambdaMock.on(InvokeCommand).resolves({
+            Payload: Buffer.from(JSON.stringify({
+                body: { tenderId: "tenderId1" }
+            }))
+        });
+
+        ddbMock.on(QueryCommand).resolves({ Items: fakeItems });
+
+        const params = ["pn-PaperDeliveryDriverCapacities", "geoKey1", "2025-06-30T00:00:00Z"];
+        const result = await handler({ operationType: "GET_DECLARED_CAPACITY", parameters: params });
+        const body = JSON.parse(result.body);
+
+        assert.strictEqual(body.length, 2);
+        const driver1Item = body.find(item => item.unifiedDeliveryDriver === "driver1");
+        const driver2Item = body.find(item => item.unifiedDeliveryDriver === "driver2");
+
+        assert.deepStrictEqual(driver1Item.capacity, 150);
+        assert.deepStrictEqual(driver1Item.activationDateFrom, "2025-06-01T00:00:00Z");
+        assert.deepStrictEqual(driver2Item.capacity, 200);
+    });
+
    it("INSERT_MOCK_CAPACITIES should batch-write items to DynamoDB", async () => {
       const csvPath = path.join(__dirname, "capacitySample.csv");
       const csvData = fs.readFileSync(csvPath, "utf8");

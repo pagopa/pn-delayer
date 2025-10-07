@@ -10,6 +10,7 @@ const { getSenderLimit } = require("./getSenderLimit.js");
 const { getPaperDelivery } = require("./getPaperDelivery.js");
 const { getStatusExecution } = require("./getStatusExecution.js");
 const { insertMockCapacities } = require('./insertMockCapacities.js');
+const { getDeclaredCapacity } = require("./getDeclaredCapacity.js");
 
 
 /***************************************
@@ -27,7 +28,8 @@ const OPERATIONS = {
     GET_SENDER_LIMIT: getSenderLimit,
     GET_PRESIGNED_URL: getPresignedUrl,
     GET_STATUS_EXECUTION: getStatusExecution,
-    INSERT_MOCK_CAPACITIES: insertMockCapacities
+    INSERT_MOCK_CAPACITIES: insertMockCapacities,
+    GET_DECLARED_CAPACITY: getDeclaredCapacity
 };
 
 /**
