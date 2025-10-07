@@ -8,6 +8,9 @@ const { runDelayerToPaperChannelWorkflow } = require("./runDelayerToPaperChannel
 const { getPresignedUrl } = require("./getPresignedUrl.js");
 const { getSenderLimit } = require("./getSenderLimit.js");
 const { getPaperDelivery } = require("./getPaperDelivery.js");
+const { getStatusExecution } = require("./getStatusExecution.js");
+const { insertMockCapacities } = require('./insertMockCapacities.js');
+const { getDeclaredCapacity } = require("./getDeclaredCapacity.js");
 
 
 /***************************************
@@ -23,7 +26,10 @@ const OPERATIONS = {
     DELAYER_TO_PAPER_CHANNEL: runDelayerToPaperChannelWorkflow,
     GET_PAPER_DELIVERY: getPaperDelivery,
     GET_SENDER_LIMIT: getSenderLimit,
-    GET_PRESIGNED_URL: getPresignedUrl
+    GET_PRESIGNED_URL: getPresignedUrl,
+    GET_STATUS_EXECUTION: getStatusExecution,
+    INSERT_MOCK_CAPACITIES: insertMockCapacities,
+    GET_DECLARED_CAPACITY: getDeclaredCapacity
 };
 
 /**

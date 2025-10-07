@@ -20,7 +20,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,8 +40,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
 
 
     @Override
-    public Mono<Void> startSenderLimitJob(String province, String tenderId, Instant startExecutionBatch) {
-        LocalDate deliveryWeek = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
+    public Mono<Void> startSenderLimitJob(String province, String tenderId, LocalDate deliveryWeek) {
         Map<Integer, List<String>> priorityMap = getPriorityMap();
         return deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province)
                 .flatMap(driversTotalCapacities -> retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, new HashMap<>(), driversTotalCapacities, priorityMap))

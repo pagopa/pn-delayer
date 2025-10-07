@@ -9,6 +9,7 @@ import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.service.EvaluateDriverCapacityJobService;
 import it.pagopa.pn.delayer.service.EvaluateResidualCapacityJobService;
 import it.pagopa.pn.delayer.service.EvaluateSenderLimitJobService;
+import it.pagopa.pn.delayer.utils.PnDelayerUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -21,7 +22,9 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +39,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     private final EvaluateResidualCapacityJobService evaluateResidualCapacityJobService;
     private final ApplicationContext applicationContext;
     private final PnDelayerConfigs pnDelayerConfigs;
+    private final PnDelayerUtils pnDelayerUtils;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -68,6 +72,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     private int executeEvaluateResidualCapacityStep() throws JsonProcessingException {
         String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateResidualCapacityJobInput().getUnifiedDeliveryDriver();
         String provinces = pnDelayerConfigs.getEvaluateResidualCapacityJobInput().getProvinceList();
+        LocalDate deliveryWeek = Objects.isNull(pnDelayerConfigs.getDeliveryWeek()) ? pnDelayerUtils.calculateDeliveryWeek(Instant.now()) : pnDelayerConfigs.getDeliveryWeek();
         List<String> provinceList = objectMapper.readValue(provinces, new TypeReference<>() {});
         String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
         if (StringUtils.hasText(jobIndex)) {
@@ -78,8 +83,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
                         log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
                         addMDC( String.join("~", unifiedDeliveryDriver,  province));
                         try {
-                            var startExecutionBatch = Instant.now();
-                            Mono<Void> monoExcecution = evaluateResidualCapacityJobService.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, pnDelayerConfigs.getActualTenderId());
+                            Mono<Void> monoExcecution = evaluateResidualCapacityJobService.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, pnDelayerConfigs.getActualTenderId());
                             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();return 0;
                         } catch (Exception e) {
                             log.error("Error while executing batch", e);
@@ -98,6 +102,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     private int executeEvaluateDriverCapacityStep() throws JsonProcessingException {
         String unifiedDeliveryDriver = pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getUnifiedDeliveryDriver();
         String provinces = pnDelayerConfigs.getEvaluateDriverCapacityJobInput().getProvinceList();
+        LocalDate deliveryWeek = Objects.isNull(pnDelayerConfigs.getDeliveryWeek()) ? pnDelayerUtils.calculateDeliveryWeek(Instant.now()) : pnDelayerConfigs.getDeliveryWeek();
         List<String> provinceList = objectMapper.readValue(provinces, new TypeReference<>() {});
         String jobIndex = System.getenv("AWS_BATCH_JOB_ARRAY_INDEX");
         if (StringUtils.hasText(jobIndex)) {
@@ -108,8 +113,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
                         log.info("Starting batch for unifiedDeliveryDriver: {} and province: {}", unifiedDeliveryDriver, province);
                         addMDC( String.join("~", unifiedDeliveryDriver,  province));
                         try {
-                            var startExecutionBatch = Instant.now();
-                            Mono<Void> monoExcecution = evaluateDriverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, startExecutionBatch, pnDelayerConfigs.getActualTenderId());
+                            Mono<Void> monoExcecution = evaluateDriverCapacityJobService.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, pnDelayerConfigs.getActualTenderId());
                             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();return 0;
                         } catch (Exception e) {
                             log.error("Error while executing batch", e);
@@ -128,11 +132,11 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     private int executeEvaluateSenderLimitStep() {
         String province = pnDelayerConfigs.getEvaluateSenderLimitJobInput().getProvince();
         String tenderId = pnDelayerConfigs.getActualTenderId();
+        LocalDate deliveryWeek = Objects.isNull(pnDelayerConfigs.getDeliveryWeek()) ? pnDelayerUtils.calculateDeliveryWeek(Instant.now()) : pnDelayerConfigs.getDeliveryWeek();
         log.info("Starting batch for province: {}", province);
         addMDC(province);
         try {
-            var startExecutionBatch = Instant.now();
-            Mono<Void> monoExcecution = evaluateSenderLimitJobService.startSenderLimitJob(province, tenderId, startExecutionBatch);
+            Mono<Void> monoExcecution = evaluateSenderLimitJobService.startSenderLimitJob(province, tenderId, deliveryWeek);
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
         } catch (Exception e) {
