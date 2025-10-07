@@ -1710,6 +1710,7 @@ Resources:
           - Effect: Allow
             Action:
               - states:StartExecution
+              - states:DescribeExecution
             Resource:
               - !Ref PaperDeliveryStateMachine
               - !Ref DelayerToPaperChannelStateMachine
