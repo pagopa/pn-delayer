@@ -28,23 +28,17 @@ async function runAlgorithm(params) {
       return resp(500, { error: "Missing environment variable SFN_ARN" });
     }
     let [paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName,
-        senderLimitTableName, senderUsedLimitTableName, countersTableName, opt] = params;
-
-    let printCapacity = opt?.printCapacity;
-    let deliveryWeek = opt?.deliveryWeek;
-
-    if (!printCapacity) {
-        printCapacity = "180000"
-    }
-    const printCapacityValue = `1970-01-01;${printCapacity}`;
+        senderLimitTableName, senderUsedLimitTableName, countersTableName, printCapacity, deliveryWeek] = params;
 
      if (!paperDeliveryTableName || !deliveryDriverCapacitiesTableName || !deliveryDriverUsedCapacitiesTableName ||
-            !senderLimitTableName || !senderUsedLimitTableName || !countersTableName) {
+            !senderLimitTableName || !senderUsedLimitTableName || !countersTableName || !printCapacity) {
           return resp(400, {
             error:
-              "Required parameters must be [paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName, senderLimitTableName, senderUsedLimitTableName, countersTableName]",
+              "Required parameters must be [paperDeliveryTableName, deliveryDriverCapacitiesTableName, deliveryDriverUsedCapacitiesTableName, senderLimitTableName, senderUsedLimitTableName, countersTableName, printCapacity]",
           });
     }
+
+    const printCapacityValue = `1970-01-01;${printCapacity}`;
 
     if(!deliveryWeek) {
       deliveryWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).toString();
