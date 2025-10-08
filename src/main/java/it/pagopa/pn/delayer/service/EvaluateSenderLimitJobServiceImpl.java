@@ -43,8 +43,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
 
 
     @Override
-    public Mono<Void> startSenderLimitJob(String province, String tenderId, Instant startExecutionBatch) {
-        LocalDate deliveryWeek = pnDelayerUtils.calculateDeliveryWeek(startExecutionBatch);
+    public Mono<Void> startSenderLimitJob(String province, String tenderId, LocalDate deliveryWeek){
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setPriorityMap(getPriorityMap());
         return senderLimitUtils.retrieveTotalEstimateCounter(deliveryWeek, province)

@@ -11,11 +11,11 @@ import java.util.Map;
 
 @Data
 public class SenderLimitJobProcessObjects {
-    List<PaperDelivery> sendToResidualCapacityStep = new ArrayList<>();
-    List<PaperDelivery> sendToDriverCapacityStep = new ArrayList<>();
-    Map<String, Tuple2<Integer, Integer>> senderLimitMap = new HashMap<>();
-    Map<String, Integer> totalEstimateCounter = new HashMap<>();
-    List<IncrementUsedSenderLimitDto> incrementUsedSenderLimitDtoList = new ArrayList<>();
-    Map<Integer, List<String>> priorityMap;
+    private List<PaperDelivery> sendToResidualCapacityStep = new ArrayList<>();
+    private List<PaperDelivery> sendToDriverCapacityStep = new ArrayList<>();
+    private Map<String, Tuple2<Integer, Integer>> senderLimitMap = new HashMap<>();
+    private Map<String, Integer> totalEstimateCounter = new HashMap<>();
+    private List<IncrementUsedSenderLimitDto> incrementUsedSenderLimitDtoList = new ArrayList<>();
+    private Map<Integer, List<String>> priorityMap;
 
 }
