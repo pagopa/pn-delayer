@@ -23,17 +23,15 @@ exports.importData = async (params = []) => {
     const BUCKET_NAME = process.env.BUCKET_NAME;
     let OBJECT_KEY = process.env.OBJECT_KEY;
     let [paperDeliveryTableName, countersTableName, fileName, deliveryWeek] = params;
-     if (!paperDeliveryTableName || !countersTableName) {
-            throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName]");
+     if (!paperDeliveryTableName || !countersTableName || !fileName) {
+            throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName, fileName]");
         }
 
-    if(fileName){
-        OBJECT_KEY = fileName;
-    }
+    OBJECT_KEY = fileName;
 
-    if (!BUCKET_NAME || !OBJECT_KEY) {
+    if (!BUCKET_NAME) {
         throw new Error(
-            "Environment variables BUCKET_NAME and OBJECT_KEY must be defined"
+            "Environment variable BUCKET_NAME must be defined"
         );
     }
 

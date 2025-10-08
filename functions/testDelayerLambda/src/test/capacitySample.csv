@@ -1,0 +1,5 @@
+unifiedDeliveryDriver;geoKey;capacity;peakCapacity;activationDateFrom;activationDateTo;products
+Poste;RM;32000;94000;2025-03-31T22:00:00.000Z;;890,AR,RS
+Poste;00010;2000;2000;2025-05-22T22:00:00.000Z;;
+Poste;00010;2000;2000;;;
+Poste;00012;2000;2000;2025-10-31T22:00:00.000Z;2025-11-31T22:00:00.000Z;

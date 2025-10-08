@@ -24,6 +24,7 @@ public class PaperDeliveryCounter {
     public static final String COL_SENT_TO_NEXT_WEEK = "sentToNextWeek";
     public static final String COL_LEK_TO_NEXT_WEEK = "lastEvaluatedKeyNextWeek";
     public static final String COL_LEK_PHASE2 = "lastEvaluatedKeyPhase2";
+    public static final String COL_STOP_SEND_TO_PHASE_TWO = "stopSendToPhaseTwo";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
@@ -37,6 +38,8 @@ public class PaperDeliveryCounter {
     private Integer weeklyPrintCapacity;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENT_TO_NEXT_WEEK)}))
     private Integer sentToNextWeek;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_STOP_SEND_TO_PHASE_TWO)}))
+    private Boolean stopSendToPhaseTwo;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TTL)}))
     private long ttl;
 
@@ -61,6 +64,7 @@ public class PaperDeliveryCounter {
         paperDeliveryCounter.setWeeklyPrintCapacity(weeklyPrintCapacity);
         paperDeliveryCounter.setSentToNextWeek(0);
         paperDeliveryCounter.setTtl(Instant.now().plus(ttlDuration).toEpochMilli());
+        paperDeliveryCounter.setStopSendToPhaseTwo(false);
         return paperDeliveryCounter;
     }
 

@@ -28,6 +28,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 import static it.pagopa.pn.delayer.model.WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY;
@@ -131,7 +132,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -200,7 +201,7 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(deliveries)
                 .thenReturn(deliveries2);
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -275,7 +276,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -336,7 +337,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -423,7 +424,7 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(Mono.just(List.of(paperDeliveryCounter1)));
 
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, Instant.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();

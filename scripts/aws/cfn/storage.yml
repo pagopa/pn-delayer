@@ -214,6 +214,8 @@ Resources:
           AttributeType: "S"
         - AttributeName: "province"
           AttributeType: "S"
+        - AttributeName: "fileKey"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
           KeyType: "HASH"
@@ -226,6 +228,12 @@ Resources:
               KeyType: "HASH"
             - AttributeName: "province"
               KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "fileKey-index"
+          KeySchema:
+            - AttributeName: "fileKey"
+              KeyType: "HASH"
           Projection:
             ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"

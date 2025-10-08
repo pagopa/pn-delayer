@@ -7,7 +7,7 @@ const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const PROVINCE_TABLE = process.env.PROVINCE_TABLE || 'pn-PaperChannelProvince';
 const LIMIT_TABLE = process.env.LIMIT_TABLE || 'pn-PaperDeliverySenderLimit';
 const COUNTERS_TABLE = process.env.COUNTERS_TABLE || 'pn-PaperDeliveryCounters';
-
+const FILEKEY_GSI = "fileKey-index";
 /**
  * Query pn-PaperChannelProvince to get provinces and their percentage distribution for a region.
  * @param {string} region
@@ -25,6 +25,25 @@ async function getProvinceDistribution(region) {
 }
 
 /**
+ * Query pn-PaperDeliverySenderLimit to verify if items with same fileKey exists.
+ * @param {string} fileKey
+ * @returns {Promise<{Count: number}>} Count of items with the given fileKey
+ */
+async function existsSenderLimitByFileKey(fileKey) {
+    const params = {
+     TableName: LIMIT_TABLE,
+     IndexName: FILEKEY_GSI,
+     KeyConditionExpression: "#fk = :fk",
+     ExpressionAttributeNames: { "#fk": "fileKey" },
+     ExpressionAttributeValues: { ":fk": fileKey },
+     Limit: 1,
+     Select: "COUNT",
+    };
+
+    return await client.send(new QueryCommand(params));
+}
+
+/**
  * Insert or update weekly estimates (pn-PaperDeliverySenderLimit).
  * Uses BatchWrite for new items and UpdateCommand for partial‑week adjustments.
  *
@@ -33,67 +52,105 @@ async function getProvinceDistribution(region) {
  */
 async function persistWeeklyEstimates(estimates, fileKey) {
     // Separate puts vs updates
-    const newItems = estimates.filter(e => !e.isPartialWeek);
-    const partials = estimates.filter(e => e.isPartialWeek);
-    const ttlValue = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 // 1y default
+    const fulls          = estimates.filter(e => e.weekType === 'FULL');
+    const partialStarts  = estimates.filter(e => e.weekType === 'PARTIAL_START');
+    const partialEnds    = estimates.filter(e => e.weekType === 'PARTIAL_END');
 
+    const ttlValue = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365; // 1y
     // Batch write 25 items at a time
-    const batches = [];
-    for (let i = 0; i < newItems.length; i += 25) {
-        batches.push(newItems.slice(i, i + 25));
-    }
-    // Process batches with retry helper
-    for (const batch of batches) {
-        const RequestItems = {
+    if (fulls.length) {
+        const batches = [];
+        for (let i = 0; i < fulls.length; i += 25) {
+          batches.push(fulls.slice(i, i + 25));
+        }
+
+        for (const batch of batches) {
+          const RequestItems = {
             [LIMIT_TABLE]: batch.map(item => ({
-                PutRequest: {
-                    Item: {
-                        pk: `${item.paId}~${item.productType}~${item.province}`,
-                        deliveryDate: item.deliveryDate,
-                        weeklyEstimate: item.weeklyEstimate,
-                        monthlyEstimate: item.monthlyEstimate,
-                        originalEstimate: item.originalEstimate,
-                        paId: item.paId,
-                        productType: item.productType,
-                        province: item.province,
-                        fileKey: fileKey,
-                        ttl: ttlValue
-                    }
-                }
+              PutRequest: {
+                  Item: {
+                      pk: `${item.paId}~${item.productType}~${item.province}`,
+                      deliveryDate: item.deliveryDate,
+                      weeklyEstimate: item.weeklyEstimate,
+                      monthlyEstimate: item.monthlyEstimate,
+                      originalEstimate: item.originalEstimate,
+                      paId: item.paId,
+                      productType: item.productType,
+                      province: item.province,
+                      fileKey: fileKey,
+                      ttl: ttlValue
+                  }
+              }
             }))
-        };
-        await batchWriteWithRetry(RequestItems);
+          };
+          await batchWriteWithRetry(RequestItems);
+        }
     }
 
-  // Update existing rows for partial weeks
-  for (const p of partials) {
-    const pk = `${p.paId}~${p.productType}~${p.province}`;
-    await client.send(
-      new UpdateCommand({
+    // === PARTIAL_START: usa secondWeekWeeklyEstimate ===
+    for (const p of partialStarts) {
+      await upsertPartial(p, ttlValue, fileKey, true);
+    }
+
+    // === PARTIAL_END: usa firstWeekWeeklyEstimate ===
+    for (const p of partialEnds) {
+      await upsertPartial(p, ttlValue, fileKey, false);
+    }
+
+    for (const item of estimates) {
+      const counterPk = item.deliveryDate;
+      const counterSk = `SUM_ESTIMATES~${item.productType}~${item.province}~${item.lastUpdate}`;
+      await client.send(
+        new UpdateCommand({
+          TableName: COUNTERS_TABLE,
+          Key: { pk: counterPk, sk: counterSk },
+          UpdateExpression: 'ADD #c :inc',
+          ExpressionAttributeNames: { '#c': 'numberOfShipments' },
+          ExpressionAttributeValues: { ':inc': item.weeklyEstimate }
+        })
+      );
+    }
+  }
+
+// Helper per gestire PARTIAL_START / PARTIAL_END
+  async function upsertPartial(p, ttlValue, fileKey, isStart) {
+      const pk = `${p.paId}~${p.productType}~${p.province}`;
+      const portionAttr = isStart ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
+
+      await client.send(new UpdateCommand({
         TableName: LIMIT_TABLE,
         Key: { pk, deliveryDate: p.deliveryDate },
-        UpdateExpression: 'SET weeklyEstimate = if_not_exists(weeklyEstimate, :zero) + :inc, productType = if_not_exists(productType, :pt), province = if_not_exists(province, :p), paId = if_not_exists(paId, :pId), #ttlAttribute = if_not_exists(#ttlAttribute, :ttlValue)',
-        ExpressionAttributeValues: { ':inc': p.weeklyEstimate, ':zero': 0, ':pt': p.productType, ':p': p.province, ':pId': p.paId, ':ttlValue': ttlValue},
-        ExpressionAttributeNames:{ '#ttlAttribute' : 'ttl'}
-      })
-    );
-  }
+        UpdateExpression: [
+          'SET',
+          // Idempotenza: rimuovi la vecchia porzione (se c’è) e aggiungi la nuova
+          `weeklyEstimate = if_not_exists(weeklyEstimate, :zero) - if_not_exists(#portion, :zero) + :portion`,
+          '#portion       = :portion',
+          'monthlyEstimate  = if_not_exists(monthlyEstimate, :me)',
+          'originalEstimate = if_not_exists(originalEstimate, :oe)',
+          'productType      = if_not_exists(productType, :pt)',
+          'province         = if_not_exists(province, :pr)',
+          'paId             = if_not_exists(paId, :pa)',
+          'fileKey          = if_not_exists(fileKey, :fk)',
+          '#ttl             = if_not_exists(#ttl, :ttl)'
+        ].join(', '),
+        ExpressionAttributeNames: {
+          '#portion': portionAttr,
+          '#ttl': 'ttl'
+        },
+        ExpressionAttributeValues: {
+          ':zero': 0,
+          ':portion': p.weeklyEstimate,  // quota di questa metà settimana (inizio/fine mese)
+          ':me': p.monthlyEstimate,
+          ':oe': p.originalEstimate,
+          ':pt': p.productType,
+          ':pr': p.province,
+          ':pa': p.paId,
+          ':fk': fileKey,
+          ':ttl': ttlValue
+        }
+      }));
+    }
 
-  // Increment counters table
-  for (const item of estimates) {
-    const counterPk = item.deliveryDate;
-    const counterSk = `SUM_ESTIMATES~${item.productType}~${item.province}~${item.lastUpdate}`;
-    await client.send(
-      new UpdateCommand({
-        TableName: COUNTERS_TABLE,
-        Key: { pk: counterPk, sk: counterSk },
-        UpdateExpression: 'ADD #c :inc',
-        ExpressionAttributeNames: { '#c': 'numberOfShipments' },
-        ExpressionAttributeValues: { ':inc': item.weeklyEstimate }
-      })
-    );
-  }
-}
 
 /**
  * Helper that executes BatchWriteCommand and transparently retries
@@ -131,4 +188,4 @@ async function batchWriteWithRetry(requestItems, maxRetries = 5) {
 
 
 
-module.exports = { getProvinceDistribution, persistWeeklyEstimates };
+module.exports = { getProvinceDistribution, persistWeeklyEstimates, existsSenderLimitByFileKey };

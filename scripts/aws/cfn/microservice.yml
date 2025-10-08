@@ -1607,6 +1607,7 @@ Resources:
           SFN_ARN: !Ref PaperDeliveryStateMachine
           DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
+          PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
       TracingConfig:
         Mode: Active
       Layers:
@@ -1695,6 +1696,7 @@ Resources:
               - s3:HeadObject
               - s3:ListBucket
               - s3:GetObjectTagging
+              - s3:PutObject
             Resource:
               - !Sub "${TestDelayerBucketArn}"
               - !Sub "${TestDelayerBucketArn}/*"
@@ -1708,9 +1710,20 @@ Resources:
           - Effect: Allow
             Action:
               - states:StartExecution
+              - states:ListExecutions
             Resource:
               - !Ref PaperDeliveryStateMachine
               - !Ref DelayerToPaperChannelStateMachine
+          - Effect: Allow
+            Action:
+              - states:DescribeExecution
+            Resource:
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:${BatchWorkflowStateMachine}:*
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule
@@ -1895,6 +1908,7 @@ Resources:
             Next: retrieveProvince
             ResultSelector:
               actualTenderId.$: $.Payload.body.tenderId
+              deliveryWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYWEEK
               paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
               paperDeliveryDriverCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERCAPACITIES_TABLENAME
               paperDeliveryDriverUsedCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME
@@ -1929,6 +1943,7 @@ Resources:
             Parameters:
               province.$: $$.Map.Item.Value.province.S
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
@@ -1969,6 +1984,8 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELIVERYWEEK
+                          Value.$: $.deliveryWeek
 #                  Retry:
 #                    - ErrorEquals:
 #                        - States.ALL
@@ -2016,6 +2033,7 @@ Resources:
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
@@ -2032,6 +2050,7 @@ Resources:
               driver.$: $$.Map.Item.Value.driver
               provinces.$: $$.Map.Item.Value.provinces
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
@@ -2074,6 +2093,8 @@ Resources:
                           Value.$: $.actualTenderId
                         - Name: PN_DELAYER_WORKFLOWSTEP
                           Value: EVALUATE_DRIVER_CAPACITY
+                        - Name: PN_DELAYER_DELIVERYWEEK
+                          Value.$: $.deliveryWeek
 #                  Retry:
 #                    - ErrorEquals:
 #                        - States.ALL
@@ -2103,6 +2124,7 @@ Resources:
               driver.$: $$.Map.Item.Value.driver
               provinces.$: $$.Map.Item.Value.provinces
               actualTenderId.$: $.actualTenderId
+              deliveryWeek.$: $.deliveryWeek
               paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
               paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
               paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
@@ -2145,6 +2167,8 @@ Resources:
                           Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELIVERYWEEK
+                          Value.$: $.deliveryWeek
 #                  Retry:
 #                    - ErrorEquals:
 #                        - States.ALL
@@ -2304,6 +2328,7 @@ Resources:
               "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
               "sk.$": $.queryResult.Items[0].sk.S
               "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
+              "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.BOOL
             Next: Parallel
           NoItemToProcess:
             Type: Succeed
@@ -2415,6 +2440,7 @@ Resources:
                         "numberOfShipments.$": $.input.numberOfShipments
                         "sendToNextStepCounter.$": $.input.sendToNextStepCounter
                         "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
+                        "stopSendToPhaseTwo": "true"
                       "processType.$": $.processType
                     Next: ToPreparePhase2Successfully
 
@@ -2488,13 +2514,15 @@ Resources:
                   "M.$": $.parallelResult[1].input.lastEvaluatedKeyPhase2
                 ":sentToNextWeekInc":
                   "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
+                ":stopSendToPhaseTwoVal":
+                  "BOOL.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
               Key:
                 pk:
                   "S.$": $.lambdaResponse.Payload.input.pk
                 sk:
                   "S.$": $.lambdaResponse.Payload.input.sk
               "TableName.$": $.PAPERDELIVERYCOUNTER_TABLENAME
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal  ADD sentToNextWeek :sentToNextWeekInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal  ADD sentToNextWeek :sentToNextWeekInc"
             Retry:
               - ErrorEquals:
                   - States.ALL

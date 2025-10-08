@@ -5,14 +5,12 @@ const path = require("path");
 const { calculateWeeklyEstimates } = require('../app/algorithm');
 
 const { mockClient } = require("aws-sdk-client-mock");
-const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand, QueryCommand} = require("@aws-sdk/lib-dynamodb");
 const ddbMock = mockClient(DynamoDBDocumentClient);
-
-// 1️⃣ risposte di default per le operazioni Dynamo
+ddbMock.on(QueryCommand).resolves({ Items: [] });
 ddbMock.on(BatchWriteCommand).resolves({ UnprocessedItems: {} });
 ddbMock.on(UpdateCommand).resolves({});
 
-// Dummy provider returning static percentages for test
 const provider = async region => {
     if (region === 'Lombardia') {
         return [
@@ -39,6 +37,12 @@ describe('calculateWeeklyEstimates', () => {
 
     beforeEach(() => {
         ddbMock.resetHistory();
+        ddbMock.reset();
+
+        // Default: tutte le send rispondono OK
+        ddbMock.on(BatchWriteCommand).resolves({ UnprocessedItems: {} });
+        ddbMock.on(UpdateCommand).resolves({});
+        ddbMock.on(QueryCommand).resolves({ Items: [] });
     });
 
     it('should compute weekly estimates for February 2025', async () => {
@@ -54,18 +58,22 @@ describe('calculateWeeklyEstimates', () => {
         assert.strictEqual(uniqueWeeks.size, weeksInMonth + partialWeek);
         // Check one sample: Milano AR product
         const miArFeb = estimates.find(
-            e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate.includes('2025-02')
+            e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-02-03' && e.weekType === 'FULL'
         );
 
         const miArJanLastWeek = estimates.find(
-            e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-01-27'
+            e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-01-27' && e.weekType === 'PARTIAL_START'
         );
+
+        const miArFebLast = estimates.find(
+                    e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-02-24' && e.weekType === 'PARTIAL_END'
+                );
 
         // Lombardia AR 1000 mensile -> Milano 60% di 1000 -> 600 -> 600:28 giorni di feb = 21,4285714 -> x 7 giorni -> 150
         assert.strictEqual(miArFeb.weeklyEstimate, 150);
-        assert.strictEqual(miArFeb.originalEstimate, 1000);
 
         // 21,4285714 x 2 giorni di febbraio -> 42,85 -> 43
         assert.strictEqual(miArJanLastWeek.weeklyEstimate, 43);
+        assert.strictEqual(miArFebLast.weeklyEstimate, 107);
     });
 });
