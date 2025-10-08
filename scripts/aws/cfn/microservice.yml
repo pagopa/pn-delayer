@@ -1505,7 +1505,7 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 15
+      Timeout: 300 #5 min
       VpcConfig:
         SubnetIds: !Split [ ",", !Ref SubnetsIds ]
         SecurityGroupIds:
@@ -1612,7 +1612,7 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 15
+      Timeout: 300 #5 min
 
   # Lambda function role
   TestDelayerLambdaRole:

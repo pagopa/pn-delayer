@@ -472,7 +472,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-safestorage_to_delayer_orders_senders'
         DelaySeconds: 1
-        VisibilityTimeout: 240 # 4 minutes
+        VisibilityTimeout: 1800 #30 min
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         
   PnDelayerSenderLimitJobLogGroup:
