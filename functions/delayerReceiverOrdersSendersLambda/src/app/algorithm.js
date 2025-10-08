@@ -5,6 +5,7 @@ const {
     eachWeekOfInterval,
     getDaysInMonth,
     differenceInCalendarDays,
+    addDays,
     formatISO
 } = require('date-fns');
 
@@ -21,10 +22,13 @@ const { persistWeeklyEstimates } = require('./dynamo');
  * @returns {Promise<Array<Object>>}        List of weekly‑granularity records.
  */
 async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey) {
-    const { weekNotInTheMonth, weeks, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
+    const { segments, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
+    const partialStart = segments.filter(s => s.weekType === 'PARTIAL_START').length;
+    const partialEnd   = segments.filter(s => s.weekType === 'PARTIAL_END').length;
+
     console.debug(
-        `[ALGO] Month context – weeks in month: ${weeks}, partialWeek: ${weekNotInTheMonth}, daysInMonth: ${daysInMonth}`
-    );
+        `[ALGO] Month context – segments: ${segments.length}, partialStart: ${partialStart}, partialEnd: ${partialEnd}, daysInMonth: ${daysInMonth}`
+      );
     const results = [];
 
     const filteredProducts = commessa.prodotti.filter(prod => prod.id === "AR" || prod.id === "890");
@@ -46,8 +50,7 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileK
                     productType: prodotto.id,
                     commessa,
                     daysInMonth,
-                    weeks,
-                    weekNotInTheMonth,
+                    segments,
                 });
 
                 results.push(...provinceRecords);
@@ -75,16 +78,33 @@ function getMonthContext(periodoRiferimento) {
     const endMonth   = endOfMonth(startMonth);
 
     //weeks contiene tutte le settimana del mese che iniziano di lunedì + eventualmente quella precedente
-    const weeks      = eachWeekOfInterval({ start: startMonth, end: endMonth }, { weekStartsOn: 1 });
+    const weeks = eachWeekOfInterval({ start: startMonth, end: endMonth }, { weekStartsOn: 1 });
 
-    const weekNotInTheMonth = weeks[0].getMonth() !== weeks[1].getMonth() ? weeks.shift() : null;
+    const segments = [];
+    for (const weekStart of weeks) {
+        const weekEnd = addDays(weekStart, 6);
 
+        // overlap of this week with the month
+        const overlapStart = weekStart < startMonth ? startMonth : weekStart;
+        const overlapEnd   = weekEnd   > endMonth   ? endMonth   : weekEnd;
+
+        const daysInWeekInMonth = differenceInCalendarDays(overlapEnd, overlapStart) + 1;
+        if (daysInWeekInMonth <= 0) continue; // should not happen
+
+        let weekType = 'FULL';
+        if (overlapStart.getTime() === weekStart.getTime() && daysInWeekInMonth < 7) {
+            weekType = 'PARTIAL_END'; // last week: starts Mon, ends before Sun
+        } else if (overlapStart.getTime() !== weekStart.getTime()) {
+            weekType = 'PARTIAL_START'; // first week: starts after Mon
+        }
+
+        segments.push({ weekStart, daysInWeekInMonth, weekType });
+    }
 
     return {
-        weekNotInTheMonth,
-        weeks,
+        segments,
         daysInMonth: getDaysInMonth(startMonth)
-    };
+      };
 }
 
 /**
@@ -96,8 +116,7 @@ function buildProvinceRecords({
                                   productType,
                                   commessa,
                                   daysInMonth,
-                                  weeks,
-                                  weekNotInTheMonth
+                                  segments
                               }) {
     const records = [];
     const monthlyRegionalEstimate = regionale.valore;
@@ -108,60 +127,45 @@ function buildProvinceRecords({
         const dailyProvEstimate   = monthlyProvEstimate / daysInMonth;
 
         // full weeks inside the month
-        for (const monday of weeks) {
-            const numberOfDaysInMonth= Math.min(7, differenceInCalendarDays(endOfMonth(monday), monday) + 1);
-            const weeklyProvEstimate  = Math.round(dailyProvEstimate * numberOfDaysInMonth);
-            records.push(buildRecord({
-                commessa,
-                productType,
-                provinceSigla,
-                monday,
-                weeklyEstimate: weeklyProvEstimate,
-                monthlyEstimate: monthlyProvEstimate,
-                originalEstimate: monthlyRegionalEstimate
-            }));
-        }
-
-        // partial week spanning previous month
-        if (weekNotInTheMonth) {
-            const missingDays = differenceInCalendarDays(weeks[0], endOfMonth(weekNotInTheMonth)) - 1;
-            const additionalEst   = dailyProvEstimate * missingDays;
-
-            records.push(buildRecord({
-                commessa,
-                productType,
-                provinceSigla,
-                monday: weekNotInTheMonth,
-                weeklyEstimate: Math.round(additionalEst),
-                // monthlyEstimate: monthlyProvEstimate,
-                isPartialWeek: true
-            }));
+    for (const { weekStart, daysInWeekInMonth, weekType } of segments) {
+        const weeklyProvEstimate = Math.round(dailyProvEstimate * daysInWeekInMonth);
+        records.push(buildRecord({
+            commessa,
+            productType,
+            provinceSigla,
+            weekStart,
+            weeklyEstimate: weeklyProvEstimate,
+            monthlyEstimate: monthlyProvEstimate,
+            originalEstimate: monthlyRegionalEstimate,
+            weekType,
+            daysInWeekInMonth
+        }));
         }
     }
 
     return records;
 }
 
-function buildRecord({
-                         commessa,
+function buildRecord({ commessa,
                          productType,
                          provinceSigla,
-                         monday,
+                         weekStart,
                          weeklyEstimate,
                          monthlyEstimate,
                          originalEstimate,
-                         isPartialWeek = false
-                     }) {
+                         weekType,
+                         daysInWeekInMonth }) {
     return {
         paId: commessa.idEnte,
         productType,
         province: provinceSigla,
-        deliveryDate: formatISO(monday, { representation: 'date' }), // YYYY‑MM‑DD
+        deliveryDate: formatISO(weekStart, { representation: 'date' }), // YYYY‑MM‑DD
         weeklyEstimate,
         monthlyEstimate,
         originalEstimate,
         lastUpdate: commessa.last_update,
-        ...(isPartialWeek ? { isPartialWeek: true } : {})
+        weekType,                 // "FULL" | "PARTIAL_START" | "PARTIAL_END"
+        daysInWeekInMonth         // 7 for FULL, <7 for partials
     };
 }
 

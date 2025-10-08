@@ -43,7 +43,7 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters"] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "file.csv"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
     });
@@ -56,7 +56,7 @@ describe("Lambda Delayer Dispatcher", () => {
             });
             ddbMock.on(BatchWriteCommand).resolves({});
 
-            const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "", "2025-08-04"] });
+            const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "180000", "2025-08-04"] });
             assert.strictEqual(result.statusCode, 200);
             assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
             assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk,"2025-08-04~EVALUATE_SENDER_LIMIT");});
@@ -214,7 +214,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
                 "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
                 "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
-                "pn-PaperDeliveryCounters"] });
+                "pn-PaperDeliveryCounters", "180000"] });
 
         assert.strictEqual(result.statusCode, 200);
         const outerBodyParse = JSON.parse(result.body);
@@ -269,7 +269,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "RUN_ALGORITHM", parameters: ["pn-DelayerPaperDelivery",
                 "pn-PaperDeliveryDriverCapacities", "pn-PaperDeliveryDriverUsedCapacities",
                 "pn-PaperDeliverySenderLimit","pn-PaperDeliveryUsedSenderLimit",
-                "pn-PaperDeliveryCounters"] });
+                "pn-PaperDeliveryCounters", "180000"] });
 
         const body = JSON.parse(result.body);
         assert.strictEqual(body.statusCode, 500);

@@ -108,6 +108,7 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
         AttributeName=pk,AttributeType=S \
         AttributeName=deliveryDate,AttributeType=S \
         AttributeName=province,AttributeType=S \
+        AttributeName=fileKey,AttributeType=S \
     --key-schema \
         AttributeName=pk,KeyType=HASH \
         AttributeName=deliveryDate,KeyType=RANGE \
@@ -118,6 +119,19 @@ aws --profile default --region us-east-1 --endpoint-url=http://localstack:4566 \
                 \"KeySchema\": [
                     {\"AttributeName\": \"deliveryDate\", \"KeyType\": \"HASH\"},
                     {\"AttributeName\": \"province\", \"KeyType\": \"RANGE\"}
+                ],
+                \"Projection\": {
+                    \"ProjectionType\": \"ALL\"
+                },
+                \"ProvisionedThroughput\": {
+                    \"ReadCapacityUnits\": 10,
+                    \"WriteCapacityUnits\": 5
+                }
+            },
+            {
+                \"IndexName\": \"fileKey-index\",
+                \"KeySchema\": [
+                    {\"AttributeName\": \"fileKey\", \"KeyType\": \"HASH\"}
                 ],
                 \"Projection\": {
                     \"ProjectionType\": \"ALL\"
