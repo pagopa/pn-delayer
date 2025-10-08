@@ -7,19 +7,21 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
+import it.pagopa.pn.delayer.model.IncrementUsedSenderLimitDto;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,16 +86,18 @@ public class SenderLimitUtilsTest {
     }
 
     @Test
-    void updateUsedSenderLimit() {
+    void createIncrementUsedSenderLimitDtos() {
         List<PaperDelivery> paperDeliveryList = List.of(createPaperDelivery("AR", "00100", "RM", "paId", 1),
                 createPaperDelivery("AR", "00100", "RM", "paId", 0));
-        LocalDate deliveryDate = LocalDate.now();
         Map<String, Tuple2<Integer, Integer>> senderLimitMaps = Map.of("paId~AR~RM", Tuples.of(100, 50));
-        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), eq(2L), eq(deliveryDate.minusWeeks(1)), anyInt()))
-                .thenReturn(Mono.just(2L));
 
-        StepVerifier.create(senderLimitUtils.updateUsedSenderLimit(paperDeliveryList, deliveryDate, senderLimitMaps))
-                .expectNext(2L)
+        StepVerifier.create(senderLimitUtils.createIncrementUsedSenderLimitDtos(paperDeliveryList, senderLimitMaps))
+                .expectNextMatches(incrementUsedSenderLimitDto -> {
+                    assertEquals("paId~AR~RM", incrementUsedSenderLimitDto.pk());
+                    assertEquals(2L, incrementUsedSenderLimitDto.increment());
+                    assertEquals(100, incrementUsedSenderLimitDto.senderLimit());
+                    return true;
+                })
                 .verifyComplete();
     }
 

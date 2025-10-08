@@ -77,7 +77,8 @@ class EvaluateSenderLimitJobServiceTest {
                 new PaperDeliveryUtils(paperDeliveryDao, pnDelayerConfigs, pnDelayerUtils, deliveryDriverUtils, paperDeliveryCounterDAO),
                 deliveryDriverUtils,
                 ssmParameterConsumerActivation,
-                new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils, paperDeliveryCounterDAO)
+                new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils, paperDeliveryCounterDAO),
+                paperDeliverySenderLimitDAO
         );
 
         Map<String, List<String>> priorityMap = Map.of(
@@ -304,9 +305,6 @@ class EvaluateSenderLimitJobServiceTest {
         deliveries.addAll(getPaperDeliveries(false));
         Page<PaperDelivery> page = mock(Page.class);
         when(page.items()).thenReturn(deliveries);
-        Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
-        lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_RESIDUAL_CAPACITY).build());
-        lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
         when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
         when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
                 .thenReturn(Mono.just(page));
@@ -434,7 +432,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(0, capturedDeliveries.get(1).size());
         Assertions.assertEquals(3, capturedDeliveries.get(2).size());
         Assertions.assertEquals(1, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(2)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
         verify(deliveryDriverUtils, times(5)).retrieveFromCache(anyString());

@@ -6,6 +6,7 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
+import it.pagopa.pn.delayer.model.IncrementUsedSenderLimitDto;
 import it.pagopa.pn.delayer.model.ProductType;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import lombok.RequiredArgsConstructor;
@@ -44,11 +45,14 @@ public class SenderLimitUtils {
                     String sk = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product.getValue(), province);
                     String shipmentDate = deliveryWeek.minusWeeks(1).toString();
                     return paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, sk, 1)
-                            .filter(paperDeliveryCounters -> !CollectionUtils.isEmpty(paperDeliveryCounters))
-                            .doOnNext(estimateShipmentCounter -> totalEstimateCounter.put(product.getValue(), estimateShipmentCounter.getFirst().getNumberOfShipments()));
+                            .flatMapMany(Flux::fromIterable)
+                            .map(counter -> Tuples.of(product, counter));
                 })
                 .collectList()
-                .then(Mono.just(totalEstimateCounter));
+                .filter(paperDeliveryCountersTuple -> !CollectionUtils.isEmpty(paperDeliveryCountersTuple))
+                .doOnNext(paperDeliveryCountersTuple -> paperDeliveryCountersTuple
+                        .forEach(tuple -> totalEstimateCounter.put(tuple.getT1().getValue(), tuple.getT2().getNumberOfShipments())))
+                .thenReturn(totalEstimateCounter);
     }
 
     /**
@@ -60,9 +64,11 @@ public class SenderLimitUtils {
      * */
     private Mono<Map<String, Tuple2<Integer, Integer>>> retrieveUsedSenderLimit(LocalDate shipmentDate, Set<String> paIdProductTypeTuples, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
         return Flux.fromIterable(paIdProductTypeTuples).buffer(25)
-                .flatMap(usedSenderLimitPkSubList -> paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(usedSenderLimitPkSubList, shipmentDate)
-                        .doOnNext(paperDeliveryUsedSenderLimit -> senderLimitMap.put(paperDeliveryUsedSenderLimit.getPk(), Tuples.of(paperDeliveryUsedSenderLimit.getSenderLimit(), paperDeliveryUsedSenderLimit.getNumberOfShipment()))))
-                .then(Mono.just(senderLimitMap));
+                .flatMap(usedSenderLimitPkSubList -> paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(usedSenderLimitPkSubList, shipmentDate))
+                .collectList()
+                .doOnNext(paperDeliveryUsedSenderLimits ->
+                        paperDeliveryUsedSenderLimits.forEach(paperDeliveryUsedSenderLimit -> senderLimitMap.put(paperDeliveryUsedSenderLimit.getPk(), Tuples.of(paperDeliveryUsedSenderLimit.getSenderLimit(), paperDeliveryUsedSenderLimit.getNumberOfShipment()))))
+                .thenReturn(senderLimitMap);
     }
 
     /**
@@ -80,12 +86,12 @@ public class SenderLimitUtils {
         paIdProductTypeTuplesCopy.removeIf(paIdProductTypeTuple -> senderLimitJobProcessObjects.getSenderLimitMap().containsKey(paIdProductTypeTuple));
         return Flux.fromIterable(paIdProductTypeTuplesCopy).buffer(25)
                 .flatMap(senderLimitPkSubList -> paperDeliverySenderLimitDAO.retrieveSendersLimit(senderLimitPkSubList, shipmentDate)
-                        .map(paperDeliverySenderLimit -> {
-                            Integer limit = calculateLimit(driversTotalCapacity, senderLimitJobProcessObjects, paperDeliverySenderLimit);
-                            senderLimitJobProcessObjects.getSenderLimitMap().put(paperDeliverySenderLimit.getPk(), Tuples.of(limit,0));
-                            return senderLimitJobProcessObjects.getSenderLimitMap();
-                        }))
-                .then(Mono.just(senderLimitJobProcessObjects.getSenderLimitMap()));
+                        .map(paperDeliverySenderLimit -> Tuples.of(paperDeliverySenderLimit.getPk(), calculateLimit(driversTotalCapacity, senderLimitJobProcessObjects, paperDeliverySenderLimit))))
+                .collectList()
+                .doOnNext(pkLimitTuples -> pkLimitTuples.forEach(tuple -> senderLimitJobProcessObjects
+                        .getSenderLimitMap()
+                        .put(tuple.getT1(), Tuples.of(tuple.getT2(), 0))))
+                .thenReturn(senderLimitJobProcessObjects.getSenderLimitMap());
     }
 
     private static Integer calculateLimit(List<DriversTotalCapacity> driversTotalCapacity,
@@ -129,11 +135,9 @@ public class SenderLimitUtils {
         return limit;
     }
 
-    public Mono<Long> updateUsedSenderLimit(List<PaperDelivery> paperDeliveryList, LocalDate deliveryDate, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
-        LocalDate shipmentDate = deliveryDate.minusWeeks(1);
+    public Flux<IncrementUsedSenderLimitDto> createIncrementUsedSenderLimitDtos(List<PaperDelivery> paperDeliveryList, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
         Map<String, Long> usedSenderLimitMap = pnDelayerUtils.groupByPaIdProductTypeProvinceAndCount(paperDeliveryList);
         return Flux.fromIterable(usedSenderLimitMap.entrySet())
-                .flatMap(tupleCounterEntry -> paperDeliverySenderLimitDAO.updateUsedSenderLimit(tupleCounterEntry.getKey(), tupleCounterEntry.getValue(), shipmentDate, senderLimitMap.get(tupleCounterEntry.getKey()).getT1()))
-                .reduce(0L, Long::sum);
+                .map(tupleCounterEntry -> new IncrementUsedSenderLimitDto(tupleCounterEntry.getKey(), tupleCounterEntry.getValue(), senderLimitMap.get(tupleCounterEntry.getKey()).getT1()));
     }
 }

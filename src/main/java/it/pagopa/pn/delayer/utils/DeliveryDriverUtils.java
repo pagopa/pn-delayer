@@ -66,8 +66,10 @@ public class DeliveryDriverUtils {
     }
 
     public void insertInCache(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriver) {
-        Map<String, String> map = pnDelayerUtils.groupByGeoKeyAndProduct(paperChannelDeliveryDriver);
-        map.forEach(cacheService::addToCache);
+        if(!CollectionUtils.isEmpty(paperChannelDeliveryDriver)) {
+            Map<String, String> map = pnDelayerUtils.groupByGeoKeyAndProduct(paperChannelDeliveryDriver);
+            map.forEach(cacheService::addToCache);
+        }
     }
 
     public Optional<String> retrieveFromCache(String capProductTypeKey) {

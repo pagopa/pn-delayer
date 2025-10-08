@@ -120,15 +120,19 @@ public class PnDelayerUtils {
      * @param senderLimitJobProcessObjects Object containing the lists to which the deliveries will be
      */
     public void evaluateSenderLimitAndFilterDeliveries(Map<String, Tuple2<Integer, Integer>> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+        List<PaperDelivery> sendToDriverCapacityStep = new ArrayList<>();
+        List<PaperDelivery> sendToResidualCapacityStep = new ArrayList<>();
         deliveriesGroupedByProductTypePaId.forEach((key, deliveries) -> {
             int limit = Optional.ofNullable(senderLimitMap.get(key))
                     .map(senderLimits -> senderLimits.getT1() - senderLimits.getT2())
                     .orElse(0);
 
             int actualLimit = Math.min(limit, deliveries.size());
-            senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
-            senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
+            sendToDriverCapacityStep.addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
+            sendToResidualCapacityStep.addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
         });
+        senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(sendToResidualCapacityStep);
+        senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(sendToDriverCapacityStep);
     }
 
     /**
