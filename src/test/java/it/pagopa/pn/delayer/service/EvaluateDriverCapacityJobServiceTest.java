@@ -235,7 +235,12 @@ class EvaluateDriverCapacityJobServiceTest {
         verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity( eq("00184"), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
         List<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptured = incrementUsedCapacityCaptor.getAllValues();
-        Assertions.assertEquals(4, incrementUsedCapacityCaptured.getFirst().size());
+        Assertions.assertEquals(3, incrementUsedCapacityCaptured.getFirst().size());
+        Assertions.assertEquals(3, incrementUsedCapacityCaptured.getFirst().stream()
+                .filter(incrementUsedCapacityDto -> incrementUsedCapacityDto.geoKey().equalsIgnoreCase("RM"))
+                .findFirst()
+                .get()
+                .numberOfDeliveries());
     }
 
     @Test
