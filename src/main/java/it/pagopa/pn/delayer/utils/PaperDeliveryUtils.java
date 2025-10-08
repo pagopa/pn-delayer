@@ -109,8 +109,9 @@ public class PaperDeliveryUtils {
                                          AtomicInteger printCounter,
                                          DriverCapacityJobProcessResult driverCapacityJobProcessResult) {
 
-        String unifiedDeliveryDriver = sortKeyPrefix.split("~")[0];
-        String province = sortKeyPrefix.split("~")[1];
+        String[] splittedSortKeyPrefix = sortKeyPrefix.split("~");
+        String unifiedDeliveryDriver = splittedSortKeyPrefix[0];
+        String province = splittedSortKeyPrefix[1];
 
         return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, Math.min(residualCapacity, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
                 .flatMap(paperDeliveryPage -> processChunkToSendToNextStep(paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, deliveryWeek, declaredCapacity, printCounter, driverCapacityJobProcessResult)

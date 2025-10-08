@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 public class DriverCapacityJobProcessObject {
-    List<PaperDelivery> toNextStep = new ArrayList<>();
-    List<PaperDelivery> toNextWeek = new ArrayList<>();
-    List<IncrementUsedCapacityDto> incrementUsedCapacityDtosForCap = new ArrayList<>();
+    private List<PaperDelivery> toNextStep = new ArrayList<>();
+    private List<PaperDelivery> toNextWeek = new ArrayList<>();
+    private List<IncrementUsedCapacityDto> incrementUsedCapacityDtosForCap = new ArrayList<>();
 }
