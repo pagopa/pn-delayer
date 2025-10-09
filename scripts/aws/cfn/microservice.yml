@@ -1705,6 +1705,7 @@ Resources:
             Action:
               - kms:Decrypt
               - kms:DescribeKey
+              - kms:GenerateDataKey
             Resource:
               - !Sub "${TestDelayerKmsBucketArn}"
           - Effect: Allow
