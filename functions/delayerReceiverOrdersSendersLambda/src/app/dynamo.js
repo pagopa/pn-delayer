@@ -114,42 +114,38 @@ async function persistWeeklyEstimates(estimates, fileKey) {
 
 // Helper per gestire PARTIAL_START / PARTIAL_END
   async function upsertPartial(p, ttlValue, fileKey, isStart) {
-      const pk = `${p.paId}~${p.productType}~${p.province}`;
-      const portionAttr = isStart ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
+    const pk = `${p.paId}~${p.productType}~${p.province}`;
+    const portionAttr = isStart ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
+    const otherPortionAttr = isStart ? 'firstWeekWeeklyEstimate' : 'secondWeekWeeklyEstimate';
 
-      await client.send(new UpdateCommand({
-        TableName: LIMIT_TABLE,
-        Key: { pk, deliveryDate: p.deliveryDate },
-        UpdateExpression: [
-          'SET',
-          // Idempotenza: rimuovi la vecchia porzione (se c’è) e aggiungi la nuova
-          `weeklyEstimate = if_not_exists(weeklyEstimate, :zero) - if_not_exists(#portion, :zero) + :portion`,
-          '#portion       = :portion',
-          'monthlyEstimate  = if_not_exists(monthlyEstimate, :me)',
-          'originalEstimate = if_not_exists(originalEstimate, :oe)',
-          'productType      = if_not_exists(productType, :pt)',
-          'province         = if_not_exists(province, :pr)',
-          'paId             = if_not_exists(paId, :pa)',
-          'fileKey          = if_not_exists(fileKey, :fk)',
-          '#ttl             = if_not_exists(#ttl, :ttl)'
-        ].join(', '),
-        ExpressionAttributeNames: {
-          '#portion': portionAttr,
-          '#ttl': 'ttl'
-        },
-        ExpressionAttributeValues: {
-          ':zero': 0,
-          ':portion': p.weeklyEstimate,  // quota di questa metà settimana (inizio/fine mese)
-          ':me': p.monthlyEstimate,
-          ':oe': p.originalEstimate,
-          ':pt': p.productType,
-          ':pr': p.province,
-          ':pa': p.paId,
-          ':fk': fileKey,
-          ':ttl': ttlValue
-        }
-      }));
-    }
+    await client.send(new UpdateCommand({
+      TableName: LIMIT_TABLE,
+      Key: { pk, deliveryDate: p.deliveryDate },
+      UpdateExpression: [
+        'SET weeklyEstimate = if_not_exists(#otherWeekPortion, :zero) + :portion,',
+        '#portion = :portion,',
+        'productType      = if_not_exists(productType, :pt),',
+        'province         = if_not_exists(province, :pr),',
+        'paId             = if_not_exists(paId, :pa),',
+        'fileKey          = if_not_exists(fileKey, :fk),',
+        '#ttl             = if_not_exists(#ttl, :ttl) '
+      ].join(' '),
+      ExpressionAttributeNames: {
+        '#portion': portionAttr,
+        '#otherWeekPortion': otherPortionAttr,
+        '#ttl': 'ttl'
+      },
+      ExpressionAttributeValues: {
+        ':zero': 0,
+        ':portion': p.weeklyEstimate,
+        ':pt': p.productType,
+        ':pr': p.province,
+        ':pa': p.paId,
+        ':fk': fileKey,
+        ':ttl': ttlValue
+      }
+    }));
+  }
 
 
 /**
