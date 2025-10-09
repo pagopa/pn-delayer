@@ -124,6 +124,8 @@ async function persistWeeklyEstimates(estimates, fileKey) {
       UpdateExpression: [
         'SET weeklyEstimate = if_not_exists(#otherWeekPortion, :zero) + :portion,',
         '#portion = :portion,',
+        'monthlyEstimate  = if_not_exists(monthlyEstimate, :me),',
+        'originalEstimate = if_not_exists(originalEstimate, :oe),',
         'productType      = if_not_exists(productType, :pt),',
         'province         = if_not_exists(province, :pr),',
         'paId             = if_not_exists(paId, :pa),',
@@ -138,6 +140,8 @@ async function persistWeeklyEstimates(estimates, fileKey) {
       ExpressionAttributeValues: {
         ':zero': 0,
         ':portion': p.weeklyEstimate,
+        ':me': p.monthlyEstimate,
+        ':oe': p.originalEstimate,
         ':pt': p.productType,
         ':pr': p.province,
         ':pa': p.paId,
