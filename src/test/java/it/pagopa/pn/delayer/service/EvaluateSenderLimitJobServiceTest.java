@@ -112,8 +112,6 @@ class EvaluateSenderLimitJobServiceTest {
         paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setWeeklyEstimate(1);
 
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.empty());
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
         when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
@@ -181,8 +179,6 @@ class EvaluateSenderLimitJobServiceTest {
         usedSenderLimit.setSenderLimit(5);
         usedSenderLimit.setNumberOfShipment(4);
 
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.empty());
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.empty());
 
@@ -255,10 +251,6 @@ class EvaluateSenderLimitJobServiceTest {
         usedSenderLimit.setPk("paId2~AR~RM");
         usedSenderLimit.setSenderLimit(5);
         usedSenderLimit.setNumberOfShipment(4);
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.empty())
-                .thenReturn(Flux.just(usedSenderLimit));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
         when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
@@ -282,9 +274,9 @@ class EvaluateSenderLimitJobServiceTest {
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
         Assertions.assertEquals(3, capturedDeliveries.getFirst().size());
         Assertions.assertEquals(1, capturedDeliveries.get(1).size());
-        Assertions.assertEquals(3, capturedDeliveries.get(2).size());
-        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(2)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        Assertions.assertEquals(2, capturedDeliveries.get(2).size());
+        Assertions.assertEquals(2, capturedDeliveries.getLast().size());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
     }
@@ -315,11 +307,6 @@ class EvaluateSenderLimitJobServiceTest {
         usedSenderLimit.setSenderLimit(5);
         usedSenderLimit.setNumberOfShipment(4);
 
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.just(usedSenderLimit));
-        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
-                .thenReturn(Mono.just(2L));
-
         ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDao.insertPaperDeliveries(senderLimitJobPaperDeliveriesCaptor.capture()))
                 .thenReturn(Mono.empty());
@@ -336,17 +323,18 @@ class EvaluateSenderLimitJobServiceTest {
 
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any())).thenReturn(Flux.empty());
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
-        Assertions.assertEquals(3, capturedDeliveries.getFirst().size());
-        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
+        Assertions.assertEquals(2, capturedDeliveries.getFirst().size());
+        Assertions.assertEquals(2, capturedDeliveries.getLast().size());
         verify(deliveryDriverUtils, times(2)).retrieveFromCache(anyString());
         verify(deliveryDriverUtils, times(1)).insertInCache(anyList());
         verify(deliveryDriverUtils, times(1)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());
-        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(2)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
     }
@@ -394,10 +382,6 @@ class EvaluateSenderLimitJobServiceTest {
         usedSenderLimit.setPk("paId2~AR~RM");
         usedSenderLimit.setSenderLimit(5);
         usedSenderLimit.setNumberOfShipment(4);
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.empty())
-                .thenReturn(Flux.just(usedSenderLimit));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
         when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
@@ -430,8 +414,8 @@ class EvaluateSenderLimitJobServiceTest {
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
         Assertions.assertEquals(4, capturedDeliveries.getFirst().size());
         Assertions.assertEquals(0, capturedDeliveries.get(1).size());
-        Assertions.assertEquals(3, capturedDeliveries.get(2).size());
-        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
+        Assertions.assertEquals(4, capturedDeliveries.get(2).size());
+        Assertions.assertEquals(0, capturedDeliveries.getLast().size());
         verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));

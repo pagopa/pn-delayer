@@ -15,6 +15,7 @@ import reactor.util.function.Tuples;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -202,10 +203,9 @@ class PnDelayerUtilsTest {
 
     @Test
     void evaluateSenderLimitAndFilterDeliveries(){
-        Map<String, Tuple2<Integer, Integer>> senderLimitMap = Map.of(
-                "paId1~AR~RM", Tuples.of(3, 1),
-                "paId2~890~RM", Tuples.of(2, 0)
-        );
+        Map<String, Tuple2<Integer, Integer>> senderLimitMap = new HashMap<>();
+        senderLimitMap.putAll( Map.of("paId1~AR~RM", Tuples.of(3, 1),
+                "paId2~890~RM", Tuples.of(2, 0)));
 
         List<PaperDelivery> deliveries1 = new ArrayList<>();
         deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
