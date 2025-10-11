@@ -100,7 +100,10 @@ public class PnDelayerUtils {
      */
     public Integer filterOnResidualDriverCapacity(List<PaperDelivery> deliveries, Tuple2<Integer, Integer> capCapacities, List<PaperDelivery> deliveriesToSend, List<PaperDelivery> toNextWeek, LocalDate deliveryWeek) {
         int remainingCapacity = Math.max(capCapacities.getT1() - capCapacities.getT2(), 0);
-        List<PaperDelivery> filteredList = deliveries.stream().limit(remainingCapacity).toList();
+        List<PaperDelivery> filteredList = new ArrayList<>();
+        if(remainingCapacity > 0) {
+            filteredList.addAll(deliveries.stream().limit(remainingCapacity).toList());
+        }
 
         if (!filteredList.isEmpty()) deliveriesToSend.addAll(mapItemForEvaluatePrintCapacityStep(filteredList, deliveryWeek));
         if (filteredList.size() < deliveries.size()) toNextWeek.addAll(deliveries.subList(filteredList.size(), deliveries.size()));

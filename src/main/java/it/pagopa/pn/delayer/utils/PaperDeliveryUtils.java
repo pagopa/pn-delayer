@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
@@ -18,6 +20,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -114,7 +117,7 @@ public class PaperDeliveryUtils {
         String province = splittedSortKeyPrefix[1];
 
         return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, Math.min(residualCapacity, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
-                .flatMap(paperDeliveryPage -> processChunkToSendToNextStep(paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, deliveryWeek, declaredCapacity, printCounter, driverCapacityJobProcessResult)
+                .flatMap(paperDeliveryPage -> processChunkToSendToNextStep(province, paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, deliveryWeek, printCounter, driverCapacityJobProcessResult)
                         .flatMap(processResult -> {
                             log.info("driverCapacityJobProcessResult for province={} and unifiedDeliveryDriver={} after processing chunk: sentToNextStep={}, totalIncrements={}",
                                     province, unifiedDeliveryDriver, processResult.getSentToNextStep(), processResult.getIncrementUsedCapacityDtos().size());
@@ -149,8 +152,15 @@ public class PaperDeliveryUtils {
     }
 
 
-    private Mono<DriverCapacityJobProcessResult> processChunkToSendToNextStep(List<PaperDelivery> chunk, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek, Integer provinceDeclaredCapacity, AtomicInteger printCounter, DriverCapacityJobProcessResult driverCapacityJobProcessResult) {
-        return evaluateCapCapacity(chunk, unifiedDeliveryDriver, tenderId, deliveryWeek)
+    private Mono<DriverCapacityJobProcessResult> processChunkToSendToNextStep(String province, List<PaperDelivery> chunk, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek, AtomicInteger printCounter, DriverCapacityJobProcessResult driverCapacityJobProcessResult) {
+
+        IncrementUsedCapacityDto alreadyUsedCapacity = driverCapacityJobProcessResult.getIncrementUsedCapacityDtos().stream()
+                .filter(incrementUsedCapacityDto -> incrementUsedCapacityDto.unifiedDeliveryDriver().equalsIgnoreCase(unifiedDeliveryDriver)
+                        && incrementUsedCapacityDto.geoKey().equalsIgnoreCase(province))
+                .findFirst()
+                .orElse(null);
+
+        return evaluateCapCapacity(chunk, unifiedDeliveryDriver, tenderId, deliveryWeek, alreadyUsedCapacity)
                 .collectList()
                 .flatMap(driverCapacityObjects -> {
                     // merge toNextStep
@@ -184,10 +194,10 @@ public class PaperDeliveryUtils {
                 });
     }
 
-    private Flux<DriverCapacityJobProcessObject> evaluateCapCapacity(List<PaperDelivery> paperDeliveries, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {
+    private Flux<DriverCapacityJobProcessObject> evaluateCapCapacity(List<PaperDelivery> paperDeliveries, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek, IncrementUsedCapacityDto incrementUsedCapacityDto) {
         Map<String, List<PaperDelivery>> capMap = pnDelayerUtils.groupByCap(paperDeliveries);
         return Flux.fromIterable(capMap.entrySet())
-                .flatMap(entry -> processCapGroup(entry.getKey(), entry.getValue(), unifiedDeliveryDriver, tenderId, deliveryWeek)
+                .flatMap(entry -> processCapGroup(entry.getKey(), entry.getValue(), unifiedDeliveryDriver, tenderId, deliveryWeek, incrementUsedCapacityDto)
                         .doOnNext(driverCapacityJobProcessObject -> log.info("Processed CAP group [{}~{}]: toNextStep={}, toNextWeek={}, increments={}",
                                 unifiedDeliveryDriver, entry.getKey(),
                                 driverCapacityJobProcessObject.getToNextStep().size(),
@@ -209,15 +219,23 @@ public class PaperDeliveryUtils {
      * @param deliveryWeek              the week for which the deliveries are processed
      * @return a Mono containing the number of processed deliveries
      */
-    private Mono<DriverCapacityJobProcessObject> processCapGroup(String cap, List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {
+    private Mono<DriverCapacityJobProcessObject> processCapGroup(String cap, List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek, IncrementUsedCapacityDto incrementUsedCapacityDto) {
         DriverCapacityJobProcessObject driverCapacityJobProcessObject = new DriverCapacityJobProcessObject();
-        return deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(cap, unifiedDeliveryDriver, tenderId, deliveryWeek)
+        return evaluateIncrementUsedCapacityDto(incrementUsedCapacityDto)
+                .switchIfEmpty(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(cap, unifiedDeliveryDriver, tenderId, deliveryWeek))
                 .doOnNext(tuple -> log.info("Retrieved capacities for [{}~{}] -> availableCapacity={}, usedCapacity={}", unifiedDeliveryDriver, cap, tuple.getT1(), tuple.getT2()))
                 .flatMap(capCapacityAndUsedCapacity -> Mono.just(pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, capCapacityAndUsedCapacity, driverCapacityJobProcessObject.getToNextStep(), driverCapacityJobProcessObject.getToNextWeek(), deliveryWeek))
                         .filter(deliveriesCount -> deliveriesCount > 0)
                         .doOnDiscard(Integer.class, unused -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
                         .doOnNext(deliveriesCount -> driverCapacityJobProcessObject.getIncrementUsedCapacityDtosForCap().add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, cap, deliveriesCount, deliveryWeek, capCapacityAndUsedCapacity.getT1()))))
                 .thenReturn(driverCapacityJobProcessObject);
+    }
+
+    private Mono<Tuple2<Integer, Integer>> evaluateIncrementUsedCapacityDto(IncrementUsedCapacityDto incrementUsedCapacityDto) {
+        if(Objects.nonNull(incrementUsedCapacityDto)){
+            return Mono.just(Tuples.of(incrementUsedCapacityDto.declaredCapacity(), incrementUsedCapacityDto.numberOfDeliveries()));
+        }
+        return Mono.empty();
     }
 
     public Mono<List<PaperDelivery>> insertPaperDeliveries(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
