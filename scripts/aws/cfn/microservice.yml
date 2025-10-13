@@ -2329,7 +2329,7 @@ Resources:
               "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
               "sk.$": $.queryResult.Items[0].sk.S
               "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
-              "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.BOOL
+              "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.Bool
             Next: Parallel
           NoItemToProcess:
             Type: Succeed
@@ -2516,7 +2516,7 @@ Resources:
                 ":sentToNextWeekInc":
                   "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
                 ":stopSendToPhaseTwoVal":
-                  "BOOL.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
+                  "Bool.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
               Key:
                 pk:
                   "S.$": $.lambdaResponse.Payload.input.pk
