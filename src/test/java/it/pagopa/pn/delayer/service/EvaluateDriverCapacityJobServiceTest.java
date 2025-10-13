@@ -222,11 +222,9 @@ class EvaluateDriverCapacityJobServiceTest {
         Assertions.assertTrue(capturedDeliveries.get(1).getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
         Assertions.assertTrue(capturedDeliveries.get(1).getFirst().getSk().startsWith(String.join("~", "3")));
 
-        Assertions.assertEquals(2, capturedDeliveries.getLast().size());
+        Assertions.assertEquals(1, capturedDeliveries.getLast().size());
         Assertions.assertTrue(capturedDeliveries.getLast().getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
         Assertions.assertTrue(capturedDeliveries.getLast().getFirst().getSk().startsWith(String.join("3~")));
-        Assertions.assertTrue(capturedDeliveries.getLast().getLast().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
-        Assertions.assertTrue(capturedDeliveries.getLast().getLast().getSk().startsWith(String.join("3~")));
 
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5));
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4));
@@ -236,7 +234,7 @@ class EvaluateDriverCapacityJobServiceTest {
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
         List<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptured = incrementUsedCapacityCaptor.getAllValues();
         Assertions.assertEquals(3, incrementUsedCapacityCaptured.getFirst().size());
-        Assertions.assertEquals(3, incrementUsedCapacityCaptured.getFirst().stream()
+        Assertions.assertEquals(2, incrementUsedCapacityCaptured.getFirst().stream()
                 .filter(incrementUsedCapacityDto -> incrementUsedCapacityDto.geoKey().equalsIgnoreCase("RM"))
                 .findFirst()
                 .get()
@@ -300,11 +298,11 @@ class EvaluateDriverCapacityJobServiceTest {
         Assertions.assertTrue(capturedDeliveries.get(1).getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
         Assertions.assertTrue(capturedDeliveries.get(1).getFirst().getSk().startsWith(String.join("~", "3")));
 
-        Assertions.assertEquals(2, capturedDeliveries.get(2).size());
-        Assertions.assertTrue(capturedDeliveries.get(2).getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
-        Assertions.assertTrue(capturedDeliveries.get(2).getFirst().getSk().startsWith(String.join("~", "1")));
-        Assertions.assertTrue(capturedDeliveries.get(2).getLast().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
-        Assertions.assertTrue(capturedDeliveries.get(2).getLast().getSk().startsWith(String.join("~", "3")));
+        Assertions.assertEquals(1, capturedDeliveries.get(2).size());
+        Assertions.assertTrue(capturedDeliveries.get(2).getFirst().getPk().equalsIgnoreCase("2025-01-13~" + EVALUATE_SENDER_LIMIT));
+
+        Assertions.assertEquals(1, capturedDeliveries.get(3).size());
+        Assertions.assertTrue(capturedDeliveries.get(3).getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
 
         Assertions.assertEquals(2, capturedDeliveries.getLast().size());
         Assertions.assertTrue(capturedDeliveries.getLast().getFirst().getPk().endsWith("2025-01-13~" + EVALUATE_SENDER_LIMIT));
@@ -318,7 +316,7 @@ class EvaluateDriverCapacityJobServiceTest {
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any());
         verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
-        verify(paperDeliveryDAO, times(4)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryDAO, times(5)).insertPaperDeliveries(anyList());
     }
 
     private static @NotNull List<PaperDelivery> getPaperDeliveries(boolean sameCap) {
