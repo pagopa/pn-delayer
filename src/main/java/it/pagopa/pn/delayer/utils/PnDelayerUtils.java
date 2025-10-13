@@ -1,6 +1,5 @@
 package it.pagopa.pn.delayer.utils;
 
-import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
@@ -8,7 +7,9 @@ import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -21,8 +22,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
-import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND;
 
 @Component
 @RequiredArgsConstructor
@@ -101,7 +100,10 @@ public class PnDelayerUtils {
      */
     public Integer filterOnResidualDriverCapacity(List<PaperDelivery> deliveries, Tuple2<Integer, Integer> capCapacities, List<PaperDelivery> deliveriesToSend, List<PaperDelivery> toNextWeek, LocalDate deliveryWeek) {
         int remainingCapacity = Math.max(capCapacities.getT1() - capCapacities.getT2(), 0);
-        List<PaperDelivery> filteredList = deliveries.stream().limit(remainingCapacity).toList();
+        List<PaperDelivery> filteredList = new ArrayList<>();
+        if(remainingCapacity > 0) {
+            filteredList.addAll(deliveries.stream().limit(remainingCapacity).toList());
+        }
 
         if (!filteredList.isEmpty()) deliveriesToSend.addAll(mapItemForEvaluatePrintCapacityStep(filteredList, deliveryWeek));
         if (filteredList.size() < deliveries.size()) toNextWeek.addAll(deliveries.subList(filteredList.size(), deliveries.size()));
@@ -130,6 +132,13 @@ public class PnDelayerUtils {
             int actualLimit = Math.min(limit, deliveries.size());
             sendToDriverCapacityStep.addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
             sendToResidualCapacityStep.addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
+
+            if(!CollectionUtils.isEmpty(sendToDriverCapacityStep)) {
+                senderLimitMap.put(key, Tuples.of(
+                        Optional.ofNullable(senderLimitMap.get(key)).map(Tuple2::getT1).orElse(0),
+                        Optional.ofNullable(senderLimitMap.get(key)).map(Tuple2::getT2).orElse(0) + sendToDriverCapacityStep.size()));
+            }
+
         });
         senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(sendToResidualCapacityStep);
         senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(sendToDriverCapacityStep);

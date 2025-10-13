@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.LocalDate;
@@ -50,11 +51,11 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .doOnNext(senderLimitJobProcessObjects::setTotalEstimateCounter)
                 .flatMap(stringIntegerMap -> deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province))
                 .flatMap(driversTotalCapacities -> retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, new HashMap<>(), driversTotalCapacities, senderLimitJobProcessObjects))
-                .flatMap(incrementUsedSenderLimitDtoList -> flushCounters(deliveryWeek, incrementUsedSenderLimitDtoList))
+                .flatMap(processObj -> flushCounters(deliveryWeek, processObj.getSenderLimitMap()))
                 .doOnError(error -> log.error("Error processing sender limit job for province: {}, tenderId: {}, deliveryWeek: {}", province, tenderId, deliveryWeek, error));
     }
 
-    private Mono<List<IncrementUsedSenderLimitDto>> retrieveAndProcessPaperDeliveries(String province, String tenderId, LocalDate deliveryWeek, Map<String, AttributeValue> lastEvaluatedKey, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+    private Mono<SenderLimitJobProcessObjects> retrieveAndProcessPaperDeliveries(String province, String tenderId, LocalDate deliveryWeek, Map<String, AttributeValue> lastEvaluatedKey, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         var sortkeyPrefix = province + "~";
         return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek, sortkeyPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
                 .flatMap(paperDeliveryPage -> processItems(paperDeliveryPage.items(), tenderId, deliveryWeek, driversTotalCapacity, senderLimitJobProcessObjects)
@@ -66,34 +67,23 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                                 return retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, paperDeliveryPage.lastEvaluatedKey(), driversTotalCapacity, processObjects);
                             }
                             log.info("Processed items for province: {}, tenderId: {}, deliveryWeek: {}. No more items to process.", province, tenderId, deliveryWeek);
-                            return Mono.just(processObjects.getIncrementUsedSenderLimitDtoList());
+                            return Mono.just(processObjects);
                         }));
     }
 
-    private Mono<Void> flushCounters(LocalDate deliveryDate, List<IncrementUsedSenderLimitDto> incrementUsedSenderLimitList) {
+    private Mono<Void> flushCounters(LocalDate deliveryDate, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
         LocalDate shipmentDate = deliveryDate.minusWeeks(1);
-
-        if (CollectionUtils.isEmpty(incrementUsedSenderLimitList)) {
-            return Mono.empty();
-        }
-
-        Map<String, Long> totalsByGeo = incrementUsedSenderLimitList.stream()
-                .collect(Collectors.groupingBy(
-                        incrementUsedSenderLimitDto -> String.join("#", incrementUsedSenderLimitDto.pk(),
-                                incrementUsedSenderLimitDto.senderLimit().toString()),
-                        Collectors.summingLong(dto -> dto.increment() == null ? 0 : dto.increment())
-                ));
-
-
-        log.info("Total used capacities to update: {}", totalsByGeo.size());
-
-        return Flux.fromIterable(totalsByGeo.entrySet())
-                .flatMap(incrementUsedCapacityEntry ->
-                        paperDeliverySenderLimitDAO.updateUsedSenderLimit(
-                                incrementUsedCapacityEntry.getKey().split("#")[0],
-                                incrementUsedCapacityEntry.getValue(),
-                                shipmentDate,
-                                Integer.valueOf(incrementUsedCapacityEntry.getKey().split("#")[1]))
+        return senderLimitUtils.createIncrementUsedSenderLimitDtos(senderLimitMap)
+                .collectList()
+                .filter(incrementUsedSenderLimitDtoList -> !CollectionUtils.isEmpty(incrementUsedSenderLimitDtoList))
+                .map(incrementUsedSenderLimitDtoList -> incrementUsedSenderLimitDtoList.stream()
+                        .collect(Collectors.groupingBy(incrementUsedSenderLimitDto -> String.join("#", incrementUsedSenderLimitDto.pk(), incrementUsedSenderLimitDto.senderLimit().toString()),
+                                Collectors.summingLong(dto -> dto.increment() == null ? 0 : dto.increment())
+                        )))
+                .map(Map::entrySet)
+                .flatMapIterable(entries -> entries)
+                .flatMap(entry ->
+                        paperDeliverySenderLimitDAO.updateUsedSenderLimit(entry.getKey().split("#")[0], entry.getValue(), shipmentDate, Integer.valueOf(entry.getKey().split("#")[1]))
                 )
                 .then();
     }
@@ -126,9 +116,6 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                     log.info("No items to send to evaluate driver capacity step for tenderId: {}, deliveryWeek: {}", tenderId, deliveryWeek);
                     return Mono.empty();
                 }))
-                .flatMapMany(sentToNextStep -> senderLimitUtils.createIncrementUsedSenderLimitDtos(sentToNextStep, senderLimitJobProcessObjects.getSenderLimitMap()))
-                .collectList()
-                .doOnNext(incrementUsedSenderLimitDtoList -> senderLimitJobProcessObjects.getIncrementUsedSenderLimitDtoList().addAll(incrementUsedSenderLimitDtoList))
                 .thenReturn(senderLimitJobProcessObjects);
     }
 

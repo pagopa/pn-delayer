@@ -60,41 +60,31 @@ public class SenderLimitUtilsTest {
         senderLimitJobProcessObjects.setSenderLimitMap(senderLimitMaps);
         senderLimitJobProcessObjects.setTotalEstimateCounter(Map.of("AR", 72));
 
-        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
-        usedSenderLimit.setPk("key1");
-        usedSenderLimit.setSenderLimit(50);
-        usedSenderLimit.setNumberOfShipment(10);
-
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("key2");
         paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setWeeklyEstimate(62);
 
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(deliveryWeek.minusWeeks(1))))
-                .thenReturn(Flux.just(usedSenderLimit));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), eq(deliveryWeek.minusWeeks(1))))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
 
         senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, List.of(new DriversTotalCapacity(List.of("RS", "AR"), capacity, List.of("POSTE"))), senderLimitJobProcessObjects)
                 .block();
 
-        assertEquals(2, senderLimitMaps.size());
-        assertTrue(senderLimitMaps.containsKey("key1"));
-        assertEquals(Tuples.of(50, 10), senderLimitMaps.get("key1"));
+        assertEquals(1, senderLimitMaps.size());
         assertTrue(senderLimitMaps.containsKey("key2"));
-        assertEquals(Tuples.of(62, 0), senderLimitMaps.get("key2"));
+        assertEquals(62, senderLimitMaps.get("key2").getT1());
+        assertEquals(0, senderLimitMaps.get("key2").getT2());
     }
 
     @Test
     void createIncrementUsedSenderLimitDtos() {
-        List<PaperDelivery> paperDeliveryList = List.of(createPaperDelivery("AR", "00100", "RM", "paId", 1),
-                createPaperDelivery("AR", "00100", "RM", "paId", 0));
         Map<String, Tuple2<Integer, Integer>> senderLimitMaps = Map.of("paId~AR~RM", Tuples.of(100, 50));
 
-        StepVerifier.create(senderLimitUtils.createIncrementUsedSenderLimitDtos(paperDeliveryList, senderLimitMaps))
+        StepVerifier.create(senderLimitUtils.createIncrementUsedSenderLimitDtos(senderLimitMaps))
                 .expectNextMatches(incrementUsedSenderLimitDto -> {
                     assertEquals("paId~AR~RM", incrementUsedSenderLimitDto.pk());
-                    assertEquals(2L, incrementUsedSenderLimitDto.increment());
+                    assertEquals(50, incrementUsedSenderLimitDto.increment());
                     assertEquals(100, incrementUsedSenderLimitDto.senderLimit());
                     return true;
                 })

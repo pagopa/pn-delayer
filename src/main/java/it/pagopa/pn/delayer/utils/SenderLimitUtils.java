@@ -32,8 +32,7 @@ public class SenderLimitUtils {
 
     public Mono<SenderLimitJobProcessObjects> retrieveAndEvaluateSenderLimit(LocalDate deliveryWeek, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         LocalDate shipmentDate = deliveryWeek.minusWeeks(1);
-        return retrieveUsedSenderLimit(shipmentDate, deliveriesGroupedByProductTypePaId.keySet(), senderLimitJobProcessObjects.getSenderLimitMap())
-                .flatMap(unused -> retrieveAndCalculateSenderLimit(shipmentDate, driversTotalCapacity, deliveriesGroupedByProductTypePaId.keySet(), senderLimitJobProcessObjects))
+        return retrieveAndCalculateSenderLimit(shipmentDate, driversTotalCapacity, deliveriesGroupedByProductTypePaId.keySet(), senderLimitJobProcessObjects)
                 .doOnNext(unused -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitJobProcessObjects.getSenderLimitMap(), deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects))
                 .thenReturn(senderLimitJobProcessObjects);
     }
@@ -53,22 +52,6 @@ public class SenderLimitUtils {
                 .doOnNext(paperDeliveryCountersTuple -> paperDeliveryCountersTuple
                         .forEach(tuple -> totalEstimateCounter.put(tuple.getT1().getValue(), tuple.getT2().getNumberOfShipments())))
                 .thenReturn(totalEstimateCounter);
-    }
-
-    /**
-     * Retrieves the used sender limit for the given delivery week and product type tuples.
-     * The results are stored in the provided senderLimitMap.
-     * @param shipmentDate LocalDate representing the delivery date
-     * @param paIdProductTypeTuples Set of tuples representing paId~product
-     * @param senderLimitMap Map containing limit for each paId~productType tuple
-     * */
-    private Mono<Map<String, Tuple2<Integer, Integer>>> retrieveUsedSenderLimit(LocalDate shipmentDate, Set<String> paIdProductTypeTuples, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
-        return Flux.fromIterable(paIdProductTypeTuples).buffer(25)
-                .flatMap(usedSenderLimitPkSubList -> paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(usedSenderLimitPkSubList, shipmentDate))
-                .collectList()
-                .doOnNext(paperDeliveryUsedSenderLimits ->
-                        paperDeliveryUsedSenderLimits.forEach(paperDeliveryUsedSenderLimit -> senderLimitMap.put(paperDeliveryUsedSenderLimit.getPk(), Tuples.of(paperDeliveryUsedSenderLimit.getSenderLimit(), paperDeliveryUsedSenderLimit.getNumberOfShipment()))))
-                .thenReturn(senderLimitMap);
     }
 
     /**
@@ -135,9 +118,9 @@ public class SenderLimitUtils {
         return limit;
     }
 
-    public Flux<IncrementUsedSenderLimitDto> createIncrementUsedSenderLimitDtos(List<PaperDelivery> paperDeliveryList, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
-        Map<String, Long> usedSenderLimitMap = pnDelayerUtils.groupByPaIdProductTypeProvinceAndCount(paperDeliveryList);
-        return Flux.fromIterable(usedSenderLimitMap.entrySet())
-                .map(tupleCounterEntry -> new IncrementUsedSenderLimitDto(tupleCounterEntry.getKey(), tupleCounterEntry.getValue(), senderLimitMap.get(tupleCounterEntry.getKey()).getT1()));
+    public Flux<IncrementUsedSenderLimitDto> createIncrementUsedSenderLimitDtos(Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
+        return Flux.fromIterable(senderLimitMap.entrySet())
+                .filter(calculateAndUsedEntry -> calculateAndUsedEntry.getValue().getT2() > 0)
+                .map(calculateAndUsedEntry -> new IncrementUsedSenderLimitDto(calculateAndUsedEntry.getKey(), calculateAndUsedEntry.getValue().getT2(), calculateAndUsedEntry.getValue().getT1()));
     }
 }
