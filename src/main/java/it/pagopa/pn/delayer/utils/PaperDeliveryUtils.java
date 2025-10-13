@@ -214,28 +214,26 @@ public class PaperDeliveryUtils {
      * @return a Mono containing the number of processed deliveries
      */
     private Mono<DriverCapacityJobProcessObject> processCapGroup(String cap, List<PaperDelivery> deliveries, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek, DriverCapacityJobProcessResult driverCapacityJobProcessResult) {
-        IncrementUsedCapacityDto alreadyUsedCapacity = driverCapacityJobProcessResult.getIncrementUsedCapacityDtos().stream()
-                .filter(incrementUsedCapacityDto -> incrementUsedCapacityDto.unifiedDeliveryDriver().equalsIgnoreCase(unifiedDeliveryDriver)
-                        && incrementUsedCapacityDto.geoKey().equalsIgnoreCase(cap))
-                .findFirst()
-                .orElse(null);
 
-        DriverCapacityJobProcessObject driverCapacityJobProcessObject = new DriverCapacityJobProcessObject();
-        return evaluateIncrementUsedCapacityDto(alreadyUsedCapacity)
-                .switchIfEmpty(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(cap, unifiedDeliveryDriver, tenderId, deliveryWeek))
-                .doOnNext(tuple -> log.info("Retrieved capacities for [{}~{}] -> availableCapacity={}, usedCapacity={}", unifiedDeliveryDriver, cap, tuple.getT1(), tuple.getT2()))
-                .flatMap(capCapacityAndUsedCapacity -> Mono.just(pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, capCapacityAndUsedCapacity, driverCapacityJobProcessObject.getToNextStep(), driverCapacityJobProcessObject.getToNextWeek(), deliveryWeek))
-                        .filter(deliveriesCount -> deliveriesCount > 0)
-                        .doOnDiscard(Integer.class, unused -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
-                        .doOnNext(deliveriesCount -> driverCapacityJobProcessObject.getIncrementUsedCapacityDtosForCap().add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, cap, deliveriesCount, deliveryWeek, capCapacityAndUsedCapacity.getT1()))))
-                .thenReturn(driverCapacityJobProcessObject);
-    }
+        DriverCapacityJobProcessObject obj = new DriverCapacityJobProcessObject();
+        int incrementsSoFar = driverCapacityJobProcessResult.getIncrementUsedCapacityDtos().stream()
+                .filter(dto -> dto.unifiedDeliveryDriver().equalsIgnoreCase(unifiedDeliveryDriver)
+                        && dto.geoKey().equalsIgnoreCase(cap) && deliveryWeek.equals(dto.deliveryWeek()))
+                .mapToInt(dto -> dto.numberOfDeliveries() == null ? 0 : dto.numberOfDeliveries())
+                .sum();
 
-    private Mono<Tuple2<Integer, Integer>> evaluateIncrementUsedCapacityDto(IncrementUsedCapacityDto incrementUsedCapacityDto) {
-        if(Objects.nonNull(incrementUsedCapacityDto)){
-            return Mono.just(Tuples.of(incrementUsedCapacityDto.declaredCapacity(), incrementUsedCapacityDto.numberOfDeliveries()));
-        }
-        return Mono.empty();
+        return deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(cap, unifiedDeliveryDriver, tenderId, deliveryWeek)
+                // used effettiva = usedDB + incrementi già processati in questa run
+                .map(db -> Tuples.of(db.getT1(), db.getT2() + incrementsSoFar))
+                .doOnNext(t -> log.info("Capacities [{}~{}] -> declared={}, used(base+inc)={} (inc={})", unifiedDeliveryDriver, cap, t.getT1(), t.getT2(), incrementsSoFar))
+                .flatMap(t -> {
+                    int processed = pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, t, obj.getToNextStep(), obj.getToNextWeek(), deliveryWeek);
+                    return Mono.just(processed)
+                            .filter(c -> c > 0)
+                            .doOnDiscard(Integer.class, u -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
+                            .doOnNext(c -> obj.getIncrementUsedCapacityDtosForCap().add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, cap, c, deliveryWeek, t.getT1())))
+                            .thenReturn(obj);
+                });
     }
 
     public Mono<List<PaperDelivery>> insertPaperDeliveries(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {

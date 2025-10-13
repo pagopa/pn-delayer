@@ -66,7 +66,7 @@ describe('handleEvent', () => {
         lastEvaluatedKeyPhase2: {},
         sendToNextStepCounter: 0,
         executionDate: '2025-07-01T00:00:00Z',
-        stopSendToPhaseTwo: 'false'
+        stopSendToPhaseTwo: false
       }
     });
 
