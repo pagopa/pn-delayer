@@ -16,10 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -130,16 +127,20 @@ public class PnDelayerUtils {
                     .orElse(0);
 
             int actualLimit = Math.min(limit, deliveries.size());
-            sendToDriverCapacityStep.addAll(new ArrayList<>(deliveries.subList(0, actualLimit)));
-            sendToResidualCapacityStep.addAll(new ArrayList<>(deliveries.subList(actualLimit, deliveries.size())));
 
-            if(!CollectionUtils.isEmpty(sendToDriverCapacityStep)) {
+            List<PaperDelivery> driverStep = (actualLimit == 0) ? List.of() : new ArrayList<>(deliveries.subList(0, actualLimit));
+            List<PaperDelivery> residualStep = (actualLimit >= deliveries.size()) ? List.of() : new ArrayList<>(deliveries.subList(actualLimit, deliveries.size()));
+
+            if (!driverStep.isEmpty()) {
                 senderLimitMap.put(key, Tuples.of(
                         Optional.ofNullable(senderLimitMap.get(key)).map(Tuple2::getT1).orElse(0),
-                        Optional.ofNullable(senderLimitMap.get(key)).map(Tuple2::getT2).orElse(0) + sendToDriverCapacityStep.size()));
+                        Optional.ofNullable(senderLimitMap.get(key)).map(Tuple2::getT2).orElse(0) + driverStep.size()));
             }
 
+            sendToDriverCapacityStep.addAll(driverStep);
+            sendToResidualCapacityStep.addAll(residualStep);
         });
+
         senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(sendToResidualCapacityStep);
         senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(sendToDriverCapacityStep);
     }
