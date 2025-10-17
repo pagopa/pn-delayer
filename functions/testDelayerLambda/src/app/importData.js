@@ -170,7 +170,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
         senderPaId: payload.senderPaId,
         province: payload.province,
         cap: payload.cap,
-        attempt: payload.attempt,
+        attempt: parseInt(payload.attempt, 10),
         iun: payload.iun,
         workflowStep: 'EVALUATE_SENDER_LIMIT',
     };
