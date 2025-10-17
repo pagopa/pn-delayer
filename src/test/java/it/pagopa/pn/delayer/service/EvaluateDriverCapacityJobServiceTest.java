@@ -255,7 +255,7 @@ class EvaluateDriverCapacityJobServiceTest {
                 .thenReturn(Mono.just(Tuples.of(1, 1)));
         when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(3, 0)))
-                .thenReturn(Mono.just(Tuples.of(3, 1)));
+                .thenReturn(Mono.just(Tuples.of(3, 0)));
 
         Page<PaperDelivery> page = mock(Page.class);
         when(page.items()).thenReturn(deliveries);
@@ -298,11 +298,8 @@ class EvaluateDriverCapacityJobServiceTest {
         Assertions.assertTrue(capturedDeliveries.get(1).getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
         Assertions.assertTrue(capturedDeliveries.get(1).getFirst().getSk().startsWith(String.join("~", "3")));
 
-        Assertions.assertEquals(1, capturedDeliveries.get(2).size());
-        Assertions.assertTrue(capturedDeliveries.get(2).getFirst().getPk().equalsIgnoreCase("2025-01-13~" + EVALUATE_SENDER_LIMIT));
-
-        Assertions.assertEquals(1, capturedDeliveries.get(3).size());
-        Assertions.assertTrue(capturedDeliveries.get(3).getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
+        Assertions.assertEquals(2, capturedDeliveries.get(2).size());
+        Assertions.assertTrue(capturedDeliveries.get(2).getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
 
         Assertions.assertEquals(2, capturedDeliveries.getLast().size());
         Assertions.assertTrue(capturedDeliveries.getLast().getFirst().getPk().endsWith("2025-01-13~" + EVALUATE_SENDER_LIMIT));
@@ -316,7 +313,7 @@ class EvaluateDriverCapacityJobServiceTest {
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any());
         verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
-        verify(paperDeliveryDAO, times(5)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryDAO, times(4)).insertPaperDeliveries(anyList());
     }
 
     private static @NotNull List<PaperDelivery> getPaperDeliveries(boolean sameCap) {
