@@ -121,7 +121,7 @@ public class PaperDeliveryUtils {
                         .flatMap(processResult -> {
                             log.info("driverCapacityJobProcessResult for province={} and unifiedDeliveryDriver={} after processing chunk: sentToNextStep={}, totalIncrements={}",
                                     province, unifiedDeliveryDriver, processResult.getSentToNextStep(), processResult.getIncrementUsedCapacityDtos().size());
-                            int residualCapacityAfterSending = residualCapacity - processResult.getSentToNextStep();
+                            int residualCapacityAfterSending = declaredCapacity - processResult.getSentToNextStep();
                             if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()) && residualCapacityAfterSending > 0) {
                                 log.info("Continuing to process chunk to send to next step for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending);
                                 return sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacityAfterSending, declaredCapacity, weeklyPrintCapacity, printCounter, processResult)
@@ -134,7 +134,7 @@ public class PaperDeliveryUtils {
                             }
                         })
                         .filter(residualCapacityAfterSending -> residualCapacityAfterSending <= 0 && !CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()))
-                        .doOnNext(integer -> log.info("Process next chunk to send to next week for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacity - driverCapacityJobProcessResult.getSentToNextStep()))
+                        .doOnNext(residualCapacityAfterSending -> log.info("Process next chunk to send to next week for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending))
                         .flatMap(unused -> sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek))
                         .thenReturn(paperDeliveryPage.items().size()));
     }
