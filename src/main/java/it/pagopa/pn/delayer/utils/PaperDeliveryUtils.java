@@ -58,8 +58,10 @@ public class PaperDeliveryUtils {
                     } else {
                         AtomicInteger printCounter = new AtomicInteger(0);
                         DriverCapacityJobProcessResult driverCapacityJobProcessResult = new DriverCapacityJobProcessResult();
+                        var declaredCapacity = tuple.getT1();
+                        var usedCapacityBase = tuple.getT2(); // nel batch EVALUATE_DRIVER_CAPACITY = 0, nel batch EVALUATE_RESIDUAL_CAPACITY = capacità utilizzata già nel batch EVALUATE_DRIVER_CAPACITY
                         return Mono.just(pnDelayerUtils.retrieveActualPrintCapacity(deliveryWeek))
-                                .flatMap(dailyPrintCapacity -> sendToNextStep(workflowStepEnum, sortKeyPrefix, new HashMap<>(), tenderId, deliveryWeek, residualCapacity, tuple.getT1(), dailyPrintCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays(), printCounter, driverCapacityJobProcessResult));
+                                .flatMap(dailyPrintCapacity -> sendToNextStep(workflowStepEnum, sortKeyPrefix, new HashMap<>(), tenderId, deliveryWeek, residualCapacity, declaredCapacity, dailyPrintCapacity * pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays(), printCounter, driverCapacityJobProcessResult, usedCapacityBase));
                     }
                 })
                 .then();
@@ -110,7 +112,8 @@ public class PaperDeliveryUtils {
                                          Integer declaredCapacity,
                                          Integer weeklyPrintCapacity,
                                          AtomicInteger printCounter,
-                                         DriverCapacityJobProcessResult driverCapacityJobProcessResult) {
+                                         DriverCapacityJobProcessResult driverCapacityJobProcessResult,
+                                         Integer usedCapacityBase) {
 
         String[] splittedSortKeyPrefix = sortKeyPrefix.split("~");
         String unifiedDeliveryDriver = splittedSortKeyPrefix[0];
@@ -121,10 +124,10 @@ public class PaperDeliveryUtils {
                         .flatMap(processResult -> {
                             log.info("driverCapacityJobProcessResult for province={} and unifiedDeliveryDriver={} after processing chunk: sentToNextStep={}, totalIncrements={}",
                                     province, unifiedDeliveryDriver, processResult.getSentToNextStep(), processResult.getIncrementUsedCapacityDtos().size());
-                            int residualCapacityAfterSending = declaredCapacity - processResult.getSentToNextStep();
+                            int residualCapacityAfterSending = declaredCapacity - (usedCapacityBase + processResult.getSentToNextStep());
                             if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()) && residualCapacityAfterSending > 0) {
                                 log.info("Continuing to process chunk to send to next step for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending);
-                                return sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacityAfterSending, declaredCapacity, weeklyPrintCapacity, printCounter, processResult)
+                                return sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacityAfterSending, declaredCapacity, weeklyPrintCapacity, printCounter, processResult, usedCapacityBase)
                                         .thenReturn(residualCapacityAfterSending);
                             } else {
                                 log.info("Finished processing chunk to send to next step for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending);
