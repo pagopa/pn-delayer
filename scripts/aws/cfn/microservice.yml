@@ -1745,7 +1745,8 @@ Resources:
               "PAPERDELIVERYSENDERLIMIT_TABLENAME": "${PaperDeliverySenderLimitTableName}",
               "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
               "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}",
-              "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}"
+              "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}",
+              "PN_DELAYER_DELIVERYWEEK": null
             }
 
   DelayerStartWorkflowScheduleRuleRole:
