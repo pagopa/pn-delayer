@@ -65,6 +65,7 @@ describe('handleEvent', () => {
         numberOfShipments: 100,
         lastEvaluatedKeyPhase2: {},
         sendToNextStepCounter: 0,
+        sentToPhaseTwo: 0,
         executionDate: '2025-07-01T00:00:00Z',
         stopSendToPhaseTwo: false
       }
@@ -75,6 +76,7 @@ describe('handleEvent', () => {
     expect(insertStub.calledOnce).to.be.true;
     expect(result.input).to.deep.include({
       sendToNextStepCounter: 1,
+      sentToPhaseTwo: 0,
       lastEvaluatedKeyPhase2: null,
       dailyPrintCapacity: 10,
       weeklyPrintCapacity: 70,
