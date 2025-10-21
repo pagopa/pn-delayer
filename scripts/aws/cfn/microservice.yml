@@ -2328,6 +2328,7 @@ Resources:
               sendToNextStepCounter: 0
               sendToNextWeekCounter: 0
               "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
+              "sentToPhaseTwo.$": $.queryResult.Items[0].sentToPhaseTwo.N
               "sk.$": $.queryResult.Items[0].sk.S
               "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
               "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.Bool
@@ -2417,7 +2418,7 @@ Resources:
                       - Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyPhase2
                         IsNull: true
                         Next: PatchPhase2Null
-                    Default: ToPreparePhase2Successfully
+                    Default: PatchPhase2NotNull
 
                   MoreItemsToSendToPreparePhase2:
                     Type: Choice
@@ -2441,10 +2442,25 @@ Resources:
                         lastEvaluatedKeyPhase2: { }
                         "numberOfShipments.$": $.input.numberOfShipments
                         "sendToNextStepCounter.$": $.input.sendToNextStepCounter
+                        "sentToPhaseTwo.$": $.input.sentToPhaseTwo
                         "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
                         "stopSendToPhaseTwo": "true"
                       "processType.$": $.processType
                     Next: ToPreparePhase2Successfully
+                  PatchPhase2NotNull:
+                    "Type": Pass,
+                    "Parameters":
+                      "input":
+                        "dailyPrintCapacity.$": $.input.dailyPrintCapacity
+                        "executionDate.$": $.input.executionDate
+                        "lastEvaluatedKeyPhase2.$": $.input.lastEvaluatedKeyPhase2
+                        "numberOfShipments.$": $.input.numberOfShipments
+                        "sendToNextStepCounter.$": $.input.sendToNextStepCounter
+                        "sentToPhaseTwo.$": $.input.sentToPhaseTwo
+                        "stopSendToPhaseTwo": "false"
+                        "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
+                      "processType.$": "$.processType"
+                    "Next": ToPreparePhase2Successfully
 
                   SendPaperDeliveryToPreparePhase2:
                     Type: Task
@@ -2516,6 +2532,8 @@ Resources:
                   "M.$": $.parallelResult[1].input.lastEvaluatedKeyPhase2
                 ":sentToNextWeekInc":
                   "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
+                ":sentToPhaseTwoInc":
+                  "N.$": "States.Format('{}', $.parallelResult[1].input.sendToNextStepCounter)"
                 ":stopSendToPhaseTwoVal":
                   "Bool.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
               Key:
@@ -2524,7 +2542,7 @@ Resources:
                 sk:
                   "S.$": $.lambdaResponse.Payload.input.sk
               "TableName.$": $.PAPERDELIVERYCOUNTER_TABLENAME
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal  ADD sentToNextWeek :sentToNextWeekInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal  ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
             Retry:
               - ErrorEquals:
                   - States.ALL

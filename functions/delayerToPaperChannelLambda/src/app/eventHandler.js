@@ -19,7 +19,8 @@ exports.handleEvent = async (event) => {
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = event.input.dailyPrintCapacity - event.input.sendToNextStepCounter;
-            if (toSendToNextStep > 0 && !event.input.stopSendToPhaseTwo) {
+            const weeklyResidual = event.input.weeklyPrintCapacity - event.input.sentToPhaseTwo;
+            if (toSendToNextStep > 0 && !event.input.stopSendToPhaseTwo && weeklyResidual > 0 ) {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
                 return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextStep);
             }
@@ -30,6 +31,7 @@ exports.handleEvent = async (event) => {
                     weeklyPrintCapacity: parseInt(event.input.weeklyPrintCapacity),
                     numberOfShipments: parseInt(event.input.numberOfShipments),
                     lastEvaluatedKeyPhase2: null,
+                    sentToPhaseTwo: parseInt(event.input.sentToPhaseTwo),
                     sendToNextStepCounter: parseInt(event.input.sendToNextStepCounter),
                     executionDate: event.input.executionDate
                 },
@@ -72,6 +74,7 @@ async function sendToPhase2(paperDeliveryTableName, deliveryWeek, input, toSendT
                     numberOfShipments: parseInt(input.numberOfShipments),
                     lastEvaluatedKeyPhase2: remapLastEvaluatedKey(result.lastEvaluatedKey),
                     sendToNextStepCounter: parseInt(result.dailyCounter),
+                    sentToPhaseTwo: parseInt(input.sentToPhaseTwo),
                     executionDate: input.executionDate
                 },
                 processType: "SEND_TO_PHASE_2"
