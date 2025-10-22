@@ -466,6 +466,13 @@ Parameters:
     Description: 'Time available for downloading the data in minutes'
     Default: 4320 #3 days
 
+  EnvironmentType:
+    Type: String
+
+Conditions:
+    IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
+
+
 Resources:
   SenderLimitComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
@@ -1645,16 +1652,16 @@ Resources:
             Action:
               - dynamodb:BatchWriteItem
             Resource:
-              - !Sub "${PaperDeliveryTableArn}"
-              - !Sub "${PaperDeliveryTableArn}/*"
-              - !Sub "${PaperDeliveryCounterTableArn}"
-              - !Sub "${PaperDeliveryCounterTableArn}/*"
               - !Sub "${PaperDeliveryMockTableArn}"
               - !Sub "${PaperDeliveryMockTableArn}/*"
               - !Sub "${PaperDeliveryCounterMockTableArn}"
               - !Sub "${PaperDeliveryCounterMockTableArn}/*"
               - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
               - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}"
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
           - Effect: Allow
             Action:
               - dynamodb:Query
@@ -1725,6 +1732,30 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+
+  TestDelayerLambdaNotProdPolicy:
+    Type: AWS::IAM::Policy
+    Condition: IsNotProdEnvironment
+    Properties:
+      PolicyName: !Sub ${ProjectName}-testDelayerLambdaNotProdPolicy
+      Roles:
+        - !Ref TestDelayerLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+            Resource:
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+              - !Sub "${PaperDeliveryCounterTableArn}"
+              - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - !Sub "${PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}/*"
+
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule
