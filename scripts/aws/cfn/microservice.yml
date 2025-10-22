@@ -2448,7 +2448,7 @@ Resources:
                       "processType.$": $.processType
                     Next: ToPreparePhase2Successfully
                   PatchPhase2NotNull:
-                    "Type": Pass,
+                    "Type": Pass
                     "Parameters":
                       "input":
                         "dailyPrintCapacity.$": $.input.dailyPrintCapacity
