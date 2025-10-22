@@ -1655,6 +1655,14 @@ Resources:
               - !Sub "${PaperDeliveryCounterMockTableArn}/*"
               - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
               - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+              - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}"
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}"
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
           - Effect: Allow
             Action:
               - dynamodb:Query
