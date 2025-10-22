@@ -2448,9 +2448,9 @@ Resources:
                       "processType.$": $.processType
                     Next: ToPreparePhase2Successfully
                   PatchPhase2NotNull:
-                    "Type": Pass
-                    "Parameters":
-                      "input":
+                    Type: Pass
+                    Parameters:
+                      input:
                         "dailyPrintCapacity.$": $.input.dailyPrintCapacity
                         "executionDate.$": $.input.executionDate
                         "lastEvaluatedKeyPhase2.$": $.input.lastEvaluatedKeyPhase2
