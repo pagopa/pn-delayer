@@ -457,6 +457,14 @@ Parameters:
     Default: '0 7 ? * 2 *'
     Description: 'Cron expression for ExportDelayerDataLambdaRule'
   
+  ExportDelayerDataRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the ExportDelayerDataRuleState'
+
   DataAnalysisTopicName:
     Type: String
     Description: data analysis topic to send mail on slack
@@ -1892,7 +1900,7 @@ Resources:
     Properties:
       Name: ExportDelayerDataRule
       ScheduleExpression: !Sub cron(${ExportDelayerDataLambdaCron})
-      State: ENABLED
+      State: !Ref ExportDelayerDataRuleState
       Targets:
         - Arn: !GetAtt ExportDelayerDataLambda.Arn
           Id: "ExportDelayerDataLambdaTarget"
