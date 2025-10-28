@@ -19,6 +19,7 @@
     "SafeStorageCxId":"pn-delayer",
     "PrintCounterTtlDuration": "30d",
     "ExportDelayerDataLambdaCron": "0 7 ? * 3 *",
+    "ExportDelayerDataRuleState": "DISABLED",
     "DelayerStartWorkflowRuleState": "DISABLED",
     "DelayerToPaperChannelDailyScheduleRuleState": "DISABLED",
     "VCPU": "1",
