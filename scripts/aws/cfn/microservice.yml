@@ -428,7 +428,20 @@ Parameters:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
-
+  
+  SafeStorageToNotificationOrdersQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to notification orders queue'
+  
+  SafeStorageToNotificationOrdersQueueARN:
+    Type: String
+    Description: 'queue name for safeStorage to to notification orders queue'
+  
+  SafeStorageToNotificationOrdersQueueURL:
+    Type: String
+    Description: 'Events from safe storage to notification orders queue URL'
+  
+  
   DelayerReceiverOrdersSendersLambdaMaxRetry:
     Type: Number
     Default: 3
@@ -1221,6 +1234,11 @@ Resources:
           InputPath: $.detail
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+        - Id: !Sub '${ProjectName}-SafeStore2NotificationOrders'
+          Arn: !Ref SafeStorageToNotificationOrdersQueueARN
+          InputPath: $.detail
+          DeadLetterConfig:
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
   DelayerOrdersSendersEventBusEnqueueRole:
     Type: AWS::IAM::Role
@@ -1575,6 +1593,14 @@ Resources:
               - sqs:ReceiveMessage
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ReceiveMessage
+            Resource:
+              - !Ref SafeStorageToNotificationOrdersQueueARN
 
   DelayerReceiverOrdersSendersLambdaAlarms:
     Type: AWS::CloudFormation::Stack
@@ -2707,3 +2733,20 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+  
+  DelayerNotificationOrdersQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SafeStorageToNotificationOrdersQueueURL
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "SQS:SendMessage"
+            Resource:
+              - !Ref SafeStorageToNotificationOrdersQueueARN
