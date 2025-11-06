@@ -1572,19 +1572,6 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - dynamodb:GetItem
-              - dynamodb:Query
-              - dynamodb:BatchWriteItem
-              - dynamodb:UpdateItem
-            Resource:
-              - !Sub "${ProvinceTableArn}"
-              - !Sub "${ProvinceTableArn}/*"
-              - !Sub "${PaperDeliverySenderLimitTableArn}"
-              - !Sub "${PaperDeliverySenderLimitTableArn}/*"
-              - !Sub "${PaperDeliveryCounterTableArn}"
-              - !Sub "${PaperDeliveryCounterTableArn}/*"
-          - Effect: Allow
-            Action:
               - dynamodb:PutItem
               - dynamodb:BatchWriteItem
               - dynamodb:UpdateItem
