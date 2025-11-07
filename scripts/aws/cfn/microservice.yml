@@ -1572,11 +1572,9 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - dynamodb:PutItem
               - dynamodb:BatchWriteItem
-              - dynamodb:UpdateItem
             Resource:
-              - !Sub "${NotificationOrdersTableArn}"
+              - !Ref NotificationOrdersTableArn
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility

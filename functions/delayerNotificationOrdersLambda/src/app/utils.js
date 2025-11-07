@@ -1,5 +1,6 @@
 'use strict';
 const { persistOrderRecords } = require('./dynamo');
+const {LocalDate} = require('@js-joda/core');
 
 /**
  * Extracts and persists records from an order.
@@ -17,71 +18,58 @@ async function extractDataFromOrder(order, fileKey) {
  * Builds all records from an order.
  */
 function buildRecordsFromOrder(order, fileKey) {
+    const createdAt = new Date().toISOString();
     const records = [];
     if (!order || !order.prodotti || !order.idEnte || !order.periodo_riferimento) {
-            return records;
+      return records;
     }
     const pk = getFirstDayOfMonth(order.periodo_riferimento);
-    order.prodotti.forEach(product => {
-        product.varianti.forEach(variant => {
+    order.prodotti.map(product => {
+        product.varianti.forEach(variante => {
             records.push(
-                ...buildRecordsForVariant({
-                    pk,
-                    entityId: order.idEnte,
-                    productId: product.id,
-                    variant,
-                    fileKey,
-                    lastUpdateOrder: order.last_update,
-                    createdAt: new Date().toISOString()
-                })
+                ...buildRecords(order.idEnte, product.id, variante)
             );
         });
     });
-    return records;
-}
-
-/**
- * Builds aggregated and regional records for a variant.
- */
-function buildRecordsForVariant({ pk, entityId, productId, variant, fileKey, lastUpdateOrder, createdAt }) {
-    return [
-        buildAggregatedRecord(pk, entityId, productId, variant, fileKey, lastUpdateOrder, createdAt),
-        ...buildRegionalRecords(pk, entityId, productId, variant, fileKey, lastUpdateOrder, createdAt)
-    ];
+    return records.map(record => {
+        return {
+            ...record,
+            pk,
+            fileKey,
+            lastUpdateOrder: order.last_update,
+            createdAt
+        };
+    });
 }
 
 /**
  * Creates the aggregated record for a variant.
  */
-function buildAggregatedRecord(pk, entityId, productId, variant, fileKey, lastUpdateOrder, createdAt) {
-    return {
-        pk,
-        sk: `${entityId}_${productId}_${variant.codice}`,
-        value: variant.valore_totale,
-        fileKey,
-        lastUpdateOrder,
-        createdAt
-    };
+function buildRecords(paId, productId, variante) {
+    let records = []
+    records.push( {
+        sk: `${paId}_${productId}_${variante.codice}`,
+        value: variante.valore_totale
+    });
+    if (!variante.distribuzione?.regionale?.length) return records;
+    records.push( ...buildRegionalRecords(paId, productId, variante));
+    return records;
+
 }
 
 /**
  * Creates the regional records for a variant.
  */
-function buildRegionalRecords(pk, entityId, productId, variant, fileKey, lastUpdateOrder, createdAt) {
-    if (!variant.distribuzione?.regionale?.length) return [];
-    return variant.distribuzione.regionale.map(regionDetail => ({
-        pk,
-        sk: `${entityId}_${productId}_${variant.codice}_${regionDetail.regione}`,
-        value: regionDetail.valore,
-        fileKey,
-        lastUpdateOrder,
-        createdAt
-    }));
+function buildRegionalRecords(paId, productId, variante) {
+    return variante.distribuzione.regionale.map(regionDetail => ({
+           sk: `${paId}_${productId}_${variante.codice}_${regionDetail.regione}`,
+           value: regionDetail.valore
+       }));
 }
 
 function getFirstDayOfMonth(dateString) {
     const [month, year] = dateString.split('-');
-    return `${year}-${month}-01`;
+    return LocalDate.of(parseInt(year), parseInt(month), 1).toString();
 }
 
 module.exports = { extractDataFromOrder };

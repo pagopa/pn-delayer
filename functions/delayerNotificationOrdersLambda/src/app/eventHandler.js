@@ -1,8 +1,7 @@
 'use strict';
 
 const { downloadJson } = require('./safeStorage');
-const { extractionDataFromOrder } = require('./utils');
-const { existsSenderLimitByFileKey } = require('./dynamo');
+const { extractDataFromOrder } = require('./utils');
 
 /**
  * Handler for SQS events (batch size 1 recommended)
@@ -24,7 +23,7 @@ exports.handleEvent = async (event = {}) => {
 
         // 1. Download the order JSON
         const orderJson = await downloadJson(fileKey);
-        const orders = await extractionDataFromOrder(
+        const orders = await extractDataFromOrder(
             orderJson,
             fileKey
         );
