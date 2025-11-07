@@ -1,5 +1,5 @@
 'use strict';
-const { persistRecord } = require('./dynamo');
+const { persistOrderRecords } = require('./dynamo');
 
 /**
  * Extracts and persists records from an order.
@@ -7,7 +7,7 @@ const { persistRecord } = require('./dynamo');
 async function extractDataFromOrder(order, fileKey) {
     const records = buildRecordsFromOrder(order, fileKey);
     if (records.length > 0) {
-        await persistRecord(records, fileKey);
+        await persistOrderRecords(records, fileKey);
     }
 
     return records;
@@ -18,6 +18,9 @@ async function extractDataFromOrder(order, fileKey) {
  */
 function buildRecordsFromOrder(order, fileKey) {
     const records = [];
+    if (!order || !order.prodotti || !order.idEnte || !order.periodo_riferimento) {
+            return records;
+    }
     const pk = getFirstDayOfMonth(order.periodo_riferimento);
     order.prodotti.forEach(product => {
         product.varianti.forEach(variant => {

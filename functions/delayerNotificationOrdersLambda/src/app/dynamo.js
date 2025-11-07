@@ -53,6 +53,7 @@ async function batchWriteWithRetry(requestItems, maxRetries = 5) {
 
         const delay = Math.floor(Math.pow(2, attempt) * 100 + Math.random() * 100);
         await new Promise(r => setTimeout(r, delay));
+        attempt++;
     }
 }
 
