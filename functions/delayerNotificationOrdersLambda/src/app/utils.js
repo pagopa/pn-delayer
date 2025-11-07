@@ -18,14 +18,13 @@ async function extractDataFromOrder(order, fileKey) {
  */
 function buildRecordsFromOrder(order, fileKey) {
     const records = [];
-    const pk = getFirstDayOfMonth(order.reference_period);
-
-    order.products.forEach(product => {
-        product.variants.forEach(variant => {
+    const pk = getFirstDayOfMonth(order.periodo_riferimento);
+    order.prodotti.forEach(product => {
+        product.varianti.forEach(variant => {
             records.push(
                 ...buildRecordsForVariant({
                     pk,
-                    entityId: order.entityId,
+                    entityId: order.idEnte,
                     productId: product.id,
                     variant,
                     fileKey,
@@ -54,8 +53,8 @@ function buildRecordsForVariant({ pk, entityId, productId, variant, fileKey, las
 function buildAggregatedRecord(pk, entityId, productId, variant, fileKey, lastUpdateOrder, createdAt) {
     return {
         pk,
-        sk: `${entityId}_${productId}_${variant.code}`,
-        value: variant.total_value,
+        sk: `${entityId}_${productId}_${variant.codice}`,
+        value: variant.valore_totale,
         fileKey,
         lastUpdateOrder,
         createdAt
@@ -66,21 +65,17 @@ function buildAggregatedRecord(pk, entityId, productId, variant, fileKey, lastUp
  * Creates the regional records for a variant.
  */
 function buildRegionalRecords(pk, entityId, productId, variant, fileKey, lastUpdateOrder, createdAt) {
-    if (!variant.distribution?.regional?.length) return [];
-
-    return variant.distribution.regional.map(regionDetail => ({
+    if (!variant.distribuzione?.regionale?.length) return [];
+    return variant.distribuzione.regionale.map(regionDetail => ({
         pk,
-        sk: `${entityId}_${productId}_${variant.code}_${regionDetail.region}`,
-        value: regionDetail.value,
+        sk: `${entityId}_${productId}_${variant.codice}_${regionDetail.regione}`,
+        value: regionDetail.valore,
         fileKey,
         lastUpdateOrder,
         createdAt
     }));
 }
 
-/**
- * Returns the first day of the month from MM-YYYY format.
- */
 function getFirstDayOfMonth(dateString) {
     const [month, year] = dateString.split('-');
     return `${year}-${month}-01`;
