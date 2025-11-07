@@ -11,19 +11,23 @@ const NOTIFICATION_ORDERS = process.env.NOTIFICATION_ORDERS_TABLENAME || 'pn-Not
  * @param {string} fileKey
  */
 async function persistOrderRecords(orderRecords, fileKey) {
-    const ttlValue = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365;
-    let unprocessed = [...orderRecords];
-    while (unprocessed.length) {
-        const chunk = unprocessed.splice(0, 25);
-        const command = new BatchWriteCommand({
-            RequestItems: {
-                [NOTIFICATION_ORDERS]: chunk.map(Item => ({
-                    PutRequest: { Item: { ...Item, ttl: ttlValue } }
-                }))
-            }
-        });
-        await batchWriteWithRetry(command);
+    const CHUNK_SIZE = 25;
+
+    let recordsToProcess = [...orderRecords];
+    while (recordsToProcess.length > 0) {
+        const chunk = recordsToProcess.splice(0, CHUNK_SIZE);
+        const requestItems = buildRequestItems(chunk);
+        await batchWriteWithRetry(requestItems);
     }
+}
+function buildRequestItems(chunk) {
+    const ttlValue = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365;
+
+    return {
+        [NOTIFICATION_ORDERS]: chunk.map(Item => ({
+            PutRequest: { Item: { ...Item, ttl: ttlValue } }
+        }))
+    };
 }
 
 /**
@@ -49,7 +53,6 @@ async function batchWriteWithRetry(requestItems, maxRetries = 5) {
 
         const delay = Math.floor(Math.pow(2, attempt) * 100 + Math.random() * 100);
         await new Promise(r => setTimeout(r, delay));
-        attempt++;
     }
 }
 
