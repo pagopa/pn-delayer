@@ -577,6 +577,17 @@ Resources:
         LogGroupName: !Sub ${ProjectName}-delayer-receiverOrdersSendersLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
+  
+  DelayerNotificationOrdersLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-notificationOrdersLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
 
   TestDelayerKmsBucket:
     Type: AWS::KMS::Key
@@ -750,6 +761,9 @@ Outputs:
 
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
+  
+  DelayerNotificationOrdersLambdaName:
+    Value: !Sub "${ProjectName}-delayer-notificationOrdersLambda"
 
   ExportDelayerDataLambdaName:
     Value: !Sub "${ProjectName}-exportDelayerDataLambda"
