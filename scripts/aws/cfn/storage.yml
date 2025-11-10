@@ -474,6 +474,19 @@ Resources:
         DelaySeconds: 1
         VisibilityTimeout: 1800 #30 min
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM SafeStorage TO NotificationOrdersQueue ###
+  SafeStorageToNotificationOrdersQueueName:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_notification_orders'
+        DelaySeconds: 1
+        VisibilityTimeout: 1800 #30 min
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
         
   PnDelayerSenderLimitJobLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -729,7 +742,16 @@ Outputs:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN:
     Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueARN
     Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue ARN
-
+  SafeStorageToNotificationOrdersQueueName:
+    Value: !GetAtt SafeStorageToNotificationOrdersQueueName.Outputs.QueueName
+    Description: SafeStorage-to-NotificationOrders queue name
+  SafeStorageToNotificationOrdersQueueURL:
+    Value: !GetAtt SafeStorageToNotificationOrdersQueueName.Outputs.QueueURL
+    Description: SafeStorage-to-NotificationOrders queue URL
+  SafeStorageToNotificationOrdersQueueARN:
+    Value: !GetAtt SafeStorageToNotificationOrdersQueueName.Outputs.QueueARN
+    Description: SafeStorage-to-NotificationOrders queue ARN
+    
   # Kinesis data stream
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn

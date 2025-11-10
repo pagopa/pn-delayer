@@ -440,6 +440,18 @@ Parameters:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
+  
+  SafeStorageToNotificationOrdersQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to notification orders queue'
+  
+  SafeStorageToNotificationOrdersQueueARN:
+    Type: String
+    Description: 'queue name for safeStorage to to notification orders queue'
+  
+  SafeStorageToNotificationOrdersQueueURL:
+    Type: String
+    Description: 'Events from safe storage to notification orders queue URL'
 
   SafeStorageToNotificationOrdersQueueName:
     Type: String
