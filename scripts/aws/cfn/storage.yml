@@ -362,6 +362,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryCounterMockTable:
     Type: AWS::DynamoDB::Table
