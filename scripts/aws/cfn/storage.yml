@@ -362,6 +362,8 @@ Resources:
         Enabled: true
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
       KinesisStreamSpecification:
         StreamArn: !Ref CdcKinesisSourceStreamArn
 
