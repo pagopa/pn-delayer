@@ -399,6 +399,14 @@ Parameters:
   ProvinceTableArn:
     Type: String
     Description: 'ARN of DynamoDB table containing Province'
+  
+  NotificationOrdersTableName:
+    Type: String
+    Description: 'DynamoDB table name for NotificationOrders'
+  
+  NotificationOrdersTableArn:
+    Type: String
+    Description: 'ARN of DynamoDB table for NotificationOrders'
 
   NotificationOrdersTableName:
     Type: String
