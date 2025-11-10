@@ -399,11 +399,11 @@ Parameters:
   ProvinceTableArn:
     Type: String
     Description: 'ARN of DynamoDB table containing Province'
-  
+
   NotificationOrdersTableName:
     Type: String
     Description: 'DynamoDB table name for NotificationOrders'
-  
+
   NotificationOrdersTableArn:
     Type: String
     Description: 'ARN of DynamoDB table for NotificationOrders'
@@ -416,7 +416,7 @@ Parameters:
   DelayerReceiverOrdersSendersLambdaName:
     Type: String
     Description: 'ReceiverOrdersSendersLambda function name'
-  
+
   DelayerNotificationOrdersLambdaName:
     Type: String
     Description: 'NotificationOrdersLambda function name'
@@ -440,15 +440,15 @@ Parameters:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
-  
+
   SafeStorageToNotificationOrdersQueueName:
     Type: String
     Description: 'queue name for safeStorage to notification orders queue'
-  
+
   SafeStorageToNotificationOrdersQueueARN:
     Type: String
     Description: 'queue name for safeStorage to to notification orders queue'
-  
+
   SafeStorageToNotificationOrdersQueueURL:
     Type: String
     Description: 'Events from safe storage to notification orders queue URL'
@@ -1240,6 +1240,11 @@ Resources:
           InputPath: $.detail
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+        - Id: !Sub '${ProjectName}-SafeStore2NotificationOrders'
+          Arn: !Ref SafeStorageToNotificationOrdersQueueARN
+          InputPath: $.detail
+          DeadLetterConfig:
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
   DelayerOrdersSendersEventBusEnqueueRole:
     Type: AWS::IAM::Role
@@ -1504,17 +1509,17 @@ Resources:
       Parameters:
         FunctionName: !Ref DelayerToPaperChannelLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-  
+
   #########################################################
   ###         DelayerNotificationOrdersLambda          ###
   #########################################################
-  
+
   DelayerNotificationOrdersLambdaSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub '${DelayerNotificationOrdersLambdaName}-sec-group'
       VpcId: !Ref VpcId
-  
+
   # Lambda function
   DelayerNotificationOrdersLambda:
     Type: AWS::Lambda::Function
@@ -1541,7 +1546,7 @@ Resources:
         SubnetIds: !Split [ ",", !Ref SubnetsIds ]
         SecurityGroupIds:
           - !GetAtt DelayerNotificationOrdersLambdaSecGroup.GroupId
-  
+
   # Lambda function role
   DelayerNotificationOrdersLambdaRole:
     Type: AWS::IAM::Role
@@ -1559,7 +1564,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
-  
+
   # Lambda function IAM policy
   DelayerNotificationOrdersLambdaPolicy:
     Type: AWS::IAM::Policy
@@ -1583,7 +1588,7 @@ Resources:
               - sqs:ReceiveMessage
             Resource:
               - !Ref SafeStorageToNotificationOrdersQueueARN
-  
+
   DelayerNotificationOrdersLambdaAlarms:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -1591,7 +1596,7 @@ Resources:
       Parameters:
         FunctionName: !Ref DelayerNotificationOrdersLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-  
+
   DelayerNotificationOrdersLambdaSQSSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
@@ -1690,6 +1695,7 @@ Resources:
               - sqs:ReceiveMessage
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+              - !Ref SafeStorageToNotificationOrdersQueueARN
 
   DelayerReceiverOrdersSendersLambdaAlarms:
     Type: AWS::CloudFormation::Stack
@@ -2822,3 +2828,20 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+
+  DelayerNotificationOrdersQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SafeStorageToNotificationOrdersQueueURL
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "SQS:SendMessage"
+            Resource:
+              - !Ref SafeStorageToNotificationOrdersQueueARN
