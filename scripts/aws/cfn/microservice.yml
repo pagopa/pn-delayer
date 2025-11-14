@@ -512,6 +512,11 @@ Parameters:
     Type: Number
     Description: 'Time available for downloading the data in minutes'
     Default: 4320 #3 days
+  
+  NotificationOrdersTtlDays:
+    Type: Number
+    Description: 'TTL days for lambda notification orders'
+    Default: 3650
 
   EnvironmentType:
     Type: String

@@ -1,9 +1,13 @@
 'use strict';
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, BatchWriteCommand } = require('@aws-sdk/lib-dynamodb');
+const { Temporal } = require('@js-temporal/polyfill');
+
 
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const NOTIFICATION_ORDERS = process.env.NOTIFICATION_ORDERS_TABLENAME || 'pn-NotificationOrders';
+
+const TTL_DAYS = process.env.TTL_DAYS;
 
 /**
  * Persists order records in DynamoDB using batch write with chunking.
@@ -21,8 +25,10 @@ async function persistOrderRecords(orderRecords, fileKey) {
     }
 }
 function buildRequestItems(chunk) {
-    const ttlValue = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365;
-
+    const DAYS = parseInt(process.env.TTL_DAYS ?? '10', 10);
+    const zdtNow = Temporal.Now.zonedDateTimeISO('UTC');
+    const zdtExp = zdtNow.add({ days: DAYS });
+    const ttlValue = Math.floor(zdtExp.toInstant().epochMilliseconds / 1000);
     return {
         [NOTIFICATION_ORDERS]: chunk.map(Item => ({
             PutRequest: { Item: { ...Item, ttl: ttlValue } }
