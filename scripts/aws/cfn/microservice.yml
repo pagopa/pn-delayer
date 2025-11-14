@@ -1562,6 +1562,7 @@ Resources:
           PN_SAFESTORAGE_URL: !Ref SandboxSafeStorageBaseUrl
           PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
           NOTIFICATION_ORDERS_TABLENAME: !Ref NotificationOrdersTableName
+          TTL_DAYS: !Ref NotificationOrdersTtlDays
       TracingConfig:
         Mode: Active
       Layers:
