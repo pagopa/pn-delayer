@@ -74,14 +74,15 @@ exports.deleteData = async (params = []) => {
 
         if(allEntities.length > 0){
             // Terza fase: delete parallele
-            const deliveryWeek = getDeliveryWeek();
+            const deliveryWeek = allEntities[0].pk.split('~')[0];
+            const previousDeliveryWeek = LocalDate.parse(deliveryWeek).with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).minusWeeks(1).toString();
             await Promise.all([
                 batchDeleteEntities(paperDeliveryTableName, allEntities),
                 (async () => {
                     const grouped = groupRecordsByProductAndProvince(allEntities);
                     await batchDeleteCounters(countersTableName, grouped, deliveryWeek);
                 })(),
-                batchDeleteUsedSenderLimit(senderUsedLimitTableName, allEntities),
+                batchDeleteUsedSenderLimit(senderUsedLimitTableName, allEntities, previousDeliveryWeek),
                 (async () => {
                     const printCapacitiesEntities = allEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
                     await batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, printCapacitiesEntities, deliveryWeek);
@@ -158,10 +159,9 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
     console.log(`Deleted ${keys.length} items from table ${countersTableName}`);
   }
 
-  async function batchDeleteUsedSenderLimit(senderUsedLimitTableName, entities) {
-    const week = getPreviousWeek();
+  async function batchDeleteUsedSenderLimit(senderUsedLimitTableName, entities, previousDeliveryWeek) {
     const grouped = groupRecordsBySenderProductProvince(entities);
-    const keys = Object.keys(grouped).map(k => ({ pk: k, sk: week }));
+    const keys = Object.keys(grouped).map(k => ({ pk: k, sk: previousDeliveryWeek }));
     await batchDeleteUsedSenderLimitItems(keys, senderUsedLimitTableName);
     console.log(`Deleted ${keys.length} items from table ${senderUsedLimitTableName}`);
   }
@@ -295,17 +295,6 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
       }
     }
   }
-
-
-function getDeliveryWeek() {
-    const dayOfWeek = 1;
-    return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
-}
-
-function getPreviousWeek() {
-  const dayOfWeek = 1;
-  return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).minusWeeks(1).toString();
-}
 
 const groupRecordsByProductAndProvince = (records) => {
   return records.reduce((acc, record) => {
