@@ -512,6 +512,11 @@ Parameters:
     Type: Number
     Description: 'Time available for downloading the data in minutes'
     Default: 4320 #3 days
+  
+  NotificationOrdersTtlDays:
+    Type: Number
+    Description: 'TTL days for lambda notification orders'
+    Default: 3650
 
   EnvironmentType:
     Type: String
@@ -1557,6 +1562,7 @@ Resources:
           PN_SAFESTORAGE_URL: !Ref SandboxSafeStorageBaseUrl
           PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
           NOTIFICATION_ORDERS_TABLENAME: !Ref NotificationOrdersTableName
+          TTL_DAYS: !Ref NotificationOrdersTtlDays
       TracingConfig:
         Mode: Active
       Layers:

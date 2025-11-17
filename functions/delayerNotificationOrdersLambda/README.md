@@ -30,6 +30,7 @@ verifying consistency between actual deposited notifications and the estimates d
 | `PN_SAFESTORAGE_URL`  | Base URL of Safe Storage REST API (e.g. `https://api.pn.pagopa.it`) |
 | `PN_SAFESTORAGE_CXID` | Client identifier header value for Safe Storage                     |
 | `NOTIFICATION-ORDER`  | (Optional) Name of **pn-NotificationOrders** table                  |
+| `TTL_DAYS`            | TTL days for lambda notification orders                             |
 
 ## Tests
 
