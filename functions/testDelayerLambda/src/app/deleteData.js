@@ -73,17 +73,16 @@ exports.deleteData = async (params = []) => {
 
         if(allEntities.length > 0){
             // Terza fase: delete parallele
+            const deliveryWeek = getDeliveryWeek();
             await Promise.all([
                 batchDeleteEntities(paperDeliveryTableName, allEntities),
                 (async () => {
                     const grouped = groupRecordsByProductAndProvince(allEntities);
-                    const deliveryWeek = getDeliveryWeek();
                     await batchDeleteCounters(countersTableName, grouped, deliveryWeek);
                 })(),
                 batchDeleteUsedSenderLimit(senderUsedLimitTableName, allEntities),
                 (async () => {
                     const printCapacitiesEntities = allEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
-                    const deliveryWeek = getDeliveryWeek();
                     await batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, printCapacitiesEntities, deliveryWeek);
                 })()
             ]);
