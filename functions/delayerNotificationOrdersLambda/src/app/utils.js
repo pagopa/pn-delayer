@@ -25,9 +25,13 @@ function buildRecordsFromOrder(order, fileKey) {
     }
     const pk = getFirstDayOfMonth(order.periodo_riferimento);
     order.prodotti.map(product => {
+        records.push({
+                sk: `${order.idEnte}~${product.id}`,
+                value: product.valore_totale
+            });
         product.varianti.forEach(variante => {
             records.push(
-                ...buildRecords(order.idEnte, product.id, variante,product)
+                ...buildRecords(order.idEnte, product.id, variante)
             );
         });
     });
@@ -45,12 +49,8 @@ function buildRecordsFromOrder(order, fileKey) {
 /**
  * Creates the aggregated record for a variant.
  */
-function buildRecords(paId, productId,variante,product) {
+function buildRecords(paId, productId,variante) {
     let records = []
-    records.push({
-        sk: `${paId}~${productId}`,
-        value: product.valore_totale
-    });
     records.push( {
         sk: `${paId}~${productId}~${variante.codice}`,
         value: variante.valore_totale

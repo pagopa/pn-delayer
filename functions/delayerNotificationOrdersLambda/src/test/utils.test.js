@@ -36,11 +36,11 @@ describe('extractDataFromOrder', () => {
     expect(records.some(r =>
       typeof r.pk === 'string' &&
       r.sk.includes(order.idEnte) &&
-      r.sk.split('_').length === 3
+      r.sk.split('~').length === 3
     )).to.be.true;
 
     expect(records.some(r =>
-      r.sk.split('_').length === 4
+      r.sk.split('~').length === 4
     )).to.be.true;
   });
 
@@ -105,13 +105,13 @@ describe('extractDataFromOrder', () => {
       periodo_riferimento: '06-2024',
       idEnte: 'ente1',
       prodotti: [{ id: 'prod1', varianti: [] }],
-      last_update: '2024-06-01'
+      last_update: '2024-06-01',
+      value: 123
     };
     const fileKey = 'no-variants';
     const records = await extractDataFromOrder(order, fileKey);
 
-    expect(records).to.deep.equal([]);
-    expect(persistOrderRecordsStub.called).to.be.false;
+    expect(records).to.have.lengthOf(1);
   });
 
   it('gestisce variante senza distribuzione regionale', async () => {
@@ -131,10 +131,11 @@ describe('extractDataFromOrder', () => {
     const fileKey = 'no-regional';
     const records = await extractDataFromOrder(order, fileKey);
 
-    expect(records).to.have.lengthOf(1);
+    expect(records).to.have.lengthOf(2);
     expect(records[0].pk).to.equal('2024-06-01');
-    expect(records[0].sk).to.equal('ente1_prod1_VAR1');
-    expect(records[0].value).to.equal(123);
+    expect(records[0].sk).to.equal('ente1~prod1');
+    expect(records[1].sk).to.equal('ente1~prod1~VAR1');
+    expect(records[1].value).to.equal(123);
 
     expect(persistOrderRecordsStub.calledWith(records, fileKey)).to.be.true;
   });
@@ -161,7 +162,7 @@ describe('extractDataFromOrder', () => {
     const fileKey = 'with-regional';
     const records = await extractDataFromOrder(order, fileKey);
 
-    expect(records).to.have.lengthOf(3);
+    expect(records).to.have.lengthOf(4);
 
     const basePk = records[0].pk;
 
@@ -173,9 +174,9 @@ describe('extractDataFromOrder', () => {
     }));
 
     expect(simplified).to.deep.include.members([
-      { pk: basePk, sk: 'ente1_prod1_VAR1', value: 123, fileKey },
-      { pk: basePk, sk: 'ente1_prod1_VAR1_LZ', value: 50, fileKey },
-      { pk: basePk, sk: 'ente1_prod1_VAR1_PI', value: 73, fileKey }
+      { pk: basePk, sk: 'ente1~prod1~VAR1', value: 123, fileKey },
+      { pk: basePk, sk: 'ente1~prod1~VAR1~LZ', value: 50, fileKey },
+      { pk: basePk, sk: 'ente1~prod1~VAR1~PI', value: 73, fileKey }
     ]);
 
     expect(persistOrderRecordsStub.calledWith(records, fileKey)).to.be.true;
