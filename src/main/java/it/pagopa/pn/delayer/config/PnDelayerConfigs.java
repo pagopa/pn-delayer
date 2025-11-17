@@ -2,10 +2,12 @@ package it.pagopa.pn.delayer.config;
 
 import it.pagopa.pn.commons.conf.SharedAutoConfiguration;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
+import it.pagopa.pn.delayer.utils.CronUtils;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -32,7 +34,8 @@ public class PnDelayerConfigs {
     private String paperDeliveryPriorityParameterName;
     private String PaperChannelTenderApiLambdaArn;
     private LocalDate deliveryWeek;
-
+    private String delayerToPaperChannelDailyScheduleCron;
+    private String mondayDelayerToPaperChannelDailyScheduleCron;
 
     @Data
     public static class EvaluateDriverCapacityJobInput {
@@ -62,5 +65,21 @@ public class PnDelayerConfigs {
         private String paperDeliveryUsedSenderLimitTableName;
         private String paperDeliveryCounterTableName;
         private String paperDeliveryPrintCapacityTableName;
+    }
+
+    public Integer calculateMondayExecutionNumber() {
+        if(StringUtils.hasText(mondayDelayerToPaperChannelDailyScheduleCron)){
+            return CronUtils.countExecutionsInNextScheduledDay(mondayDelayerToPaperChannelDailyScheduleCron);
+        }else{
+            return CronUtils.countExecutionsInNextScheduledDay(delayerToPaperChannelDailyScheduleCron);
+        }
+    }
+
+    public Integer calculateDailyExecutionNumber() {
+        if(StringUtils.hasText(delayerToPaperChannelDailyScheduleCron)){
+            return CronUtils.countExecutionsInNextScheduledDay(delayerToPaperChannelDailyScheduleCron);
+        }else{
+            throw new RuntimeException("Delayer to Paper Channel Lambda Cron is not configured");
+        }
     }
 }

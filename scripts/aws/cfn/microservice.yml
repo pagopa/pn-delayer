@@ -550,6 +550,8 @@ Resources:
             Value: !Ref DeliveryDateDayOfWeek
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
+            Value: !Ref DelayerToPaperChannelDailyScheduleCron
 
       PlatformCapabilities:
         - FARGATE
@@ -730,6 +732,8 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
+            Value: !Ref DelayerToPaperChannelDailyScheduleCron
 
       PlatformCapabilities:
         - FARGATE
@@ -897,6 +901,8 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
+            Value: !Ref DelayerToPaperChannelDailyScheduleCron
 
       PlatformCapabilities:
         - FARGATE
@@ -1785,6 +1791,7 @@ Resources:
               "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
               "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}",
               "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON": "${DelayerToPaperChannelDailyScheduleCron}",
               "PN_DELAYER_DELIVERYWEEK": null
             }
 
@@ -1958,6 +1965,7 @@ Resources:
               paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
               deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
               printCapacity.$: $$.Execution.Input.PN_DELAYER_PRINTCAPACITY
+              delayerToPaperChannelDailyScheduleCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
           retrieveProvince:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:scan
@@ -1992,6 +2000,7 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitSenderLimitJob
@@ -2025,6 +2034,8 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
+                          Value.$: $.delayerToPaperChannelDailyScheduleCron
                         - Name: PN_DELAYER_DELIVERYWEEK
                           Value.$: $.deliveryWeek
 #                  Retry:
@@ -2081,6 +2092,7 @@ Resources:
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
               unifiedDeliveryDrivers.$: $.tempGetParameterResult.unifiedDeliveryDrivers
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
             Next: MapSubmitEvaluateDriverCapacityJobs
           MapSubmitEvaluateDriverCapacityJobs:
             Type: Map
@@ -2099,6 +2111,7 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateDriverCapacityJob
@@ -2126,6 +2139,8 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
+                          Value.$: $.delayerToPaperChannelDailyScheduleCron
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
                           Value.$: $.driver
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
@@ -2173,6 +2188,7 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateResidualCapacityJob
@@ -2208,6 +2224,8 @@ Resources:
                           Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
+                          Value.$: $.DelayerToPaperChannelDailyScheduleCron
                         - Name: PN_DELAYER_DELIVERYWEEK
                           Value.$: $.deliveryWeek
 #                  Retry:
