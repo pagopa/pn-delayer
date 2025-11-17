@@ -71,6 +71,7 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
 
     @Test
     void updatePrintCapacityCounterTest() {
+        pnDelayerConfigs.setDelayerToPaperChannelDailyScheduleCron("0 5-21 ? * TUE-SUN *");
         LocalDate deliveryDate = LocalDate.parse("2025-04-07");
 
         paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 35000).block();
@@ -81,6 +82,11 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
         Assertions.assertEquals("PRINT", result.getFirst().getPk());
         Assertions.assertEquals(5000, result.getFirst().getDailyPrintCapacity());
         Assertions.assertEquals(35000, result.getFirst().getWeeklyPrintCapacity());
+        Assertions.assertEquals(0, result.getFirst().getSentToNextWeek());
+        Assertions.assertEquals(0, result.getFirst().getSentToPhaseTwo());
+        Assertions.assertEquals(17, result.getFirst().getDailyExecutions());
+        Assertions.assertEquals(17, result.getFirst().getMondayExecutions());
+        Assertions.assertEquals(0, result.getFirst().getDailyExecutionCounter());
 
 
         paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 5000).block();
@@ -91,5 +97,10 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
         Assertions.assertEquals("PRINT", result2.getFirst().getPk());
         Assertions.assertEquals(5000, result.getFirst().getDailyPrintCapacity());
         Assertions.assertEquals(35000, result.getFirst().getWeeklyPrintCapacity());
+        Assertions.assertEquals(0, result.getFirst().getSentToNextWeek());
+        Assertions.assertEquals(0, result.getFirst().getSentToPhaseTwo());
+        Assertions.assertEquals(17, result.getFirst().getDailyExecutions());
+        Assertions.assertEquals(17, result.getFirst().getMondayExecutions());
+        Assertions.assertEquals(0, result.getFirst().getDailyExecutionCounter());
     }
 }
