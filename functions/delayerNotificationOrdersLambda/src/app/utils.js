@@ -25,6 +25,10 @@ function buildRecordsFromOrder(order, fileKey) {
     }
     const pk = getFirstDayOfMonth(order.periodo_riferimento);
     order.prodotti.map(product => {
+        records.push({
+                sk: `${order.idEnte}~${product.id}`,
+                value: product.valore_totale
+            });
         product.varianti.forEach(variante => {
             records.push(
                 ...buildRecords(order.idEnte, product.id, variante)
@@ -45,16 +49,15 @@ function buildRecordsFromOrder(order, fileKey) {
 /**
  * Creates the aggregated record for a variant.
  */
-function buildRecords(paId, productId, variante) {
+function buildRecords(paId, productId,variante) {
     let records = []
     records.push( {
-        sk: `${paId}_${productId}_${variante.codice}`,
+        sk: `${paId}~${productId}~${variante.codice}`,
         value: variante.valore_totale
     });
     if (!variante.distribuzione?.regionale?.length) return records;
     records.push( ...buildRegionalRecords(paId, productId, variante));
     return records;
-
 }
 
 /**
@@ -62,7 +65,7 @@ function buildRecords(paId, productId, variante) {
  */
 function buildRegionalRecords(paId, productId, variante) {
     return variante.distribuzione.regionale.map(regionDetail => ({
-           sk: `${paId}_${productId}_${variante.codice}_${regionDetail.regione}`,
+           sk: `${paId}~${productId}~${variante.codice}~${regionDetail.regione}`,
            value: regionDetail.valore
        }));
 }
