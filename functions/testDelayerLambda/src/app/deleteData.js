@@ -14,6 +14,11 @@ const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 
+// Configurazione parallelismo
+const CONCURRENT_QUERIES = 10; // Query parallele
+const BATCH_SIZE = 25; // Dimensione batch DynamoDB (max)
+const BATCH_DELAY = 50; // Ridotto da 200ms a 50ms
+
 /**
  * DELETE_DATA operation: downloads the CSV and delete rows to DynamoDB.
  * @param {Array<string>} params[fileName]
@@ -38,8 +43,7 @@ exports.deleteData = async (params = []) => {
         );
     }
 
-    let processed = 0;
-    let allEntities = [];
+    let requestIds = [];
 
     try {
         const { Body } = await s3Client.send(
@@ -48,47 +52,99 @@ exports.deleteData = async (params = []) => {
 
         const stream = Body instanceof Readable ? Body : Readable.from(Body);
 
+        // Prima fase: raccogliere tutti i requestId
         for await (const record of stream.pipe(csv({ separator: ";" }))) {
             const requestId = record.requestId;
-            if (!requestId) continue;
-
-            const queryInput = {
-                TableName: paperDeliveryTableName,
-                IndexName: "requestId-CreatedAt-index",
-                KeyConditionExpression: "requestId = :id",
-                ExpressionAttributeValues: { ":id": requestId }
-            };
-
-            let queryResult;
-            try {
-                queryResult = await docClient.send(new QueryCommand(queryInput));
-            } catch (err) {
-                console.error("Errore QueryCommand:", err, queryInput);
-                continue;
-            }
-
-            if (queryResult.Items && queryResult.Items.length > 0) {
-                allEntities.push(...queryResult.Items);
+            if (requestId) {
+                requestIds.push(requestId);
             }
         }
+
+        console.log(`Found ${requestIds.length} requestIds to process`);
+
+        // Seconda fase: query parallele in chunk
+        const allEntities = await queryEntitiesInParallel(
+            paperDeliveryTableName,
+            requestIds,
+            CONCURRENT_QUERIES
+        );
+
+        console.log(`Retrieved ${allEntities.length} entities from DynamoDB`);
 
         if(allEntities.length > 0){
-            await batchDeleteEntities(paperDeliveryTableName, allEntities);
-            const grouped = groupRecordsByProductAndProvince(allEntities);
-            const deliveryWeek = getDeliveryWeek();
-            await batchDeleteCounters(countersTableName, grouped, deliveryWeek);
-            await batchDeleteUsedSenderLimit(senderUsedLimitTableName, allEntities);
-            const printCapacitiesEntities = allEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
-            await batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, printCapacitiesEntities, deliveryWeek);
+            // Terza fase: delete parallele
+            await Promise.all([
+                batchDeleteEntities(paperDeliveryTableName, allEntities),
+                (async () => {
+                    const grouped = groupRecordsByProductAndProvince(allEntities);
+                    const deliveryWeek = getDeliveryWeek();
+                    await batchDeleteCounters(countersTableName, grouped, deliveryWeek);
+                })(),
+                batchDeleteUsedSenderLimit(senderUsedLimitTableName, allEntities),
+                (async () => {
+                    const printCapacitiesEntities = allEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
+                    const deliveryWeek = getDeliveryWeek();
+                    await batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, printCapacitiesEntities, deliveryWeek);
+                })()
+            ]);
         }
 
-        console.log("Processed deletions:", processed);
-        return { message: "Delete completed", processed };
+        console.log("Processed deletions:", allEntities.length);
+        return { message: "Delete completed", processed: allEntities.length };
     } catch (err) {
         console.error("Errore deleteData:", err);
         throw err;
     }
 };
+
+/**
+ * Query entities in parallel with concurrency control
+ */
+async function queryEntitiesInParallel(tableName, requestIds, concurrency) {
+    const allEntities = [];
+    const chunks = [];
+
+    // Dividi in chunk per il parallelismo
+    for (let i = 0; i < requestIds.length; i += concurrency) {
+        chunks.push(requestIds.slice(i, i + concurrency));
+    }
+
+    for (const chunk of chunks) {
+        const promises = chunk.map(requestId =>
+            queryEntitiesByRequestId(tableName, requestId)
+        );
+
+        const results = await Promise.all(promises);
+        results.forEach(entities => allEntities.push(...entities));
+
+        // Log progress
+        if (allEntities.length % 100 === 0) {
+            console.log(`Queried ${allEntities.length} entities so far...`);
+        }
+    }
+
+    return allEntities;
+}
+
+/**
+ * Query entities by single requestId
+ */
+async function queryEntitiesByRequestId(tableName, requestId) {
+    const queryInput = {
+        TableName: tableName,
+        IndexName: "requestId-CreatedAt-index",
+        KeyConditionExpression: "requestId = :id",
+        ExpressionAttributeValues: { ":id": requestId }
+    };
+
+    try {
+        const queryResult = await docClient.send(new QueryCommand(queryInput));
+        return queryResult.Items || [];
+    } catch (err) {
+        console.error(`Error querying requestId ${requestId}:`, err);
+        return [];
+    }
+}
 
 async function batchDeleteEntities(paperDeliveryTableName, entities) {
     const keys = entities.map(e => ({ pk: e.pk, sk: e.sk }));
@@ -126,73 +182,125 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
   async function batchDeleteItems(keys, tableName) {
     if (!keys?.length) return;
     let pending = keys.filter(k => k?.pk && k?.sk);
-    do {
-      const chunk = pending.splice(0, 25);
 
-      const command = new BatchWriteCommand({
-        RequestItems: {
-          [tableName]: chunk.map(k => ({
-            DeleteRequest: { Key: { pk: k.pk, sk: k.sk } }
-          }))
+    const chunks = [];
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      chunks.push(pending.slice(i, i + BATCH_SIZE));
+    }
+
+    // Elabora i chunk in parallelo (max 5 alla volta per evitare throttling)
+    const concurrentBatches = 5;
+    for (let i = 0; i < chunks.length; i += concurrentBatches) {
+      const batchPromises = chunks.slice(i, i + concurrentBatches).map(async chunk => {
+        let retries = 3;
+        while (retries > 0) {
+          const command = new BatchWriteCommand({
+            RequestItems: {
+              [tableName]: chunk.map(k => ({
+                DeleteRequest: { Key: { pk: k.pk, sk: k.sk } }
+              }))
+            }
+          });
+
+          const res = await docClient.send(command);
+          const notProcessed = res.UnprocessedItems?.[tableName] || [];
+
+          if (notProcessed.length === 0) break;
+
+          retries--;
+          chunk = notProcessed.map(r => r.DeleteRequest.Key);
+          await new Promise(r => setTimeout(r, BATCH_DELAY));
         }
       });
 
-      const res = await docClient.send(command);
-      const notProcessed = res.UnprocessedItems?.[tableName]?.map(r => r.DeleteRequest.Key) || [];
-      pending.push(...notProcessed);
+      await Promise.all(batchPromises);
 
-      if (pending.length) {
-        await new Promise(r => setTimeout(r, 200));
+      if (i + concurrentBatches < chunks.length) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
       }
-    } while (pending.length);
+    }
   }
 
   async function batchDeleteUsedSenderLimitItems(keys, tableName) {
     if (!keys?.length) return;
     let pending = keys.filter(k => k?.pk && k?.sk);
-    do {
-      const chunk = pending.splice(0, 25);
 
-      const command = new BatchWriteCommand({
-        RequestItems: {
-          [tableName]: chunk.map(k => ({
-            DeleteRequest: { Key: { pk: k.pk, deliveryDate: k.sk } }
-          }))
+    const chunks = [];
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      chunks.push(pending.slice(i, i + BATCH_SIZE));
+    }
+
+    const concurrentBatches = 5;
+    for (let i = 0; i < chunks.length; i += concurrentBatches) {
+      const batchPromises = chunks.slice(i, i + concurrentBatches).map(async chunk => {
+        let retries = 3;
+        while (retries > 0) {
+          const command = new BatchWriteCommand({
+            RequestItems: {
+              [tableName]: chunk.map(k => ({
+                DeleteRequest: { Key: { pk: k.pk, deliveryDate: k.sk } }
+              }))
+            }
+          });
+
+          const res = await docClient.send(command);
+          const notProcessed = res.UnprocessedItems?.[tableName] || [];
+
+          if (notProcessed.length === 0) break;
+
+          retries--;
+          chunk = notProcessed.map(r => r.DeleteRequest.Key);
+          await new Promise(r => setTimeout(r, BATCH_DELAY));
         }
       });
 
-      const res = await docClient.send(command);
-      const notProcessed = res.UnprocessedItems?.[tableName]?.map(r => r.DeleteRequest.Key) || [];
-      pending.push(...notProcessed);
+      await Promise.all(batchPromises);
 
-      if (pending.length) {
-        await new Promise(r => setTimeout(r, 200));
+      if (i + concurrentBatches < chunks.length) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
       }
-    } while (pending.length);
+    }
   }
 
   async function batchDeleteUsedCapacityItems(keys, tableName) {
     if (!keys?.length) return;
     let pending = keys.filter(k => k?.pk && k?.sk);
-    do {
-      const chunk = pending.splice(0, 25);
 
-      const command = new BatchWriteCommand({
-        RequestItems: {
-          [tableName]: chunk.map(k => ({
-            DeleteRequest: { Key: { unifiedDeliveryDriverGeokey: k.pk, deliveryDate: k.sk } }
-          }))
+    const chunks = [];
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      chunks.push(pending.slice(i, i + BATCH_SIZE));
+    }
+
+    const concurrentBatches = 5;
+    for (let i = 0; i < chunks.length; i += concurrentBatches) {
+      const batchPromises = chunks.slice(i, i + concurrentBatches).map(async chunk => {
+        let retries = 3;
+        while (retries > 0) {
+          const command = new BatchWriteCommand({
+            RequestItems: {
+              [tableName]: chunk.map(k => ({
+                DeleteRequest: { Key: { unifiedDeliveryDriverGeokey: k.pk, deliveryDate: k.sk } }
+              }))
+            }
+          });
+
+          const res = await docClient.send(command);
+          const notProcessed = res.UnprocessedItems?.[tableName] || [];
+
+          if (notProcessed.length === 0) break;
+
+          retries--;
+          chunk = notProcessed.map(r => r.DeleteRequest.Key);
+          await new Promise(r => setTimeout(r, BATCH_DELAY));
         }
       });
 
-      const res = await docClient.send(command);
-      const notProcessed = res.UnprocessedItems?.[tableName]?.map(r => r.DeleteRequest.Key) || [];
-      pending.push(...notProcessed);
+      await Promise.all(batchPromises);
 
-      if (pending.length) {
-        await new Promise(r => setTimeout(r, 200));
+      if (i + concurrentBatches < chunks.length) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
       }
-    } while (pending.length);
+    }
   }
 
 
