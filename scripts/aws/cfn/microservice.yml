@@ -1607,6 +1607,7 @@ Resources:
   TestDelayerLambda:
     Type: AWS::Lambda::Function
     Properties:
+      MemorySize: 512
       FunctionName: !Ref TestDelayerLambdaName
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
