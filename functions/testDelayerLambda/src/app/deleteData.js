@@ -18,6 +18,7 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 const CONCURRENT_QUERIES = 10; // Query parallele
 const BATCH_SIZE = 25; // Dimensione batch DynamoDB (max)
 const BATCH_DELAY = 50; // Ridotto da 200ms a 50ms
+const CONCURRENT_BATCHES = 5; // Numero di batch paralleli
 
 /**
  * DELETE_DATA operation: downloads the CSV and delete rows to DynamoDB.
@@ -116,10 +117,6 @@ async function queryEntitiesInParallel(tableName, requestIds, concurrency) {
         const results = await Promise.all(promises);
         results.forEach(entities => allEntities.push(...entities));
 
-        // Log progress
-        if (allEntities.length % 100 === 0) {
-            console.log(`Queried ${allEntities.length} entities so far...`);
-        }
     }
 
     return allEntities;
@@ -188,9 +185,8 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
     }
 
     // Elabora i chunk in parallelo (max 5 alla volta per evitare throttling)
-    const concurrentBatches = 5;
-    for (let i = 0; i < chunks.length; i += concurrentBatches) {
-      const batchPromises = chunks.slice(i, i + concurrentBatches).map(async chunk => {
+    for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
+      const batchPromises = chunks.slice(i, i + CONCURRENT_BATCHES).map(async chunk => {
         let retries = 3;
         while (retries > 0) {
           const command = new BatchWriteCommand({
@@ -214,7 +210,7 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
 
       await Promise.all(batchPromises);
 
-      if (i + concurrentBatches < chunks.length) {
+      if (i + CONCURRENT_BATCHES < chunks.length) {
         await new Promise(r => setTimeout(r, BATCH_DELAY));
       }
     }
@@ -229,9 +225,8 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
       chunks.push(pending.slice(i, i + BATCH_SIZE));
     }
 
-    const concurrentBatches = 5;
-    for (let i = 0; i < chunks.length; i += concurrentBatches) {
-      const batchPromises = chunks.slice(i, i + concurrentBatches).map(async chunk => {
+    for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
+      const batchPromises = chunks.slice(i, i + CONCURRENT_BATCHES).map(async chunk => {
         let retries = 3;
         while (retries > 0) {
           const command = new BatchWriteCommand({
@@ -255,7 +250,7 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
 
       await Promise.all(batchPromises);
 
-      if (i + concurrentBatches < chunks.length) {
+      if (i + CONCURRENT_BATCHES < chunks.length) {
         await new Promise(r => setTimeout(r, BATCH_DELAY));
       }
     }
@@ -270,9 +265,8 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
       chunks.push(pending.slice(i, i + BATCH_SIZE));
     }
 
-    const concurrentBatches = 5;
-    for (let i = 0; i < chunks.length; i += concurrentBatches) {
-      const batchPromises = chunks.slice(i, i + concurrentBatches).map(async chunk => {
+    for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
+      const batchPromises = chunks.slice(i, i + CONCURRENT_BATCHES).map(async chunk => {
         let retries = 3;
         while (retries > 0) {
           const command = new BatchWriteCommand({
@@ -296,7 +290,7 @@ async function batchDeleteEntities(paperDeliveryTableName, entities) {
 
       await Promise.all(batchPromises);
 
-      if (i + concurrentBatches < chunks.length) {
+      if (i + CONCURRENT_BATCHES < chunks.length) {
         await new Promise(r => setTimeout(r, BATCH_DELAY));
       }
     }
