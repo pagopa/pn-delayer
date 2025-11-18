@@ -1607,6 +1607,7 @@ Resources:
   TestDelayerLambda:
     Type: AWS::Lambda::Function
     Properties:
+      MemorySize: 512
       FunctionName: !Ref TestDelayerLambdaName
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
@@ -1627,7 +1628,7 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 300 #5 min
+      Timeout: 900 #15 min
 
   # Lambda function role
   TestDelayerLambdaRole:
