@@ -23,6 +23,8 @@
     "DelayerStartWorkflowRuleState": "DISABLED",
     "DelayerToPaperChannelDailyScheduleRuleState": "DISABLED",
     "VCPU": "1",
-    "Memory": "4096"
+    "Memory": "4096",
+    "DelayerToPaperChannelActiveSchedulerStartDate": "2025-11-24T00:00:00Z",
+    "DelayerToPaperChannelActiveSchedulerCron": "0 5-21 ? * MON-SUN *"
   }
 }

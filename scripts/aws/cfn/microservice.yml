@@ -371,10 +371,34 @@ Parameters:
     Default: '0 3 ? * MON *'
     Description: 'Cron expression for DelayerStartWorkflowRule'
 
-  DelayerToPaperChannelDailyScheduleCron:
+  DelayerToPaperChannelActiveSchedulerCron:
     Type: String
-    Default: '0 5-21 ? * TUE-SUN *'
-    Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
+    Default: '0 5-21 ? * MON-SUN *'
+    Description: 'Cron expression for DelayerToPaperChannelActiveScheduleRule'
+
+  DelayerToPaperChannelNextSchedulerCron:
+    Type: String
+    Default: '0 5-21 ? * MON-SUN *'
+    Description: 'Cron expression for DelayerToPaperChannelNextScheduleRule'
+
+  DelayerToPaperChannelActiveSchedulerStartDate:
+    Type: String
+    Description: 'Start date for DelayerToPaperChannelDailyScheduleActiveRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. Has to be the next monday to the release date'
+
+  DelayerToPaperChannelActiveSchedulerEndDate:
+    Type: String
+    Description: 'End date for DelayerToPaperChannelDailyScheduleActiveRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. To specify an unlimited duration we use 2099'
+    Default: '2099-01-01T23:00:00Z'
+
+  DelayerToPaperChannelNextSchedulerStartDate:
+    Type: String
+    Description: 'Start date for DelayerToPaperChannelDailyScheduleNextRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. Must be disabled for now, so we set 2099-01-01'
+    Default: '2099-01-01T00:00:00Z'
+
+  DelayerToPaperChannelNextSchedulerEndDate:
+    Type: String
+    Description: 'End date for DelayerToPaperChannelDailyScheduleNextRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. To specify an unlimited duration we use 2099'
+    Default: '2099-01-01T23:00:00Z'
 
   DelayerStartWorkflowRuleState:
     Type: String
@@ -550,8 +574,14 @@ Resources:
             Value: !Ref DeliveryDateDayOfWeek
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
-            Value: !Ref DelayerToPaperChannelDailyScheduleCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELACTIVESCHEDULECRON
+            Value: !Ref DelayerToPaperChannelActiveSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELNEXTSCHEDULECRON
+            Value: !Ref DelayerToPaperChannelNextSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELACTIVESCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelActiveSchedulerStartDate
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELNEXTSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelNextSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -732,8 +762,14 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
-            Value: !Ref DelayerToPaperChannelDailyScheduleCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELACTIVESCHEDULECRON
+            Value: !Ref DelayerToPaperChannelActiveSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELNEXTSCHEDULECRON
+            Value: !Ref DelayerToPaperChannelNextSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELACTIVESCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelActiveSchedulerStartDate
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELNEXTSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelNextSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -901,8 +937,14 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
-            Value: !Ref DelayerToPaperChannelDailyScheduleCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELACTIVESCHEDULECRON
+            Value: !Ref DelayerToPaperChannelActiveSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELNEXTSCHEDULECRON
+            Value: !Ref DelayerToPaperChannelNextSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELACTIVESCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelActiveSchedulerStartDate
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELNEXTSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelNextSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -2316,13 +2358,38 @@ Resources:
                 - events:PutPermission
               Resource: "*"
 
-  DelayerToPaperChannelDailyScheduleRule:
-    Type: AWS::Events::Rule
+  DelayerToPaperChannelDailyActiveScheduler:
+    Type: AWS::Scheduler::Schedule
     Properties:
-      Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
-      ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
+      Name: !Sub '${ProjectName}-delayerToPaperChannelDailyActiveScheduler'
+      ScheduleExpression: !Sub cron(${DelayerToPaperChannelActiveSchedulerCron})
       State: !Ref DelayerToPaperChannelDailyScheduleRuleState
-      Targets:
+      StartDate: !Ref DelayerToPaperChannelActiveSchedulerStartDate
+      EndDate: !Ref DelayerToPaperChannelActiveSchedulerEndDate
+      FlexibleTimeWindow:
+        Mode: OFF
+      Target:
+        - Id: DelayerToPaperChannelStepFunctionTarget
+          Arn: !Ref DelayerToPaperChannelStateMachine
+          RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+          Input: !Sub |
+            {
+              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+            }
+
+  DelayerToPaperChannelDailyNextScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${ProjectName}-delayerToPaperChannelDailyNextScheduler'
+      ScheduleExpression: !Sub cron(${DelayerToPaperChannelNextSchedulerCron})
+      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      StartDate: !Ref DelayerToPaperChannelNextSchedulerStartDate
+      EndDate: !Ref DelayerToPaperChannelNextSchedulerEndDate
+      FlexibleTimeWindow:
+        Mode: OFF
+      Target:
         - Id: DelayerToPaperChannelStepFunctionTarget
           Arn: !Ref DelayerToPaperChannelStateMachine
           RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
