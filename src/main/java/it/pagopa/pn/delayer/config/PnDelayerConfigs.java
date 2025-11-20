@@ -1,16 +1,18 @@
 package it.pagopa.pn.delayer.config;
 
 import it.pagopa.pn.commons.conf.SharedAutoConfiguration;
+import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.utils.CronUtils;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.util.StringUtils;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Configuration
@@ -34,8 +36,10 @@ public class PnDelayerConfigs {
     private String paperDeliveryPriorityParameterName;
     private String PaperChannelTenderApiLambdaArn;
     private LocalDate deliveryWeek;
-    private String delayerToPaperChannelDailyScheduleCron;
-    private String mondayDelayerToPaperChannelDailyScheduleCron;
+    private String delayerToPaperChannelFirstSchedulerCron;
+    private String delayerToPaperChannelSecondSchedulerCron;
+    private Instant delayerToPaperChannelFirstSchedulerStartDate;
+    private Instant delayerToPaperChannelSecondSchedulerStartDate;
 
     @Data
     public static class EvaluateDriverCapacityJobInput {
@@ -67,19 +71,30 @@ public class PnDelayerConfigs {
         private String paperDeliveryPrintCapacityTableName;
     }
 
-    public Integer calculateMondayExecutionNumber() {
-        if(StringUtils.hasText(mondayDelayerToPaperChannelDailyScheduleCron)){
-            return CronUtils.countExecutionsInNextScheduledDay(mondayDelayerToPaperChannelDailyScheduleCron);
-        }else{
-            return CronUtils.countExecutionsInNextScheduledDay(delayerToPaperChannelDailyScheduleCron);
+    public Integer calculateDailyExecutionNumber(LocalDate deliveryWeek) {
+        Instant deliveryDate = deliveryWeek.atStartOfDay(ZoneOffset.UTC).toInstant();
+
+        boolean activeSchedulerBeforeDeliveryDate = delayerToPaperChannelFirstSchedulerStartDate.isBefore(deliveryDate);
+        boolean nextSchedulerBeforeDeliveryDate   = delayerToPaperChannelSecondSchedulerStartDate.isBefore(deliveryDate);
+
+        if (!activeSchedulerBeforeDeliveryDate && !nextSchedulerBeforeDeliveryDate) {
+            throw new PnInternalException("Both scheduler start dates are after the delivery date", "ERROR_SCHEDULERS_START_AFTER_DELIVERY_DATE");
         }
+
+        String cron = retrieveCron(activeSchedulerBeforeDeliveryDate, nextSchedulerBeforeDeliveryDate);
+
+        return CronUtils.countExecutionsInNextScheduledDay(cron);
     }
 
-    public Integer calculateDailyExecutionNumber() {
-        if(StringUtils.hasText(delayerToPaperChannelDailyScheduleCron)){
-            return CronUtils.countExecutionsInNextScheduledDay(delayerToPaperChannelDailyScheduleCron);
-        }else{
-            throw new RuntimeException("Delayer to Paper Channel Lambda Cron is not configured");
+    private String retrieveCron(boolean activeSchedulerBeforeDeliveryDate, boolean nextSchedulerBeforeDeliveryDate) {
+        String cron;
+        if (activeSchedulerBeforeDeliveryDate && nextSchedulerBeforeDeliveryDate) {
+            cron = delayerToPaperChannelFirstSchedulerStartDate.isAfter(delayerToPaperChannelSecondSchedulerStartDate)
+                    ? delayerToPaperChannelFirstSchedulerCron
+                    : delayerToPaperChannelSecondSchedulerCron;
+        } else {
+            cron = activeSchedulerBeforeDeliveryDate ? delayerToPaperChannelFirstSchedulerCron : delayerToPaperChannelSecondSchedulerCron;
         }
+        return cron;
     }
 }

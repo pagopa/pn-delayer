@@ -26,7 +26,6 @@ public class PaperDeliveryCounter {
     public static final String COL_LEK_TO_NEXT_WEEK = "lastEvaluatedKeyNextWeek";
     public static final String COL_LEK_PHASE2 = "lastEvaluatedKeyPhase2";
     public static final String COL_DAILY_EXECUTION_NUMBER = "dailyExecutionNumber";
-    public static final String COL_MONDAY_EXECUTION_NUMBER = "mondayExecutionNumber";
     public static final String COL_DAILY_EXECUTION_COUNTER = "dailyExecutionCounter";
 
 
@@ -42,8 +41,6 @@ public class PaperDeliveryCounter {
     private Integer weeklyPrintCapacity;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DAILY_EXECUTION_NUMBER)}))
     private Integer dailyExecutions;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_MONDAY_EXECUTION_NUMBER)}))
-    private Integer mondayExecutions;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DAILY_EXECUTION_COUNTER)}))
     private Integer dailyExecutionCounter;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENT_TO_NEXT_WEEK)}))
@@ -68,7 +65,7 @@ public class PaperDeliveryCounter {
     }
 
     @DynamoDbIgnore
-    public static PaperDeliveryCounter constructPrintCounterEntity(Integer weeklyPrintCapacity, Integer workingDays, Duration ttlDuration, Integer dailyExecutionNumber, Integer mondayExecutionNumber) {
+    public static PaperDeliveryCounter constructPrintCounterEntity(Integer weeklyPrintCapacity, Integer workingDays, Duration ttlDuration, Integer dailyExecutionNumber) {
         PaperDeliveryCounter paperDeliveryCounter = new PaperDeliveryCounter();
         paperDeliveryCounter.setDailyPrintCapacity(weeklyPrintCapacity / workingDays);
         paperDeliveryCounter.setWeeklyPrintCapacity(weeklyPrintCapacity);
@@ -76,7 +73,6 @@ public class PaperDeliveryCounter {
         paperDeliveryCounter.setSentToPhaseTwo(0);
         paperDeliveryCounter.setDailyExecutionCounter(0);
         paperDeliveryCounter.setDailyExecutions(dailyExecutionNumber);
-        paperDeliveryCounter.setMondayExecutions(mondayExecutionNumber);
         paperDeliveryCounter.setTtl(Instant.now().plus(ttlDuration).toEpochMilli());
         return paperDeliveryCounter;
     }

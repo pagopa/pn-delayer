@@ -61,7 +61,8 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
 
         Map<String, AttributeValue> map = PaperDeliveryCounter
                 .entityToAttributeValueMap(PaperDeliveryCounter.constructPrintCounterEntity(weeklyPrintCapacity, pnDelayerConfigs.getPrintCapacityWeeklyWorkingDays(),
-                        pnDelayerConfigs.getPrintCounterTtlDuration(), pnDelayerConfigs.calculateDailyExecutionNumber(), pnDelayerConfigs.calculateMondayExecutionNumber()));
+                        pnDelayerConfigs.getPrintCounterTtlDuration(), pnDelayerConfigs.calculateDailyExecutionNumber(deliveryDate)));
+
         map.forEach((key, value) ->
                 updateExpressions.add(buildUpdateExpressions(key, value, expressionAttributeNames, expressionAttributeValues)));
 

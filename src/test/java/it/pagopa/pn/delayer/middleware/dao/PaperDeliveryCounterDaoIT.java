@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -71,7 +72,10 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
 
     @Test
     void updatePrintCapacityCounterTest() {
-        pnDelayerConfigs.setDelayerToPaperChannelDailyScheduleCron("0 5-21 ? * TUE-SUN *");
+        pnDelayerConfigs.setDelayerToPaperChannelFirstSchedulerCron("0 5-21 ? * MON-SUN *");
+        pnDelayerConfigs.setDelayerToPaperChannelSecondSchedulerCron("0 1-21 ? * MON-SUN *");
+        pnDelayerConfigs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.parse("2024-06-01T00:00:00Z"));
+        pnDelayerConfigs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.parse("2024-07-01T00:00:00Z"));
         LocalDate deliveryDate = LocalDate.parse("2025-04-07");
 
         paperDeliveryCounterDAO.updatePrintCapacityCounter(deliveryDate, 3000, 35000).block();
@@ -84,8 +88,7 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
         Assertions.assertEquals(35000, result.getFirst().getWeeklyPrintCapacity());
         Assertions.assertEquals(0, result.getFirst().getSentToNextWeek());
         Assertions.assertEquals(0, result.getFirst().getSentToPhaseTwo());
-        Assertions.assertEquals(17, result.getFirst().getDailyExecutions());
-        Assertions.assertEquals(17, result.getFirst().getMondayExecutions());
+        Assertions.assertEquals(21, result.getFirst().getDailyExecutions());
         Assertions.assertEquals(0, result.getFirst().getDailyExecutionCounter());
 
 
@@ -99,8 +102,7 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
         Assertions.assertEquals(35000, result.getFirst().getWeeklyPrintCapacity());
         Assertions.assertEquals(0, result.getFirst().getSentToNextWeek());
         Assertions.assertEquals(0, result.getFirst().getSentToPhaseTwo());
-        Assertions.assertEquals(17, result.getFirst().getDailyExecutions());
-        Assertions.assertEquals(17, result.getFirst().getMondayExecutions());
+        Assertions.assertEquals(21, result.getFirst().getDailyExecutions());
         Assertions.assertEquals(0, result.getFirst().getDailyExecutionCounter());
     }
 }
