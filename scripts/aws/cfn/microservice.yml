@@ -432,14 +432,6 @@ Parameters:
     Type: String
     Description: 'ARN of DynamoDB table for NotificationOrders'
 
-  NotificationOrdersTableName:
-    Type: String
-    Description: 'DynamoDB table name for NotificationOrders'
-
-  NotificationOrdersTableArn:
-    Type: String
-    Description: 'ARN of DynamoDB table for NotificationOrders'
-
   PaperChannelTenderApiLambdaName:
     Type: String
     Description: 'PaperChannelTenderApiLambda function name'
@@ -473,18 +465,6 @@ Parameters:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
   
-  SafeStorageToNotificationOrdersQueueName:
-    Type: String
-    Description: 'queue name for safeStorage to notification orders queue'
-  
-  SafeStorageToNotificationOrdersQueueARN:
-    Type: String
-    Description: 'queue name for safeStorage to to notification orders queue'
-  
-  SafeStorageToNotificationOrdersQueueURL:
-    Type: String
-    Description: 'Events from safe storage to notification orders queue URL'
-
   SafeStorageToNotificationOrdersQueueName:
     Type: String
     Description: 'queue name for safeStorage to notification orders queue'
@@ -618,14 +598,14 @@ Resources:
             Value: !Ref DeliveryDateDayOfWeek
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULECRON
-            Value: "DelayerToPaperChannelFirstSchedulerCron"
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULECRON
-            Value: "DelayerToPaperChannelSecondSchedulerCron"
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelFirstSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelSecondSchedulerCron
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
-            Value: "DelayerToPaperChannelFirstSchedulerStartDate"
+            Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
-            Value: "DelayerToPaperChannelSecondSchedulerStartDate"
+            Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -806,14 +786,14 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULECRON
-            Value: "DelayerToPaperChannelFirstSchedulerCron"
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULECRON
-            Value: "DelayerToPaperChannelSecondSchedulerCron"
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelFirstSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelSecondSchedulerCron
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
-            Value: "DelayerToPaperChannelFirstSchedulerStartDate"
+            Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
-            Value: "DelayerToPaperChannelSecondSchedulerStartDate"
+            Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -981,14 +961,14 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULECRON
-            Value: "DelayerToPaperChannelFirstSchedulerCron"
-          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULECRON
-            Value: "DelayerToPaperChannelSecondSchedulerCron"
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelFirstSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelSecondSchedulerCron
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
-            Value: "DelayerToPaperChannelFirstSchedulerStartDate"
+            Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
-            Value: "DelayerToPaperChannelSecondSchedulerStartDate"
+            Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -1981,7 +1961,10 @@ Resources:
               "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
               "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}",
               "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}",
-              "PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON": "${DelayerToPaperChannelDailyScheduleCron}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON": "${DelayerToPaperChannelFirstSchedulerCron}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON": "${DelayerToPaperChannelSecondSchedulerCron}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE": "${DelayerToPaperChannelFirstSchedulerStartDate}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE: "${DelayerToPaperChannelSecondSchedulerStartDate}"
               "PN_DELAYER_DELIVERYWEEK": null
             }
 
@@ -2155,7 +2138,10 @@ Resources:
               paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
               deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
               printCapacity.$: $$.Execution.Input.PN_DELAYER_PRINTCAPACITY
-              delayerToPaperChannelDailyScheduleCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
+              delayerToPaperChannelFirstSchedulerCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+              delayerToPaperChannelSecondSchedulerCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+              delayerToPaperChannelFirstSchedulerStartDate.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+              delayerToPaperChannelSecondSchedulerStartDate.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
           retrieveProvince:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:scan
@@ -2190,7 +2176,10 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
-              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitSenderLimitJob
@@ -2224,8 +2213,14 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
-                          Value.$: $.delayerToPaperChannelDailyScheduleCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
                         - Name: PN_DELAYER_DELIVERYWEEK
                           Value.$: $.deliveryWeek
 #                  Retry:
@@ -2282,7 +2277,10 @@ Resources:
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
               unifiedDeliveryDrivers.$: $.tempGetParameterResult.unifiedDeliveryDrivers
               printCapacity.$: $.printCapacity
-              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
             Next: MapSubmitEvaluateDriverCapacityJobs
           MapSubmitEvaluateDriverCapacityJobs:
             Type: Map
@@ -2301,7 +2299,10 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
-              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateDriverCapacityJob
@@ -2329,8 +2330,14 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
-                          Value.$: $.delayerToPaperChannelDailyScheduleCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
                           Value.$: $.driver
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
@@ -2378,7 +2385,10 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
-              delayerToPaperChannelDailyScheduleCron.$: $.delayerToPaperChannelDailyScheduleCron
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateResidualCapacityJob
@@ -2414,8 +2424,14 @@ Resources:
                           Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELDAILYSCHEDULECRON
-                          Value.$: $.DelayerToPaperChannelDailyScheduleCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
                         - Name: PN_DELAYER_DELIVERYWEEK
                           Value.$: $.deliveryWeek
 #                  Retry:
