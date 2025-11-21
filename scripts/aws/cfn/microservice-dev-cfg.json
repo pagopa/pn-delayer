@@ -9,7 +9,6 @@
     "KinesisPaperDeliveryLambdaBatchSize": "25",
     "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60",
     "DelayerStartWorkflowCron": "0 1 ? * MON *",
-    "DelayerToPaperChannelDailyScheduleCron" : "0 5-21 ? * TUE-SUN *",
     "DelayerToPaperChannelPipeState": "STOPPED",
     "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
     "PrintCapacityWeeklyWorkingDays": "7",
@@ -23,6 +22,8 @@
     "DelayerStartWorkflowRuleState": "DISABLED",
     "DelayerToPaperChannelDailyScheduleRuleState": "DISABLED",
     "VCPU": "1",
-    "Memory": "4096"
+    "Memory": "4096",
+    "DelayerToPaperChannelFirstSchedulerStartDate": "2025-11-24T00:00:00Z",
+    "DelayerToPaperChannelFirstSchedulerCron": "0 5-21 ? * MON-SUN *"
   }
 }
