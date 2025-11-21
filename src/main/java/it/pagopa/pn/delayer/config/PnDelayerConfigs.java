@@ -71,11 +71,11 @@ public class PnDelayerConfigs {
         private String paperDeliveryPrintCapacityTableName;
     }
 
-    public Integer calculateDailyExecutionNumber(LocalDate deliveryWeek) {
-        Instant deliveryDate = deliveryWeek.atStartOfDay(ZoneOffset.UTC).toInstant();
+    public Integer calculateDailyExecutionNumber() {
+        Instant now = Instant.now();
 
-        boolean activeSchedulerBeforeDeliveryDate = delayerToPaperChannelFirstSchedulerStartDate.isBefore(deliveryDate);
-        boolean nextSchedulerBeforeDeliveryDate   = delayerToPaperChannelSecondSchedulerStartDate.isBefore(deliveryDate);
+        boolean activeSchedulerBeforeDeliveryDate = delayerToPaperChannelFirstSchedulerStartDate.isBefore(now);
+        boolean nextSchedulerBeforeDeliveryDate   = delayerToPaperChannelSecondSchedulerStartDate.isBefore(now);
 
         if (!activeSchedulerBeforeDeliveryDate && !nextSchedulerBeforeDeliveryDate) {
             throw new PnInternalException("Both scheduler start dates are after the delivery date", "ERROR_SCHEDULERS_START_AFTER_DELIVERY_DATE");

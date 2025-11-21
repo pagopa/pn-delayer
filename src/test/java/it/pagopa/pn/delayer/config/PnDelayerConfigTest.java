@@ -18,7 +18,7 @@ public class PnDelayerConfigTest {
         configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().minus(1, ChronoUnit.DAYS));
         configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
 
-        int count = configs.calculateDailyExecutionNumber(LocalDate.now());
+        int count = configs.calculateDailyExecutionNumber();
         Assertions.assertEquals(20, count);
     }
 
@@ -31,7 +31,7 @@ public class PnDelayerConfigTest {
         configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
         configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().minus(1, ChronoUnit.DAYS));
 
-        int count = configs.calculateDailyExecutionNumber(LocalDate.now());
+        int count = configs.calculateDailyExecutionNumber();
         Assertions.assertEquals(10, count);
     }
 
@@ -44,7 +44,7 @@ public class PnDelayerConfigTest {
         configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
         configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
 
-        Assertions.assertThrows(RuntimeException.class, () -> configs.calculateDailyExecutionNumber(LocalDate.now()));
+        Assertions.assertThrows(RuntimeException.class, configs::calculateDailyExecutionNumber);
     }
 
     @Test
@@ -56,7 +56,7 @@ public class PnDelayerConfigTest {
         configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().minus(1, ChronoUnit.DAYS));
         configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().minus(2, ChronoUnit.DAYS));
 
-        int count = configs.calculateDailyExecutionNumber(LocalDate.now());
+        int count = configs.calculateDailyExecutionNumber();
         Assertions.assertEquals(20, count);
     }
 }
