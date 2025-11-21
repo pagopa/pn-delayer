@@ -73,6 +73,17 @@ Parameters:
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_paper_delivery_counters
 
+  NotificationOrdersTableName:
+    Type: String
+    Description: DynamoDB table name for notification orders
+
+  NotificationOrdersGlueTableName:
+    Type: String
+    Description: Glue table name for notification orders
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_notification_orders
+
 Resources:
   PaperDeliveryDataQualityStack:
     Type: AWS::CloudFormation::Stack
@@ -217,3 +228,28 @@ Resources:
               sentToNextWeek:struct<N:string>,
               ttl:struct<N:string>
             >
+
+  NotificationOrdersDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+        TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+        Parameters:
+            DynamoTableName: !Ref NotificationOrdersTableName
+            GlueTableName: !Ref NotificationOrdersGlueTableName
+            GlueServiceRoleArn: !Ref GlueServiceRoleArn
+            LogsBucketName: !Ref LogsBucketName
+            GlueDatabaseName: !Ref GlueDatabaseName
+            DynamoDBKeysStructure: |
+              struct<
+                  pk:struct<S:string>,
+                  sk:struct<S:string>
+              >
+            DynamoDBNewImageStructure: |
+              struct<
+                  pk:struct<S:string>,
+                  sk:struct<S:string>,
+                  value:struct<N:string>,
+                  fileKey:struct<S:string>,
+                  lastUpdateOrder:struct<S:string>,
+                  createdAt:struct<S:string>
+              >

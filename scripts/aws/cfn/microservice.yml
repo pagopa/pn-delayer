@@ -423,6 +423,22 @@ Parameters:
   ProvinceTableArn:
     Type: String
     Description: 'ARN of DynamoDB table containing Province'
+  
+  NotificationOrdersTableName:
+    Type: String
+    Description: 'DynamoDB table name for NotificationOrders'
+  
+  NotificationOrdersTableArn:
+    Type: String
+    Description: 'ARN of DynamoDB table for NotificationOrders'
+
+  NotificationOrdersTableName:
+    Type: String
+    Description: 'DynamoDB table name for NotificationOrders'
+
+  NotificationOrdersTableArn:
+    Type: String
+    Description: 'ARN of DynamoDB table for NotificationOrders'
 
   PaperChannelTenderApiLambdaName:
     Type: String
@@ -432,6 +448,10 @@ Parameters:
   DelayerReceiverOrdersSendersLambdaName:
     Type: String
     Description: 'ReceiverOrdersSendersLambda function name'
+
+  DelayerNotificationOrdersLambdaName:
+    Type: String
+    Description: 'NotificationOrdersLambda function name'
 
   SafeStorageCxId:
     Type: String
@@ -452,11 +472,30 @@ Parameters:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
+  
+  SafeStorageToNotificationOrdersQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to notification orders queue'
+  
+  SafeStorageToNotificationOrdersQueueARN:
+    Type: String
+    Description: 'queue name for safeStorage to to notification orders queue'
+  
+  SafeStorageToNotificationOrdersQueueURL:
+    Type: String
+    Description: 'Events from safe storage to notification orders queue URL'
 
-  DelayerReceiverOrdersSendersLambdaMaxRetry:
-    Type: Number
-    Default: 3
-    Description: 'Maximum retry attempts for received message for DelayerReceiverOrdersSendersLambdaQueue'
+  SafeStorageToNotificationOrdersQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to notification orders queue'
+
+  SafeStorageToNotificationOrdersQueueARN:
+    Type: String
+    Description: 'queue name for safeStorage to to notification orders queue'
+
+  SafeStorageToNotificationOrdersQueueURL:
+    Type: String
+    Description: 'Events from safe storage to notification orders queue URL'
 
   PrintCounterTtlDuration:
     Type: String
@@ -497,6 +536,11 @@ Parameters:
     Type: Number
     Description: 'Time available for downloading the data in minutes'
     Default: 4320 #3 days
+  
+  NotificationOrdersTtlDays:
+    Type: Number
+    Description: 'TTL days for lambda notification orders'
+    Default: 3650
 
   EnvironmentType:
     Type: String
@@ -1269,6 +1313,11 @@ Resources:
           InputPath: $.detail
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+        - Id: !Sub '${ProjectName}-SafeStore2NotificationOrders'
+          Arn: !Ref SafeStorageToNotificationOrdersQueueARN
+          InputPath: $.detail
+          DeadLetterConfig:
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
   DelayerOrdersSendersEventBusEnqueueRole:
     Type: AWS::IAM::Role
@@ -1534,6 +1583,103 @@ Resources:
         FunctionName: !Ref DelayerToPaperChannelLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
+  #########################################################
+  ###         DelayerNotificationOrdersLambda          ###
+  #########################################################
+
+  DelayerNotificationOrdersLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${DelayerNotificationOrdersLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  DelayerNotificationOrdersLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref DelayerNotificationOrdersLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerNotificationOrdersLambda.zip"
+      Role: !GetAtt DelayerNotificationOrdersLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PN_SAFESTORAGE_URL: !Ref SandboxSafeStorageBaseUrl
+          PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
+          NOTIFICATION_ORDERS_TABLENAME: !Ref NotificationOrdersTableName
+          TTL_DAYS: !Ref NotificationOrdersTtlDays
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 300 #5 min
+      VpcConfig:
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
+        SecurityGroupIds:
+          - !GetAtt DelayerNotificationOrdersLambdaSecGroup.GroupId
+
+  # Lambda function role
+  DelayerNotificationOrdersLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-DelayerNotificationOrdersLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+
+  # Lambda function IAM policy
+  DelayerNotificationOrdersLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DelayerNotificationOrdersLambdaPolicy
+      Roles:
+        - !Ref DelayerNotificationOrdersLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+            Resource:
+              - !Ref NotificationOrdersTableArn
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ReceiveMessage
+            Resource:
+              - !Ref SafeStorageToNotificationOrdersQueueARN
+
+  DelayerNotificationOrdersLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DelayerNotificationOrdersLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  DelayerNotificationOrdersLambdaSQSSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      EventSourceArn: !Ref SafeStorageToNotificationOrdersQueueARN
+      FunctionName: !Ref DelayerNotificationOrdersLambda
+      Enabled: true
+      MaximumBatchingWindowInSeconds: 0
+
 
   #########################################################
   ###         DelayerReceiverOrdersSendersLambda          ###
@@ -1623,6 +1769,7 @@ Resources:
               - sqs:ReceiveMessage
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+              - !Ref SafeStorageToNotificationOrdersQueueARN
 
   DelayerReceiverOrdersSendersLambdaAlarms:
     Type: AWS::CloudFormation::Stack
@@ -1655,6 +1802,7 @@ Resources:
   TestDelayerLambda:
     Type: AWS::Lambda::Function
     Properties:
+      MemorySize: 512
       FunctionName: !Ref TestDelayerLambdaName
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
@@ -1675,7 +1823,7 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 300 #5 min
+      Timeout: 900 #15 min
 
   # Lambda function role
   TestDelayerLambdaRole:
@@ -2792,3 +2940,20 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+
+  DelayerNotificationOrdersQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SafeStorageToNotificationOrdersQueueURL
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "SQS:SendMessage"
+            Resource:
+              - !Ref SafeStorageToNotificationOrdersQueueARN
