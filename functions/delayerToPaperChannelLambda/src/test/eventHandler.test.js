@@ -36,13 +36,21 @@ describe('handleEvent', () => {
     try {
       await handler.handleEvent({
         processType: 'UNKNOWN',
-        input: {
+        executionDate: '2025-07-01T00:00:00Z',
+        fixed: {
           dailyPrintCapacity: 10,
           weeklyPrintCapacity: 70,
           numberOfShipments: 100,
+          dailyExecutionCounter: 0,
+          sentToPhaseTwo: 0,
+          mondayExecutions: 17,
+          dailyExecutions: 17,
+        },
+        variable: {
           lastEvaluatedKeyPhase2: {},
           sendToNextStepCounter: 0,
-          executionDate: '2025-07-01T00:00:00Z'
+          lastEvaluatedKeyNextWeek: {},
+          sendToNextWeekCounter: 0,
         }
       });
     } catch (err) {
@@ -59,83 +67,89 @@ describe('handleEvent', () => {
 
     const result = await handler.handleEvent({
       processType: 'SEND_TO_PHASE_2',
-      input: {
+      executionDate: '2025-07-01T00:00:00Z',
+      fixed: {
         dailyPrintCapacity: 10,
         weeklyPrintCapacity: 70,
         numberOfShipments: 100,
         lastEvaluatedKeyPhase2: {},
         sendToNextStepCounter: 0,
         sentToPhaseTwo: 0,
-        executionDate: '2025-07-01T00:00:00Z',
-        stopSendToPhaseTwo: false
-      }
+        dailyExecutionCounter: 0,
+        dailyExecutions: 17,
+      },
+      variable: {
+       lastEvaluatedKeyPhase2: {},
+       sendToNextStepCounter: 0,
+       lastEvaluatedKeyNextWeek: {},
+       sendToNextWeekCounter: 0,
+     }
     });
 
     expect(retrieveStub.calledOnce).to.be.true;
     expect(mapStub.calledOnce).to.be.true;
     expect(insertStub.calledOnce).to.be.true;
-    expect(result.input).to.deep.include({
+    expect(result).to.deep.include({
       sendToNextStepCounter: 1,
-      sentToPhaseTwo: 0,
-      lastEvaluatedKeyPhase2: null,
-      dailyPrintCapacity: 10,
-      weeklyPrintCapacity: 70,
-      numberOfShipments: 100,
-      executionDate: '2025-07-01T00:00:00Z'
+      lastEvaluatedKeyPhase2: null
     });
   });
 
-  it('should handle SEND_TO_PHASE_2 when stopSendToPhaseTwo is true', async () => {
+  it('should handle SEND_TO_PHASE_2 when execution throughput', async () => {
     const result = await handler.handleEvent({
       processType: 'SEND_TO_PHASE_2',
-      input: {
+      executionDate: '2025-07-01T00:00:00Z',
+      fixed: {
         dailyPrintCapacity: 10,
         weeklyPrintCapacity: 70,
         numberOfShipments: 100,
+        dailyExecutionCounter: 0,
+        mondayExecutions: 17,
+        dailyExecutions: 17,
+      },
+      variable: {
         lastEvaluatedKeyPhase2: {},
         sendToNextStepCounter: 0,
-        executionDate: '2025-07-01T00:00:00Z',
-        stopSendToPhaseTwo: 'true'
+        lastEvaluatedKeyNextWeek: {},
+        sendToNextWeekCounter: 0,
       }
     });
 
     expect(retrieveStub.notCalled).to.be.true;
     expect(mapStub.notCalled).to.be.true;
     expect(insertStub.notCalled).to.be.true;
-    expect(result.input).to.deep.include({
+    expect(result).to.deep.include({
       sendToNextStepCounter: 0,
-      lastEvaluatedKeyPhase2: null,
-      dailyPrintCapacity: 10,
-      weeklyPrintCapacity: 70,
-      numberOfShipments: 100,
-      executionDate: '2025-07-01T00:00:00Z'
+      lastEvaluatedKeyPhase2: null
     });
   });
 
   it('should handle SEND_TO_PHASE_2 when dailyPrintCapacity is zero', async () => {
     const result = await handler.handleEvent({
       processType: 'SEND_TO_PHASE_2',
-      input: {
+      executionDate: '2025-07-01T00:00:00Z',
+      fixed: {
         dailyPrintCapacity: 0,
         weeklyPrintCapacity: 70,
         numberOfShipments: 100,
-        lastEvaluatedKeyPhase2: {},
-        sendToNextStepCounter: 0,
-        executionDate: '2025-07-01T00:00:00Z',
-        stopSendToPhaseTwo: 'false'
-      }
+        dailyExecutionCounter: 0,
+        mondayExecutions: 17,
+        dailyExecutions: 17,
+      },
+      variable: {
+       lastEvaluatedKeyPhase2: {},
+       sendToNextStepCounter: 0,
+       lastEvaluatedKeyNextWeek: {},
+       sendToNextWeekCounter: 0,
+     }
     });
 
     expect(retrieveStub.notCalled).to.be.true;
     expect(mapStub.notCalled).to.be.true;
     expect(insertStub.notCalled).to.be.true;
-    expect(result.input).to.deep.include({
+    expect(result).to.deep.include({
       sendToNextStepCounter: 0,
-      lastEvaluatedKeyPhase2: null,
-      dailyPrintCapacity: 0,
-      weeklyPrintCapacity: 70,
-      numberOfShipments: 100,
-      executionDate: '2025-07-01T00:00:00Z'
+      lastEvaluatedKeyPhase2: null
     });
   });
 
@@ -152,28 +166,30 @@ describe('handleEvent', () => {
 
     const result = await handler.handleEvent({
       processType: 'SEND_TO_NEXT_WEEK',
-      input: {
+      executionDate: '2025-07-01T00:00:00Z',
+      fixed: {
         dailyPrintCapacity: 4,
         weeklyPrintCapacity: 28,
         numberOfShipments: 20,
+        sentToNextWeek: 0,
+        dailyExecutionCounter: 0,
+        mondayExecutions: 17,
+        dailyExecutions: 17,
+      },
+      variable: {
+        lastEvaluatedKeyPhase2: {},
+        sendToNextStepCounter: 0,
         lastEvaluatedKeyNextWeek: {},
         sendToNextWeekCounter: 0,
-        sentToNextWeek: 0,
-        executionDate: '2025-07-01T00:00:00Z'
-      },
+      }
     });
 
     expect(retrieveStub.callCount).to.equal(0);
     expect(mapStub.callCount).to.equal(0);
     expect(insertStub.callCount).to.equal(0);
-    expect(result.input).to.deep.include({
+    expect(result).to.deep.include({
       sendToNextWeekCounter: 0,
-      lastEvaluatedKeyNextWeek: null,
-      dailyPrintCapacity: 4,
-      weeklyPrintCapacity: 28,
-      numberOfShipments: 20,
-      executionDate: '2025-07-01T00:00:00Z',
-      sentToNextWeek: 0
+      lastEvaluatedKeyNextWeek: null
     });
   });
 
@@ -190,28 +206,30 @@ describe('handleEvent', () => {
 
     const result = await handler.handleEvent({
       processType: 'SEND_TO_NEXT_WEEK',
-      input: {
+      executionDate: '2025-07-01T00:00:00Z',
+      fixed: {
         dailyPrintCapacity: 4,
         weeklyPrintCapacity: 28,
         numberOfShipments: 8000,
-        lastEvaluatedKeyNextWeek: {},
-        sendToNextWeekCounter: 0,
         sentToNextWeek: 0,
-        executionDate: '2025-07-01T00:00:00Z'
+        dailyExecutionCounter: 0,
+        mondayExecutions: 17,
+        dailyExecutions: 17,
       },
+      variable: {
+          lastEvaluatedKeyPhase2: {},
+          sendToNextStepCounter: 0,
+          lastEvaluatedKeyNextWeek: {},
+          sendToNextWeekCounter: 0,
+        }
     });
 
     expect(retrieveStub.callCount).to.equal(2);
     expect(mapStub.callCount).to.equal(3);
     expect(insertStub.callCount).to.equal(2);
-    expect(result.input).to.deep.include({
+    expect(result).to.deep.include({
       sendToNextWeekCounter: 3,
-      lastEvaluatedKeyNextWeek: null,
-      dailyPrintCapacity: 4,
-      weeklyPrintCapacity: 28,
-      numberOfShipments: 8000,
-      executionDate: '2025-07-01T00:00:00Z',
-      sentToNextWeek: 0
+      lastEvaluatedKeyNextWeek: null
     });
   });
 });
