@@ -16,7 +16,7 @@ exports.handleEvent = async (event) => {
         .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek)))
         .toString();
     const numberOfDailyExecution = event.fixed.dailyExecutions;
-    const numberOfDailyShipments = Math.ceil(event.fixed.dailyPrintCapacity / numberOfDailyExecution);
+    const numberOfShipmentsPerExecution = Math.ceil(event.fixed.dailyPrintCapacity / numberOfDailyExecution);
     if(event.fixed.dailyExecutionCounter >= numberOfDailyExecution){
         console.warn(`More execution than declared - declaredDailyExecution: ${numberOfDailyExecution}, currentExecutionNumber: ${event.fixed.dailyExecutionCounter}`);
         return {
@@ -29,13 +29,14 @@ exports.handleEvent = async (event) => {
     }
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
-            const toSendToNextStep = numberOfDailyShipments - event.variable.sendToNextWeekCounter;
+            const toSendToNextStep = numberOfShipmentsPerExecution - event.variable.sendToNextStepCounter;
+            const dailyResidual = event.fixed.dailyPrintCapacity - event.fixed.sentToPhaseTwo - event.fixed.sendToNextStepCounter;
             const weeklyResidual = event.fixed.weeklyPrintCapacity - event.fixed.sentToPhaseTwo;
-            if (toSendToNextStep > 0 && weeklyResidual > 0 ) {
+            if (toSendToNextStep > 0 && weeklyResidual > 0 && dailyResidual > 0 ) {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
                 return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextStep);
             }
-            console.log("No shipments to send to next step numberOfDailyShipments:", numberOfDailyShipments, "sendToNextStepCounter:", event.variable.sendToNextStepCounter);
+            console.log("No shipments to send to next step numberOfShipmentsPerExecution:", numberOfShipmentsPerExecution, "sendToNextStepCounter:", event.variable.sendToNextStepCounter);
             return {
                     lastEvaluatedKeyPhase2: null,
                     sendToNextStepCounter: parseInt(event.variable.sendToNextStepCounter),
