@@ -7,28 +7,13 @@ import org.junit.jupiter.api.Test;
 public class CronUtilsTest {
 
     @Test
-    void testWithoutMondayCronCustom() {
+    void testCronCustom() {
 
         PnDelayerConfigs configs = new PnDelayerConfigs();
-        configs.setDelayerToPaperChannelDailyScheduleCron("0 4-20 ? * MON-SUN *");
-        configs.setMondayDelayerToPaperChannelDailyScheduleCron(null);
+        configs.setDelayerToPaperChannelFirstSchedulerCron("0 1-20 ? * TUE-SUN *");
 
-        int count = CronUtils.countExecutionsInNextScheduledDay(configs.getDelayerToPaperChannelDailyScheduleCron());
-        Assertions.assertEquals(17, count);
-
-    }
-
-    @Test
-    void testWithMondayCronCustom() {
-
-        PnDelayerConfigs configs = new PnDelayerConfigs();
-        configs.setDelayerToPaperChannelDailyScheduleCron("0 1-20 ? * TUE-SUN *");
-        configs.setMondayDelayerToPaperChannelDailyScheduleCron("0 4-20 ? * MON *");
-
-        int count = CronUtils.countExecutionsInNextScheduledDay(configs.getDelayerToPaperChannelDailyScheduleCron());
-        int mondayCount = CronUtils.countExecutionsInNextScheduledDay(configs.getMondayDelayerToPaperChannelDailyScheduleCron());
+        int count = CronUtils.countExecutionsInNextScheduledDay(configs.getDelayerToPaperChannelFirstSchedulerCron());
         Assertions.assertEquals(20, count);
-        Assertions.assertEquals(17, mondayCount);
 
     }
 }

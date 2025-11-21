@@ -3,32 +3,60 @@ package it.pagopa.pn.delayer.config;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+
 public class PnDelayerConfigTest {
 
     @Test
-    void testWithoutMondayCronCustom() {
+    void calculateDailyExecutionNumberActive() {
 
         PnDelayerConfigs configs = new PnDelayerConfigs();
-        configs.setDelayerToPaperChannelDailyScheduleCron("0 4-20 ? * MON-SUN *");
-        configs.setMondayDelayerToPaperChannelDailyScheduleCron(null);
+        configs.setDelayerToPaperChannelFirstSchedulerCron("0 1-20 ? * TUE-SUN *");
+        configs.setDelayerToPaperChannelSecondSchedulerCron("0 1-10 ? * TUE-SUN *");
+        configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().minus(1, ChronoUnit.DAYS));
+        configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
 
-        int mondayCount = configs.calculateMondayExecutionNumber();
         int count = configs.calculateDailyExecutionNumber();
-        Assertions.assertEquals(17, count);
-        Assertions.assertEquals(17, mondayCount);
+        Assertions.assertEquals(20, count);
     }
 
     @Test
-    void testWithMondayCronCustom() {
+    void calculateDailyExecutionNumberNext() {
 
         PnDelayerConfigs configs = new PnDelayerConfigs();
-        configs.setDelayerToPaperChannelDailyScheduleCron("0 1-20 ? * TUE-SUN *");
-        configs.setMondayDelayerToPaperChannelDailyScheduleCron("0 4-20 ? * MON *");
+        configs.setDelayerToPaperChannelFirstSchedulerCron("0 1-20 ? * TUE-SUN *");
+        configs.setDelayerToPaperChannelSecondSchedulerCron("0 1-10 ? * TUE-SUN *");
+        configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
+        configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().minus(1, ChronoUnit.DAYS));
 
-        int mondayCount = configs.calculateMondayExecutionNumber();
+        int count = configs.calculateDailyExecutionNumber();
+        Assertions.assertEquals(10, count);
+    }
+
+    @Test
+    void calculateDailyExecutionNumberBothDateAfter() {
+
+        PnDelayerConfigs configs = new PnDelayerConfigs();
+        configs.setDelayerToPaperChannelFirstSchedulerCron(null);
+        configs.setDelayerToPaperChannelSecondSchedulerCron(null);
+        configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
+        configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().plus(1, ChronoUnit.DAYS));
+
+        Assertions.assertThrows(RuntimeException.class, configs::calculateDailyExecutionNumber);
+    }
+
+    @Test
+    void calculateDailyExecutionNumberBothDateBefore() {
+
+        PnDelayerConfigs configs = new PnDelayerConfigs();
+        configs.setDelayerToPaperChannelFirstSchedulerCron("0 1-20 ? * TUE-SUN *");
+        configs.setDelayerToPaperChannelSecondSchedulerCron("0 1-10 ? * TUE-SUN *");
+        configs.setDelayerToPaperChannelFirstSchedulerStartDate(Instant.now().minus(1, ChronoUnit.DAYS));
+        configs.setDelayerToPaperChannelSecondSchedulerStartDate(Instant.now().minus(2, ChronoUnit.DAYS));
+
         int count = configs.calculateDailyExecutionNumber();
         Assertions.assertEquals(20, count);
-        Assertions.assertEquals(17, mondayCount);
-
     }
 }
