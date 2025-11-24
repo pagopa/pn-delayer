@@ -6,20 +6,21 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 ## Operazioni disponibili
 
-| Nome                         | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                                                                                                                                                                                   |
-|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **IMPORT_DATA**              | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename", "deliveryWeek"]` deliveryWeek opzionale                                                                                                          |
-| **DELETE_DATA**              | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename", "]` filename opzionale                                                          |
-| **GET_USED_CAPACITY**        | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                           |
-| **GET_BY_REQUEST_ID**        | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                  |
-| **RUN_ALGORITHM**            | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity", "deliveryWeek"]` |
-| **DELAYER_TO_PAPER_CHANNEL** | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                             |
-| **GET_STATUS_EXECUTION**     | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                               | `["executionArn"]`                                                                                                                                                                                                               |
-| **GET_PAPER_DELIVERY**       | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
-| **GET_SENDER_LIMIT**         | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                     |
-| **GET_PRESIGNED_URL**        | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                         | `["filename","checksum"]`                                                                                                                                                                                                        |
-| **GET_DECLARED_CAPACITY**    | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
-| **INSERT_MOCK_CAPACITIES**   | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                          | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
+| Nome                           | Descrizione                                                                                                                                                         | Parametri (`event.parameters`)                                                                                                                                                                                                   |
+|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **IMPORT_DATA**                | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                        | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName","filename", "deliveryWeek"]` deliveryWeek opzionale                                                                                                          |
+| **DELETE_DATA**                | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                            | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename", "]` filename opzionale                                                         |
+| **GET_USED_CAPACITY**          | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`. | `[ "unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                                                                           |
+| **GET_BY_REQUEST_ID**          | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.            | `[ requestId ]`                                                                                                                                                                                                                  |
+| **RUN_ALGORITHM**              | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                           | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity", "deliveryWeek"]` |
+| **DELAYER_TO_PAPER_CHANNEL**   | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                             |
+| **GET_STATUS_EXECUTION**       | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                               | `["executionArn"]`                                                                                                                                                                                                               |
+| **GET_PAPER_DELIVERY**         | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
+| **GET_SENDER_LIMIT**           | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                     |
+| **GET_PRESIGNED_URL**          | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                         | `["filename","checksum"]`                                                                                                                                                                                                        |
+| **GET_DECLARED_CAPACITY**      | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
+| **INSERT_MOCK_CAPACITIES**     | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                          | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
+| **GET_PRINT_CAPACITY_COUNTER** | Restituisce l'entità del contatore per la verifica della capacità di stampa settimanale.                                                                            | `["paperDeliveryCountersTableName, deliveryDate"]`                                                                                                                                                                               |
 
 ### Esempi di payload
 
@@ -172,6 +173,15 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   "parameters": ["example.csv","abcd1234efgh5678ijkl9012mnop3456"]
 }
 ```
+
+*GET_PRINT_CAPACITY_COUNTER*
+```json
+{
+  "operationType": "GET_PRINT_CAPACITY_COUNTER",
+  "parameters": ["pn-PaperDeliveryCounters","2025-11-24"]
+}
+```
+
 ### Output GET_DECLARED_CAPACITY
 
 * Items trovati → 
@@ -326,6 +336,29 @@ Un esempio di risposta è il seguente:
 }
 ```
 
+### Output GET_PRINT_CAPACITY_COUNTER
+
+* Items presenti →
+```json
+{
+  "pk": "PRINT",
+  "sk": "2025-11-24",
+  "dailyExecutionCounter": 4,
+  "dailyExecutionNumber": 4,
+  "dailyPrintCapacity": 20,
+  "lastEvaluatedKeyNextWeek": {},
+  "lastEvaluatedKeyPhase2": {
+  "pk": "2025-11-24~EVALUATE_PRINT_CAPACITY",
+  "sk": "1~2025-07-02T00:48:00Z~tcRanking_RS_2"
+  },
+  "numberOfShipments": 70,
+  "sentToNextWeek": 0,
+  "sentToPhaseTwo": 11,
+  "ttl": 1766571878068,
+  "weeklyPrintCapacity": 140
+}
+ ```
+
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 
 ## Struttura del progetto
@@ -344,9 +377,10 @@ Un esempio di risposta è il seguente:
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
 │       ├── getDeclaredCapacity.js                      # Implementazione operazione GET_DECLARED_CAPACITY
 │       ├── getPaperDelivery.js                         # Implementazione operazione GET_PAPER_DELIVERY
-        ├── getPresignedUrl.js                          # Implementazione operazione GET_PRESIGNED_URL
+│       ├── getPresignedUrl.js                          # Implementazione operazione GET_PRESIGNED_URL
 │       ├── getStatusExecution.js                       # Implementazione operazione GET_STATUS_EXECUTION
 │       ├── insertMockCapacities.js                     # Implementazione operazione INSERT_MOCK_CAPACITIES
+│       └── getPrintCapacityCounter.js                  # Implementazione operazione GET_PRINT_CAPACITY_COUNTER
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio

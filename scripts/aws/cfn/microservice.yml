@@ -1797,6 +1797,10 @@ Resources:
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
           DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
+          DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON: !Ref DelayerToPaperChannelFirstSchedulerCron
+          DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON: !Ref DelayerToPaperChannelSecondSchedulerCron
+          DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+          DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
       TracingConfig:
@@ -2645,8 +2649,7 @@ Resources:
                 sentToNextWeek.$: $.queryResult.Items[0].sentToNextWeek.N
                 sentToPhaseTwo.$: $.queryResult.Items[0].sentToPhaseTwo.N
                 sk.$: $.queryResult.Items[0].sk.S
-                dailyExecutions.$: $.queryResult.Items[0].dailyExecutions.N
-                mondayExecutions.$: $.queryResult.Items[0].mondayExecutions.N
+                dailyExecutions.$: $.queryResult.Items[0].dailyExecutionNumber.N
                 dailyExecutionCounter.$: $.queryResult.Items[0].dailyExecutionCounter.N
               variable:
                 sendToNextStepCounter: 0
