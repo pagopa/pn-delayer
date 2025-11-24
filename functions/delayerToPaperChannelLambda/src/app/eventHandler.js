@@ -17,7 +17,7 @@ exports.handleEvent = async (event) => {
         .toString();
     const numberOfDailyExecution = event.fixed.dailyExecutions;
     const numberOfShipmentsPerExecution = Math.ceil(event.fixed.dailyPrintCapacity / numberOfDailyExecution);
-    if(event.fixed.dailyExecutionCounter >= numberOfDailyExecution){
+    if (parseInt(event.fixed.dailyExecutionCounter, 10) >= parseInt(numberOfDailyExecution)) {
         console.warn(`More execution than declared - declaredDailyExecution: ${numberOfDailyExecution}, currentExecutionNumber: ${event.fixed.dailyExecutionCounter}`);
         return {
             moreExecutionThanDeclared: true,
@@ -30,7 +30,7 @@ exports.handleEvent = async (event) => {
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = numberOfShipmentsPerExecution - event.variable.sendToNextStepCounter;
-            const dailyResidual = event.fixed.dailyPrintCapacity - event.fixed.sentToPhaseTwo - event.fixed.sendToNextStepCounter;
+            const dailyResidual = event.fixed.dailyPrintCapacity - event.fixed.sentToPhaseTwo - event.variable.sendToNextStepCounter;
             const weeklyResidual = event.fixed.weeklyPrintCapacity - event.fixed.sentToPhaseTwo;
             if (toSendToNextStep > 0 && weeklyResidual > 0 && dailyResidual > 0 ) {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
