@@ -388,17 +388,17 @@ Parameters:
   DelayerToPaperChannelFirstSchedulerEndDate:
     Type: String
     Description: 'End date for DelayerToPaperChannelDailyScheduleFirstRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. To specify an unlimited duration we use 2099'
-    Default: '2099-01-01T23:00:00Z'
+    Default: '2099-01-01T23:00:00.000Z'
 
   DelayerToPaperChannelSecondSchedulerStartDate:
     Type: String
     Description: 'Start date for DelayerToPaperChannelDailyScheduleSecondRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. Must be disabled for now, so we set 2099-01-01'
-    Default: '2099-01-01T00:00:00Z'
+    Default: '2099-01-01T00:00:00.000Z'
 
   DelayerToPaperChannelSecondSchedulerEndDate:
     Type: String
     Description: 'End date for DelayerToPaperChannelDailyScheduleSecondRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. To specify an unlimited duration we use 2099'
-    Default: '2099-01-01T23:00:00Z'
+    Default: '2099-01-01T23:00:00.000Z'
 
   DelayerStartWorkflowRuleState:
     Type: String
@@ -1964,7 +1964,7 @@ Resources:
               "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON": "${DelayerToPaperChannelFirstSchedulerCron}",
               "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON": "${DelayerToPaperChannelSecondSchedulerCron}",
               "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE": "${DelayerToPaperChannelFirstSchedulerStartDate}",
-              "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE: "${DelayerToPaperChannelSecondSchedulerStartDate}"
+              "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE": "${DelayerToPaperChannelSecondSchedulerStartDate}",
               "PN_DELAYER_DELIVERYWEEK": null
             }
 
@@ -2528,20 +2528,19 @@ Resources:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
       State: !Ref DelayerToPaperChannelDailyScheduleRuleState
-      StartDate: "DelayerToPaperChannelFirstSchedulerStartDate"
-      EndDate: "DelayerToPaperChannelFirstSchedulerEndDate"
+      StartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+      EndDate: !Ref DelayerToPaperChannelFirstSchedulerEndDate
       FlexibleTimeWindow:
-        Mode: OFF
+        Mode: "OFF"
       Target:
-        - Id: DelayerToPaperChannelStepFunctionTarget
-          Arn: !Ref DelayerToPaperChannelStateMachine
-          RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
-          Input: !Sub |
-            {
-              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
-              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
-            }
+        Arn: !Ref DelayerToPaperChannelStateMachine
+        RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+        Input: !Sub |
+          {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
 
   DelayerToPaperChannelDailySecondScheduler:
     Type: AWS::Scheduler::Schedule
@@ -2549,20 +2548,19 @@ Resources:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
       State: !Ref DelayerToPaperChannelDailyScheduleRuleState
-      StartDate: "DelayerToPaperChannelSecondSchedulerStartDate"
-      EndDate: "DelayerToPaperChannelSecondSchedulerEndDate"
+      StartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+      EndDate: !Ref DelayerToPaperChannelSecondSchedulerEndDate
       FlexibleTimeWindow:
-        Mode: OFF
+        Mode: "OFF"
       Target:
-        - Id: DelayerToPaperChannelStepFunctionTarget
-          Arn: !Ref DelayerToPaperChannelStateMachine
-          RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
-          Input: !Sub |
-            {
-              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
-              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
-            }
+        Arn: !Ref DelayerToPaperChannelStateMachine
+        RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+        Input: !Sub |
+          {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
 
   DelayerToPaperChannelDailyScheduleRuleRole:
     Type: AWS::IAM::Role
@@ -2573,7 +2571,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: events.amazonaws.com
+              Service: scheduler.amazonaws.com
             Action: sts:AssumeRole
       Policies:
         - PolicyName: DelayerToPaperChannelStepFunctionInvokePolicy
@@ -2835,9 +2833,9 @@ Resources:
                 ":phase2Val":
                   M.$: $.variable.lastEvaluatedKeyPhase2
                 ":sentToNextWeekInc":
-                  N.$: States.Format("{}", $.variable.sendToNextWeekCounter)
+                  "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
                 ":sentToPhaseTwoInc":
-                  N.$: States.Format("{}", $.variable.sendToNextStepCounter)
+                  "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
                 ":dailyExecutionCounterInc":
                   N: "1"
               Key:
