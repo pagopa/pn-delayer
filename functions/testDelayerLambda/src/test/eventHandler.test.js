@@ -88,7 +88,7 @@ describe("Lambda Delayer Dispatcher", () => {
             capacity: 1000,
         };
         ddbMock.on(GetCommand).resolves({ Item: fakeItem });
-        const params = ["Sailpost", "87100", "2025-06-30T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverUsedCapacities", "Sailpost", "87100", "2025-06-30T00:00:00Z"];
 
         const result = await handler({ operationType: "GET_USED_CAPACITY", parameters: params });
         assert.strictEqual(result.statusCode, 200);
@@ -98,7 +98,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
     it("GET_USED_CAPACITY item not found", async () => {
         ddbMock.on(GetCommand).resolves({});
-        const params = ["Nope", "00000", "2025-01-01T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverUsedCapacities", "Nope", "00000", "2025-01-01T00:00:00Z"];
 
         const result = await handler({ operationType: "GET_USED_CAPACITY", parameters: params });
         assert.strictEqual(JSON.parse(result.body).message, "Item not found");
