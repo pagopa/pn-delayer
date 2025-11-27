@@ -17,30 +17,28 @@ exports.handleEvent = async (event) => {
         .toString();
     const numberOfDailyExecution = event.fixed.dailyExecutions;
     const numberOfShipmentsPerExecution = Math.ceil(event.fixed.dailyPrintCapacity / numberOfDailyExecution);
-    if (parseInt(event.fixed.dailyExecutionCounter, 10) >= parseInt(numberOfDailyExecution)) {
-        console.warn(`More execution than declared - declaredDailyExecution: ${numberOfDailyExecution}, currentExecutionNumber: ${event.fixed.dailyExecutionCounter}`);
-        return {
-            moreExecutionThanDeclared: true,
-            sendToNextStepCounter: parseInt(event.variable.sendToNextStepCounter),
-            sendToNextWeekCounter: parseInt(event.variable.sendToNextWeekCounter),
-            lastEvaluatedKeyNextWeek: null,
-            lastEvaluatedKeyPhase2: null
-        }
+    const today = new Date().toISOString();
+    const counter = parseInt(event.fixed.dailyExecutionCounter, 10) || 0;
+    const maxExecutions = parseInt(numberOfDailyExecution, 10) || 0;
+    let lastExecution = false;
+
+    if (counter === maxExecutions - 1) {
+        console.warn(`Last execution for day ${today} -> numberOfDailyExecution: ${numberOfDailyExecution}, currentExecutionNumber: ${event.fixed.dailyExecutionCounter}`);
+        lastExecution = true;
     }
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = numberOfShipmentsPerExecution - event.variable.sendToNextStepCounter;
-            const dailyResidual = event.fixed.dailyPrintCapacity - event.fixed.sentToPhaseTwo - event.variable.sendToNextStepCounter;
             const weeklyResidual = event.fixed.weeklyPrintCapacity - event.fixed.sentToPhaseTwo;
-            if (toSendToNextStep > 0 && weeklyResidual > 0 && dailyResidual > 0 ) {
+            if (toSendToNextStep > 0 && !event.variable.stopSendToPhaseTwo && weeklyResidual > 0) {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
-                return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextStep);
+                return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextStep, lastExecution);
             }
-            console.log("No shipments to send to next step numberOfShipmentsPerExecution:", numberOfShipmentsPerExecution, "sendToNextStepCounter:", event.variable.sendToNextStepCounter);
+            console.log("No shipments to send to next step - weeklyResidual:", weeklyResidual, "sentToPhaseTwo:", event.fixed.sentToPhaseTwo);
             return {
                     lastEvaluatedKeyPhase2: null,
                     sendToNextStepCounter: parseInt(event.variable.sendToNextStepCounter),
-                    moreExecutionThanDeclared: false,
+                    lastExecution: lastExecution,
             };
         }
         case "SEND_TO_NEXT_WEEK": {
@@ -48,13 +46,13 @@ exports.handleEvent = async (event) => {
             const toSendToNextWeek = exceed - event.fixed.sentToNextWeek - event.variable.sendToNextWeekCounter;
             if (toSendToNextWeek > 0) {
                 console.log(`To send to next week: ${toSendToNextWeek}`);
-                return sendToNextWeek(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextWeek);
+                return sendToNextWeek(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextWeek, lastExecution);
             }
             console.log("No shipments to send to next week");
             return {
                     lastEvaluatedKeyNextWeek: null,
                     sendToNextWeekCounter: parseInt(event.variable.sendToNextWeekCounter),
-                    moreExecutionThanDeclared: false,
+                    lastExecution: lastExecution,
             };
         }
         default:
@@ -62,7 +60,7 @@ exports.handleEvent = async (event) => {
     }
 };
 
-async function sendToPhase2(paperDeliveryTableName, deliveryWeek, variable, toSendToNextStep) {
+async function sendToPhase2(paperDeliveryTableName, deliveryWeek, variable, toSendToNextStep, lastExecution) {
     return retrieveAndProcessItems(
             paperDeliveryTableName,
             deliveryWeek,
@@ -77,12 +75,12 @@ async function sendToPhase2(paperDeliveryTableName, deliveryWeek, variable, toSe
             return {
                     lastEvaluatedKeyPhase2: remapLastEvaluatedKey(result.lastEvaluatedKey),
                     sendToNextStepCounter: parseInt(result.dailyCounter),
-                    moreExecutionThanDeclared: false,
+                    lastExecution: lastExecution,
             };
     });
 }
 
-async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, variable, toSendToNextWeek) {
+async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, variable, toSendToNextWeek, lastExecution) {
     return retrieveAndProcessItems(
             paperDeliveryTableName,
             deliveryWeek,
@@ -97,7 +95,7 @@ async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, variable, to
             return {
                     lastEvaluatedKeyNextWeek: remapLastEvaluatedKeyForNextWeek(result.lastEvaluatedKey, result.toHandle, result.dailyCounter),
                     sendToNextWeekCounter: parseInt(result.dailyCounter),
-                    moreExecutionThanDeclared: false,
+                    lastExecution: lastExecution,
             };
     });
 }

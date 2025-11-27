@@ -2656,10 +2656,13 @@ Resources:
                 sendToNextWeekCounter: 0
                 lastEvaluatedKeyNextWeek.$: $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
                 lastEvaluatedKeyPhase2.$: $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
+                lastExecution: false
+                stopSendToPhaseTwo.$: $.queryResult.Items[0].stopSendToPhaseTwo.Bool
+
 
           Parallel:
             Type: Parallel
-            Next: MoreExecutionThanDeclared
+            Next: IsLastEvaluatedKeyNextWeekNull
             ResultPath: $.variable
             Branches:
               - StartAt: SendPrintCapacityExceedToNextWeek
@@ -2678,7 +2681,7 @@ Resources:
                     ResultSelector:
                       lastEvaluatedKeyNextWeek.$: $.Payload.lastEvaluatedKeyNextWeek
                       sendToNextWeekCounter.$: $.Payload.sendToNextWeekCounter
-                      moreExecutionThanDeclared.$: $.Payload.moreExecutionThanDeclared
+                      lastExecution.$: $.Payload.lastExecution
                     ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
@@ -2705,6 +2708,8 @@ Resources:
                               IsNull: true
                           - Variable: $.variable.sendToNextWeekCounter
                             NumericLessThan: 250000
+                          - Variable: $.variable.lastExecution
+                            BooleanEquals: false
                         Next: SendPrintCapacityExceedToNextWeek
                     Default: ToNextWeekSuccessfully
 
@@ -2730,7 +2735,7 @@ Resources:
                     ResultSelector:
                       lastEvaluatedKeyPhase2.$: $.Payload.lastEvaluatedKeyPhase2
                       sendToNextStepCounter.$: $.Payload.sendToNextStepCounter
-                      moreExecutionThanDeclared.$: $.Payload.moreExecutionThanDeclared
+                      lastExecution.$: $.Payload.lastExecution
                     ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
@@ -2757,6 +2762,8 @@ Resources:
                               IsNull: true
                           - Variable: $.variable.sendToNextStepCounter
                             NumericLessThanPath: $.fixed.dailyPrintCapacity
+                          - Variable: $.variable.lastExecution
+                            BooleanEquals: false
                         Next: SendPaperDeliveryToPreparePhase2
                     Default: ToPreparePhase2Successfully
 
@@ -2771,21 +2778,7 @@ Resources:
               sendToNextStepCounter.$: $[1].variable.sendToNextStepCounter
               lastEvaluatedKeyNextWeek.$: $[0].variable.lastEvaluatedKeyNextWeek
               sendToNextWeekCounter.$: $[0].variable.sendToNextWeekCounter
-              moreExecutionThanDeclared.$: $[1].variable.moreExecutionThanDeclared
-
-          MoreExecutionThanDeclared:
-            Type: Choice
-            Choices:
-              - And:
-                  - Variable: $.variable.moreExecutionThanDeclared
-                    IsPresent: true
-                  - Variable: $.variable.moreExecutionThanDeclared
-                    BooleanEquals: true
-                Next: MoreExecutionThanDeclaredNoUpdate
-            Default: IsLastEvaluatedKeyNextWeekNull
-
-          MoreExecutionThanDeclaredNoUpdate:
-            Type: Succeed
+              lastExecution.$: $[1].variable.lastExecution
 
           IsLastEvaluatedKeyNextWeekNull:
             Type: Choice
@@ -2801,17 +2794,19 @@ Resources:
               - Variable: $.variable.lastEvaluatedKeyPhase2
                 IsNull: true
                 Next: PatchPhase2Null
-            Default: UpdatePaperDeliveryCounter
+            Default: LastExecution
 
           PatchPhase2Null:
             Type: Pass
-            Next: UpdatePaperDeliveryCounter
+            Next: LastExecution
             ResultPath: $.variable
             Parameters:
               lastEvaluatedKeyPhase2: { }
               lastEvaluatedKeyNextWeek.$: $.variable.lastEvaluatedKeyNextWeek
               sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
               sendToNextStepCounter.$: $.variable.sendToNextStepCounter
+              lastExecution.$: $.variable.lastExecution
+              stopSendToPhaseTwo: "true"
 
           PatchNextWeekNull:
             Type: Pass
@@ -2819,9 +2814,55 @@ Resources:
             ResultPath: $.variable
             Parameters:
               lastEvaluatedKeyNextWeek: { }
-              sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
               lastEvaluatedKeyPhase2.$: $.variable.lastEvaluatedKeyPhase2
+              sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
               sendToNextStepCounter.$: $.variable.sendToNextStepCounter
+              lastExecution.$: $.variable.lastExecution
+
+          LastExecution:
+            Type: Choice
+            Choices:
+              - And:
+                  - IsPresent: true
+                    Variable: $.variable.lastExecution
+                  - BooleanEquals: true
+                    Variable: $.variable.lastExecution
+                Next: UpdatePaperDeliveryCounterResetExecution
+            Default: UpdatePaperDeliveryCounter
+
+          UpdatePaperDeliveryCounterResetExecution:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:updateItem
+            Parameters:
+              ExpressionAttributeValues:
+                ":dailyExecutionCounterInc":
+                  N: "0"
+                ":nextWeekVal":
+                  M.$: $.variable.lastEvaluatedKeyNextWeek
+                ":phase2Val":
+                  M.$: $.variable.lastEvaluatedKeyPhase2
+                ":sentToNextWeekInc":
+                  "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
+                ":sentToPhaseTwoInc":
+                  "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
+              Key:
+                pk:
+                  S.$: $.fixed.pk
+                sk:
+                  S.$: $.fixed.sk
+              TableName.$: $.paperDeliveryCountersTableName
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
+            End: true
+            Retry:
+              - ErrorEquals:
+                  - States.ALL
+                IntervalSeconds: 1
+                BackoffRate: 2
+                MaxAttempts: 3
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: UpdateCounterOperationFail
 
           NoItemToProcess:
             Type: Succeed
@@ -2841,13 +2882,15 @@ Resources:
                   "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
                 ":dailyExecutionCounterInc":
                   N: "1"
+                ":stopSendToPhaseTwoVal":
+                  "Bool.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
               Key:
                 pk:
                   S.$: $.fixed.pk
                 sk:
                   S.$: $.fixed.sk
               TableName.$: $.paperDeliveryCountersTableName
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc, dailyExecutionCounter :dailyExecutionCounterInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc, dailyExecutionCounter :dailyExecutionCounterInc"
             Retry:
               - ErrorEquals:
                   - States.ALL
