@@ -2736,6 +2736,7 @@ Resources:
                       lastEvaluatedKeyPhase2.$: $.Payload.lastEvaluatedKeyPhase2
                       sendToNextStepCounter.$: $.Payload.sendToNextStepCounter
                       lastExecution.$: $.Payload.lastExecution
+                      stopSendToPhaseTwo.$: $.Payload.stopSendToPhaseTwo
                     ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
@@ -2806,7 +2807,7 @@ Resources:
               sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
               sendToNextStepCounter.$: $.variable.sendToNextStepCounter
               lastExecution.$: $.variable.lastExecution
-              stopSendToPhaseTwo: "true"
+              stopSendToPhaseTwo: true
 
           PatchNextWeekNull:
             Type: Pass
@@ -2818,7 +2819,7 @@ Resources:
               sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
               sendToNextStepCounter.$: $.variable.sendToNextStepCounter
               lastExecution.$: $.variable.lastExecution
-
+              stopSendToPhaseTwo.$: $.variable.stopSendToPhaseTwo
           LastExecution:
             Type: Choice
             Choices:
@@ -2845,13 +2846,15 @@ Resources:
                   "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
                 ":sentToPhaseTwoInc":
                   "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
+                ":stopSendToPhaseTwoVal":
+                  BOOL.$: $.variable.stopSendToPhaseTwo
               Key:
                 pk:
                   S.$: $.fixed.pk
                 sk:
                   S.$: $.fixed.sk
               TableName.$: $.paperDeliveryCountersTableName
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
             End: true
             Retry:
               - ErrorEquals:
@@ -2869,7 +2872,7 @@ Resources:
 
           UpdatePaperDeliveryCounter:
             Type: Task
-            Resource: arn:aws:states:::aws-sdk:dynamodb:updateItem
+            Resource: arn:aws:states:::dynamodb:updateItem
             Parameters:
               ExpressionAttributeValues:
                 ":nextWeekVal":
@@ -2883,7 +2886,7 @@ Resources:
                 ":dailyExecutionCounterInc":
                   N: "1"
                 ":stopSendToPhaseTwoVal":
-                  "Bool.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
+                  BOOL.$: $.variable.stopSendToPhaseTwo
               Key:
                 pk:
                   S.$: $.fixed.pk

@@ -83,6 +83,7 @@ describe('handleEvent', () => {
        sendToNextStepCounter: 0,
        lastEvaluatedKeyNextWeek: {},
        sendToNextWeekCounter: 0,
+       stopSendToPhaseTwo: false,
      }
     });
 
@@ -112,6 +113,7 @@ describe('handleEvent', () => {
         sendToNextStepCounter: 0,
         lastEvaluatedKeyNextWeek: {},
         sendToNextWeekCounter: 0,
+        stopSendToPhaseTwo: false,
       }
     });
 
@@ -141,6 +143,7 @@ describe('handleEvent', () => {
        sendToNextStepCounter: 0,
        lastEvaluatedKeyNextWeek: {},
        sendToNextWeekCounter: 0,
+       stopSendToPhaseTwo: false,
      }
     });
 
@@ -181,6 +184,7 @@ describe('handleEvent', () => {
         sendToNextStepCounter: 0,
         lastEvaluatedKeyNextWeek: {},
         sendToNextWeekCounter: 0,
+        stopSendToPhaseTwo: false,
       }
     });
 
@@ -221,6 +225,7 @@ describe('handleEvent', () => {
           sendToNextStepCounter: 0,
           lastEvaluatedKeyNextWeek: {},
           sendToNextWeekCounter: 0,
+          stopSendToPhaseTwo: false,
         }
     });
 
