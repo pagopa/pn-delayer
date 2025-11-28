@@ -2780,7 +2780,7 @@ Resources:
               lastEvaluatedKeyNextWeek.$: $[0].variable.lastEvaluatedKeyNextWeek
               sendToNextWeekCounter.$: $[0].variable.sendToNextWeekCounter
               lastExecution.$: $[1].variable.lastExecution
-
+              stopSendToPhaseTwo.$: $[1].variable.stopSendToPhaseTwo
           IsLastEvaluatedKeyNextWeekNull:
             Type: Choice
             Choices:
