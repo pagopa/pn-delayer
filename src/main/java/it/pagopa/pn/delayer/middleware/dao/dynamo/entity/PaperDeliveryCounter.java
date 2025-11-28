@@ -25,6 +25,7 @@ public class PaperDeliveryCounter {
     public static final String COL_SENT_TO_PHASE_TWO = "sentToPhaseTwo";
     public static final String COL_LEK_TO_NEXT_WEEK = "lastEvaluatedKeyNextWeek";
     public static final String COL_LEK_PHASE2 = "lastEvaluatedKeyPhase2";
+    public static final String COL_STOP_SEND_TO_PHASE_TWO = "stopSendToPhaseTwo";
     public static final String COL_DAILY_EXECUTION_NUMBER = "dailyExecutionNumber";
     public static final String COL_DAILY_EXECUTION_COUNTER = "dailyExecutionCounter";
 
@@ -47,6 +48,8 @@ public class PaperDeliveryCounter {
     private Integer sentToNextWeek;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENT_TO_PHASE_TWO)}))
     private Integer sentToPhaseTwo;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_STOP_SEND_TO_PHASE_TWO)}))
+    private Boolean stopSendToPhaseTwo;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TTL)}))
     private long ttl;
 
@@ -74,6 +77,7 @@ public class PaperDeliveryCounter {
         paperDeliveryCounter.setDailyExecutionCounter(0);
         paperDeliveryCounter.setDailyExecutions(dailyExecutionNumber);
         paperDeliveryCounter.setTtl(Instant.now().plus(ttlDuration).toEpochMilli());
+        paperDeliveryCounter.setStopSendToPhaseTwo(false);
         return paperDeliveryCounter;
     }
 

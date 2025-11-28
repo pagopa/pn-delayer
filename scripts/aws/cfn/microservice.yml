@@ -2657,6 +2657,8 @@ Resources:
                 lastEvaluatedKeyNextWeek.$: $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
                 lastEvaluatedKeyPhase2.$: $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
                 lastExecution: false
+                stopSendToPhaseTwo.$: $.queryResult.Items[0].stopSendToPhaseTwo.Bool
+
 
           Parallel:
             Type: Parallel
@@ -2734,6 +2736,7 @@ Resources:
                       lastEvaluatedKeyPhase2.$: $.Payload.lastEvaluatedKeyPhase2
                       sendToNextStepCounter.$: $.Payload.sendToNextStepCounter
                       lastExecution.$: $.Payload.lastExecution
+                      stopSendToPhaseTwo.$: $.Payload.stopSendToPhaseTwo
                     ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
@@ -2804,6 +2807,7 @@ Resources:
               sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
               sendToNextStepCounter.$: $.variable.sendToNextStepCounter
               lastExecution.$: $.variable.lastExecution
+              stopSendToPhaseTwo: true
 
           PatchNextWeekNull:
             Type: Pass
@@ -2815,7 +2819,7 @@ Resources:
               sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
               sendToNextStepCounter.$: $.variable.sendToNextStepCounter
               lastExecution.$: $.variable.lastExecution
-
+              stopSendToPhaseTwo.$: $.variable.stopSendToPhaseTwo
           LastExecution:
             Type: Choice
             Choices:
@@ -2842,13 +2846,15 @@ Resources:
                   "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
                 ":sentToPhaseTwoInc":
                   "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
+                ":stopSendToPhaseTwoVal":
+                  BOOL.$: $.variable.stopSendToPhaseTwo
               Key:
                 pk:
                   S.$: $.fixed.pk
                 sk:
                   S.$: $.fixed.sk
               TableName.$: $.paperDeliveryCountersTableName
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
             End: true
             Retry:
               - ErrorEquals:
@@ -2866,7 +2872,7 @@ Resources:
 
           UpdatePaperDeliveryCounter:
             Type: Task
-            Resource: arn:aws:states:::aws-sdk:dynamodb:updateItem
+            Resource: arn:aws:states:::dynamodb:updateItem
             Parameters:
               ExpressionAttributeValues:
                 ":nextWeekVal":
@@ -2879,13 +2885,15 @@ Resources:
                   "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
                 ":dailyExecutionCounterInc":
                   N: "1"
+                ":stopSendToPhaseTwoVal":
+                  BOOL.$: $.variable.stopSendToPhaseTwo
               Key:
                 pk:
                   S.$: $.fixed.pk
                 sk:
                   S.$: $.fixed.sk
               TableName.$: $.paperDeliveryCountersTableName
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc, dailyExecutionCounter :dailyExecutionCounterInc"
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc, dailyExecutionCounter :dailyExecutionCounterInc"
             Retry:
               - ErrorEquals:
                   - States.ALL
