@@ -469,6 +469,33 @@ Parameters:
   EnvironmentType:
     Type: String
 
+  ExportDryRunDashboardDataLambdaName:
+    Type: String
+    Description: 'ExportDryRunDashboardData function name'
+
+  ExportDryRunDashboardDataRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the ExportDryRunDashboardDataRuleState'
+
+  ExportDryRunDashboardDataLambdaCron:
+    Type: String
+    Default: '0 7 ? * 2 *'
+    Description: 'Cron expression for ExportDryRunDashboardDataLambdaRule'
+    
+  AthenaDatabaseName:
+    Type: String
+    Default: 'cdc_analytics_database'
+    Description: 'Name of the Athena database where delayer dry run data is stored'
+
+  MonthsToRetrieveDataQuery:
+    Type: String
+    Default: '4'
+    Description: 'Number of months to retrieve data for the dry run dashboard'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
 
@@ -1897,7 +1924,7 @@ Resources:
         - Arn: !GetAtt ExportDelayerDataLambda.Arn
           Id: "ExportDelayerDataLambdaTarget"
 
-  LambdaInvokePermission:
+  LambdaExportDelayerDataInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref ExportDelayerDataLambda
@@ -1905,6 +1932,119 @@ Resources:
       Principal: "events.amazonaws.com"
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
+
+  #########################################################
+  ###         ExportDryRunDashboardDataLambda           ###
+  #########################################################
+  # Lambda function
+  ExportDryRunDashboardDataLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref ExportDryRunDashboardDataLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/exportDryRunDashboardDataLambda.zip"
+      Role: !GetAtt ExportDryRunDashboardDataLambdaRole.Arn
+      Environment:
+        Variables:
+          SNS_TOPIC_NAME: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${DataAnalysisTopicName}
+          MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
+          ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
+          QUERY_MONTHS: !Ref MonthsToRetrieveDataQuery
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 300
+
+  # Lambda function role
+  ExportDryRunDashboardDataLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-ExportDryRunDashboardDataLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  ExportDryRunDashboardDataLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-ExportDryRunDashboardDataLambdaPolicy
+      Roles:
+        - !Ref ExportDryRunDashboardDataLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          #athena permission
+          - Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+              - athena:ListQueryExecutions
+            Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
+          - Effect: Allow
+            Action:
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetTable
+              - glue:GetTables
+              - glue:GetPartition
+              - glue:GetPartitions
+            Resource: 
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/pn_delayer_paper_delivery_json_view
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/pn_paper_delivery_sender_limit_json_view
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+            Resource:
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results/*"
+              
+  ExportDryRunDashboardDataLambdaAlarms:
+    DependsOn:
+      - ExportDryRunDashboardDataLambda
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref ExportDryRunDashboardDataLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ExportDryRunDashboardDataLambdaSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: ExportDryRunDashboardDataRuleState
+      ScheduleExpression: !Sub cron(${ExportDryRunDashboardDataLambdaCron})
+      State: !Ref ExportDryRunDashboardDataLambdaRuleState
+      Targets:
+        - Arn: !GetAtt ExporDryRunDashboardDataLambda.Arn
+          Id: "ExportDryRunDashboardDataLambdaTarget"
+
+  LambdaExportDryRunDashboardDataInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ExportDryRunDashboardDataLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !GetAtt ExportDryRunDashboardDataLambdaSchedule.Arn
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
