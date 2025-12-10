@@ -1915,6 +1915,7 @@ Resources:
               - states:DescribeExecution
             Resource:
               - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:BatchWorkflowStateMachine:*
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:DelayerToPaperChannelStateMachine:*
           - Effect: Allow
             Action:
               - lambda:InvokeFunction
