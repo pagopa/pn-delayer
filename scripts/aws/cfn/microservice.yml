@@ -362,6 +362,10 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  PreRunAlgorithmLambdaName:
+    Type: String
+    Description: 'PreRunAlgorithmLambdaName function name'
+
   UnifiedDeliveryDriverProvinceParameter:
     Type: String
     Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
@@ -1945,6 +1949,53 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
 
+  #########################################################
+  ###         PreRunAlgorithmLambda                ###
+  #########################################################
+
+  PreRunAlgorithmLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PreRunAlgorithmLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PreRunAlgorithmLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      MemorySize: 512
+      FunctionName: !Ref PreRunAlgorithmLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/PreRunAlgorithmLambda.zip"
+      Role: !GetAtt PreRunAlgorithmLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 900 #15 min
+
+  # Lambda function role
+  PreRunAlgorithmLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-preRunAlgorithmLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule
