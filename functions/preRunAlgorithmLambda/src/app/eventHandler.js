@@ -6,7 +6,7 @@ exports.handleEvent = async (event = {}) => {
 
   const deliveryWeek = event.deliveryWeek ?? undefined;
 
-  if (deliveryWeek) {
+  if (deliveryWeek && deliveryWeek.trim() !== '') {
     return deliveryWeek.toString();
   }
 

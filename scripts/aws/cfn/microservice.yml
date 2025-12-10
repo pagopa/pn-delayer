@@ -2158,8 +2158,76 @@ Resources:
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
       Definition:
         Comment: "Paper Delivery State Machine"
-        StartAt: GetActiveTender
+        StartAt: PreRunAlgorithmLambda
         States:
+          PreRunAlgorithmLambda:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              Payload:
+                deliveryWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYWEEK
+              FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 1
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
+            Next: DynamoDB PutItem
+            ResultSelector:
+              deliveryWeek.$: $.Payload
+            ResultPath: $.preRunAlgorithmResponse
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+
+          DynamoDB PutItem:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:putItem
+            Parameters:
+              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
+              Item:
+                pk:
+                  S: PRINT
+                sk:
+                  S.$: $.preRunAlgorithmResponse.deliveryWeek
+                numberOfShipments:
+                  N: "0"
+                weeklyPrintCapacity:
+                  N: "0"
+                dailyPrintCapacity:
+                  N: "0"
+                dailyExecutions:
+                  N: "0"
+                dailyExecutionCounter:
+                  N: "0"
+                sentToNextWeek:
+                  N: "0"
+                sentToPhaseTwo:
+                  N: "0"
+                stopSendToPhaseTwo:
+                  BOOL: "true"
+                lastEvaluatedKeyPhase2:
+                  M: { }
+                lastEvaluatedKeyNextWeek:
+                  M: { }
+            Next: GetActiveTender
+            Retry:
+              - ErrorEquals:
+                  - States.ALL
+                BackoffRate: 2
+                IntervalSeconds: 1
+                MaxAttempts: 3
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+            ResultPath: null
           GetActiveTender:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
@@ -2551,6 +2619,12 @@ Resources:
                 - !Sub "${ProvinceTableArn}/*"
             - Effect: Allow
               Action:
+                - dynamodb:PutItem
+              Resource:
+                - !Sub "${PaperDeliveryCounterTableArn}"
+                - !Sub "${PaperDeliveryCounterTableArn}/*"
+            - Effect: Allow
+              Action:
                 - batch:SubmitJob
                 - batch:DescribeJobs
               Resource:
@@ -2565,6 +2639,7 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
             - Effect: Allow
               Action:
                 - events:PutRule
