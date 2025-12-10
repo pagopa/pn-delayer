@@ -362,6 +362,10 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  PreRunAlgorithmLambdaName:
+    Type: String
+    Description: 'PreRunAlgorithmLambdaName function name'
+
   UnifiedDeliveryDriverProvinceParameter:
     Type: String
     Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
@@ -1915,6 +1919,7 @@ Resources:
               - states:DescribeExecution
             Resource:
               - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:BatchWorkflowStateMachine:*
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:DelayerToPaperChannelStateMachine:*
           - Effect: Allow
             Action:
               - lambda:InvokeFunction
@@ -1944,6 +1949,53 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
 
+  #########################################################
+  ###         PreRunAlgorithmLambda                ###
+  #########################################################
+
+  PreRunAlgorithmLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PreRunAlgorithmLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PreRunAlgorithmLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      MemorySize: 512
+      FunctionName: !Ref PreRunAlgorithmLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/preRunAlgorithmLambda.zip"
+      Role: !GetAtt PreRunAlgorithmLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 900 #15 min
+
+  # Lambda function role
+  PreRunAlgorithmLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-preRunAlgorithmLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule
@@ -2107,8 +2159,76 @@ Resources:
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
       Definition:
         Comment: "Paper Delivery State Machine"
-        StartAt: GetActiveTender
+        StartAt: PreRunAlgorithmLambda
         States:
+          PreRunAlgorithmLambda:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              Payload:
+                deliveryWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYWEEK
+              FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 1
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
+            Next: DynamoDB PutItem
+            ResultSelector:
+              deliveryWeek.$: $.Payload
+            ResultPath: $.preRunAlgorithmResponse
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+
+          DynamoDB PutItem:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:putItem
+            Parameters:
+              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
+              Item:
+                pk:
+                  S: PRINT
+                sk:
+                  S.$: $.preRunAlgorithmResponse.deliveryWeek
+                numberOfShipments:
+                  N: "0"
+                weeklyPrintCapacity:
+                  N: "0"
+                dailyPrintCapacity:
+                  N: "0"
+                dailyExecutionNumber:
+                  N: "0"
+                dailyExecutionCounter:
+                  N: "0"
+                sentToNextWeek:
+                  N: "0"
+                sentToPhaseTwo:
+                  N: "0"
+                stopSendToPhaseTwo:
+                  BOOL: "true"
+                lastEvaluatedKeyPhase2:
+                  M: { }
+                lastEvaluatedKeyNextWeek:
+                  M: { }
+            Next: GetActiveTender
+            Retry:
+              - ErrorEquals:
+                  - States.ALL
+                BackoffRate: 2
+                IntervalSeconds: 1
+                MaxAttempts: 3
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+            ResultPath: $.toDiscard
           GetActiveTender:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
@@ -2500,6 +2620,12 @@ Resources:
                 - !Sub "${ProvinceTableArn}/*"
             - Effect: Allow
               Action:
+                - dynamodb:PutItem
+              Resource:
+                - !Sub "${PaperDeliveryCounterTableArn}"
+                - !Sub "${PaperDeliveryCounterTableArn}/*"
+            - Effect: Allow
+              Action:
                 - batch:SubmitJob
                 - batch:DescribeJobs
               Resource:
@@ -2514,6 +2640,7 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
             - Effect: Allow
               Action:
                 - events:PutRule

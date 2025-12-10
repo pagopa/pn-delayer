@@ -596,6 +596,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  PreRunAlgorithmLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-preRunAlgorithmLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   ExportDelayerDataLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -814,6 +825,9 @@ Outputs:
 
   TestDelayerLambdaName:
     Value: !Sub "${ProjectName}-testDelayerLambda"
+
+  PreRunAlgorithmLambdaName:
+    Value: !Sub "${ProjectName}-preRunAlgorithmLambda"
 
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
