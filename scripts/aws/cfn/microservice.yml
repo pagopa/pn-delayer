@@ -1919,6 +1919,7 @@ Resources:
               - states:DescribeExecution
             Resource:
               - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:BatchWorkflowStateMachine:*
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:DelayerToPaperChannelStateMachine:*
           - Effect: Allow
             Action:
               - lambda:InvokeFunction
@@ -2906,7 +2907,7 @@ Resources:
               lastEvaluatedKeyNextWeek.$: $[0].variable.lastEvaluatedKeyNextWeek
               sendToNextWeekCounter.$: $[0].variable.sendToNextWeekCounter
               lastExecution.$: $[1].variable.lastExecution
-
+              stopSendToPhaseTwo.$: $[1].variable.stopSendToPhaseTwo
           IsLastEvaluatedKeyNextWeekNull:
             Type: Choice
             Choices:
