@@ -4,11 +4,10 @@ const { DayOfWeek, TemporalAdjusters, Instant, ZoneOffset, LocalDate } = require
 exports.handleEvent = async (event = {}) => {
   console.log("Event received:", JSON.stringify(event));
 
-  const parameters = event.parameters ?? [];
-  const inputDate = parameters[0];
+  const deliveryWeek = event.deliveryWeek ?? undefined;
 
-  if (inputDate) {
-    return inputDate.toString();
+  if (deliveryWeek) {
+    return deliveryWeek.toString();
   }
 
   const now = Instant.now().atZone(ZoneOffset.UTC).toLocalDate();
