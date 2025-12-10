@@ -2203,7 +2203,7 @@ Resources:
                   N: "0"
                 dailyPrintCapacity:
                   N: "0"
-                dailyExecutions:
+                dailyExecutionNumber:
                   N: "0"
                 dailyExecutionCounter:
                   N: "0"
