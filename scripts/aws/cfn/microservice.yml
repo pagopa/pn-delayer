@@ -2228,7 +2228,7 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Next: WorkflowFail
-            ResultPath: null
+            ResultPath: $.toDiscard
           GetActiveTender:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
