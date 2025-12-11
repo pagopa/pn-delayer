@@ -1951,6 +1951,7 @@ Resources:
         Variables:
           MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
           ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
+          ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
           QUERY_MONTHS: !Ref MonthsToRetrieveDataQuery
       TracingConfig:
         Mode: Active
@@ -1995,9 +1996,6 @@ Resources:
               - athena:GetQueryExecution
               - athena:GetQueryResults
               - athena:ListQueryExecutions
-            Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
-          - Effect: Allow
-            Action:
               - glue:GetDatabase
               - glue:GetDatabases
               - glue:GetTable
@@ -2005,10 +2003,10 @@ Resources:
               - glue:GetPartition
               - glue:GetPartitions
             Resource: 
+              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/pn_delayer_paper_delivery_json_view
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdc_analytics_database/pn_paper_delivery_sender_limit_json_view
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/*
           - Effect: Allow
             Action:
               - s3:PutObject
@@ -2018,8 +2016,8 @@ Resources:
               - s3:AbortMultipartUpload
               - s3:ListMultipartUploadParts
             Resource:
-              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results"
-              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results/*"
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/*"
               - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
               - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
           - Effect: Allow
@@ -2034,8 +2032,6 @@ Resources:
               - "*"
               
   ExportDryRunDashboardDataLambdaAlarms:
-    DependsOn:
-      - ExportDryRunDashboardDataLambda
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"

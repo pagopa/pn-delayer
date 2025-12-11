@@ -41,6 +41,7 @@ describe("eventHandler", () => {
     process.env.ATHENA_DATABASE_NAME = "testdb";
     process.env.MONITORING_BUCKET_NAME = "bucket-test";
     process.env.SPECIFIC_DATE = "2024-01-01";
+    process.env.ATHENA_WORKGROUP_NAME = "workgroup-test";
 
     await eventHandler.handleEvent({});
 
@@ -54,6 +55,7 @@ describe("eventHandler", () => {
   it("usa getCurrentMonday se SPECIFIC_DATE non è impostata", async () => {
     process.env.ATHENA_DATABASE_NAME = "testdb";
     process.env.MONITORING_BUCKET_NAME = "bucket-test";
+    process.env.ATHENA_WORKGROUP_NAME = "workgroup-test";
     delete process.env.SPECIFIC_DATE;
 
     await eventHandler.handleEvent({});
@@ -66,6 +68,7 @@ describe("eventHandler", () => {
     process.env.ATHENA_DATABASE_NAME = "db";
     process.env.MONITORING_BUCKET_NAME = "bucket-test";
     process.env.SPECIFIC_DATE = "2024-01-01";
+    process.env.ATHENA_WORKGROUP_NAME = "workgroup-test";
 
     await eventHandler.handleEvent({});
 

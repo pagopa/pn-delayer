@@ -41,12 +41,12 @@ async function prepareAndRunQuery(name, sql, database, bucket, basePath, date) {
 }
 
 
-async function runAllQueries(queries, database, bucket, basePath, date) {
+async function runAllQueries(workgroup, queries, database, bucket, basePath, date) {
   console.log("Preparing to execute queries:");
   for (const [name, sql] of Object.entries(queries)) {
     console.log(`- ${name}\n`);
     console.log( sql)
-    await prepareAndRunQuery(name, sql, database, bucket, basePath, date);
+    await prepareAndRunQuery(workgroup, name, sql, database, bucket, basePath, date);
   }
   console.log("All queries executed successfully.");
 }
@@ -56,6 +56,7 @@ exports.handleEvent = async (event) => {
   const specificDate = process.env.SPECIFIC_DATE || getCurrentMonday();
   const database = process.env.ATHENA_DATABASE_NAME;
   const monitoringBucketName = process.env.MONITORING_BUCKET_NAME;
+  const workgroupName = process.env.ATHENA_WORKGROUP_NAME;
   const basePath = `athena_results/data`;
 
   console.log(`Environment:
@@ -76,5 +77,5 @@ exports.handleEvent = async (event) => {
       specificDate
     ),
   };
-  await runAllQueries(queries, database, monitoringBucketName, basePath, specificDate);
+  await runAllQueries(workgroupName, queries, database, monitoringBucketName, basePath, specificDate);
 };

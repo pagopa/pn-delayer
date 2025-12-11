@@ -2,9 +2,10 @@ const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand, GetQ
 
 const client = new AthenaClient();
 
-async function startQueryExecution(queryString, database, outputLocation) {
+async function startQueryExecution(workgroup, queryString, database, outputLocation) {
   const input = {
     QueryString: queryString,
+    WorkGroup: workgroup,
     QueryExecutionContext: {
       Database: database
     },
@@ -28,19 +29,8 @@ async function getQueryExecution(queryExecutionId) {
   return response.QueryExecution;
 }
 
-async function getQueryResults(queryExecutionId) {
-  const input = {
-    QueryExecutionId: queryExecutionId
-  };
-
-  const command = new GetQueryResultsCommand(input);
-  const response = await client.send(command);
-  return response.ResultSet;
-}
-
-
-async function queryExecution(query, database, outputLocation) {
-  const result = await startQueryExecution(query, database, outputLocation);
+async function queryExecution(workgroup, query, database, outputLocation) {
+  const result = await startQueryExecution(workgroup, query, database, outputLocation);
   let fileResult;
   while (true) {
     const queryExecution = await getQueryExecution(result);
@@ -52,10 +42,11 @@ async function queryExecution(query, database, outputLocation) {
     } else if (status === 'FAILED' || status === 'CANCELLED') {
       throw new Error(`Query execution failed with status: ${status}`);
     }
-    await new Promise(resolve => setTimeout(resolve, 5000)); // wait for 5 seconds before checking again
+    await new Promise(resolve => setTimeout(resolve, 3000)); // wait for 5 seconds before checking again
   }
 
   console.log(`Query result available`);
+  return fileResult;
 }
 
 module.exports = { queryExecution }

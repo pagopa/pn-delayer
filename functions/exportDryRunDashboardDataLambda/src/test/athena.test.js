@@ -141,7 +141,7 @@ describe("queryExecution", () => {
     });
 
     let error;
-    const promise = queryExecution("SELECT 1", "mydb", "s3://bucket/output/");
+    const promise = queryExecution("workgroup-test", "SELECT 1", "mydb", "s3://bucket/output/");
 
     await clock.tickAsync(5000);
 
