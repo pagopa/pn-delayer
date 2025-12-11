@@ -2049,7 +2049,7 @@ Resources:
     Properties:
       Name: ExportDryRunDashboardDataRuleState
       ScheduleExpression: !Sub cron(${ExportDryRunDashboardDataLambdaCron})
-      State: !Ref ExportDryRunDashboardDataLambdaRuleState
+      State: !Ref ExportDryRunDashboardDataRuleState
       Targets:
         - Arn: !GetAtt ExportDryRunDashboardDataLambda.Arn
           Id: "ExportDryRunDashboardDataLambdaTarget"
