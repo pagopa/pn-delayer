@@ -1949,7 +1949,6 @@ Resources:
       Role: !GetAtt ExportDryRunDashboardDataLambdaRole.Arn
       Environment:
         Variables:
-          SNS_TOPIC_NAME: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${DataAnalysisTopicName}
           MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
           ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
           QUERY_MONTHS: !Ref MonthsToRetrieveDataQuery

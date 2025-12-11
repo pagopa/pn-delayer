@@ -527,7 +527,7 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
       Parameters:
-        LogGroupName: !Sub "${ProjectName}-delayer-dryRunDashboardDataLambda"
+        LogGroupName: !Sub "${ProjectName}-exportDryRunDashboardDataLambda"
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: '/aws/lambda'
 
