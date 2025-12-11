@@ -4,7 +4,7 @@ const { deleteS3Object, copyS3Object } = require("./lib/s3");
 
 async function prepareQuery(fileName, date) {
   console.log(`Preparing query "${fileName}" for date: ${date}`);
-  const query = prepareQueryCondition(`../resources/${fileName}.sql`, date);
+  const query = prepareQueryCondition(`./resources/${fileName}.sql`, date);
   console.log(`Query "${fileName}" prepared.`);
   return query;
 }
@@ -78,13 +78,3 @@ exports.handleEvent = async (event) => {
   };
   await runAllQueries(queries, database, monitoringBucketName, basePath, specificDate);
 };
-
-/* Execute directly */
-if (require.main === module) {
-  exports.handleEvent({})
-    .then(() => console.log("Execution completed"))
-    .catch((error) => {
-      console.error("Execution failed:", error);
-      process.exit(1);
-    });
-}

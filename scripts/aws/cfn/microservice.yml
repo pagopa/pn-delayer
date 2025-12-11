@@ -1996,7 +1996,7 @@ Resources:
               - athena:GetQueryExecution
               - athena:GetQueryResults
               - athena:ListQueryExecutions
-            Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
+            Resource: !Sub arn:aws:athena:eu-south-1:830192246553:workgroup/cdc_analytics_workgroup
           - Effect: Allow
             Action:
               - glue:GetDatabase
@@ -2006,16 +2006,33 @@ Resources:
               - glue:GetPartition
               - glue:GetPartitions
             Resource: 
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/pn_delayer_paper_delivery_json_view
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/pn_paper_delivery_sender_limit_json_view
+              - !Sub arn:aws:glue:eu-south-1:830192246553:catalog
+              - !Sub arn:aws:glue:eu-south-1:830192246553:database/${AthenaDatabaseName}
+              - !Sub arn:aws:glue:eu-south-1:830192246553:table/${AthenaDatabaseName}/pn_delayer_paper_delivery_json_view
+              - !Sub arn:aws:glue:eu-south-1:830192246553:table/cdc_analytics_database/pn_paper_delivery_sender_limit_json_view
           - Effect: Allow
             Action:
               - s3:PutObject
               - s3:GetObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:AbortMultipartUpload
+              - s3:ListMultipartUploadParts
+            Resource:
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results"
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results/*"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
             Resource:
               - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results/*"
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource:
+              - "*"
               
   ExportDryRunDashboardDataLambdaAlarms:
     DependsOn:
