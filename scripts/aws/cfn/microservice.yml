@@ -2051,7 +2051,7 @@ Resources:
       ScheduleExpression: !Sub cron(${ExportDryRunDashboardDataLambdaCron})
       State: !Ref ExportDryRunDashboardDataLambdaRuleState
       Targets:
-        - Arn: !GetAtt ExporDryRunDashboardDataLambda.Arn
+        - Arn: !GetAtt ExportDryRunDashboardDataLambda.Arn
           Id: "ExportDryRunDashboardDataLambdaTarget"
 
   LambdaExportDryRunDashboardDataInvokePermission:

@@ -1,6 +1,5 @@
 //create s3 client in order to upload files to s3
 const { S3Client, CopyObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
-const { fromIni } = require("@aws-sdk/credential-provider-ini");
 
 const s3Client = new S3Client();
 
