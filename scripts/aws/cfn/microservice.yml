@@ -2624,6 +2624,8 @@ Resources:
               Resource:
                 - !Sub "${PaperDeliveryCounterTableArn}"
                 - !Sub "${PaperDeliveryCounterTableArn}/*"
+                - !Sub "${PaperDeliveryCounterMockTableArn}"
+                - !Sub "${PaperDeliveryCounterTableMockArn}/*"
             - Effect: Allow
               Action:
                 - batch:SubmitJob
