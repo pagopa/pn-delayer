@@ -1,9 +1,7 @@
-//create s3 client in order to upload files to s3
 const { S3Client, CopyObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 
 const s3Client = new S3Client();
 
-//function that us copy sdk v3 to rename an object in s3
 async function copyS3Object(bucketName, oldKey, newKey) {
     console.log(`Copying object from ${oldKey} to ${newKey} in bucket ${bucketName}`);
     const input = { // CopyObjectRequest
@@ -16,7 +14,6 @@ async function copyS3Object(bucketName, oldKey, newKey) {
     return response;
 }
 
-//delete s3 object using prefix and key
 async function deleteS3Object(bucketName, key) {
     const input = { // DeleteObjectRequest
         Bucket: bucketName,
