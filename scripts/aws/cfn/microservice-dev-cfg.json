@@ -8,8 +8,7 @@
     "KinesisPaperDeliveryLambdaMaxRetry": "3",
     "KinesisPaperDeliveryLambdaBatchSize": "25",
     "KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds": "60",
-    "DelayerStartWorkflowCron": "0 3 ? * MON *",
-    "DelayerToPaperChannelLambdaCron": "0 9 * * ? *",
+    "DelayerStartWorkflowCron": "0 1 ? * MON *",
     "DelayerToPaperChannelPipeState": "STOPPED",
     "PaperDeliveryKinesisRecordsTtlSeconds": "86400",
     "PrintCapacityWeeklyWorkingDays": "7",
@@ -19,9 +18,12 @@
     "SafeStorageCxId":"pn-delayer",
     "PrintCounterTtlDuration": "30d",
     "ExportDelayerDataLambdaCron": "0 7 ? * 3 *",
+    "ExportDelayerDataRuleState": "DISABLED",
     "DelayerStartWorkflowRuleState": "DISABLED",
     "DelayerToPaperChannelDailyScheduleRuleState": "DISABLED",
     "VCPU": "1",
-    "Memory": "4096"
+    "Memory": "4096",
+    "DelayerToPaperChannelFirstSchedulerStartDate": "2025-11-24T00:00:00.000Z",
+    "DelayerToPaperChannelFirstSchedulerCron": "0 5-21 ? * MON-SUN *"
   }
 }

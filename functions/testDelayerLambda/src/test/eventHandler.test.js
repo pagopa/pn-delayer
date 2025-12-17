@@ -9,6 +9,10 @@ process.env.BUCKET_NAME = "test-bucket";
 process.env.OBJECT_KEY = "test-key.csv";
 process.env.SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:BatchWorkflowStateMachine";
 process.env.DELAYERTOPAPERCHANNEL_SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:delayerToPaperChannelStateMachine";
+process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON = "cron(0 8 ? * MON-FRI *)";
+process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON = "cron(0 12 ? * MON-FRI *)";
+process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
+process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
 
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
@@ -84,7 +88,7 @@ describe("Lambda Delayer Dispatcher", () => {
             capacity: 1000,
         };
         ddbMock.on(GetCommand).resolves({ Item: fakeItem });
-        const params = ["Sailpost", "87100", "2025-06-30T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverUsedCapacities", "Sailpost", "87100", "2025-06-30T00:00:00Z"];
 
         const result = await handler({ operationType: "GET_USED_CAPACITY", parameters: params });
         assert.strictEqual(result.statusCode, 200);
@@ -94,7 +98,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
     it("GET_USED_CAPACITY item not found", async () => {
         ddbMock.on(GetCommand).resolves({});
-        const params = ["Nope", "00000", "2025-01-01T00:00:00Z"];
+        const params = ["pn-PaperDeliveryDriverUsedCapacities", "Nope", "00000", "2025-01-01T00:00:00Z"];
 
         const result = await handler({ operationType: "GET_USED_CAPACITY", parameters: params });
         assert.strictEqual(JSON.parse(result.body).message, "Item not found");
@@ -719,4 +723,39 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(result.statusCode,500);
        assert.strictEqual(body.message, "Field unifiedDeliveryDriver is required and cannot be empty");
    });
+
+    it("GET_PRINT_CAPACITY_COUNTER record trovato", async () => {
+      const fakeItem = {
+                        "pk": "PRINT",
+                        "sk": "2025-11-24",
+                        "dailyExecutionCounter": 4,
+                        "dailyExecutionNumber": 4,
+                        "dailyPrintCapacity": 20,
+                        "lastEvaluatedKeyNextWeek": {},
+                        "lastEvaluatedKeyPhase2": {
+                         "pk": "2025-11-24~EVALUATE_PRINT_CAPACITY",
+                         "sk": "1~2025-07-02T00:48:00Z~tcRanking_RS_2"
+                        },
+                        "numberOfShipments": 70,
+                        "sentToNextWeek": 0,
+                        "sentToPhaseTwo": 11,
+                        "ttl": 1766571878068,
+                        "weeklyPrintCapacity": 140
+                       };
+      ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+      const result = await handler({ operationType: "GET_PRINT_CAPACITY_COUNTER", parameters: ["pn-paperDeliveryCountersMock", "2025-11-10"] });
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.strictEqual(body.dailyExecutionNumber, 4);
+    });
+
+    it("GET_PRINT_CAPACITY_COUNTER no record", async () => {
+     ddbMock.on(GetCommand).resolves({});
+
+     const result = await handler({ operationType: "GET_PRINT_CAPACITY_COUNTER", parameters: ["pn-paperDeliveryCountersMock", "2025-11-10"] });
+     const body = JSON.parse(result.body);
+     assert.strictEqual(result.statusCode,200);
+     assert.strictEqual(JSON.parse(result.body).message, "Item not found");
+    });
 });

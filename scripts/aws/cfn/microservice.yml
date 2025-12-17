@@ -362,6 +362,10 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  PreRunAlgorithmLambdaName:
+    Type: String
+    Description: 'PreRunAlgorithmLambdaName function name'
+
   UnifiedDeliveryDriverProvinceParameter:
     Type: String
     Description: 'Parameter name for UnifiedDeliveryDriverProvinceParameter'
@@ -371,10 +375,34 @@ Parameters:
     Default: '0 3 ? * MON *'
     Description: 'Cron expression for DelayerStartWorkflowRule'
 
-  DelayerToPaperChannelDailyScheduleCron:
+  DelayerToPaperChannelFirstSchedulerCron:
     Type: String
-    Default: '0 9 * * ? *'
-    Description: 'Cron expression for DelayerToPaperChannelDailyScheduleRule'
+    Default: '0 5-21 ? * MON-SUN *'
+    Description: 'Cron expression for DelayerToPaperChannelFirstScheduleRule'
+
+  DelayerToPaperChannelSecondSchedulerCron:
+    Type: String
+    Default: '0 5-21 ? * MON-SUN *'
+    Description: 'Cron expression for DelayerToPaperChannelSecondScheduleRule'
+
+  DelayerToPaperChannelFirstSchedulerStartDate:
+    Type: String
+    Description: 'Start date for DelayerToPaperChannelDailyScheduleFirstRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. Has to be the next monday to the release date'
+
+  DelayerToPaperChannelFirstSchedulerEndDate:
+    Type: String
+    Description: 'End date for DelayerToPaperChannelDailyScheduleFirstRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. To specify an unlimited duration we use 2099'
+    Default: '2099-01-01T23:00:00.000Z'
+
+  DelayerToPaperChannelSecondSchedulerStartDate:
+    Type: String
+    Description: 'Start date for DelayerToPaperChannelDailyScheduleSecondRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. Must be disabled for now, so we set 2099-01-01'
+    Default: '2099-01-01T00:00:00.000Z'
+
+  DelayerToPaperChannelSecondSchedulerEndDate:
+    Type: String
+    Description: 'End date for DelayerToPaperChannelDailyScheduleSecondRule in YYYY-MM-DDTHH:MM:SSZ (UTC) format. To specify an unlimited duration we use 2099'
+    Default: '2099-01-01T23:00:00.000Z'
 
   DelayerStartWorkflowRuleState:
     Type: String
@@ -399,6 +427,14 @@ Parameters:
   ProvinceTableArn:
     Type: String
     Description: 'ARN of DynamoDB table containing Province'
+  
+  NotificationOrdersTableName:
+    Type: String
+    Description: 'DynamoDB table name for NotificationOrders'
+  
+  NotificationOrdersTableArn:
+    Type: String
+    Description: 'ARN of DynamoDB table for NotificationOrders'
 
   PaperChannelTenderApiLambdaName:
     Type: String
@@ -408,6 +444,10 @@ Parameters:
   DelayerReceiverOrdersSendersLambdaName:
     Type: String
     Description: 'ReceiverOrdersSendersLambda function name'
+
+  DelayerNotificationOrdersLambdaName:
+    Type: String
+    Description: 'NotificationOrdersLambda function name'
 
   SafeStorageCxId:
     Type: String
@@ -428,11 +468,18 @@ Parameters:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
+  
+  SafeStorageToNotificationOrdersQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to notification orders queue'
 
-  DelayerReceiverOrdersSendersLambdaMaxRetry:
-    Type: Number
-    Default: 3
-    Description: 'Maximum retry attempts for received message for DelayerReceiverOrdersSendersLambdaQueue'
+  SafeStorageToNotificationOrdersQueueARN:
+    Type: String
+    Description: 'queue name for safeStorage to to notification orders queue'
+
+  SafeStorageToNotificationOrdersQueueURL:
+    Type: String
+    Description: 'Events from safe storage to notification orders queue URL'
 
   PrintCounterTtlDuration:
     Type: String
@@ -457,6 +504,14 @@ Parameters:
     Default: '0 7 ? * 2 *'
     Description: 'Cron expression for ExportDelayerDataLambdaRule'
   
+  ExportDelayerDataRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the ExportDelayerDataRuleState'
+
   DataAnalysisTopicName:
     Type: String
     Description: data analysis topic to send mail on slack
@@ -465,6 +520,11 @@ Parameters:
     Type: Number
     Description: 'Time available for downloading the data in minutes'
     Default: 4320 #3 days
+  
+  NotificationOrdersTtlDays:
+    Type: Number
+    Description: 'TTL days for lambda notification orders'
+    Default: 3650
 
   EnvironmentType:
     Type: String
@@ -569,6 +629,14 @@ Resources:
             Value: !Ref DeliveryDateDayOfWeek
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelFirstSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelSecondSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -749,6 +817,14 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelFirstSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelSecondSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -916,6 +992,14 @@ Resources:
             Value: !Ref PaperDeliveryCounterTableName
           - Name: PN_DELAYER_PRINTCAPACITY
             Value: !Ref PrintCapacity
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelFirstSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+            Value: !Ref DelayerToPaperChannelSecondSchedulerCron
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+          - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+            Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
 
       PlatformCapabilities:
         - FARGATE
@@ -1240,6 +1324,11 @@ Resources:
           InputPath: $.detail
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+        - Id: !Sub '${ProjectName}-SafeStore2NotificationOrders'
+          Arn: !Ref SafeStorageToNotificationOrdersQueueARN
+          InputPath: $.detail
+          DeadLetterConfig:
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
   DelayerOrdersSendersEventBusEnqueueRole:
     Type: AWS::IAM::Role
@@ -1505,6 +1594,103 @@ Resources:
         FunctionName: !Ref DelayerToPaperChannelLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
+  #########################################################
+  ###         DelayerNotificationOrdersLambda          ###
+  #########################################################
+
+  DelayerNotificationOrdersLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${DelayerNotificationOrdersLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  DelayerNotificationOrdersLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref DelayerNotificationOrdersLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerNotificationOrdersLambda.zip"
+      Role: !GetAtt DelayerNotificationOrdersLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PN_SAFESTORAGE_URL: !Ref SandboxSafeStorageBaseUrl
+          PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
+          NOTIFICATION_ORDERS_TABLENAME: !Ref NotificationOrdersTableName
+          TTL_DAYS: !Ref NotificationOrdersTtlDays
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 300 #5 min
+      VpcConfig:
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
+        SecurityGroupIds:
+          - !GetAtt DelayerNotificationOrdersLambdaSecGroup.GroupId
+
+  # Lambda function role
+  DelayerNotificationOrdersLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-DelayerNotificationOrdersLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+
+  # Lambda function IAM policy
+  DelayerNotificationOrdersLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DelayerNotificationOrdersLambdaPolicy
+      Roles:
+        - !Ref DelayerNotificationOrdersLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchWriteItem
+            Resource:
+              - !Ref NotificationOrdersTableArn
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ReceiveMessage
+            Resource:
+              - !Ref SafeStorageToNotificationOrdersQueueARN
+
+  DelayerNotificationOrdersLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DelayerNotificationOrdersLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  DelayerNotificationOrdersLambdaSQSSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      EventSourceArn: !Ref SafeStorageToNotificationOrdersQueueARN
+      FunctionName: !Ref DelayerNotificationOrdersLambda
+      Enabled: true
+      MaximumBatchingWindowInSeconds: 0
+
 
   #########################################################
   ###         DelayerReceiverOrdersSendersLambda          ###
@@ -1594,6 +1780,7 @@ Resources:
               - sqs:ReceiveMessage
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+              - !Ref SafeStorageToNotificationOrdersQueueARN
 
   DelayerReceiverOrdersSendersLambdaAlarms:
     Type: AWS::CloudFormation::Stack
@@ -1626,6 +1813,7 @@ Resources:
   TestDelayerLambda:
     Type: AWS::Lambda::Function
     Properties:
+      MemorySize: 512
       FunctionName: !Ref TestDelayerLambdaName
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
@@ -1640,13 +1828,17 @@ Resources:
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
           DELAYERTOPAPERCHANNEL_SFN_ARN: !Ref DelayerToPaperChannelStateMachine
+          DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON: !Ref DelayerToPaperChannelFirstSchedulerCron
+          DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON: !Ref DelayerToPaperChannelSecondSchedulerCron
+          DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+          DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
       TracingConfig:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 300 #5 min
+      Timeout: 900 #15 min
 
   # Lambda function role
   TestDelayerLambdaRole:
@@ -1754,6 +1946,7 @@ Resources:
               - states:DescribeExecution
             Resource:
               - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:BatchWorkflowStateMachine:*
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:DelayerToPaperChannelStateMachine:*
           - Effect: Allow
             Action:
               - lambda:InvokeFunction
@@ -1783,6 +1976,53 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
 
+  #########################################################
+  ###         PreRunAlgorithmLambda                ###
+  #########################################################
+
+  PreRunAlgorithmLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PreRunAlgorithmLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PreRunAlgorithmLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      MemorySize: 512
+      FunctionName: !Ref PreRunAlgorithmLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/preRunAlgorithmLambda.zip"
+      Role: !GetAtt PreRunAlgorithmLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 900 #15 min
+
+  # Lambda function role
+  PreRunAlgorithmLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-preRunAlgorithmLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   DelayerStartWorkflowScheduleRule:
     Type: AWS::Events::Rule
@@ -1804,6 +2044,10 @@ Resources:
               "PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME": "${PaperDeliveryUsedSenderLimitTableName}",
               "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}",
               "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON": "${DelayerToPaperChannelFirstSchedulerCron}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON": "${DelayerToPaperChannelSecondSchedulerCron}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE": "${DelayerToPaperChannelFirstSchedulerStartDate}",
+              "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE": "${DelayerToPaperChannelSecondSchedulerStartDate}",
               "PN_DELAYER_DELIVERYWEEK": null
             }
 
@@ -1919,7 +2163,7 @@ Resources:
     Properties:
       Name: ExportDelayerDataRule
       ScheduleExpression: !Sub cron(${ExportDelayerDataLambdaCron})
-      State: ENABLED
+      State: !Ref ExportDelayerDataRuleState
       Targets:
         - Arn: !GetAtt ExportDelayerDataLambda.Arn
           Id: "ExportDelayerDataLambdaTarget"
@@ -2067,8 +2311,76 @@ Resources:
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
       Definition:
         Comment: "Paper Delivery State Machine"
-        StartAt: GetActiveTender
+        StartAt: PreRunAlgorithmLambda
         States:
+          PreRunAlgorithmLambda:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              Payload:
+                deliveryWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYWEEK
+              FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 1
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
+            Next: DynamoDB PutItem
+            ResultSelector:
+              deliveryWeek.$: $.Payload
+            ResultPath: $.preRunAlgorithmResponse
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+
+          DynamoDB PutItem:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:putItem
+            Parameters:
+              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
+              Item:
+                pk:
+                  S: PRINT
+                sk:
+                  S.$: $.preRunAlgorithmResponse.deliveryWeek
+                numberOfShipments:
+                  N: "0"
+                weeklyPrintCapacity:
+                  N: "0"
+                dailyPrintCapacity:
+                  N: "0"
+                dailyExecutionNumber:
+                  N: "0"
+                dailyExecutionCounter:
+                  N: "0"
+                sentToNextWeek:
+                  N: "0"
+                sentToPhaseTwo:
+                  N: "0"
+                stopSendToPhaseTwo:
+                  BOOL: "true"
+                lastEvaluatedKeyPhase2:
+                  M: { }
+                lastEvaluatedKeyNextWeek:
+                  M: { }
+            Next: GetActiveTender
+            Retry:
+              - ErrorEquals:
+                  - States.ALL
+                BackoffRate: 2
+                IntervalSeconds: 1
+                MaxAttempts: 3
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: WorkflowFail
+            ResultPath: $.toDiscard
           GetActiveTender:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
@@ -2102,6 +2414,10 @@ Resources:
               paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
               deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
               printCapacity.$: $$.Execution.Input.PN_DELAYER_PRINTCAPACITY
+              delayerToPaperChannelFirstSchedulerCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+              delayerToPaperChannelSecondSchedulerCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+              delayerToPaperChannelFirstSchedulerStartDate.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+              delayerToPaperChannelSecondSchedulerStartDate.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
           retrieveProvince:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:scan
@@ -2136,6 +2452,10 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitSenderLimitJob
@@ -2169,6 +2489,14 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
                         - Name: PN_DELAYER_DELIVERYWEEK
                           Value.$: $.deliveryWeek
 #                  Retry:
@@ -2225,6 +2553,10 @@ Resources:
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
               unifiedDeliveryDrivers.$: $.tempGetParameterResult.unifiedDeliveryDrivers
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
             Next: MapSubmitEvaluateDriverCapacityJobs
           MapSubmitEvaluateDriverCapacityJobs:
             Type: Map
@@ -2243,6 +2575,10 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateDriverCapacityJob
@@ -2270,6 +2606,14 @@ Resources:
                           Value.$: $.deliveryDateDayOfWeek
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
                           Value.$: $.driver
                         - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
@@ -2317,6 +2661,10 @@ Resources:
               paperDeliveryTableName.$: $.paperDeliveryTableName
               deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
               printCapacity.$: $.printCapacity
+              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
+              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
+              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
+              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
               paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
             Iterator:
               StartAt: submitEvaluateResidualCapacityJob
@@ -2352,6 +2700,14 @@ Resources:
                           Value.$: $.paperDeliveryCounterTableName
                         - Name: PN_DELAYER_PRINTCAPACITY
                           Value.$: $.printCapacity
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
+                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
+                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
+                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
                         - Name: PN_DELAYER_DELIVERYWEEK
                           Value.$: $.deliveryWeek
 #                  Retry:
@@ -2416,6 +2772,14 @@ Resources:
                 - !Sub "${ProvinceTableArn}/*"
             - Effect: Allow
               Action:
+                - dynamodb:PutItem
+              Resource:
+                - !Sub "${PaperDeliveryCounterTableArn}"
+                - !Sub "${PaperDeliveryCounterTableArn}/*"
+                - !Sub "${PaperDeliveryCounterMockTableArn}"
+                - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+            - Effect: Allow
+              Action:
                 - batch:SubmitJob
                 - batch:DescribeJobs
               Resource:
@@ -2430,6 +2794,7 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
             - Effect: Allow
               Action:
                 - events:PutRule
@@ -2442,22 +2807,45 @@ Resources:
                 - events:PutPermission
               Resource: "*"
 
-  DelayerToPaperChannelDailyScheduleRule:
-    Type: AWS::Events::Rule
+  DelayerToPaperChannelDailyFirstScheduler:
+    Type: AWS::Scheduler::Schedule
     Properties:
-      Name: !Sub '${ProjectName}-delayerToPaperChannelDailyScheduleRule'
-      ScheduleExpression: !Sub cron(${DelayerToPaperChannelDailyScheduleCron})
+      Name: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
+      ScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
       State: !Ref DelayerToPaperChannelDailyScheduleRuleState
-      Targets:
-        - Id: DelayerToPaperChannelStepFunctionTarget
-          Arn: !Ref DelayerToPaperChannelStateMachine
-          RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
-          Input: !Sub |
-            {
-              "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
-              "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
-              "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
-            }
+      StartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+      EndDate: !Ref DelayerToPaperChannelFirstSchedulerEndDate
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !Ref DelayerToPaperChannelStateMachine
+        RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+        Input: !Sub |
+          {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
+
+  DelayerToPaperChannelDailySecondScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
+      ScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
+      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      StartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+      EndDate: !Ref DelayerToPaperChannelSecondSchedulerEndDate
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !Ref DelayerToPaperChannelStateMachine
+        RoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+        Input: !Sub |
+          {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
 
   DelayerToPaperChannelDailyScheduleRuleRole:
     Type: AWS::IAM::Role
@@ -2468,7 +2856,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: events.amazonaws.com
+              Service: scheduler.amazonaws.com
             Action: sts:AssumeRole
       Policies:
         - PolicyName: DelayerToPaperChannelStepFunctionInvokePolicy
@@ -2489,6 +2877,30 @@ Resources:
         Comment: Delayer to paper channel State Machine
         StartAt: RetrieveCounter
         States:
+          RetrieveCounter:
+            Type: Task
+            Resource: arn:aws:states:::aws-sdk:dynamodb:query
+            Parameters:
+              ExpressionAttributeValues:
+                ":pk":
+                  S: "PRINT"
+              KeyConditionExpression: "pk = :pk"
+              Limit: 1
+              ScanIndexForward: false
+              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
+            ResultPath: $.queryResult
+            Retry:
+              - ErrorEquals:
+                  - States.ALL
+                IntervalSeconds: 1
+                BackoffRate: 2
+                MaxAttempts: 2
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Next: RetrieveCounterOperationFail
+            Next: CheckIfCounterExists
+
           CheckIfCounterExists:
             Type: Choice
             Choices:
@@ -2496,82 +2908,62 @@ Resources:
                 NumericGreaterThan: 0
                 Next: MapItem
             Default: NoItemToProcess
-          DynamoDbOperationFail:
+
+          RetrieveCounterOperationFail:
             Type: Fail
+
+          UpdateCounterOperationFail:
+            Type: Fail
+
           MapItem:
             Type: Pass
-            ResultPath: $.lambdaResponse.Payload.input
-            Parameters:
-              "dailyPrintCapacity.$": $.queryResult.Items[0].dailyPrintCapacity.N
-              "executionDate.$": $$.Execution.StartTime
-              "lastEvaluatedKeyNextWeek.$": $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
-              "lastEvaluatedKeyPhase2.$": $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
-              "numberOfShipments.$": $.queryResult.Items[0].numberOfShipments.N
-              "pk.$": $.queryResult.Items[0].pk.S
-              sendToNextStepCounter: 0
-              sendToNextWeekCounter: 0
-              "sentToNextWeek.$": $.queryResult.Items[0].sentToNextWeek.N
-              "sentToPhaseTwo.$": $.queryResult.Items[0].sentToPhaseTwo.N
-              "sk.$": $.queryResult.Items[0].sk.S
-              "weeklyPrintCapacity.$": $.queryResult.Items[0].weeklyPrintCapacity.N
-              "stopSendToPhaseTwo.$": $.queryResult.Items[0].stopSendToPhaseTwo.Bool
             Next: Parallel
-          NoItemToProcess:
-            Type: Succeed
+            Parameters:
+              paperDeliveryTableName.$: $.PAPERDELIVERY_TABLENAME
+              paperDeliveryCountersTableName.$: $.PAPERDELIVERYCOUNTER_TABLENAME
+              fixed:
+                dailyPrintCapacity.$: $.queryResult.Items[0].dailyPrintCapacity.N
+                executionDate.$: $$.Execution.StartTime
+                numberOfShipments.$: $.queryResult.Items[0].numberOfShipments.N
+                pk.$: $.queryResult.Items[0].pk.S
+                weeklyPrintCapacity.$: $.queryResult.Items[0].weeklyPrintCapacity.N
+                sentToNextWeek.$: $.queryResult.Items[0].sentToNextWeek.N
+                sentToPhaseTwo.$: $.queryResult.Items[0].sentToPhaseTwo.N
+                sk.$: $.queryResult.Items[0].sk.S
+                dailyExecutions.$: $.queryResult.Items[0].dailyExecutionNumber.N
+                dailyExecutionCounter.$: $.queryResult.Items[0].dailyExecutionCounter.N
+              variable:
+                sendToNextStepCounter: 0
+                sendToNextWeekCounter: 0
+                lastEvaluatedKeyNextWeek.$: $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
+                lastEvaluatedKeyPhase2.$: $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
+                lastExecution: false
+                stopSendToPhaseTwo.$: $.queryResult.Items[0].stopSendToPhaseTwo.Bool
+
 
           Parallel:
             Type: Parallel
-            ResultPath: $.parallelResult
+            Next: IsLastEvaluatedKeyNextWeekNull
+            ResultPath: $.variable
             Branches:
-              # ──────────────────────────────── BRANCH 1 ────────────────────────────────
               - StartAt: SendPrintCapacityExceedToNextWeek
                 States:
-                  IsLastEvaluatedKeyNextWeekNull:
-                    Type: Choice
-                    OutputPath: $.lambdaResponse.Payload
-                    Choices:
-                      - Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyNextWeek
-                        IsNull: true
-                        Next: PatchNextWeekNull
-                    Default: ToNextWeekSuccessfully
-
-                  MoreItemsToSendToNextWeek:
-                    Type: Choice
-                    Choices:
-                      - And:
-                          - Not:
-                              Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyNextWeek
-                              IsNull: true
-                          - Variable: $.lambdaResponse.Payload.input.sendToNextWeekCounter
-                            NumericLessThan: 250000
-                        Next: SendPrintCapacityExceedToNextWeek
-                    Default: IsLastEvaluatedKeyNextWeekNull
-
-                  PatchNextWeekNull:
-                    Type: Pass
-                    ResultPath: $
-                    Parameters:
-                      input:
-                        "dailyPrintCapacity.$": $.input.dailyPrintCapacity
-                        "executionDate.$": $.input.executionDate
-                        lastEvaluatedKeyNextWeek: { }
-                        "numberOfShipments.$": $.input.numberOfShipments
-                        "sendToNextWeekCounter.$": $.input.sendToNextWeekCounter
-                        "sentToNextWeek.$": $.input.sentToNextWeek
-                        "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
-                      "processType.$": $.processType
-                    Next: ToNextWeekSuccessfully
-
                   SendPrintCapacityExceedToNextWeek:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
-                    ResultPath: $.lambdaResponse
                     Parameters:
                       FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
                       Payload:
-                        "input.$": $.lambdaResponse.Payload.input
-                        "paperDeliveryTableName.$": $.PAPERDELIVERY_TABLENAME
+                        variable.$: $.variable
+                        fixed.$: $.fixed
+                        paperDeliveryTableName.$: $.paperDeliveryTableName
+                        executionDate.$: $$.Execution.StartTime
                         processType: SEND_TO_NEXT_WEEK
+                    ResultSelector:
+                      lastEvaluatedKeyNextWeek.$: $.Payload.lastEvaluatedKeyNextWeek
+                      sendToNextWeekCounter.$: $.Payload.sendToNextWeekCounter
+                      lastExecution.$: $.Payload.lastExecution
+                    ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
                           - Lambda.ServiceException
@@ -2579,82 +2971,54 @@ Resources:
                           - Lambda.SdkClientException
                           - Lambda.TooManyRequestsException
                         IntervalSeconds: 1
-                        MaxAttempts: 2
                         BackoffRate: 2
+                        MaxAttempts: 2
                         JitterStrategy: FULL
                     Catch:
                       - ErrorEquals:
                           - States.ALL
                         Next: SendPrintCapacityExceedToNextWeekFail
                     Next: MoreItemsToSendToNextWeek
-                  SendPrintCapacityExceedToNextWeekFail:
-                    Type: Fail
-                  ToNextWeekSuccessfully:
-                    Type: Succeed
-              # ──────────────────────────────── BRANCH 2 ────────────────────────────────
-              - StartAt: SendPaperDeliveryToPreparePhase2
-                States:
-                  IsLastEvaluatedPhase2Null:
-                    Type: Choice
-                    OutputPath: $.lambdaResponse.Payload
-                    Choices:
-                      - Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyPhase2
-                        IsNull: true
-                        Next: PatchPhase2Null
-                    Default: PatchPhase2NotNull
 
-                  MoreItemsToSendToPreparePhase2:
+                  MoreItemsToSendToNextWeek:
                     Type: Choice
                     Choices:
                       - And:
                           - Not:
-                              Variable: $.lambdaResponse.Payload.input.lastEvaluatedKeyPhase2
+                              Variable: $.variable.lastEvaluatedKeyNextWeek
                               IsNull: true
-                          - Variable: $.lambdaResponse.Payload.input.sendToNextStepCounter
-                            NumericLessThanPath: $.lambdaResponse.Payload.input.dailyPrintCapacity
-                        Next: SendPaperDeliveryToPreparePhase2
-                    Default: IsLastEvaluatedPhase2Null
+                          - Variable: $.variable.sendToNextWeekCounter
+                            NumericLessThan: 250000
+                          - Variable: $.variable.lastExecution
+                            BooleanEquals: false
+                        Next: SendPrintCapacityExceedToNextWeek
+                    Default: ToNextWeekSuccessfully
 
-                  PatchPhase2Null:
-                    Type: Pass
-                    ResultPath: $
-                    Parameters:
-                      input:
-                        "dailyPrintCapacity.$": $.input.dailyPrintCapacity
-                        "executionDate.$": $.input.executionDate
-                        lastEvaluatedKeyPhase2: { }
-                        "numberOfShipments.$": $.input.numberOfShipments
-                        "sendToNextStepCounter.$": $.input.sendToNextStepCounter
-                        "sentToPhaseTwo.$": $.input.sentToPhaseTwo
-                        "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
-                        "stopSendToPhaseTwo": "true"
-                      "processType.$": $.processType
-                    Next: ToPreparePhase2Successfully
-                  PatchPhase2NotNull:
-                    Type: Pass
-                    Parameters:
-                      input:
-                        "dailyPrintCapacity.$": $.input.dailyPrintCapacity
-                        "executionDate.$": $.input.executionDate
-                        "lastEvaluatedKeyPhase2.$": $.input.lastEvaluatedKeyPhase2
-                        "numberOfShipments.$": $.input.numberOfShipments
-                        "sendToNextStepCounter.$": $.input.sendToNextStepCounter
-                        "sentToPhaseTwo.$": $.input.sentToPhaseTwo
-                        "stopSendToPhaseTwo": "false"
-                        "weeklyPrintCapacity.$": $.input.weeklyPrintCapacity
-                      "processType.$": "$.processType"
-                    "Next": ToPreparePhase2Successfully
+                  SendPrintCapacityExceedToNextWeekFail:
+                    Type: Fail
 
+                  ToNextWeekSuccessfully:
+                    Type: Succeed
+
+              - StartAt: SendPaperDeliveryToPreparePhase2
+                States:
                   SendPaperDeliveryToPreparePhase2:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
-                    ResultPath: $.lambdaResponse
                     Parameters:
                       FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
                       Payload:
-                        "input.$": $.lambdaResponse.Payload.input
-                        "paperDeliveryTableName.$": $.PAPERDELIVERY_TABLENAME
+                        variable.$: $.variable
+                        fixed.$: $.fixed
+                        paperDeliveryTableName.$: $.paperDeliveryTableName
+                        executionDate.$: $$.Execution.StartTime
                         processType: SEND_TO_PHASE_2
+                    ResultSelector:
+                      lastEvaluatedKeyPhase2.$: $.Payload.lastEvaluatedKeyPhase2
+                      sendToNextStepCounter.$: $.Payload.sendToNextStepCounter
+                      lastExecution.$: $.Payload.lastExecution
+                      stopSendToPhaseTwo.$: $.Payload.stopSendToPhaseTwo
+                    ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
                           - Lambda.ServiceException
@@ -2662,8 +3026,8 @@ Resources:
                           - Lambda.SdkClientException
                           - Lambda.TooManyRequestsException
                         IntervalSeconds: 1
-                        MaxAttempts: 2
                         BackoffRate: 2
+                        MaxAttempts: 2
                         JitterStrategy: FULL
                     Catch:
                       - ErrorEquals:
@@ -2671,72 +3035,157 @@ Resources:
                         Next: SendPaperDeliveryToPreparePhase2Fail
                     Next: MoreItemsToSendToPreparePhase2
 
+                  MoreItemsToSendToPreparePhase2:
+                    Type: Choice
+                    Choices:
+                      - And:
+                          - Not:
+                              Variable: $.variable.lastEvaluatedKeyPhase2
+                              IsNull: true
+                          - Variable: $.variable.sendToNextStepCounter
+                            NumericLessThanPath: $.fixed.dailyPrintCapacity
+                          - Variable: $.variable.lastExecution
+                            BooleanEquals: false
+                        Next: SendPaperDeliveryToPreparePhase2
+                    Default: ToPreparePhase2Successfully
+
                   SendPaperDeliveryToPreparePhase2Fail:
                     Type: Fail
 
                   ToPreparePhase2Successfully:
                     Type: Succeed
 
-            Next: UpdatePaperDeliveryCounter
+            ResultSelector:
+              lastEvaluatedKeyPhase2.$: $[1].variable.lastEvaluatedKeyPhase2
+              sendToNextStepCounter.$: $[1].variable.sendToNextStepCounter
+              lastEvaluatedKeyNextWeek.$: $[0].variable.lastEvaluatedKeyNextWeek
+              sendToNextWeekCounter.$: $[0].variable.sendToNextWeekCounter
+              lastExecution.$: $[1].variable.lastExecution
+              stopSendToPhaseTwo.$: $[1].variable.stopSendToPhaseTwo
+          IsLastEvaluatedKeyNextWeekNull:
+            Type: Choice
+            Choices:
+              - Variable: $.variable.lastEvaluatedKeyNextWeek
+                IsNull: true
+                Next: PatchNextWeekNull
+            Default: IsLastEvaluatedPhase2Null
 
-          RetrieveCounter:
+          IsLastEvaluatedPhase2Null:
+            Type: Choice
+            Choices:
+              - Variable: $.variable.lastEvaluatedKeyPhase2
+                IsNull: true
+                Next: PatchPhase2Null
+            Default: LastExecution
+
+          PatchPhase2Null:
+            Type: Pass
+            Next: LastExecution
+            ResultPath: $.variable
+            Parameters:
+              lastEvaluatedKeyPhase2: { }
+              lastEvaluatedKeyNextWeek.$: $.variable.lastEvaluatedKeyNextWeek
+              sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
+              sendToNextStepCounter.$: $.variable.sendToNextStepCounter
+              lastExecution.$: $.variable.lastExecution
+              stopSendToPhaseTwo: true
+
+          PatchNextWeekNull:
+            Type: Pass
+            Next: IsLastEvaluatedPhase2Null
+            ResultPath: $.variable
+            Parameters:
+              lastEvaluatedKeyNextWeek: { }
+              lastEvaluatedKeyPhase2.$: $.variable.lastEvaluatedKeyPhase2
+              sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
+              sendToNextStepCounter.$: $.variable.sendToNextStepCounter
+              lastExecution.$: $.variable.lastExecution
+              stopSendToPhaseTwo.$: $.variable.stopSendToPhaseTwo
+          LastExecution:
+            Type: Choice
+            Choices:
+              - And:
+                  - IsPresent: true
+                    Variable: $.variable.lastExecution
+                  - BooleanEquals: true
+                    Variable: $.variable.lastExecution
+                Next: UpdatePaperDeliveryCounterResetExecution
+            Default: UpdatePaperDeliveryCounter
+
+          UpdatePaperDeliveryCounterResetExecution:
             Type: Task
-            Resource: arn:aws:states:::aws-sdk:dynamodb:query
-            ResultPath: $.queryResult
+            Resource: arn:aws:states:::dynamodb:updateItem
             Parameters:
               ExpressionAttributeValues:
-                ":pk":
-                  S: PRINT
-              KeyConditionExpression: "pk = :pk"
-              Limit: 1
-              ScanIndexForward: false
-              "TableName.$": $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
+                ":dailyExecutionCounterInc":
+                  N: "0"
+                ":nextWeekVal":
+                  M.$: $.variable.lastEvaluatedKeyNextWeek
+                ":phase2Val":
+                  M.$: $.variable.lastEvaluatedKeyPhase2
+                ":sentToNextWeekInc":
+                  "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
+                ":sentToPhaseTwoInc":
+                  "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
+                ":stopSendToPhaseTwoVal":
+                  BOOL.$: $.variable.stopSendToPhaseTwo
+              Key:
+                pk:
+                  S.$: $.fixed.pk
+                sk:
+                  S.$: $.fixed.sk
+              TableName.$: $.paperDeliveryCountersTableName
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
+            End: true
             Retry:
               - ErrorEquals:
                   - States.ALL
                 IntervalSeconds: 1
-                MaxAttempts: 2
                 BackoffRate: 2
+                MaxAttempts: 3
             Catch:
               - ErrorEquals:
                   - States.ALL
-                Next: DynamoDbOperationFail
-            Next: CheckIfCounterExists
+                Next: UpdateCounterOperationFail
+
+          NoItemToProcess:
+            Type: Succeed
 
           UpdatePaperDeliveryCounter:
             Type: Task
-            End: true
-            Resource: arn:aws:states:::aws-sdk:dynamodb:updateItem
+            Resource: arn:aws:states:::dynamodb:updateItem
             Parameters:
               ExpressionAttributeValues:
                 ":nextWeekVal":
-                  "M.$": $.parallelResult[0].input.lastEvaluatedKeyNextWeek
+                  M.$: $.variable.lastEvaluatedKeyNextWeek
                 ":phase2Val":
-                  "M.$": $.parallelResult[1].input.lastEvaluatedKeyPhase2
+                  M.$: $.variable.lastEvaluatedKeyPhase2
                 ":sentToNextWeekInc":
-                  "N.$": "States.Format('{}', $.parallelResult[0].input.sendToNextWeekCounter)"
+                  "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
                 ":sentToPhaseTwoInc":
-                  "N.$": "States.Format('{}', $.parallelResult[1].input.sendToNextStepCounter)"
+                  "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
+                ":dailyExecutionCounterInc":
+                  N: "1"
                 ":stopSendToPhaseTwoVal":
-                  "Bool.$": "$.parallelResult[1].input.stopSendToPhaseTwo"
+                  BOOL.$: $.variable.stopSendToPhaseTwo
               Key:
                 pk:
-                  "S.$": $.lambdaResponse.Payload.input.pk
+                  S.$: $.fixed.pk
                 sk:
-                  "S.$": $.lambdaResponse.Payload.input.sk
-              "TableName.$": $.PAPERDELIVERYCOUNTER_TABLENAME
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal  ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
+                  S.$: $.fixed.sk
+              TableName.$: $.paperDeliveryCountersTableName
+              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc, dailyExecutionCounter :dailyExecutionCounterInc"
             Retry:
               - ErrorEquals:
                   - States.ALL
                 IntervalSeconds: 1
-                MaxAttempts: 2
                 BackoffRate: 2
+                MaxAttempts: 2
             Catch:
               - ErrorEquals:
                   - States.ALL
-                Next: DynamoDbOperationFail
-
+                Next: UpdateCounterOperationFail
+            End: true
 
   DelayerToPaperChannelStateMachineRole:
     Type: AWS::IAM::Role
@@ -2851,3 +3300,20 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+
+  DelayerNotificationOrdersQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SafeStorageToNotificationOrdersQueueURL
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "SQS:SendMessage"
+            Resource:
+              - !Ref SafeStorageToNotificationOrdersQueueARN

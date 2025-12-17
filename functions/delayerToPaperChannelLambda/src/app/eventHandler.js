@@ -1,6 +1,6 @@
 const dynamo = require("./lib/dynamo");
 const utils = require("./lib/utils");
-const { DayOfWeek, TemporalAdjusters, Instant, ZoneId } = require('@js-joda/core');
+const { DayOfWeek, TemporalAdjusters, Instant, ZoneOffset } = require('@js-joda/core');
 
 exports.handleEvent = async (event) => {
     console.log("Event received:", JSON.stringify(event));
@@ -10,53 +10,50 @@ exports.handleEvent = async (event) => {
     }
     const paperDeliveryTableName = event.paperDeliveryTableName;
     const dayOfWeek = parseInt(process.env.PN_DELAYER_DELIVERYDATEDAYOFWEEK, 10) || 1;
-    const instant = Instant.parse(event.input.executionDate);
-    const zone = ZoneId.systemDefault(); // Or use ZoneId.of("Europe/Rome") if you want to specify
+    const instant = Instant.parse(event.executionDate);
+    const zone = ZoneOffset.UTC;
     const deliveryWeek = instant.atZone(zone).toLocalDate()
         .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek)))
         .toString();
+    const numberOfDailyExecution = event.fixed.dailyExecutions;
+    const numberOfShipmentsPerExecution = Math.ceil(event.fixed.dailyPrintCapacity / numberOfDailyExecution);
+    const today = new Date().toISOString();
+    const counter = parseInt(event.fixed.dailyExecutionCounter, 10) || 0;
+    const maxExecutions = parseInt(numberOfDailyExecution, 10) || 0;
+    let lastExecution = false;
 
+    if (counter === maxExecutions - 1) {
+        console.warn(`Last execution for day ${today} -> numberOfDailyExecution: ${numberOfDailyExecution}, currentExecutionNumber: ${event.fixed.dailyExecutionCounter}`);
+        lastExecution = true;
+    }
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
-            const toSendToNextStep = event.input.dailyPrintCapacity - event.input.sendToNextStepCounter;
-            const weeklyResidual = event.input.weeklyPrintCapacity - event.input.sentToPhaseTwo;
-            if (toSendToNextStep > 0 && !event.input.stopSendToPhaseTwo && weeklyResidual > 0 ) {
+            const toSendToNextStep = numberOfShipmentsPerExecution - event.variable.sendToNextStepCounter;
+            const weeklyResidual = event.fixed.weeklyPrintCapacity - event.fixed.sentToPhaseTwo;
+            if (toSendToNextStep > 0 && !event.variable.stopSendToPhaseTwo && weeklyResidual > 0) {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
-                return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextStep);
+                return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextStep, lastExecution, event.variable.stopSendToPhaseTwo);
             }
-            console.log("No shipments to send to next step")
+            console.log("No shipments to send to next step - weeklyResidual:", weeklyResidual, "sentToPhaseTwo:", event.fixed.sentToPhaseTwo, "stopSendToPhaseTwo:", event.variable.stopSendToPhaseTwo );
             return {
-                input: {
-                    dailyPrintCapacity: parseInt(event.input.dailyPrintCapacity),
-                    weeklyPrintCapacity: parseInt(event.input.weeklyPrintCapacity),
-                    numberOfShipments: parseInt(event.input.numberOfShipments),
                     lastEvaluatedKeyPhase2: null,
-                    sentToPhaseTwo: parseInt(event.input.sentToPhaseTwo),
-                    sendToNextStepCounter: parseInt(event.input.sendToNextStepCounter),
-                    executionDate: event.input.executionDate
-                },
-                processType: "SEND_TO_PHASE_2"
+                    sendToNextStepCounter: parseInt(event.variable.sendToNextStepCounter),
+                    lastExecution: lastExecution,
+                    stopSendToPhaseTwo: event.variable.stopSendToPhaseTwo
             };
         }
         case "SEND_TO_NEXT_WEEK": {
-            const exceed = event.input.numberOfShipments - event.input.weeklyPrintCapacity;
-            const toSendToNextWeek = exceed - event.input.sentToNextWeek - event.input.sendToNextWeekCounter;
+            const exceed = event.fixed.numberOfShipments - event.fixed.weeklyPrintCapacity;
+            const toSendToNextWeek = exceed - event.fixed.sentToNextWeek - event.variable.sendToNextWeekCounter;
             if (toSendToNextWeek > 0) {
                 console.log(`To send to next week: ${toSendToNextWeek}`);
-                return sendToNextWeek(paperDeliveryTableName, deliveryWeek, event.input, toSendToNextWeek);
+                return sendToNextWeek(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextWeek, lastExecution);
             }
             console.log("No shipments to send to next week");
             return {
-                input: {
-                    dailyPrintCapacity: parseInt(event.input.dailyPrintCapacity),
-                    weeklyPrintCapacity: parseInt(event.input.weeklyPrintCapacity),
-                    numberOfShipments: parseInt(event.input.numberOfShipments),
                     lastEvaluatedKeyNextWeek: null,
-                    sendToNextWeekCounter: parseInt(event.input.sendToNextWeekCounter),
-                    sentToNextWeek: parseInt(event.input.sentToNextWeek),
-                    executionDate: event.input.executionDate
-                },
-                processType: "SEND_TO_NEXT_WEEK"
+                    sendToNextWeekCounter: parseInt(event.variable.sendToNextWeekCounter),
+                    lastExecution: lastExecution
             };
         }
         default:
@@ -64,38 +61,43 @@ exports.handleEvent = async (event) => {
     }
 };
 
-async function sendToPhase2(paperDeliveryTableName, deliveryWeek, input, toSendToNextStep) {
-    return retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek,input.lastEvaluatedKeyPhase2,input.sendToNextStepCounter,toSendToNextStep,0,"SENT_TO_PREPARE_PHASE_2", true)
+async function sendToPhase2(paperDeliveryTableName, deliveryWeek, variable, toSendToNextStep, lastExecution, stopSendToPhaseTwo) {
+    return retrieveAndProcessItems(
+            paperDeliveryTableName,
+            deliveryWeek,
+            variable.lastEvaluatedKeyPhase2,
+            variable.sendToNextStepCounter,
+            toSendToNextStep,
+            0,
+            "SENT_TO_PREPARE_PHASE_2",
+            true
+        )
         .then(result => {
             return {
-                input: {
-                    dailyPrintCapacity: parseInt(input.dailyPrintCapacity),
-                    weeklyPrintCapacity: parseInt(input.weeklyPrintCapacity),
-                    numberOfShipments: parseInt(input.numberOfShipments),
                     lastEvaluatedKeyPhase2: remapLastEvaluatedKey(result.lastEvaluatedKey),
                     sendToNextStepCounter: parseInt(result.dailyCounter),
-                    sentToPhaseTwo: parseInt(input.sentToPhaseTwo),
-                    executionDate: input.executionDate
-                },
-                processType: "SEND_TO_PHASE_2"
+                    lastExecution: lastExecution,
+                    stopSendToPhaseTwo: stopSendToPhaseTwo
             };
     });
 }
 
-async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, input, toSendToNextWeek) {
-    return retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek,input.lastEvaluatedKeyNextWeek,input.sendToNextWeekCounter,toSendToNextWeek,0,"EVALUATE_SENDER_LIMIT", false)
+async function sendToNextWeek(paperDeliveryTableName, deliveryWeek, variable, toSendToNextWeek, lastExecution) {
+    return retrieveAndProcessItems(
+            paperDeliveryTableName,
+            deliveryWeek,
+            variable.lastEvaluatedKeyNextWeek,
+            variable.sendToNextWeekCounter,
+            toSendToNextWeek,
+            0,
+            "EVALUATE_SENDER_LIMIT",
+            false
+         )
         .then(result => {
             return {
-                input: {
-                    dailyPrintCapacity: parseInt(input.dailyPrintCapacity),
-                    weeklyPrintCapacity: parseInt(input.weeklyPrintCapacity),
-                    numberOfShipments: parseInt(input.numberOfShipments),
                     lastEvaluatedKeyNextWeek: remapLastEvaluatedKeyForNextWeek(result.lastEvaluatedKey, result.toHandle, result.dailyCounter),
                     sendToNextWeekCounter: parseInt(result.dailyCounter),
-                    sentToNextWeek: parseInt(input.sentToNextWeek),
-                    executionDate: input.executionDate
-                },
-                processType: "SEND_TO_NEXT_WEEK"
+                    lastExecution: lastExecution,
             };
     });
 }
@@ -124,7 +126,7 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
         toHandle > 0 &&
         response.LastEvaluatedKey &&
         Object.keys(response.LastEvaluatedKey).length > 0 &&
-        executionCounter < 4000
+        executionCounter < 5000
       ) {
         return retrieveAndProcessItems(
             paperDeliveryTableName,

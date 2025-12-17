@@ -339,6 +339,33 @@ Resources:
         PointInTimeRecoveryEnabled: true
       KinesisStreamSpecification:
         StreamArn: !Ref CdcKinesisSourceStreamArn
+  
+  NotificationOrdersTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-NotificationOrders'
+      AttributeDefinitions:
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "sk"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "sk"
+          KeyType: "RANGE"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
 
   PaperDeliveryCounterMockTable:
     Type: AWS::DynamoDB::Table
@@ -474,6 +501,19 @@ Resources:
         DelaySeconds: 1
         VisibilityTimeout: 1800 #30 min
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM SafeStorage TO NotificationOrdersQueue ###
+  SafeStorageToNotificationOrdersQueueName:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_notification_orders'
+        DelaySeconds: 1
+        VisibilityTimeout: 1800 #30 min
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
         
   PnDelayerSenderLimitJobLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -567,6 +607,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  PreRunAlgorithmLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-preRunAlgorithmLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   ExportDelayerDataLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -586,6 +637,17 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Sub ${ProjectName}-delayer-receiverOrdersSendersLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+  
+  DelayerNotificationOrdersLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-notificationOrdersLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
@@ -683,6 +745,13 @@ Outputs:
   PaperDeliveryCounterTableArn:
     Description: ARN of dynamodb table containing PaperDeliveryCounter
     Value: !Sub '${PaperDeliveryCounterTable.Arn}'
+  
+  NotificationOrdersTableName:
+    Description: Name of dynamodb table containing NotificationOrders
+    Value: !Ref NotificationOrdersTable
+  NotificationOrdersTableArn:
+    Description: ARN of dynamodb table containing NotificationOrders
+    Value: !Sub '${NotificationOrdersTable.Arn}'
 
   PaperDeliveryCounterMockTableName:
     Description: Name of dynamodb table containing PaperDeliveryCounterMock
@@ -729,7 +798,16 @@ Outputs:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN:
     Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueARN
     Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue ARN
-
+  SafeStorageToNotificationOrdersQueueName:
+    Value: !GetAtt SafeStorageToNotificationOrdersQueueName.Outputs.QueueName
+    Description: SafeStorage-to-NotificationOrders queue name
+  SafeStorageToNotificationOrdersQueueURL:
+    Value: !GetAtt SafeStorageToNotificationOrdersQueueName.Outputs.QueueURL
+    Description: SafeStorage-to-NotificationOrders queue URL
+  SafeStorageToNotificationOrdersQueueARN:
+    Value: !GetAtt SafeStorageToNotificationOrdersQueueName.Outputs.QueueARN
+    Description: SafeStorage-to-NotificationOrders queue ARN
+    
   # Kinesis data stream
   PnDelayerInputsKinesisDataStreamArn:
     Value: !GetAtt PnDelayerInputsKinesisDataStream.Outputs.KinesisStreamArn
@@ -759,8 +837,14 @@ Outputs:
   TestDelayerLambdaName:
     Value: !Sub "${ProjectName}-testDelayerLambda"
 
+  PreRunAlgorithmLambdaName:
+    Value: !Sub "${ProjectName}-preRunAlgorithmLambda"
+
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
+  
+  DelayerNotificationOrdersLambdaName:
+    Value: !Sub "${ProjectName}-delayer-notificationOrdersLambda"
 
   ExportDelayerDataLambdaName:
     Value: !Sub "${ProjectName}-exportDelayerDataLambda"
