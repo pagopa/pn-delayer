@@ -25,11 +25,11 @@ async function moveAthenaResult(bucket, athenaResultPath, targetKey) {
 }
 
 
-async function prepareAndRunQuery(name, sql, database, bucket, basePath, date) {
+async function prepareAndRunQuery(workgroup, name, sql, database, bucket, basePath, date) {
   console.log(`Executing query: ${name}`);
 
   const athenaOutputPath = `s3://${bucket}/${basePath}`;
-  const result = await queryExecution(sql, database, athenaOutputPath);
+  const result = await queryExecution(workgroup, sql, database, athenaOutputPath);
 
   if (!result) {
     console.warn(`No result for query ${name}, skipping.`);
