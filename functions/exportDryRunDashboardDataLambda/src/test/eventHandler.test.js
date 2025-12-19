@@ -46,7 +46,7 @@ describe("eventHandler", () => {
     await eventHandler.handleEvent({});
 
     // Verifica che le dipendenze siano state chiamate
-    expect(prepareQueryConditionStub.callCount).to.equal(2); // due query
+    expect(prepareQueryConditionStub.callCount).to.equal(1); // due query
     expect(queryExecutionStub.called).to.be.true;
     expect(copyS3ObjectStub.called).to.be.true;
     expect(deleteS3ObjectStub.callCount).to.be.greaterThan(1);

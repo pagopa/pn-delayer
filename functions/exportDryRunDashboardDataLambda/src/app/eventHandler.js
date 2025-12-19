@@ -67,10 +67,6 @@ exports.handleEvent = async (event) => {
   `);
 
   const queries = {
-    SettimanaleDistribuzionePostalizzazioni: await prepareQuery(
-      "SettimanaleDistribuzionePostalizzazioni",
-      specificDate
-    ),
 
     SettimanaleEnteProvinciaProdotto: await prepareQuery(
       "SettimanaleEnteProvinciaProdotto",
