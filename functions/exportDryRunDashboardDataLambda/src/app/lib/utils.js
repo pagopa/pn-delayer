@@ -58,9 +58,11 @@ function prepareQueryPlaceholdersMap(mDate) {
     'YYYY-LAST-WEEK': last.yyyy,
     'MM-LAST-WEEK': last.mm,
     'DD-LAST-WEEK': last.dd,
-
+    
+    'YYYY-MM-DD-LAST-WEEK': last.full,
     QUERY_CONDITION_Q1: `${generatePartitionConditionWithBetween(last.full, base.full)} AND pk='${base.full}~EVALUATE_SENDER_LIMIT'`,
     QUERY_CONDITION_Q2: generatePartitionConditionWithMonths(last.full, months),
+    QUERY_CONDITION_Q3: `${generatePartitionConditionWithBetween(base.full, next.full)} AND pk='${base.full}~SENT_TO_PREPARE_PHASE_2'`,
   };
 }
 
