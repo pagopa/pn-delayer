@@ -1,0 +1,469 @@
+{
+  "Comment": "Delayer to paper channel State Machine",
+  "StartAt": "Lambda Invoke",
+  "States": {
+    "Lambda Invoke": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PreRunAlgorithmLambdaName}",
+        "Payload": {
+          "deliveryWeek": null
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "RetrieveCounter",
+      "ResultSelector": {
+        "deliveryWeek.$": "$.Payload"
+      },
+      "ResultPath": "$.preRunAlgorithmResponse"
+    },
+    "RetrieveCounter": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:getItem",
+      "Parameters": {
+        "TableName.$": "$$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME",
+        "Key": {
+          "pk": {
+            "S": "PRINT"
+          },
+          "sk": {
+            "S.$": "$.preRunAlgorithmResponse.deliveryWeek"
+          }
+        }
+      },
+      "Next": "CheckIfCounterExists",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "RetrieveCounterOperationFail"
+        }
+      ],
+      "ResultPath": "$.GetItemResponse"
+    },
+    "CheckIfCounterExists": {
+      "Choices": [
+        {
+          "Next": "MapItem",
+          "Variable": "$.GetItemResponse",
+          "IsNull": false
+        }
+      ],
+      "Default": "NoItemToProcess",
+      "Type": "Choice"
+    },
+    "IsLastEvaluatedKeyNextWeekNull": {
+      "Choices": [
+        {
+          "IsNull": true,
+          "Next": "PatchNextWeekNull",
+          "Variable": "$.variable.lastEvaluatedKeyNextWeek"
+        }
+      ],
+      "Default": "IsLastEvaluatedPhase2Null",
+      "Type": "Choice"
+    },
+    "IsLastEvaluatedPhase2Null": {
+      "Choices": [
+        {
+          "IsNull": true,
+          "Next": "PatchPhase2Null",
+          "Variable": "$.variable.lastEvaluatedKeyPhase2"
+        }
+      ],
+      "Default": "LastExecution",
+      "Type": "Choice"
+    },
+    "LastExecution": {
+      "Choices": [
+        {
+          "And": [
+            {
+              "IsPresent": true,
+              "Variable": "$.variable.lastExecution"
+            },
+            {
+              "BooleanEquals": true,
+              "Variable": "$.variable.lastExecution"
+            }
+          ],
+          "Next": "UpdatePaperDeliveryCounterResetExecution"
+        }
+      ],
+      "Default": "UpdatePaperDeliveryCounter",
+      "Type": "Choice"
+    },
+    "MapItem": {
+      "Next": "Parallel",
+      "Parameters": {
+        "fixed": {
+          "dailyExecutionCounter.$": "$.GetItemResponse.Item.dailyExecutionCounter.N",
+          "dailyExecutions.$": "$.GetItemResponse.Item.dailyExecutionNumber.N",
+          "dailyPrintCapacity.$": "$.GetItemResponse.Item.dailyPrintCapacity.N",
+          "executionDate.$": "$$.Execution.StartTime",
+          "numberOfShipments.$": "$.GetItemResponse.Item.numberOfShipments.N",
+          "pk.$": "$.GetItemResponse.Item.pk.S",
+          "sentToNextWeek.$": "$.GetItemResponse.Item.sentToNextWeek.N",
+          "sentToPhaseTwo.$": "$.GetItemResponse.Item.sentToPhaseTwo.N",
+          "sk.$": "$.GetItemResponse.Item.sk.S",
+          "weeklyPrintCapacity.$": "$.GetItemResponse.Item.weeklyPrintCapacity.N"
+        },
+        "paperDeliveryCountersTableName.$": "$.PAPERDELIVERYCOUNTER_TABLENAME",
+        "paperDeliveryTableName.$": "$.PAPERDELIVERY_TABLENAME",
+        "variable": {
+          "lastEvaluatedKeyNextWeek.$": "$.GetItemResponse.Item.lastEvaluatedKeyNextWeek.M",
+          "lastEvaluatedKeyPhase2.$": "$.GetItemResponse.Item.lastEvaluatedKeyPhase2.M",
+          "lastExecution": false,
+          "sendToNextStepCounter": 0,
+          "sendToNextWeekCounter": 0,
+          "stopSendToPhaseTwo.$": "$.GetItemResponse.Item.stopSendToPhaseTwo.BOOL"
+        }
+      },
+      "Type": "Pass"
+    },
+    "NoItemToProcess": {
+      "Type": "Succeed"
+    },
+    "Parallel": {
+      "Branches": [
+        {
+          "StartAt": "SendPrintCapacityExceedToNextWeek",
+          "States": {
+            "MoreItemsToSendToNextWeek": {
+              "Choices": [
+                {
+                  "And": [
+                    {
+                      "Not": {
+                        "IsNull": true,
+                        "Variable": "$.variable.lastEvaluatedKeyNextWeek"
+                      }
+                    },
+                    {
+                      "NumericLessThan": 250000,
+                      "Variable": "$.variable.sendToNextWeekCounter"
+                    },
+                    {
+                      "BooleanEquals": false,
+                      "Variable": "$.variable.lastExecution"
+                    }
+                  ],
+                  "Next": "SendPrintCapacityExceedToNextWeek"
+                }
+              ],
+              "Default": "ToNextWeekSuccessfully",
+              "Type": "Choice"
+            },
+            "SendPrintCapacityExceedToNextWeek": {
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "Next": "SendPrintCapacityExceedToNextWeekFail"
+                }
+              ],
+              "Next": "MoreItemsToSendToNextWeek",
+              "Parameters": {
+                "FunctionName": "${DelayerToPaperChannelLambdaName}",
+                "Payload": {
+                  "executionDate.$": "$$.Execution.StartTime",
+                  "fixed.$": "$.fixed",
+                  "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+                  "processType": "SEND_TO_NEXT_WEEK",
+                  "variable.$": "$.variable"
+                }
+              },
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "ResultPath": "$.variable",
+              "ResultSelector": {
+                "lastEvaluatedKeyNextWeek.$": "$.Payload.lastEvaluatedKeyNextWeek",
+                "lastExecution.$": "$.Payload.lastExecution",
+                "sendToNextWeekCounter.$": "$.Payload.sendToNextWeekCounter"
+              },
+              "Retry": [
+                {
+                  "BackoffRate": 2,
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "JitterStrategy": "FULL",
+                  "MaxAttempts": 2
+                }
+              ],
+              "Type": "Task"
+            },
+            "SendPrintCapacityExceedToNextWeekFail": {
+              "Type": "Fail"
+            },
+            "ToNextWeekSuccessfully": {
+              "Type": "Succeed"
+            }
+          }
+        },
+        {
+          "StartAt": "SendPaperDeliveryToPreparePhase2",
+          "States": {
+            "MoreItemsToSendToPreparePhase2": {
+              "Choices": [
+                {
+                  "And": [
+                    {
+                      "Not": {
+                        "IsNull": true,
+                        "Variable": "$.variable.lastEvaluatedKeyPhase2"
+                      }
+                    },
+                    {
+                      "NumericLessThanPath": "$.fixed.dailyPrintCapacity",
+                      "Variable": "$.variable.sendToNextStepCounter"
+                    },
+                    {
+                      "BooleanEquals": false,
+                      "Variable": "$.variable.lastExecution"
+                    }
+                  ],
+                  "Next": "SendPaperDeliveryToPreparePhase2"
+                }
+              ],
+              "Default": "ToPreparePhase2Successfully",
+              "Type": "Choice"
+            },
+            "SendPaperDeliveryToPreparePhase2": {
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "Next": "SendPaperDeliveryToPreparePhase2Fail"
+                }
+              ],
+              "Next": "MoreItemsToSendToPreparePhase2",
+              "Parameters": {
+                "FunctionName": "${DelayerToPaperChannelLambdaName}",
+                "Payload": {
+                  "executionDate.$": "$$.Execution.StartTime",
+                  "fixed.$": "$.fixed",
+                  "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+                  "processType": "SEND_TO_PHASE_2",
+                  "variable.$": "$.variable"
+                }
+              },
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "ResultPath": "$.variable",
+              "ResultSelector": {
+                "lastEvaluatedKeyPhase2.$": "$.Payload.lastEvaluatedKeyPhase2",
+                "lastExecution.$": "$.Payload.lastExecution",
+                "sendToNextStepCounter.$": "$.Payload.sendToNextStepCounter",
+                "stopSendToPhaseTwo.$": "$.Payload.stopSendToPhaseTwo"
+              },
+              "Retry": [
+                {
+                  "BackoffRate": 2,
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "JitterStrategy": "FULL",
+                  "MaxAttempts": 2
+                }
+              ],
+              "Type": "Task"
+            },
+            "SendPaperDeliveryToPreparePhase2Fail": {
+              "Type": "Fail"
+            },
+            "ToPreparePhase2Successfully": {
+              "Type": "Succeed"
+            }
+          }
+        }
+      ],
+      "Next": "IsLastEvaluatedKeyNextWeekNull",
+      "ResultPath": "$.variable",
+      "ResultSelector": {
+        "lastEvaluatedKeyNextWeek.$": "$[0].variable.lastEvaluatedKeyNextWeek",
+        "lastEvaluatedKeyPhase2.$": "$[1].variable.lastEvaluatedKeyPhase2",
+        "lastExecution.$": "$[1].variable.lastExecution",
+        "sendToNextStepCounter.$": "$[1].variable.sendToNextStepCounter",
+        "sendToNextWeekCounter.$": "$[0].variable.sendToNextWeekCounter",
+        "stopSendToPhaseTwo.$": "$[1].variable.stopSendToPhaseTwo"
+      },
+      "Type": "Parallel"
+    },
+    "PatchNextWeekNull": {
+      "Next": "IsLastEvaluatedPhase2Null",
+      "Parameters": {
+        "lastEvaluatedKeyNextWeek": {},
+        "lastEvaluatedKeyPhase2.$": "$.variable.lastEvaluatedKeyPhase2",
+        "lastExecution.$": "$.variable.lastExecution",
+        "sendToNextStepCounter.$": "$.variable.sendToNextStepCounter",
+        "sendToNextWeekCounter.$": "$.variable.sendToNextWeekCounter",
+        "stopSendToPhaseTwo.$": "$.variable.stopSendToPhaseTwo"
+      },
+      "ResultPath": "$.variable",
+      "Type": "Pass"
+    },
+    "PatchPhase2Null": {
+      "Next": "LastExecution",
+      "Parameters": {
+        "lastEvaluatedKeyNextWeek.$": "$.variable.lastEvaluatedKeyNextWeek",
+        "lastEvaluatedKeyPhase2": {},
+        "lastExecution.$": "$.variable.lastExecution",
+        "sendToNextStepCounter.$": "$.variable.sendToNextStepCounter",
+        "sendToNextWeekCounter.$": "$.variable.sendToNextWeekCounter",
+        "stopSendToPhaseTwo": true
+      },
+      "ResultPath": "$.variable",
+      "Type": "Pass"
+    },
+    "RetrieveCounterOperationFail": {
+      "Type": "Fail"
+    },
+    "UpdateCounterOperationFail": {
+      "Type": "Fail"
+    },
+    "UpdatePaperDeliveryCounter": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "UpdateCounterOperationFail"
+        }
+      ],
+      "End": true,
+      "Parameters": {
+        "ExpressionAttributeValues": {
+          ":dailyExecutionCounterInc": {
+            "N": "1"
+          },
+          ":nextWeekVal": {
+            "M.$": "$.variable.lastEvaluatedKeyNextWeek"
+          },
+          ":phase2Val": {
+            "M.$": "$.variable.lastEvaluatedKeyPhase2"
+          },
+          ":sentToNextWeekInc": {
+            "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
+          },
+          ":sentToPhaseTwoInc": {
+            "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
+          },
+          ":stopSendToPhaseTwoVal": {
+            "BOOL.$": "$.variable.stopSendToPhaseTwo"
+          }
+        },
+        "Key": {
+          "pk": {
+            "S.$": "$.fixed.pk"
+          },
+          "sk": {
+            "S.$": "$.fixed.sk"
+          }
+        },
+        "TableName.$": "$.paperDeliveryCountersTableName",
+        "UpdateExpression": "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc, dailyExecutionCounter :dailyExecutionCounterInc"
+      },
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2
+        }
+      ],
+      "Type": "Task"
+    },
+    "UpdatePaperDeliveryCounterResetExecution": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "UpdateCounterOperationFail"
+        }
+      ],
+      "End": true,
+      "Parameters": {
+        "ExpressionAttributeValues": {
+          ":dailyExecutionCounterInc": {
+            "N": "0"
+          },
+          ":nextWeekVal": {
+            "M.$": "$.variable.lastEvaluatedKeyNextWeek"
+          },
+          ":phase2Val": {
+            "M.$": "$.variable.lastEvaluatedKeyPhase2"
+          },
+          ":sentToNextWeekInc": {
+            "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
+          },
+          ":sentToPhaseTwoInc": {
+            "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
+          },
+          ":stopSendToPhaseTwoVal": {
+            "BOOL.$": "$.variable.stopSendToPhaseTwo"
+          }
+        },
+        "Key": {
+          "pk": {
+            "S.$": "$.fixed.pk"
+          },
+          "sk": {
+            "S.$": "$.fixed.sk"
+          }
+        },
+        "TableName.$": "$.paperDeliveryCountersTableName",
+        "UpdateExpression": "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
+      },
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    }
+  }
+}
