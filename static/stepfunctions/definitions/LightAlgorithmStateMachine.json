@@ -1,0 +1,185 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "DisableDelayerToPaperChannelDailyFirstScheduler",
+  "States": {
+    "DisableDelayerToPaperChannelDailyFirstScheduler": {
+      "Type": "Task",
+      "Arguments": {
+        "Name": "${DelayerToPaperChannelDailyFirstScheduler}",
+        "State": "DISABLED",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": "${DelayerToPaperChannelFirstScheduleExpression}",
+        "Target": {
+          "Arn": "${DelayerToPaperChannelStateMachine}",
+          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
+      "Next": "DisableDelayerToPaperChannelDailySecondScheduler",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "DisableRuleFail"
+        }
+      ]
+    },
+    "DisableDelayerToPaperChannelDailySecondScheduler": {
+      "Type": "Task",
+      "Arguments": {
+        "Name": "${DelayerToPaperChannelDailySecondScheduler}",
+        "State": "DISABLED",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": "${DelayerToPaperChannelSecondScheduleExpression}",
+        "Target": {
+          "Arn": "${DelayerToPaperChannelStateMachine}",
+          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
+      "Next": "LightAlgorithmJobGlue",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "DisableRuleFail"
+        }
+      ]
+    },
+    "DisableRuleFail": {
+      "Type": "Fail"
+    },
+    "LightAlgorithmJobGlue": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun",
+      "Arguments": {
+        "JobName": "${LightAlgorithm}",
+        "Arguments": {
+          "--delivery-week": "{% $states.input.deliveryWeek %}"
+        }
+      },
+      "Next": "EnableDelayerToPaperChannelDailyFirstScheduler",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "JobGlueFail"
+        }
+      ]
+    },
+    "JobGlueFail": {
+      "Type": "Fail"
+    },
+    "EnableDelayerToPaperChannelDailyFirstScheduler": {
+      "Type": "Task",
+      "Arguments": {
+        "Name": "${DelayerToPaperChannelDailyFirstScheduler}",
+        "State": "ENABLED",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": "${DelayerToPaperChannelFirstScheduleExpression}",
+        "Target": {
+          "Arn": "${DelayerToPaperChannelStateMachine}",
+          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "EnableRuleFail"
+        }
+      ],
+      "Next": "EnableDelayerToPaperChannelDailySecondScheduler"
+    },
+    "EnableDelayerToPaperChannelDailySecondScheduler": {
+      "Type": "Task",
+      "Arguments": {
+        "Name": "${DelayerToPaperChannelDailySecondScheduler}",
+        "State": "ENABLED",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": "${DelayerToPaperChannelSecondScheduleExpression}",
+        "Target": {
+          "Arn": "${DelayerToPaperChannelStateMachine}",
+          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
+      "End": true,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "EnableRuleFail"
+        }
+      ]
+    },
+    "EnableRuleFail": {
+      "Type": "Fail"
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
