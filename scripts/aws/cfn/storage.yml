@@ -671,7 +671,20 @@ Resources:
               SSEAlgorithm: 'aws:kms'
               KMSMasterKeyID: !GetAtt TestDelayerKmsBucket.Arn
 
+  ResetUsedDataGlueJobLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/aws-glue/jobs/${ProjectName}-delayer-ResetUsedDataGlueJob"
+      RetentionInDays: !Ref LogRetention
+
 Outputs:
+
+  ResetUsedDataGlueJobName:
+    Description: Name of the Glue Job to reset used data
+    Value: !Sub "${ProjectName}-delayer-ResetUsedDataGlueJob"
+
   # Dynamo tables
   PaperDeliveryDriverCapacitiesTableName:
     Description: Name of dynamodb table containing capacities
