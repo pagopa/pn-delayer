@@ -529,6 +529,10 @@ Parameters:
   EnvironmentType:
     Type: String
 
+  ResetUsedDataGlueJobName:
+    Type: String
+    Description: 'Reset Used Data Glue Job name'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
 
@@ -2149,6 +2153,83 @@ Resources:
       Principal: "events.amazonaws.com"
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
+
+  RetryAlgorithmStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - RetryAlgorithmStateMachinePolicy
+    Properties:
+      StateMachineName: RetryAlgorithmStateMachine
+      RoleArn: !GetAtt RetryAlgorithmStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
+        DefinitionSubstitutions:
+          DelayerToPaperChannelDailyFirstScheduler: !Ref DelayerToPaperChannelDailyFirstScheduler
+          DelayerToPaperChannelFirstScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
+          DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
+          DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+          DelayerToPaperChannelDailySecondScheduler:  !Ref DelayerToPaperChannelDailySecondScheduler
+          DelayerToPaperChannelSecondScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
+          ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
+          BatchWorkflowStateMachineArn: !Ref PaperDeliveryStateMachine
+          PaperDeliveryTableName: !Ref PaperDeliveryTableName
+          PaperDeliveryDriverCapacitiesTableName: !Ref PaperDeliveryDriverCapacitiesTableName
+          PaperDeliveryDriverUsedCapacitiesTableName: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+          PaperDeliverySenderLimitTableName: !Ref PaperDeliverySenderLimitTableName
+          PaperDeliveryUsedSenderLimitTableName: !Ref PaperDeliveryUsedSenderLimitTableName
+          PaperDeliveryCounterTableName: !Ref PaperDeliveryCounterTableName
+          PrintCapacity: !Ref PrintCapacity
+          DelayerToPaperChannelFirstSchedulerCron: !Ref DelayerToPaperChannelFirstSchedulerCron
+          DelayerToPaperChannelSecondSchedulerCron: !Ref DelayerToPaperChannelSecondSchedulerCron
+          DelayerToPaperChannelFirstSchedulerStartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+          DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+        TracingConfiguration:
+          Enabled: false
+
+  RetryAlgorithmStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+    # Lambda function IAM policy
+  RetryAlgorithmStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachinePolicy
+      Roles:
+        - !Ref RetryAlgorithmStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - scheduler:UpdateSchedule
+            Resource:
+              - !Ref DelayerToPaperChannelDailyFirstScheduler
+              - !Ref DelayerToPaperChannelDailySecondScheduler
+          - Effect: Allow
+            Action:
+              - glue:StartJobRun
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:BatchStopJobRun
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ResetUsedDataGlueJobName}"
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+              - !Ref PaperDeliveryStateMachine
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
