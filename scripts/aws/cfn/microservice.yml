@@ -529,6 +529,15 @@ Parameters:
   EnvironmentType:
     Type: String
 
+  SwitchOffAlgorithmLambdaName:
+    Type: String
+    Description: 'SwitchOffAlgorithmLambda function name'
+
+  SwitchOffAlgorithmWaitSeconds:
+    Type: Number
+    Description: 'Wait time in seconds before re run SwitchOffAlgorithmLambda'
+    Default: 3600
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
 
@@ -2149,6 +2158,52 @@ Resources:
       Principal: "events.amazonaws.com"
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
+
+  SwitchOffAlgorithmStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - SwitchOffAlgorithmStateMachinePolicy
+    Properties:
+      StateMachineName: SwitchOffAlgorithmStateMachine
+      RoleArn: !GetAtt SwitchOffAlgorithmStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/SwitchOffStateMachine.json"
+        DefinitionSubstitutions:
+          WaitSeconds: !Ref SwitchOffAlgorithmWaitSeconds
+          SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
+        TracingConfiguration:
+          Enabled: false
+
+  SwitchOffAlgorithmStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayer-switchOffAlgorithmStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+    # Lambda function IAM policy
+  SwitchOffAlgorithmStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayer-switchOffAlgorithmStateMachinePolicy
+      Roles:
+        - !Ref SwitchOffAlgorithmStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine

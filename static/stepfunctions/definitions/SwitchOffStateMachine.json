@@ -1,0 +1,61 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "SwitchOffAlgorithmLambda",
+  "States": {
+    "SwitchOffAlgorithmLambda": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${SwitchOffAlgorithmLambdaArn}",
+        "Payload": "{% $states.input %}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException",
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "LastEvaluatedKeyIsPresent?",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "SwitchOffAlgorithmLambdaFail"
+        }
+      ]
+    },
+    "SwitchOffAlgorithmLambdaFail": {
+      "Type": "Fail"
+    },
+    "LastEvaluatedKeyIsPresent?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Wait",
+          "Condition": "{% $not($type($.result.lastEvaluatedKey) = \"null\") %}"
+        }
+      ],
+      "Default": "Success"
+    },
+    "Wait": {
+      "Type": "Wait",
+      "End": true,
+      "Seconds": "${WaitSeconds}"
+    },
+    "Success": {
+      "Type": "Succeed"
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
