@@ -2922,16 +2922,16 @@ Resources:
               paperDeliveryTableName.$: $.PAPERDELIVERY_TABLENAME
               paperDeliveryCountersTableName.$: $.PAPERDELIVERYCOUNTER_TABLENAME
               fixed:
-                dailyPrintCapacity.$: $.queryResult.Items[0].dailyPrintCapacity.N
+                dailyPrintCapacity.$: States.StringToJson($.queryResult.Items[0].dailyPrintCapacity.N)
                 executionDate.$: $$.Execution.StartTime
-                numberOfShipments.$: $.queryResult.Items[0].numberOfShipments.N
+                numberOfShipments.$: States.StringToJson($.queryResult.Items[0].numberOfShipments.N)
                 pk.$: $.queryResult.Items[0].pk.S
-                weeklyPrintCapacity.$: $.queryResult.Items[0].weeklyPrintCapacity.N
-                sentToNextWeek.$: $.queryResult.Items[0].sentToNextWeek.N
-                sentToPhaseTwo.$: $.queryResult.Items[0].sentToPhaseTwo.N
+                weeklyPrintCapacity.$: States.StringToJson($.queryResult.Items[0].weeklyPrintCapacity.N)
+                sentToNextWeek.$: States.StringToJson($.queryResult.Items[0].sentToNextWeek.N)
+                sentToPhaseTwo.$: States.StringToJson($.queryResult.Items[0].sentToPhaseTwo.N)
                 sk.$: $.queryResult.Items[0].sk.S
-                dailyExecutions.$: $.queryResult.Items[0].dailyExecutionNumber.N
-                dailyExecutionCounter.$: $.queryResult.Items[0].dailyExecutionCounter.N
+                dailyExecutions.$: States.StringToJson($.queryResult.Items[0].dailyExecutionNumber.N)
+                dailyExecutionCounter.$: States.StringToJson($.queryResult.Items[0].dailyExecutionCounter.N)
               variable:
                 sendToNextStepCounter: 0
                 sendToNextWeekCounter: 0
@@ -2989,8 +2989,6 @@ Resources:
                               IsNull: true
                           - Variable: $.variable.sendToNextWeekCounter
                             NumericLessThan: 250000
-                          - Variable: $.variable.lastExecution
-                            BooleanEquals: false
                         Next: SendPrintCapacityExceedToNextWeek
                     Default: ToNextWeekSuccessfully
 
@@ -3018,6 +3016,7 @@ Resources:
                       sendToNextStepCounter.$: $.Payload.sendToNextStepCounter
                       lastExecution.$: $.Payload.lastExecution
                       stopSendToPhaseTwo.$: $.Payload.stopSendToPhaseTwo
+                      numberOfShipmentsPerExecution.$: $.Payload.numberOfShipmentsPerExecution
                     ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
@@ -3044,8 +3043,8 @@ Resources:
                               IsNull: true
                           - Variable: $.variable.sendToNextStepCounter
                             NumericLessThanPath: $.fixed.dailyPrintCapacity
-                          - Variable: $.variable.lastExecution
-                            BooleanEquals: false
+                          - Variable: $.variable.sendToNextStepCounter
+                            NumericLessThanPath: $.variable.numberOfShipmentsPerExecution
                         Next: SendPaperDeliveryToPreparePhase2
                     Default: ToPreparePhase2Successfully
 
