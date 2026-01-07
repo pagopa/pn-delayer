@@ -529,6 +529,10 @@ Parameters:
   EnvironmentType:
     Type: String
 
+  SwitchOffAlgorithmLambdaName:
+    Type: String
+    Description: 'SwitchOffAlgorithmLambda function name'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
 
@@ -2044,6 +2048,84 @@ Resources:
                 Action:
                   - states:StartExecution
                 Resource: !Ref PaperDeliveryStateMachine
+
+  #########################################################
+  ###             SwitchOffAlgorithmLambda              ###
+  #########################################################
+
+  SwitchOffAlgorithmLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${SwitchOffAlgorithmLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  SwitchOffAlgorithmLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref SwitchOffAlgorithmLambdaName
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/switchOffAlgorithmLambda.zip"
+      Role: !GetAtt SwitchOffAlgorithmLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
+          QUERY_LIMIT: !Ref PaperDeliveryQueryLimit
+          PAPER_DELIVERY_PRIORITY_PARAMETER: "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 10
+
+  # Lambda function role
+  SwitchOffAlgorithmLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-SwitchOffAlgorithmLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  SwitchOffAlgorithmLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-SwitchOffAlgorithmLambdaPolicy
+      Roles:
+        - !Ref SwitchOffAlgorithmLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:PutItem
+              - dynamodb:BatchWriteItem
+            Resource:
+              - !Sub "${PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}/*"
+          - Effect: Allow
+
+  SwitchOffAlgorithmLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SwitchOffAlgorithmLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   #########################################################
   ###             ExportDelayerDataLambda               ###
