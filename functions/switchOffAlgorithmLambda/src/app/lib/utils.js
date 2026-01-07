@@ -23,9 +23,9 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
 };
 
 function retrieveDate(payload) {
-    if(payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
+    if (payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
       return payload.prepareRequestDate;
-    }else{
+    } else {
       return payload.notificationSentAt;
     }
 }

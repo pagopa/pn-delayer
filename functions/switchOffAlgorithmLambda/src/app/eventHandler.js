@@ -1,8 +1,6 @@
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require('@js-joda/core');
-const { queryByPartitionKey, insertItemsBatch } = require('./dynamo');
-const { buildPaperDeliveryRecord } = require('./utils');
-
-const TABLE_NAME = process.env.DELAYER_PAPER_DELIVERY_TABLE_NAME;
+const { queryByPartitionKey, insertItemsBatch } = require('./lib/dynamo');
+const { buildPaperDeliveryRecord } = require('./lib/utils');
 
 exports.handleEvent = async (event = {}) => {
   const { executionLimit, lastEvaluatedKey } = event;
@@ -11,7 +9,7 @@ exports.handleEvent = async (event = {}) => {
     throw new Error('executionLimit è obbligatorio e deve essere maggiore di 0');
   }
 
-  const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
+  const dayOfWeek = Number.parseInt(process.env.DELIVERYDATEDAYOFWEEK, 10) || 1;
 
   const deliveryDate = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek)));
   const pk = `${deliveryDate}~EVALUATE_SENDER_LIMIT`;
@@ -33,18 +31,18 @@ exports.handleEvent = async (event = {}) => {
   };
 };
 
-async function processQueryAndItems(pk,executionLimit,lastEvaluatedKey,deliveryDate,totalProcessedItems,isWeek2) {
+async function processQueryAndItems(pk, executionLimit, lastEvaluatedKey, deliveryDate, totalProcessedItems, isWeek2) {
   const result = await queryByPartitionKey(pk, executionLimit - totalProcessedItems, lastEvaluatedKey);
 
   let processedCount = totalProcessedItems;
 
   if (result.items.length > 0) {
     const transformed = result.items.map(i => buildPaperDeliveryRecord(i, deliveryDate));
-    await processItems(transformed, deliveryDate);
+    await processItems(transformed);
     processedCount += transformed.length;
   }
 
-  // Condizione 1: lastEvaluatedKey assente e non abbiamo raggiunto il limite di esecuzione
+  // Condizione 1: lastEvaluatedKey presente e non abbiamo raggiunto il limite di esecuzione
   if (result.lastEvaluatedKey && processedCount < executionLimit) {
     return processQueryAndItems(
       pk,
@@ -56,7 +54,7 @@ async function processQueryAndItems(pk,executionLimit,lastEvaluatedKey,deliveryD
     );
   }
   // Condizione 2: lastEvaluatedKey assente, non abbiamo raggiunto il limite di esecuzione e stiamo ancora processando la settimana corrente
-  else if(!result.lastEvaluatedKey && processedCount < executionLimit && !isWeek2) {
+  else if (!result.lastEvaluatedKey && processedCount < executionLimit && !isWeek2) {
      const nextDeliveryDate = deliveryDate.plusWeeks(1);
      const pkWeek2 = `${nextDeliveryDate}~EVALUATE_SENDER_LIMIT`;
      return processQueryAndItems(
@@ -76,7 +74,7 @@ async function processQueryAndItems(pk,executionLimit,lastEvaluatedKey,deliveryD
       lastEvaluatedKey: result.lastEvaluatedKey
     };
   }
-  else{
+  else {
     return {
       totalProcessedItems: processedCount,
       lastEvaluatedKey: null

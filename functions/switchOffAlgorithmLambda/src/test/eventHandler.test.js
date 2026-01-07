@@ -14,9 +14,8 @@ describe('eventHandler.js', () => {
   let TemporalAdjustersStub;
 
   beforeEach(() => {
-    process.env.DELAYER_PAPER_DELIVERY_TABLE_NAME = 'test-table';
     process.env.QUERY_LIMIT = '1000';
-    process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK = '1';
+    process.env.DELIVERYDATEDAYOFWEEK = '1';
 
     queryByPartitionKeyStub = sinon.stub();
     insertItemsBatchStub = sinon.stub();
@@ -56,11 +55,11 @@ describe('eventHandler.js', () => {
         DayOfWeek: DayOfWeekStub,
         TemporalAdjusters: TemporalAdjustersStub,
       },
-      './dynamo': {
+      './lib/dynamo': {
         queryByPartitionKey: queryByPartitionKeyStub,
         insertItemsBatch: insertItemsBatchStub,
       },
-      './utils': {
+      './lib/utils': {
         buildPaperDeliveryRecord: buildPaperDeliveryRecordStub,
       },
     });
@@ -68,9 +67,8 @@ describe('eventHandler.js', () => {
 
   afterEach(() => {
     sinon.restore();
-    delete process.env.DELAYER_PAPER_DELIVERY_TABLE_NAME;
     delete process.env.QUERY_LIMIT;
-    delete process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK;
+    delete process.env.DELIVERYDATEDAYOFWEEK;
   });
 
   it('handleEvent lancia errore se executionLimit mancante o <= 0', async () => {

@@ -6,7 +6,7 @@ const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.DELAYER_PAPER_DELIVERY_TABLE_NAME;
-const QUERY_LIMIT = parseInt(process.env.QUERY_LIMIT, 10) || 1000;
+const QUERY_LIMIT = Number.parseInt(process.env.QUERY_LIMIT, 10) || 1000;
 
 async function queryByPartitionKey(partitionKey, executionLimit, lastEvaluatedKey) {
     const limit = Math.min(QUERY_LIMIT, executionLimit);

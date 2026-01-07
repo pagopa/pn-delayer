@@ -2075,6 +2075,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
           QUERY_LIMIT: !Ref PaperDeliveryQueryLimit
+          DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
           PAPER_DELIVERY_PRIORITY_PARAMETER: "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
       TracingConfig:
         Mode: Active
@@ -2117,7 +2118,6 @@ Resources:
             Resource:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
-          - Effect: Allow
 
   SwitchOffAlgorithmLambdaAlarms:
     Type: AWS::CloudFormation::Stack
