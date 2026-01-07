@@ -131,12 +131,13 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
     toHandle -= itemsProcessed;
     executionCounter += itemsProcessed;
     console.log(`Items processed so far for step ${step}: ${dailyCounter}, items still to handle: ${toHandle}, executionCounter: ${executionCounter}`);
+    const maxExecutionCounter = parseInt(process.env.PN_MAXPAPERDELIVERIESFOREXECUTION);
 
      if (
         toHandle > 0 &&
         response.LastEvaluatedKey &&
         Object.keys(response.LastEvaluatedKey).length > 0 &&
-        executionCounter < 5000
+        executionCounter < maxExecutionCounter
       ) {
         return retrieveAndProcessItems(
             paperDeliveryTableName,
