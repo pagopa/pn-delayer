@@ -33,7 +33,7 @@ exports.handleEvent = async (event) => {
             if (toSendToNextStep > 0 && !event.variable.stopSendToPhaseTwo && weeklyResidual > 0) {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
                 return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextStep, lastExecution, event.variable.stopSendToPhaseTwo, numberOfShipmentsPerExecution);
-            }else if(weeklyResidual > 0 && event.variable.lastEvaluatedKeyPhase2){
+            } else if(weeklyResidual > 0 && lastEvaluatedKeyIsPresent(event.variable.lastEvaluatedKeyPhase2)) {
                 return {
                     lastEvaluatedKeyPhase2: remapLastEvaluatedKey(event.variable.lastEvaluatedKeyPhase2),
                     sendToNextStepCounter: parseInt(event.variable.sendToNextStepCounter),
@@ -159,13 +159,17 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
 }
 
 function remapLastEvaluatedKey(lastEvaluatedKey){
-    if(lastEvaluatedKey && lastEvaluatedKey != null && Object.keys(lastEvaluatedKey).length > 0){
+    if(lastEvaluatedKeyIsPresent(lastEvaluatedKey)){
         return {
         pk: { S: lastEvaluatedKey.pk },
         sk: { S: lastEvaluatedKey.sk }
         };
     }
     return null;
+}
+
+function lastEvaluatedKeyIsPresent(lastEvaluatedKey){
+    return lastEvaluatedKey && lastEvaluatedKey != null && Object.keys(lastEvaluatedKey).length > 0;
 }
 
 function remapLastEvaluatedKeyForNextWeek(lastEvaluatedKey, toHandle, dailyCounter){
