@@ -14,11 +14,7 @@ exports.handleEvent = async (event) => {
 
    const timelineElements = (
      await Promise.all(
-       cdcEvents
-         .filter(e =>
-           e.dynamodb?.NewImage?.category === "NOTIFICATION_CANCELLATION_REQUEST"
-         )
-         .map(async cdcEvent => {
+       cdcEvents.map(async cdcEvent => {
            const elements = await retrieveTimelineElements(
              cdcEvent.dynamodb.NewImage.iun
            );
