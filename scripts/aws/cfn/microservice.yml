@@ -529,6 +529,38 @@ Parameters:
   EnvironmentType:
     Type: String
 
+  ExportDryRunDashboardDataLambdaName:
+    Type: String
+    Description: 'ExportDryRunDashboardData function name'
+
+  ExportDryRunDashboardDataRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the ExportDryRunDashboardDataRuleState'
+
+  ExportDryRunDashboardDataLambdaCron:
+    Type: String
+    Default: '0 7 ? * 2 *'
+    Description: 'Cron expression for ExportDryRunDashboardDataLambdaRule'
+
+  AthenaDatabaseName:
+    Type: String
+    Default: 'cdc_analytics_database'
+    Description: 'Name of the Athena database where delayer dry run data is stored'
+
+  MonthsToRetrieveDataQuery:
+    Type: String
+    Default: '4'
+    Description: 'Number of months to retrieve data for the dry run dashboard'
+
+  MaxPaperDeliveriesForExecution:
+    Type: Number
+    Description: 'Max paper deliveries for execution'
+    Default: 5000
+
   SwitchOffAlgorithmLambdaName:
     Type: String
     Description: 'SwitchOffAlgorithmLambda function name'
@@ -1518,6 +1550,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          PN_MAXPAPERDELIVERIESFOREXECUTION: !Ref MaxPaperDeliveriesForExecution
       TracingConfig:
         Mode: Active
       Layers:
@@ -2223,7 +2256,7 @@ Resources:
         - Arn: !GetAtt ExportDelayerDataLambda.Arn
           Id: "ExportDelayerDataLambdaTarget"
 
-  LambdaInvokePermission:
+  LambdaExportDelayerDataInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref ExportDelayerDataLambda
@@ -2231,6 +2264,131 @@ Resources:
       Principal: "events.amazonaws.com"
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
+
+  #########################################################
+  ###         ExportDryRunDashboardDataLambda           ###
+  #########################################################
+  # Lambda function
+  ExportDryRunDashboardDataLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref ExportDryRunDashboardDataLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/exportDryRunDashboardDataLambda.zip"
+      Role: !GetAtt ExportDryRunDashboardDataLambdaRole.Arn
+      Environment:
+        Variables:
+          MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
+          ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
+          ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
+          QUERY_MONTHS: !Ref MonthsToRetrieveDataQuery
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 300
+
+  # Lambda function role
+  ExportDryRunDashboardDataLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-ExportDryRunDashboardDataLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  ExportDryRunDashboardDataLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-ExportDryRunDashboardDataLambdaPolicy
+      Roles:
+        - !Ref ExportDryRunDashboardDataLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          #athena permission
+          - Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+              - athena:ListQueryExecutions
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetTable
+              - glue:GetTables
+              - glue:GetPartition
+              - glue:GetPartitions
+            Resource:
+              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/*
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:AbortMultipartUpload
+              - s3:ListMultipartUploadParts
+            Resource:
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/*"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
+            Resource:
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results/*"
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource:
+              - "*"
+
+  ExportDryRunDashboardDataLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref ExportDryRunDashboardDataLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ExportDryRunDashboardDataLambdaSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: ExportDryRunDashboardDataRuleState
+      ScheduleExpression: !Sub cron(${ExportDryRunDashboardDataLambdaCron})
+      State: !Ref ExportDryRunDashboardDataRuleState
+      Targets:
+        - Arn: !GetAtt ExportDryRunDashboardDataLambda.Arn
+          Id: "ExportDryRunDashboardDataLambdaTarget"
+
+  LambdaExportDryRunDashboardDataInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ExportDryRunDashboardDataLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !GetAtt ExportDryRunDashboardDataLambdaSchedule.Arn
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
@@ -2852,16 +3010,16 @@ Resources:
               paperDeliveryTableName.$: $.PAPERDELIVERY_TABLENAME
               paperDeliveryCountersTableName.$: $.PAPERDELIVERYCOUNTER_TABLENAME
               fixed:
-                dailyPrintCapacity.$: $.queryResult.Items[0].dailyPrintCapacity.N
+                dailyPrintCapacity.$: States.StringToJson($.queryResult.Items[0].dailyPrintCapacity.N)
                 executionDate.$: $$.Execution.StartTime
-                numberOfShipments.$: $.queryResult.Items[0].numberOfShipments.N
+                numberOfShipments.$: States.StringToJson($.queryResult.Items[0].numberOfShipments.N)
                 pk.$: $.queryResult.Items[0].pk.S
-                weeklyPrintCapacity.$: $.queryResult.Items[0].weeklyPrintCapacity.N
-                sentToNextWeek.$: $.queryResult.Items[0].sentToNextWeek.N
-                sentToPhaseTwo.$: $.queryResult.Items[0].sentToPhaseTwo.N
+                weeklyPrintCapacity.$: States.StringToJson($.queryResult.Items[0].weeklyPrintCapacity.N)
+                sentToNextWeek.$: States.StringToJson($.queryResult.Items[0].sentToNextWeek.N)
+                sentToPhaseTwo.$: States.StringToJson($.queryResult.Items[0].sentToPhaseTwo.N)
                 sk.$: $.queryResult.Items[0].sk.S
-                dailyExecutions.$: $.queryResult.Items[0].dailyExecutionNumber.N
-                dailyExecutionCounter.$: $.queryResult.Items[0].dailyExecutionCounter.N
+                dailyExecutions.$: States.StringToJson($.queryResult.Items[0].dailyExecutionNumber.N)
+                dailyExecutionCounter.$: States.StringToJson($.queryResult.Items[0].dailyExecutionCounter.N)
               variable:
                 sendToNextStepCounter: 0
                 sendToNextWeekCounter: 0
@@ -2919,8 +3077,6 @@ Resources:
                               IsNull: true
                           - Variable: $.variable.sendToNextWeekCounter
                             NumericLessThan: 250000
-                          - Variable: $.variable.lastExecution
-                            BooleanEquals: false
                         Next: SendPrintCapacityExceedToNextWeek
                     Default: ToNextWeekSuccessfully
 
@@ -2948,6 +3104,7 @@ Resources:
                       sendToNextStepCounter.$: $.Payload.sendToNextStepCounter
                       lastExecution.$: $.Payload.lastExecution
                       stopSendToPhaseTwo.$: $.Payload.stopSendToPhaseTwo
+                      numberOfShipmentsPerExecution.$: $.Payload.numberOfShipmentsPerExecution
                     ResultPath: $.variable
                     Retry:
                       - ErrorEquals:
@@ -2974,8 +3131,8 @@ Resources:
                               IsNull: true
                           - Variable: $.variable.sendToNextStepCounter
                             NumericLessThanPath: $.fixed.dailyPrintCapacity
-                          - Variable: $.variable.lastExecution
-                            BooleanEquals: false
+                          - Variable: $.variable.sendToNextStepCounter
+                            NumericLessThanPath: $.variable.numberOfShipmentsPerExecution
                         Next: SendPaperDeliveryToPreparePhase2
                     Default: ToPreparePhase2Successfully
 
