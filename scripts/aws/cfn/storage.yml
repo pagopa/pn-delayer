@@ -585,6 +585,31 @@ Resources:
         HasDLQ: "false"
         QueueHasAlarm: "true"
 
+  KinesisNotificationCancellationLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-delayer-kinesisNotificationCancellationLambda"
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: '/aws/lambda'
+
+  KinesisNotificationCancellationLambdaDLQ:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-delayer_kinesis_notification_cancellation_DLQ'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicArn
+        HasDLQ: "false"
+        QueueHasAlarm: "true"
+
+
   DelayerToPaperChannelLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -842,6 +867,9 @@ Outputs:
   KinesisPaperDeliveryLambdaName:
     Value: !Sub "${ProjectName}-delayer-kinesisPaperDeliveryLambda"
 
+  KinesisNotificationCancellationLambdaName:
+    Value: !Sub "${ProjectName}-delayer-kinesisNotificationCancellationLambda"
+
   DelayerToPaperChannelLambdaName:
     Value: !Sub "${ProjectName}-delayerToPaperChannelLambda"
 
@@ -869,6 +897,10 @@ Outputs:
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
     Description: pn-delayer_kinesis_paper_delivery_DLQ' queue ARN
+
+  KinesisNotificationCancellationLambdaDLQARN:
+    Value: !GetAtt KinesisNotificationCancellationLambdaDLQ.Outputs.QueueARN
+    Description: pn-delayer_kinesis_notification_cancellation_DLQ' queue ARN
 
   # Buckets
   TestDelayerBucketName:

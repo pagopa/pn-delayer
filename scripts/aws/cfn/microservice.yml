@@ -66,7 +66,15 @@ Parameters:
   LogsKinesisSourceStreamArn:
     Type: String
     Description: 'Kinesis stream that receive logs'
-  
+
+  CdcKinesisSourceStreamArn:
+    Type: String
+    Description: 'Where to send CDC'
+
+  CdcKinesisSourceStreamKeyArn:
+    Description: "Kinesis source CDC stream crypto key ARN"
+    Type: String
+
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -310,12 +318,35 @@ Parameters:
 
   KinesisPaperDeliveryLambdaName:
     Type: String
-    Description: 'PaperDeliveryLambda function name'
+    Description: 'KinesisPaperDeliveryLambda function name'
 
   KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds:
     Type: Number
     Default: 20
     Description: 'Maximum batching window in seconds for KinesisPaperDeliveryLambda'
+
+  KinesisNotificationCancellationLambdaName:
+    Type: String
+    Description: 'KinesisNotificationCancellationLambdaName function name'
+
+  KinesisNotificationCancellationLambdaDLQARN:
+    Type: String
+    Description: 'DLQ ARN for KinesisNotificationCancellationLambda'
+
+  KinesisNotificationCancellationLambdaMaxRetry:
+    Type: Number
+    Default: 3
+    Description: 'Maximum retry attempts for KinesisNotificationCancellationLambda'
+
+  KinesisNotificationCancellationLambdaBatchSize:
+    Type: Number
+    Default: 25
+    Description: 'Batch size for KinesisNotificationCancellationLambda'
+
+  KinesisNotificationCancellationLambdaBatchWindowInSeconds:
+    Type: Number
+    Default: 20
+    Description: 'Maximum batching window in seconds for KinesisNotificationCancellationLambda'
 
   DelayerToPaperChannelLambdaName:
     Type: String
@@ -2164,6 +2195,136 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
         FunctionName: !Ref SwitchOffAlgorithmLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  #########################################################
+  ###         KinesisNotificationCancellationLambda         ###
+  #########################################################
+
+  KinesisNotificationCancellationLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${KinesisNotificationCancellationLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  KinesisNotificationCancellationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref KinesisNotificationCancellationLambdaName
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/kinesisNotificationCancellation.zip"
+      Role: !GetAtt KinesisNotificationCancellationLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
+          KINESIS_BATCHSIZE: !Ref KinesisNotificationCancellationLambdaBatchSize
+          TIMELINE_SERVICE_BASE_PATH: !Ref ApplicationLoadBalancerDomain
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 10
+
+  # Lambda function role
+  KinesisNotificationCancellationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-kinesisNotificationCancellationLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  KinesisNotificationCancellationLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-KinesisNotificationCancellationLambdaPolicy
+      Roles:
+        - !Ref KinesisNotificationCancellationLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:DeleteItem
+              - dynamodb:PutItem
+              - dynamodb:TransactWriteItems
+            Resource:
+              - !Sub "${PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}/*"
+          - Effect: Allow
+            Action:
+              - kinesis:DescribeStream
+              - kinesis:DescribeStreamSummary
+              - kinesis:GetShardIterator
+              - kinesis:GetRecords
+              - kinesis:ListShards
+              - kinesis:ListStreams
+              - kinesis:SubscribeToShard
+            Resource: !Ref CdcKinesisSourceStreamArn
+          - Action: kms:Decrypt
+            Effect: Allow
+            Resource: !Ref CdcKinesisSourceStreamKeyArn
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:SendMessage
+            Resource:
+              !Ref KinesisNotificationCancellationLambdaDLQARN
+
+  # CDC to NotificationCancellationLambda
+  KinesisNotificationCancellationLambdaSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: !Sub ${KinesisNotificationCancellationLambdaBatchSize}
+      BisectBatchOnFunctionError: true
+      EventSourceArn: !Ref CdcKinesisSourceStreamArn
+      FunctionName: !Ref KinesisNotificationCancellationLambda
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      MaximumBatchingWindowInSeconds: !Sub ${KinesisNotificationCancellationLambdaBatchWindowInSeconds}
+      MaximumRetryAttempts: !Ref KinesisNotificationCancellationLambdaMaxRetry
+      StartingPosition: TRIM_HORIZON
+      DestinationConfig:
+        OnFailure:
+          Destination: !Ref KinesisNotificationCancellationLambdaDLQARN
+      FilterCriteria:
+        Filters:
+          - Pattern: >
+              {
+                "data": {
+                  "tableName": ["pn-Timelines"],
+                  "dynamodb": {
+                    "NewImage": {
+                      "reworkId": { "S": [ { "exists": true } ] },
+                      "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] }
+                    }
+                  }
+                }
+              }
+
+  KinesisNotificationCancellationLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref KinesisNotificationCancellationLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   #########################################################
