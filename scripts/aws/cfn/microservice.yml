@@ -619,6 +619,14 @@ Parameters:
     Type: String
     Description: 'Reset Used Data Glue Job name'
 
+  RetryAlgorithmStateMachineRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the RetryAlgorithmStateMachineRuleState'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
     PaperDeliveryLambdaKinesisSourceEnabled: !Equals [ !Ref EnablePaperDeliveryLambdaKinesisSource, "true" ]
@@ -1205,6 +1213,30 @@ Resources:
                 Action:
                   - "sns:Publish"
                 Resource: !Ref AlarmSNSTopicArn
+
+  ## Enable retrying the step function execution when it fails, times out or is aborted.
+  RetryAlgorithmStateMachineRule:
+   Type: AWS::Events::Rule
+   Properties:
+     Description: The EventBridge rule to match Step function execution state change
+     RoleArn: !GetAtt PnDelayerAlarmTopicPublisherRole.Arn
+     EventPattern:
+       source:
+         - aws.states
+       detail-type:
+         - Step Functions Execution Status Change
+       detail:
+         status:
+           - FAILED
+           - TIMED_OUT
+           - ABORTED
+         stateMachineArn:
+           - !Ref PaperDeliveryStateMachine
+     State: !Ref RetryAlgorithmStateMachineRuleState
+     Targets:
+      - Arn: !Ref RetryAlgorithmStateMachine
+        Id: !Sub "${ProjectName}-delayer-retry-algorithm"
+        RoleArn: !GetAtt RetryAlgorithmStateMachineRole.Arn
 
   ### Enable sending notifications to SNS topic when the step functions are in failed, aborted or timedOut status.
   BatchBridgeStateRule:
