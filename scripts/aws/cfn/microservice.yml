@@ -2216,7 +2216,7 @@ Resources:
       Handler: "index.handler"
       Code:
         S3Bucket: !Ref MicroserviceBucketName
-        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/kinesisNotificationCancellation.zip"
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/kinesisNotificationCancellationLambda.zip"
       Role: !GetAtt KinesisNotificationCancellationLambdaRole.Arn
       Environment:
         Variables:
