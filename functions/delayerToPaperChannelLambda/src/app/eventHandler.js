@@ -29,17 +29,26 @@ exports.handleEvent = async (event) => {
     switch (event.processType) {
         case "SEND_TO_PHASE_2": {
             const toSendToNextStep = numberOfShipmentsPerExecution - event.variable.sendToNextStepCounter;
-            const weeklyResidual = event.fixed.weeklyPrintCapacity - event.fixed.sentToPhaseTwo;
+            const weeklyResidual = event.fixed.weeklyPrintCapacity - event.fixed.sentToPhaseTwo - event.variable.sendToNextStepCounter;
             if (toSendToNextStep > 0 && !event.variable.stopSendToPhaseTwo && weeklyResidual > 0) {
                 console.log(`To send to phase 2: ${toSendToNextStep}`);
-                return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextStep, lastExecution, event.variable.stopSendToPhaseTwo);
+                return sendToPhase2(paperDeliveryTableName, deliveryWeek, event.variable, toSendToNextStep, lastExecution, event.variable.stopSendToPhaseTwo, numberOfShipmentsPerExecution);
+            } else if(weeklyResidual > 0 && lastEvaluatedKeyIsPresent(event.variable.lastEvaluatedKeyPhase2)) {
+                return {
+                    lastEvaluatedKeyPhase2: remapLastEvaluatedKey(event.variable.lastEvaluatedKeyPhase2),
+                    sendToNextStepCounter: parseInt(event.variable.sendToNextStepCounter),
+                    lastExecution: lastExecution,
+                    stopSendToPhaseTwo: event.variable.stopSendToPhaseTwo,
+                    numberOfShipmentsPerExecution: numberOfShipmentsPerExecution
+                }
             }
             console.log("No shipments to send to next step - weeklyResidual:", weeklyResidual, "sentToPhaseTwo:", event.fixed.sentToPhaseTwo, "stopSendToPhaseTwo:", event.variable.stopSendToPhaseTwo );
             return {
                     lastEvaluatedKeyPhase2: null,
                     sendToNextStepCounter: parseInt(event.variable.sendToNextStepCounter),
                     lastExecution: lastExecution,
-                    stopSendToPhaseTwo: event.variable.stopSendToPhaseTwo
+                    stopSendToPhaseTwo: event.variable.stopSendToPhaseTwo,
+                    numberOfShipmentsPerExecution: numberOfShipmentsPerExecution
             };
         }
         case "SEND_TO_NEXT_WEEK": {
@@ -61,7 +70,7 @@ exports.handleEvent = async (event) => {
     }
 };
 
-async function sendToPhase2(paperDeliveryTableName, deliveryWeek, variable, toSendToNextStep, lastExecution, stopSendToPhaseTwo) {
+async function sendToPhase2(paperDeliveryTableName, deliveryWeek, variable, toSendToNextStep, lastExecution, stopSendToPhaseTwo, numberOfShipmentsPerExecution) {
     return retrieveAndProcessItems(
             paperDeliveryTableName,
             deliveryWeek,
@@ -77,7 +86,8 @@ async function sendToPhase2(paperDeliveryTableName, deliveryWeek, variable, toSe
                     lastEvaluatedKeyPhase2: remapLastEvaluatedKey(result.lastEvaluatedKey),
                     sendToNextStepCounter: parseInt(result.dailyCounter),
                     lastExecution: lastExecution,
-                    stopSendToPhaseTwo: stopSendToPhaseTwo
+                    stopSendToPhaseTwo: stopSendToPhaseTwo,
+                    numberOfShipmentsPerExecution: numberOfShipmentsPerExecution
             };
     });
 }
@@ -121,12 +131,13 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
     toHandle -= itemsProcessed;
     executionCounter += itemsProcessed;
     console.log(`Items processed so far for step ${step}: ${dailyCounter}, items still to handle: ${toHandle}, executionCounter: ${executionCounter}`);
+    const maxExecutionCounter = parseInt(process.env.PN_MAXPAPERDELIVERIESFOREXECUTION);
 
      if (
         toHandle > 0 &&
         response.LastEvaluatedKey &&
         Object.keys(response.LastEvaluatedKey).length > 0 &&
-        executionCounter < 5000
+        executionCounter < maxExecutionCounter
       ) {
         return retrieveAndProcessItems(
             paperDeliveryTableName,
@@ -148,13 +159,17 @@ async function retrieveAndProcessItems(paperDeliveryTableName, deliveryWeek, las
 }
 
 function remapLastEvaluatedKey(lastEvaluatedKey){
-    if(lastEvaluatedKey){
+    if(lastEvaluatedKeyIsPresent(lastEvaluatedKey)){
         return {
         pk: { S: lastEvaluatedKey.pk },
         sk: { S: lastEvaluatedKey.sk }
         };
     }
     return null;
+}
+
+function lastEvaluatedKeyIsPresent(lastEvaluatedKey){
+    return lastEvaluatedKey && lastEvaluatedKey != null && Object.keys(lastEvaluatedKey).length > 0;
 }
 
 function remapLastEvaluatedKeyForNextWeek(lastEvaluatedKey, toHandle, dailyCounter){

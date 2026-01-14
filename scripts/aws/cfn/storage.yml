@@ -560,6 +560,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: '/aws/lambda'
 
+  DryRunDashboardDataLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-exportDryRunDashboardDataLambda"
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: '/aws/lambda'
+
   # internal queues DLQ
   KinesisPaperDeliveryLambdaDLQ:
     Type: AWS::CloudFormation::Stack
@@ -573,6 +584,31 @@ Resources:
         AlarmSNSTopicName: !Ref AlarmSNSTopicArn
         HasDLQ: "false"
         QueueHasAlarm: "true"
+
+  KinesisNotificationCancellationLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-delayer-kinesisNotificationCancellationLambda"
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: '/aws/lambda'
+
+  KinesisNotificationCancellationLambdaDLQ:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-delayer_kinesis_notification_cancellation_DLQ'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicArn
+        HasDLQ: "false"
+        QueueHasAlarm: "true"
+
 
   DelayerToPaperChannelLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -640,6 +676,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  SwitchOffAlgorithmLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-switchOffAlgorithmLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   TestDelayerKmsBucket:
     Type: AWS::KMS::Key
     Properties:
@@ -671,7 +718,20 @@ Resources:
               SSEAlgorithm: 'aws:kms'
               KMSMasterKeyID: !GetAtt TestDelayerKmsBucket.Arn
 
+  LightAlgorithmGlueJobLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/aws-glue/jobs/${ProjectName}-delayer-LightAlgorithmGlueJob"
+      RetentionInDays: !Ref LogRetention
+
 Outputs:
+
+  LightAlgorithmGlueJobName:
+    Description: Name of the Glue Job to run Light algorithm
+    Value: !Sub "${ProjectName}-delayer-LightAlgorithmGlueJob"
+
   # Dynamo tables
   PaperDeliveryDriverCapacitiesTableName:
     Description: Name of dynamodb table containing capacities
@@ -820,6 +880,9 @@ Outputs:
   KinesisPaperDeliveryLambdaName:
     Value: !Sub "${ProjectName}-delayer-kinesisPaperDeliveryLambda"
 
+  KinesisNotificationCancellationLambdaName:
+    Value: !Sub "${ProjectName}-delayer-kinesisNotificationCancellationLambda"
+
   DelayerToPaperChannelLambdaName:
     Value: !Sub "${ProjectName}-delayerToPaperChannelLambda"
 
@@ -835,12 +898,22 @@ Outputs:
   DelayerNotificationOrdersLambdaName:
     Value: !Sub "${ProjectName}-delayer-notificationOrdersLambda"
 
+  SwitchOffAlgorithmLambdaName:
+    Value: !Sub "${ProjectName}-delayer-switchOffAlgorithmLambda"
+
   ExportDelayerDataLambdaName:
     Value: !Sub "${ProjectName}-exportDelayerDataLambda"
+
+  ExportDryRunDashboardDataLambdaName:
+    Value: !Sub "${ProjectName}-exportDryRunDashboardDataLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
     Description: pn-delayer_kinesis_paper_delivery_DLQ' queue ARN
+
+  KinesisNotificationCancellationLambdaDLQARN:
+    Value: !GetAtt KinesisNotificationCancellationLambdaDLQ.Outputs.QueueARN
+    Description: pn-delayer_kinesis_notification_cancellation_DLQ' queue ARN
 
   # Buckets
   TestDelayerBucketName:
