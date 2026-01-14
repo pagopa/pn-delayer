@@ -1238,7 +1238,7 @@ Resources:
   FailedCriticalStepAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "oncall-${ProjectName}-delayer-FailedCriticalStep-Alarm"
+      AlarmName: !Sub "oncall-${ProjectName}-delayer-DisableDelayerScheduler-Alarm"
       AlarmDescription: "CloudWatch alarm for when pn-delayer critical step function executions reaches a failed, timed out or aborted state."
       TreatMissingData: notBreaching
       AlarmActions:
