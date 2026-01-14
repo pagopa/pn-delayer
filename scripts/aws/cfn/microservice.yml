@@ -603,7 +603,7 @@ Parameters:
 
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
-
+    PaperDeliveryLambdaKinesisSourceEnabled: !Equals [ !Ref EnablePaperDeliveryLambdaKinesisSource, "true" ]
 
 Resources:
   SenderLimitComputeEnvironment:
@@ -1538,7 +1538,7 @@ Resources:
   PaperDeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      Enabled: !Equals [!Ref EnablePaperDeliveryLambdaKinesisSource, "true"]
+      Enabled: !If [ PaperDeliveryLambdaKinesisSourceEnabled , true, false]
       BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
