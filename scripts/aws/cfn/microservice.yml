@@ -565,6 +565,11 @@ Parameters:
     Type: String
     Description: 'SwitchOffAlgorithmLambda function name'
 
+  EnablePaperDeliveryLambdaKinesisSource:
+    Type: String
+    AllowedValues: [ "true", "false" ]
+    Default: "true"
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
 
@@ -1502,6 +1507,7 @@ Resources:
   PaperDeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
+      Enabled: !Equals [!Ref EnablePaperDeliveryLambdaKinesisSource, "true"]
       BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
