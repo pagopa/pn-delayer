@@ -1235,6 +1235,28 @@ Resources:
       Statistic: Sum
       Threshold: 1
 
+  FailedCriticalStepAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${ProjectName}-delayer-FailedCriticalStep-Alarm"
+      AlarmDescription: "CloudWatch alarm for when pn-delayer critical step function executions reaches a failed, timed out or aborted state."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      Dimensions:
+        - Name: StepName
+          Value: DisableDelayerScheduler
+      DatapointsToAlarm: 1
+      MetricName: "CriticalStepFailed"
+      Namespace: "StepFunctions/Steps"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 12 # 30 minutes
+      Period: 300 # 5 minutes
+      Statistic: Sum
+      Threshold: 1
+
   SenderLimitJobErrorFatalLogsMetricFilter:
     Type: AWS::Logs::MetricFilter
     Properties:
