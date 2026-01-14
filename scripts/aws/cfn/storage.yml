@@ -560,6 +560,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: '/aws/lambda'
 
+  DryRunDashboardDataLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-exportDryRunDashboardDataLambda"
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: '/aws/lambda'
+
   # internal queues DLQ
   KinesisPaperDeliveryLambdaDLQ:
     Type: AWS::CloudFormation::Stack
@@ -662,6 +673,17 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Sub ${ProjectName}-delayer-notificationOrdersLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  SwitchOffAlgorithmLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-switchOffAlgorithmLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
@@ -863,8 +885,14 @@ Outputs:
   DelayerNotificationOrdersLambdaName:
     Value: !Sub "${ProjectName}-delayer-notificationOrdersLambda"
 
+  SwitchOffAlgorithmLambdaName:
+    Value: !Sub "${ProjectName}-delayer-switchOffAlgorithmLambda"
+
   ExportDelayerDataLambdaName:
     Value: !Sub "${ProjectName}-exportDelayerDataLambda"
+
+  ExportDryRunDashboardDataLambdaName:
+    Value: !Sub "${ProjectName}-exportDryRunDashboardDataLambda"
 
   KinesisPaperDeliveryLambdaDLQARN:
     Value: !GetAtt KinesisPaperDeliveryLambdaDLQ.Outputs.QueueARN
