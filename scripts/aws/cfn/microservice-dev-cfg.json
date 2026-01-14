@@ -24,6 +24,7 @@
     "VCPU": "1",
     "Memory": "4096",
     "DelayerToPaperChannelFirstSchedulerStartDate": "2025-11-24T00:00:00.000Z",
-    "DelayerToPaperChannelFirstSchedulerCron": "0 5-21 ? * MON-SUN *"
+    "DelayerToPaperChannelFirstSchedulerCron": "0 5-21 ? * MON-SUN *",
+    "RetryAlgorithmStateMachineRuleState": "ENABLED"
   }
 }
