@@ -18,6 +18,7 @@ describe('handleEvent', () => {
 
     process.env.PN_DELAYER_QUERY_LIMIT = '1000';
     process.env.PN_DELAYER_DELIVERYDATEDAYOFWEEK = '1';
+    process.env.PN_MAXPAPERDELIVERIESFOREXECUTION = '5000';
   });
 
   afterEach(() => {
