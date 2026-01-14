@@ -517,6 +517,11 @@ Parameters:
     Default: 30d
     Description: 'Ttl duration for printCapacity counter'
 
+  PrintCounterTtlDays:
+    Type: String
+    Default: 30
+    Description: 'Ttl days for printCapacity counter'
+
   StepFunctionStateMaxAttempts:
     Type: Number
     Default: 2
@@ -559,6 +564,15 @@ Parameters:
 
   EnvironmentType:
     Type: String
+
+  LightAlgorithmGlueJobName:
+    Type: String
+    Description: 'Light Algorithm Glue Job name'
+
+  LightAlgorithmGlueJobParallelism:
+    Type: Number
+    Description: 'Light Algorithm Glue Job parallelism'
+    Default: 20
 
   ExportDryRunDashboardDataLambdaName:
     Type: String
@@ -3571,3 +3585,70 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToNotificationOrdersQueueARN
+
+  LightAlgorithmGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Ref LightAlgorithmGlueJobName
+      Role: !GetAtt LightAlgorithmGlueJobRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/LightAlgorithmScript.py"
+        PythonVersion: "3"
+      DefaultArguments:
+        "--job-language": "python"
+        "--paper-delivery-table-name": !Ref PaperDeliveryTableName
+        "--province-table-name": !Ref ProvinceTableName
+        "--counter-table-name": !Ref PaperDeliveryCounterTableName
+        "--priority-parameter": "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
+        "--counter-ttl-days": !Ref PrintCounterTtlDays
+        "--counter-working-days": !Ref PrintCapacityWeeklyWorkingDays
+        "--print-capacity": !Ref PrintCapacity
+        "--parallelism": !Ref LightAlgorithmGlueJobParallelism
+        "--log-every": "20000"
+        "--enable-continuous-cloudwatch-log": "true"
+        "--enable-metrics": "true"
+        "--enable-spark-ui": "true"
+        "--TempDir": !Sub "s3://aws-glue-assets-${AWS::AccountId}-${AWS::Region}/temporary/"
+      MaxRetries: 0
+      Timeout: 480
+      GlueVersion: "5.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      ExecutionClass: STANDARD
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+
+  LightAlgorithmGlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-delayer-LightAlgorithmGlueJobRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: LightAlgorithmGlueJobPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:PutItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub "${PaperDeliveryTableArn}"
+                  - !Sub "${PaperDeliveryTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
