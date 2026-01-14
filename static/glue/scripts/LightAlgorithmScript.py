@@ -71,7 +71,7 @@ def load_provinces(dynamodb_resource, province_table_name: str) -> list[str]:
     resp = province_table.scan(ProjectionExpression="province")
     provinces_set = {it.get("province") for it in resp.get("Items", []) if it.get("province")}
     if not provinces_set:
-        raise RuntimeError("Nessuna provincia trovata: controlla ProjectionExpression/attributo.")
+        raise RuntimeError("No provinces found")
     return list(provinces_set)
 
 def calculate_print_counter_ttl(days: int) -> int:
@@ -79,16 +79,19 @@ def calculate_print_counter_ttl(days: int) -> int:
     return int(expire_at.timestamp())
 
 def compute_daily_print_capacity(delivery_date: date, print_capacity_config: str) -> int:
-    return next(
-        cap
-        for start, cap in sorted(
+    capacities = sorted(
             (
                 (date.fromisoformat(d.split(";")[0]), int(d.split(";")[1]))
                 for d in print_capacity_config.split(",")
             ),
             reverse=True,
         )
-        if delivery_date >= start
+    for start, cap in capacities:
+        if delivery_date >= start:
+            return cap
+    raise RuntimeError(
+        f"No print capacity configured for delivery date {delivery_date}: "
+        f"delivery date is before all configured start dates in print-capacity."
     )
 
 def remap_items(priority_obj: dict, items: list[dict], delivery_date: str) -> list[dict]:
@@ -232,10 +235,10 @@ def batch_write_item_with_retry(
             raise RuntimeError(f"[DYNAMO BATCH WRITE] Max attempts reached ({max_attempts}) with unprocessed items: {len(remaining)}")
 
         request_items = unprocessed
-        sleep = base * (2 ** (attempt - 1))
-        sleep += random.uniform(0, sleep / 2)
-        print(f"[BATCH RETRY] unprocessed={len(remaining)} attempt={attempt} sleep={sleep:.2f}s")
-        time.sleep(sleep)
+        sleep_duration = base * (2 ** (attempt - 1))
+        sleep_duration += random.uniform(0, sleep_duration / 2)
+        print(f"[BATCH RETRY] unprocessed={len(remaining)} attempt={attempt} sleep={sleep_duration:.2f}s")
+        time.sleep(sleep_duration)
 
 
 # ----------------------------
