@@ -2591,7 +2591,7 @@ Resources:
       DefinitionS3Location:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/LightAlgorithmStateMachine.json"
-        DefinitionSubstitutions:
+      DefinitionSubstitutions:
           DelayerToPaperChannelDailyFirstScheduler: !Ref DelayerToPaperChannelDailyFirstScheduler
           DelayerToPaperChannelFirstScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
           DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
@@ -2599,7 +2599,7 @@ Resources:
           DelayerToPaperChannelDailySecondScheduler:  !Ref DelayerToPaperChannelDailySecondScheduler
           DelayerToPaperChannelSecondScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
           LightAlgorithm: !Ref LightAlgorithmGlueJobName
-        TracingConfiguration:
+      TracingConfiguration:
           Enabled: false
 
   LightAlgorithmStateMachineRole:
