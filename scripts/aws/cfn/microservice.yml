@@ -615,10 +615,6 @@ Parameters:
     AllowedValues: [ "true", "false" ]
     Default: "true"
 
-  SwitchOffAlgorithmLambdaName:
-    Type: String
-    Description: 'SwitchOffAlgorithmLambda function name'
-
   SwitchOffAlgorithmWaitSeconds:
     Type: Number
     Description: 'Wait time in seconds before re run SwitchOffAlgorithmLambda'
