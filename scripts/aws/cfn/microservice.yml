@@ -2571,6 +2571,66 @@ Resources:
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDryRunDashboardDataLambdaSchedule.Arn
 
+  LightAlgorithmStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - LightAlgorithmStateMachinePolicy
+    Properties:
+      StateMachineName: LightAlgorithmStateMachine
+      RoleArn: !GetAtt LightAlgorithmStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/LightAlgorithmStateMachine.json"
+        DefinitionSubstitutions:
+          DelayerToPaperChannelDailyFirstScheduler: !Ref DelayerToPaperChannelDailyFirstScheduler
+          DelayerToPaperChannelFirstScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
+          DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
+          DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+          DelayerToPaperChannelDailySecondScheduler:  !Ref DelayerToPaperChannelDailySecondScheduler
+          DelayerToPaperChannelSecondScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
+          LightAlgorithm: !Ref LightAlgorithmGlueJobName
+        TracingConfiguration:
+          Enabled: false
+
+  LightAlgorithmStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+    # Lambda function IAM policy
+  LightAlgorithmStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayer-lightAlgorithmStateMachinePolicy
+      Roles:
+        - !Ref LightAlgorithmStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - scheduler:UpdateSchedule
+            Resource:
+              - !Ref DelayerToPaperChannelDailyFirstScheduler
+              - !Ref DelayerToPaperChannelDailySecondScheduler
+          - Effect: Allow
+            Action:
+              - glue:StartJobRun
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:BatchStopJobRun
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${LightAlgorithmGlueJobName}"
+
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
     DependsOn:
