@@ -2651,11 +2651,11 @@ Resources:
       DefinitionS3Location:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/SwitchOffStateMachine.json"
-        DefinitionSubstitutions:
+      DefinitionSubstitutions:
           WaitSeconds: !Ref SwitchOffAlgorithmWaitSeconds
           SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
           SwitchOffAlgorithmLambdaExecutionLimit: !Ref SwitchOffAlgorithmLambdaExecutionLimit
-        TracingConfiguration:
+      TracingConfiguration:
           Enabled: false
 
   SwitchOffAlgorithmStateMachineRole:
