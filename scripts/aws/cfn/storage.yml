@@ -141,6 +141,12 @@ Resources:
           KeySchema:
             - AttributeName: "deliveryDate"
               KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "deliveryDate-driver-index"
+          KeySchema:
+            - AttributeName: "deliveryDate"
+              KeyType: "HASH"
             - AttributeName: "unifiedDeliveryDriver"
               KeyType: "RANGE"
           Projection:
@@ -165,8 +171,6 @@ Resources:
           AttributeType: "S"
         - AttributeName: "deliveryDate"
           AttributeType: "S"
-        - AttributeName: "unifiedDeliveryDriver"
-          AttributeType: "S"
       KeySchema:
         - AttributeName: "unifiedDeliveryDriverGeokey"
           KeyType: "HASH"
@@ -177,8 +181,6 @@ Resources:
           KeySchema:
             - AttributeName: "deliveryDate"
               KeyType: "HASH"
-            - AttributeName: "unifiedDeliveryDriver"
-              KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
@@ -272,7 +274,7 @@ Resources:
         - AttributeName: "deliveryDate"
           KeyType: "RANGE"
       GlobalSecondaryIndexes:
-        - IndexName: "deliveryDate-index"
+        - IndexName: "deliveryDate-province-index"
           KeySchema:
             - AttributeName: "deliveryDate"
               KeyType: "HASH"
@@ -300,22 +302,11 @@ Resources:
           AttributeType: "S"
         - AttributeName: "deliveryDate"
           AttributeType: "S"
-        - AttributeName: "province"
-          AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
           KeyType: "HASH"
         - AttributeName: "deliveryDate"
           KeyType: "RANGE"
-      GlobalSecondaryIndexes:
-        - IndexName: "deliveryDate-index"
-          KeySchema:
-            - AttributeName: "deliveryDate"
-              KeyType: "HASH"
-            - AttributeName: "province"
-              KeyType: "RANGE"
-          Projection:
-            ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
         AttributeName: "ttl"
