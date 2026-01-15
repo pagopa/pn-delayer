@@ -2620,8 +2620,8 @@ Resources:
             Action:
               - scheduler:UpdateSchedule
             Resource:
-              - !Ref DelayerToPaperChannelDailyFirstScheduler
-              - !Ref DelayerToPaperChannelDailySecondScheduler
+              - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
+              - !GetAtt DelayerToPaperChannelDailySecondScheduler.Arn
           - Effect: Allow
             Action:
               - glue:StartJobRun
