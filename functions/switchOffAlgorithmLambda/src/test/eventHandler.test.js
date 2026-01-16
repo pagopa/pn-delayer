@@ -1,6 +1,7 @@
 const proxyquire = require('proxyquire').noCallThru();
 const sinon = require('sinon');
 const { expect } = require('chai');
+const { LocalDate, TemporalAdjusters, DayOfWeek } = require('@js-joda/core');
 
 describe('eventHandler.js', () => {
   let handler;
@@ -9,9 +10,7 @@ describe('eventHandler.js', () => {
   let insertItemsBatchStub;
   let buildPaperDeliveryRecordStub;
 
-  let LocalDateStub;
-  let DayOfWeekStub;
-  let TemporalAdjustersStub;
+  let localDateNowStub = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1)));
 
   beforeEach(() => {
     process.env.QUERY_LIMIT = '1000';
@@ -21,40 +20,7 @@ describe('eventHandler.js', () => {
     insertItemsBatchStub = sinon.stub();
     buildPaperDeliveryRecordStub = sinon.stub();
 
-    const fakeDateWeek1 = {
-      toString: () => '2026-01-05',
-      plusWeeks: (n) => {
-        if (n !== 1) throw new Error('Unexpected plusWeeks arg');
-        return {
-          toString: () => '2026-01-12',
-          plusWeeks: () => {
-            throw new Error('Not needed in tests');
-          },
-        };
-      },
-      with: function () {
-        return this;
-      },
-    };
-
-    LocalDateStub = {
-      now: sinon.stub().returns(fakeDateWeek1),
-    };
-
-    DayOfWeekStub = {
-      of: sinon.stub().callsFake((n) => n),
-    };
-
-    TemporalAdjustersStub = {
-      next: sinon.stub().callsFake((dow) => ({ dow })),
-    };
-
     handler = proxyquire('../app/eventHandler', {
-      '@js-joda/core': {
-        LocalDate: LocalDateStub,
-        DayOfWeek: DayOfWeekStub,
-        TemporalAdjusters: TemporalAdjustersStub,
-      },
       './lib/dynamo': {
         queryByPartitionKey: queryByPartitionKeyStub,
         insertItemsBatch: insertItemsBatchStub,
@@ -67,7 +33,6 @@ describe('eventHandler.js', () => {
 
   afterEach(() => {
     sinon.restore();
-    delete process.env.QUERY_LIMIT;
     delete process.env.DELIVERYDATEDAYOFWEEK;
   });
 
@@ -102,7 +67,7 @@ describe('eventHandler.js', () => {
 
     const res = await handler.handleEvent({ executionLimit: 10, lastEvaluatedKey: null });
 
-    const expectedPk = '2026-01-05~EVALUATE_SENDER_LIMIT';
+    const expectedPk = localDateNowStub + '~EVALUATE_SENDER_LIMIT';
 
     expect(queryByPartitionKeyStub.calledTwice).to.equal(true);
     expect(queryByPartitionKeyStub.firstCall.args[0]).to.equal(expectedPk);
@@ -190,8 +155,8 @@ describe('eventHandler.js', () => {
     const res = await handler.handleEvent({ executionLimit: 10, lastEvaluatedKey: null });
 
     expect(queryByPartitionKeyStub.callCount).to.equal(2);
-    expect(queryByPartitionKeyStub.getCall(0).args[0]).to.equal('2026-01-05~EVALUATE_SENDER_LIMIT');
-    expect(queryByPartitionKeyStub.getCall(1).args[0]).to.equal('2026-01-12~EVALUATE_SENDER_LIMIT');
+    expect(queryByPartitionKeyStub.getCall(0).args[0]).to.equal(localDateNowStub + '~EVALUATE_SENDER_LIMIT');
+    expect(queryByPartitionKeyStub.getCall(1).args[0]).to.equal(localDateNowStub.plusWeeks(1) + '~EVALUATE_SENDER_LIMIT');
 
     expect(res.itemsProcessed).to.equal(2);
     expect(res.completed).to.equal(true);

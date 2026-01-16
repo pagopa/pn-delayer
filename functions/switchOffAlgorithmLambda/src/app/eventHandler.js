@@ -11,7 +11,7 @@ exports.handleEvent = async (event = {}) => {
 
   const dayOfWeek = Number.parseInt(process.env.DELIVERYDATEDAYOFWEEK, 10) || 1;
 
-  const deliveryDate = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek)));
+  const deliveryDate = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek)));
   const pk = `${deliveryDate}~EVALUATE_SENDER_LIMIT`;
 
   const result = await processQueryAndItems(
