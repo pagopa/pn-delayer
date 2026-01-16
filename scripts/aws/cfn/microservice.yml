@@ -2798,7 +2798,21 @@ Resources:
               Action:
                 - logs:CreateLogStream
                 - logs:PutLogEvents
-              Resource: !Ref PaperDeliveryStateMachineLogGroupARN
+              Resource: !Sub "${PaperDeliveryStateMachineLogGroupARN}:*"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogDelivery
+                - logs:GetLogDelivery
+                - logs:UpdateLogDelivery
+                - logs:DeleteLogDelivery
+                - logs:ListLogDeliveries
+                - logs:PutResourcePolicy
+                - logs:DescribeResourcePolicies
+                - logs:DescribeLogGroups
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  aws:SourceAccount: !Ref AWS::AccountId
 
   DelayerToPaperChannelDailyFirstScheduler:
     Type: AWS::Scheduler::Schedule
@@ -2921,7 +2935,21 @@ Resources:
             Action:
               - logs:CreateLogStream
               - logs:PutLogEvents
-            Resource: !Ref DelayerToPaperChannelStateMachineLogGroupARN
+            Resource: !Sub "${DelayerToPaperChannelStateMachineLogGroupARN}:*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogDelivery
+              - logs:GetLogDelivery
+              - logs:UpdateLogDelivery
+              - logs:DeleteLogDelivery
+              - logs:ListLogDeliveries
+              - logs:PutResourcePolicy
+              - logs:DescribeResourcePolicies
+              - logs:DescribeLogGroups
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
 
   DelayerToPaperChannelPipe:
     Type: AWS::Pipes::Pipe
