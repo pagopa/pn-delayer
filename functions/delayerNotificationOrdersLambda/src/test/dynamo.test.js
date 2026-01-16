@@ -14,14 +14,20 @@ describe('persistOrderRecords', () => {
 
   it('build request items con TTL corretto', async () => {
     const records = [{ pk: '2025-10-01', sk: 'ente_AR_NZ', value: 100 }];
+    const beforeCall = Date.now();
     await persistOrderRecords(records, 'fileKey');
     const calls = ddbMock.commandCalls(BatchWriteCommand);
     expect(calls.length).to.equal(1);
     const sentItems = calls[0].args[0].input.RequestItems;
     const item = sentItems['pn-NotificationOrders'][0].PutRequest.Item;
-    const itemTtlDate = new Date(item.ttl * 1000);
-    const expectedYear = new Date().getFullYear() + 10;
-    expect(itemTtlDate.getFullYear()).to.equal(expectedYear);
+    const ttlDays = parseInt(process.env.TTL_DAYS);
+    const expectedTtl = Math.floor(beforeCall / 1000) + (ttlDays * 24 * 60 * 60);
+    expect(item.ttl).to.be.closeTo(expectedTtl, 10);
+    expect(item.ttl).to.be.greaterThan(Math.floor(Date.now() / 1000));
+    const ttlDate = new Date(item.ttl * 1000);
+    const now = new Date();
+    const yearsDifference = (ttlDate - now) / (1000 * 60 * 60 * 24 * 365);
+    expect(yearsDifference).to.be.closeTo(10, 0.1);
   });
 
   it('scrive i record in batch su DynamoDB (caso base)', async () => {

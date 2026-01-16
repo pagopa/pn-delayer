@@ -66,7 +66,15 @@ Parameters:
   LogsKinesisSourceStreamArn:
     Type: String
     Description: 'Kinesis stream that receive logs'
-  
+
+  CdcKinesisSourceStreamArn:
+    Type: String
+    Description: 'Where to send CDC'
+
+  CdcKinesisSourceStreamKeyArn:
+    Description: "Kinesis source CDC stream crypto key ARN"
+    Type: String
+
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -310,12 +318,35 @@ Parameters:
 
   KinesisPaperDeliveryLambdaName:
     Type: String
-    Description: 'PaperDeliveryLambda function name'
+    Description: 'KinesisPaperDeliveryLambda function name'
 
   KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds:
     Type: Number
     Default: 20
     Description: 'Maximum batching window in seconds for KinesisPaperDeliveryLambda'
+
+  KinesisNotificationCancellationLambdaName:
+    Type: String
+    Description: 'KinesisNotificationCancellationLambdaName function name'
+
+  KinesisNotificationCancellationLambdaDLQARN:
+    Type: String
+    Description: 'DLQ ARN for KinesisNotificationCancellationLambda'
+
+  KinesisNotificationCancellationLambdaMaxRetry:
+    Type: Number
+    Default: 3
+    Description: 'Maximum retry attempts for KinesisNotificationCancellationLambda'
+
+  KinesisNotificationCancellationLambdaBatchSize:
+    Type: Number
+    Default: 25
+    Description: 'Batch size for KinesisNotificationCancellationLambda'
+
+  KinesisNotificationCancellationLambdaBatchWindowInSeconds:
+    Type: Number
+    Default: 20
+    Description: 'Maximum batching window in seconds for KinesisNotificationCancellationLambda'
 
   DelayerToPaperChannelLambdaName:
     Type: String
@@ -486,6 +517,11 @@ Parameters:
     Default: 30d
     Description: 'Ttl duration for printCapacity counter'
 
+  PrintCounterTtlDays:
+    Type: String
+    Default: 30
+    Description: 'Ttl days for printCapacity counter'
+
   StepFunctionStateMaxAttempts:
     Type: Number
     Default: 2
@@ -529,9 +565,69 @@ Parameters:
   EnvironmentType:
     Type: String
 
+  LightAlgorithmGlueJobName:
+    Type: String
+    Description: 'Light Algorithm Glue Job name'
+
+  LightAlgorithmGlueJobParallelism:
+    Type: Number
+    Description: 'Light Algorithm Glue Job parallelism'
+    Default: 20
+
+  ExportDryRunDashboardDataLambdaName:
+    Type: String
+    Description: 'ExportDryRunDashboardData function name'
+
+  ExportDryRunDashboardDataRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the ExportDryRunDashboardDataRuleState'
+
+  ExportDryRunDashboardDataLambdaCron:
+    Type: String
+    Default: '0 7 ? * 2 *'
+    Description: 'Cron expression for ExportDryRunDashboardDataLambdaRule'
+
+  AthenaDatabaseName:
+    Type: String
+    Default: 'cdc_analytics_database'
+    Description: 'Name of the Athena database where delayer dry run data is stored'
+
+  MonthsToRetrieveDataQuery:
+    Type: String
+    Default: '4'
+    Description: 'Number of months to retrieve data for the dry run dashboard'
+
+  MaxPaperDeliveriesForExecution:
+    Type: Number
+    Description: 'Max paper deliveries for execution'
+    Default: 5000
+
+  SwitchOffAlgorithmLambdaName:
+    Type: String
+    Description: 'SwitchOffAlgorithmLambda function name'
+
+  EnablePaperDeliveryLambdaKinesisSource:
+    Type: String
+    AllowedValues: [ "true", "false" ]
+    Default: "true"
+
+  SwitchOffAlgorithmWaitSeconds:
+    Type: Number
+    Description: 'Wait time in seconds before re run SwitchOffAlgorithmLambda'
+    Default: 3600
+
+  SwitchOffAlgorithmLambdaExecutionLimit:
+    Type: Number
+    Description: 'Maximum number of executions for SwitchOffAlgorithmLambda'
+    Default: 5000
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
-
+    PaperDeliveryLambdaKinesisSourceEnabled: !Equals [ !Ref EnablePaperDeliveryLambdaKinesisSource, "true" ]
 
 Resources:
   SenderLimitComputeEnvironment:
@@ -1466,6 +1562,7 @@ Resources:
   PaperDeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
+      Enabled: !If [ PaperDeliveryLambdaKinesisSourceEnabled , true, false]
       BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
@@ -1514,6 +1611,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PN_DELAYER_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          PN_MAXPAPERDELIVERIESFOREXECUTION: !Ref MaxPaperDeliveriesForExecution
       TracingConfig:
         Mode: Active
       Layers:
@@ -2046,6 +2144,214 @@ Resources:
                 Resource: !Ref PaperDeliveryStateMachine
 
   #########################################################
+  ###             SwitchOffAlgorithmLambda              ###
+  #########################################################
+
+  SwitchOffAlgorithmLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${SwitchOffAlgorithmLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  SwitchOffAlgorithmLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref SwitchOffAlgorithmLambdaName
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/switchOffAlgorithmLambda.zip"
+      Role: !GetAtt SwitchOffAlgorithmLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
+          QUERY_LIMIT: !Ref PaperDeliveryQueryLimit
+          DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          PAPER_DELIVERY_PRIORITY_PARAMETER: "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 10
+
+  # Lambda function role
+  SwitchOffAlgorithmLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-SwitchOffAlgorithmLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  SwitchOffAlgorithmLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-SwitchOffAlgorithmLambdaPolicy
+      Roles:
+        - !Ref SwitchOffAlgorithmLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:PutItem
+              - dynamodb:BatchWriteItem
+            Resource:
+              - !Sub "${PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}/*"
+
+  SwitchOffAlgorithmLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SwitchOffAlgorithmLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  #########################################################
+  ###         KinesisNotificationCancellationLambda         ###
+  #########################################################
+
+  KinesisNotificationCancellationLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${KinesisNotificationCancellationLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  KinesisNotificationCancellationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref KinesisNotificationCancellationLambdaName
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/kinesisNotificationCancellationLambda.zip"
+      Role: !GetAtt KinesisNotificationCancellationLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
+          KINESIS_BATCHSIZE: !Ref KinesisNotificationCancellationLambdaBatchSize
+          TIMELINE_SERVICE_BASE_PATH: !Ref ApplicationLoadBalancerDomain
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 10
+
+  # Lambda function role
+  KinesisNotificationCancellationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-kinesisNotificationCancellationLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  KinesisNotificationCancellationLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-KinesisNotificationCancellationLambdaPolicy
+      Roles:
+        - !Ref KinesisNotificationCancellationLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:DeleteItem
+              - dynamodb:PutItem
+              - dynamodb:TransactWriteItems
+            Resource:
+              - !Sub "${PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}/*"
+          - Effect: Allow
+            Action:
+              - kinesis:DescribeStream
+              - kinesis:DescribeStreamSummary
+              - kinesis:GetShardIterator
+              - kinesis:GetRecords
+              - kinesis:ListShards
+              - kinesis:ListStreams
+              - kinesis:SubscribeToShard
+            Resource: !Ref CdcKinesisSourceStreamArn
+          - Action: kms:Decrypt
+            Effect: Allow
+            Resource: !Ref CdcKinesisSourceStreamKeyArn
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:SendMessage
+            Resource:
+              !Ref KinesisNotificationCancellationLambdaDLQARN
+
+  # CDC to NotificationCancellationLambda
+  KinesisNotificationCancellationLambdaSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: !Sub ${KinesisNotificationCancellationLambdaBatchSize}
+      BisectBatchOnFunctionError: true
+      EventSourceArn: !Ref CdcKinesisSourceStreamArn
+      FunctionName: !Ref KinesisNotificationCancellationLambda
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      MaximumBatchingWindowInSeconds: !Sub ${KinesisNotificationCancellationLambdaBatchWindowInSeconds}
+      MaximumRetryAttempts: !Ref KinesisNotificationCancellationLambdaMaxRetry
+      StartingPosition: TRIM_HORIZON
+      DestinationConfig:
+        OnFailure:
+          Destination: !Ref KinesisNotificationCancellationLambdaDLQARN
+      FilterCriteria:
+        Filters:
+          - Pattern: >
+              {
+                "data": {
+                  "tableName": ["pn-Timelines"],
+                  "dynamodb": {
+                    "NewImage": {
+                      "reworkId": { "S": [ { "exists": true } ] },
+                      "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] }
+                    }
+                  }
+                }
+              }
+
+  KinesisNotificationCancellationLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref KinesisNotificationCancellationLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  #########################################################
   ###             ExportDelayerDataLambda               ###
   #########################################################
   # Lambda function
@@ -2141,7 +2447,7 @@ Resources:
         - Arn: !GetAtt ExportDelayerDataLambda.Arn
           Id: "ExportDelayerDataLambdaTarget"
 
-  LambdaInvokePermission:
+  LambdaExportDelayerDataInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref ExportDelayerDataLambda
@@ -2149,6 +2455,238 @@ Resources:
       Principal: "events.amazonaws.com"
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDelayerDataLambdaSchedule.Arn
+
+  #########################################################
+  ###         ExportDryRunDashboardDataLambda           ###
+  #########################################################
+  # Lambda function
+  ExportDryRunDashboardDataLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref ExportDryRunDashboardDataLambdaName
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/exportDryRunDashboardDataLambda.zip"
+      Role: !GetAtt ExportDryRunDashboardDataLambdaRole.Arn
+      Environment:
+        Variables:
+          MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
+          ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
+          ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
+          QUERY_MONTHS: !Ref MonthsToRetrieveDataQuery
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 300
+
+  # Lambda function role
+  ExportDryRunDashboardDataLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-ExportDryRunDashboardDataLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  ExportDryRunDashboardDataLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-ExportDryRunDashboardDataLambdaPolicy
+      Roles:
+        - !Ref ExportDryRunDashboardDataLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          #athena permission
+          - Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+              - athena:ListQueryExecutions
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetTable
+              - glue:GetTables
+              - glue:GetPartition
+              - glue:GetPartitions
+            Resource:
+              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/*
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:AbortMultipartUpload
+              - s3:ListMultipartUploadParts
+            Resource:
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/*"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
+            Resource:
+              - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/athena_results/*"
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource:
+              - "*"
+
+  ExportDryRunDashboardDataLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref ExportDryRunDashboardDataLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ExportDryRunDashboardDataLambdaSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: ExportDryRunDashboardDataRuleState
+      ScheduleExpression: !Sub cron(${ExportDryRunDashboardDataLambdaCron})
+      State: !Ref ExportDryRunDashboardDataRuleState
+      Targets:
+        - Arn: !GetAtt ExportDryRunDashboardDataLambda.Arn
+          Id: "ExportDryRunDashboardDataLambdaTarget"
+
+  LambdaExportDryRunDashboardDataInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ExportDryRunDashboardDataLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !GetAtt ExportDryRunDashboardDataLambdaSchedule.Arn
+
+  LightAlgorithmStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - LightAlgorithmStateMachinePolicy
+    Properties:
+      StateMachineName: LightAlgorithmStateMachine
+      RoleArn: !GetAtt LightAlgorithmStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/LightAlgorithmStateMachine.json"
+      DefinitionSubstitutions:
+          DelayerToPaperChannelDailyFirstScheduler: !Ref DelayerToPaperChannelDailyFirstScheduler
+          DelayerToPaperChannelFirstScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
+          DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
+          DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+          DelayerToPaperChannelDailySecondScheduler:  !Ref DelayerToPaperChannelDailySecondScheduler
+          DelayerToPaperChannelSecondScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
+          LightAlgorithm: !Ref LightAlgorithmGlueJobName
+      TracingConfiguration:
+          Enabled: false
+
+  LightAlgorithmStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+    # Lambda function IAM policy
+  LightAlgorithmStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayer-lightAlgorithmStateMachinePolicy
+      Roles:
+        - !Ref LightAlgorithmStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - scheduler:UpdateSchedule
+            Resource:
+              - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
+              - !GetAtt DelayerToPaperChannelDailySecondScheduler.Arn
+          - Effect: Allow
+            Action:
+              - glue:StartJobRun
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:BatchStopJobRun
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${LightAlgorithmGlueJobName}"
+
+  SwitchOffAlgorithmStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - SwitchOffAlgorithmStateMachinePolicy
+    Properties:
+      StateMachineName: SwitchOffAlgorithmStateMachine
+      RoleArn: !GetAtt SwitchOffAlgorithmStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/SwitchOffStateMachine.json"
+      DefinitionSubstitutions:
+          WaitSeconds: !Ref SwitchOffAlgorithmWaitSeconds
+          SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
+          SwitchOffAlgorithmLambdaExecutionLimit: !Ref SwitchOffAlgorithmLambdaExecutionLimit
+      TracingConfiguration:
+          Enabled: false
+
+  SwitchOffAlgorithmStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayer-switchOffAlgorithmStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+    # Lambda function IAM policy
+  SwitchOffAlgorithmStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayer-switchOffAlgorithmStateMachinePolicy
+      Roles:
+        - !Ref SwitchOffAlgorithmStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
@@ -2160,16 +2698,16 @@ Resources:
       DefinitionS3Location:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/BatchWorkflowStateMachine.json"
-        DefinitionSubstitutions:
-          TenderAPILambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
-          UnifiedDeliveryDriverProvinceParameter: !Ref UnifiedDeliveryDriverProvinceParameter
-          PnDelayerDriverCapacityJobDefinition: !Ref DriverCapacityJobDefinition
-          PnDelayerDriverCapacityJobQueue: !Ref DriverCapacityJobQueue
-          PnDelayerResidualCapacityJobDefinition: !Ref ResidualCapacityJobDefinition
-          PnDelayerResidualCapacityJobQueue: !Ref ResidualCapacityJobQueue
-          PnDelayerSenderLimitJobDefinition: !Ref SenderLimitJobDefinition
-          PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
-        TracingConfiguration:
+      DefinitionSubstitutions:
+        TenderAPILambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+        UnifiedDeliveryDriverProvinceParameter: !Ref UnifiedDeliveryDriverProvinceParameter
+        PnDelayerDriverCapacityJobDefinition: !Ref DriverCapacityJobDefinition
+        PnDelayerDriverCapacityJobQueue: !Ref DriverCapacityJobQueue
+        PnDelayerResidualCapacityJobDefinition: !Ref ResidualCapacityJobDefinition
+        PnDelayerResidualCapacityJobQueue: !Ref ResidualCapacityJobQueue
+        PnDelayerSenderLimitJobDefinition: !Ref SenderLimitJobDefinition
+        PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
+      TracingConfiguration:
           Enabled: false
 
   PaperDeliveryStateMachineRole:
@@ -2312,11 +2850,11 @@ Resources:
       DefinitionS3Location:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/DelayerToPaperChannelStateMachine.json"
-        DefinitionSubstitutions:
-          DelayerToPaperChannelLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
-          PreRunAlgorithmLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
-        TracingConfiguration:
-          Enabled: false
+      DefinitionSubstitutions:
+        DelayerToPaperChannelLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
+        PreRunAlgorithmLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
+      TracingConfiguration:
+        Enabled: false
 
   DelayerToPaperChannelStateMachineRole:
     Type: AWS::IAM::Role
@@ -2449,3 +2987,70 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToNotificationOrdersQueueARN
+
+  LightAlgorithmGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Ref LightAlgorithmGlueJobName
+      Role: !GetAtt LightAlgorithmGlueJobRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/LightAlgorithmScript.py"
+        PythonVersion: "3"
+      DefaultArguments:
+        "--job-language": "python"
+        "--paper-delivery-table-name": !Ref PaperDeliveryTableName
+        "--province-table-name": !Ref ProvinceTableName
+        "--counter-table-name": !Ref PaperDeliveryCounterTableName
+        "--priority-parameter": "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
+        "--counter-ttl-days": !Ref PrintCounterTtlDays
+        "--counter-working-days": !Ref PrintCapacityWeeklyWorkingDays
+        "--print-capacity": !Ref PrintCapacity
+        "--parallelism": !Ref LightAlgorithmGlueJobParallelism
+        "--log-every": "20000"
+        "--enable-continuous-cloudwatch-log": "true"
+        "--enable-metrics": "true"
+        "--enable-spark-ui": "true"
+        "--TempDir": !Sub "s3://aws-glue-assets-${AWS::AccountId}-${AWS::Region}/temporary/"
+      MaxRetries: 0
+      Timeout: 480
+      GlueVersion: "5.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      ExecutionClass: STANDARD
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+
+  LightAlgorithmGlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-delayer-LightAlgorithmGlueJobRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: LightAlgorithmGlueJobPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:PutItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub "${PaperDeliveryTableArn}"
+                  - !Sub "${PaperDeliveryTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
