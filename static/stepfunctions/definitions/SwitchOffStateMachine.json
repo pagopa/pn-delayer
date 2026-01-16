@@ -10,7 +10,7 @@
         "FunctionName": "${SwitchOffAlgorithmLambdaArn}",
         "Payload": {
           "executionLimit": "${SwitchOffAlgorithmLambdaExecutionLimit}",
-          "lastEvaluatedKey": null
+          "lastEvaluatedKey": "{% $states.input.lastEvaluatedKey %}"
         }
       },
       "Retry": [
@@ -19,8 +19,7 @@
             "Lambda.ServiceException",
             "Lambda.AWSLambdaException",
             "Lambda.SdkClientException",
-            "Lambda.TooManyRequestsException",
-            "States.ALL"
+            "Lambda.TooManyRequestsException"
           ],
           "IntervalSeconds": 1,
           "MaxAttempts": 3,
@@ -46,14 +45,14 @@
       "Choices": [
         {
           "Next": "Wait",
-          "Condition": "{% $not($type($.result.lastEvaluatedKey) = \"null\") %}"
+          "Condition": "{% $states.input.lastEvaluatedKey != null %}"
         }
       ],
       "Default": "Success"
     },
     "Wait": {
       "Type": "Wait",
-      "Seconds": "${WaitSeconds}",
+      "Seconds": "{% $states.input.waitSeconds %}",
       "Next": "SwitchOffAlgorithmLambda"
     },
     "Success": {
