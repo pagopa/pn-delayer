@@ -3100,10 +3100,11 @@ Resources:
                   - ssm:GetParameter
                 Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
+
   ResetUsedDataGlueJob:
     Type: AWS::Glue::Job
     Properties:
-      Name: !Sub "${ProjectName}-delayer-ResetUsedDataGlueJob"
+      Name: !Ref ResetUsedDataGlueJobName
       Role: !GetAtt ResetUsedDataGlueJobRole.Arn
       Command:
         Name: glueetl
@@ -3114,6 +3115,14 @@ Resources:
         "--used-capacity-table-name": !Ref PaperDeliveryDriverUsedCapacitiesTableName
         "--used-sender-limit-table-name": !Ref PaperDeliveryUsedSenderLimitTableName
         "--counter-table-name": !Ref PaperDeliveryCounterTableName
+        "--province-table-name": !Ref ProvinceTableName
+        "--driver-province-parameter": "{{resolve:ssm:/config/pn-delayer/unifiedDeliveryDriver-province}}"
+        "--parallelism": !Ref LightAlgorithmGlueJobParallelism
+        "--log-every": "20000"
+        "--enable-continuous-cloudwatch-log": "true"
+        "--enable-metrics": "true"
+        "--enable-spark-ui": "true"
+        "--TempDir": !Sub "s3://aws-glue-assets-${AWS::AccountId}-${AWS::Region}/temporary/"
       MaxRetries: 0
       Timeout: 480
       GlueVersion: "5.0"
