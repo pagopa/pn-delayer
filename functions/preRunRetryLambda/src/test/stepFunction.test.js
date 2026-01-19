@@ -14,7 +14,7 @@ const { executionWithDeliveryDateExists } = require("../app/lib/stepFunction");
 
 const sfnMock = mockClient(SFNClient);
 
-process.env.RETRY_ALGORITHM_STATE_MACHINE = "prova";
+process.env.RETRY_ALGORITHM_STATE_MACHINE_ARN = "prova";
 
 describe("stepFunction", () => {
   const deliveryDate = LocalDate.parse("2025-01-20"); // Monday

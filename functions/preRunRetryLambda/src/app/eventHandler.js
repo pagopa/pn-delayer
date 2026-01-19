@@ -5,14 +5,15 @@ const { calculateDeliveryDate } = require("./lib/utils");
 exports.handleEvent = async (event = {}) => {
   const {
     skipStepExecutionCheck = false,
+    executionArn
   } = event;
 
   const deliveryDate = calculateDeliveryDate();
 
   let canExecuteRetryAlgorithm = true;
 
-  if(!skipStepExecutionCheck){
-    canExecuteRetryAlgorithm = await executionWithDeliveryDateExists(deliveryDate);
+  if (!skipStepExecutionCheck){
+    canExecuteRetryAlgorithm = await executionWithDeliveryDateExists(deliveryDate, executionArn);
   }
 
   if (!canExecuteRetryAlgorithm) {

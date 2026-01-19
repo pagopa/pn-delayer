@@ -395,7 +395,7 @@ Parameters:
 
   PreRunRetryLambdaName:
     Type: String
-    Description: 'PreStartLambda function name'
+    Description: 'PreRunRetryLambdaName function name'
 
   PreRunAlgorithmLambdaName:
     Type: String
@@ -2064,7 +2064,7 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}/*"
 
   #########################################################
-  ###                  PreStartLambda                   ###
+  ###                  PreRunRetryLambdaName                   ###
   #########################################################
 
   PreRunRetryLambdaSecGroup:
@@ -2089,7 +2089,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           DELAYER_TO_PAPER_CHANNEL_FIRST_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
           DELAYER_TO_PAPER_CHANNEL_SECOND_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
-        #  RETRY_ALGORITHM_STATE_MACHINE: !Ref RetryAlgorithmStateMachine
+        #  RETRY_ALGORITHM_STATE_MACHINE_ARN: !Ref RetryAlgorithmStateMachine
       TracingConfig:
         Mode: Active
       Layers:
@@ -2100,7 +2100,7 @@ Resources:
   PreRunRetryLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ProjectName}-PreStartLambdaRole
+      RoleName: !Sub ${ProjectName}-PreRunRetryLambdaNameRole
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:

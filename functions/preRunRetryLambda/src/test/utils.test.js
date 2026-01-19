@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const {
   DayOfWeek,
   Instant,
-  ZoneOffset,
   LocalDate
 } = require("@js-joda/core");
 
