@@ -13,6 +13,8 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +32,16 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
     @Override
     public Mono<Integer> getPaperDeliveryDriverCapacities(String tenderId, String unifiedDeliveryDriver, String geoKey, LocalDate deliveryDate) {
 
+        String dateToQuery = deliveryDate.atStartOfDay()
+                .atOffset(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"));
+
         QueryConditional keyCondition = QueryConditional.sortLessThanOrEqualTo(Key.builder()
                 .partitionValue(PaperDeliveryDriverCapacity.buildKey(tenderId, unifiedDeliveryDriver, geoKey))
-                .sortValue(deliveryDate.toString()).build());
+                .sortValue(dateToQuery).build());
 
         Map<String, AttributeValue> expressionValues = new HashMap<>();
-        expressionValues.put(":now", AttributeValue.builder().s(deliveryDate.toString()).build());
+        expressionValues.put(":now", AttributeValue.builder().s(dateToQuery).build());
 
         Map<String, String> expressionAttributeNames = new HashMap<>();
         expressionAttributeNames.put("#to", "activationDateTo");
@@ -66,12 +72,16 @@ public class PaperDeliveryDriverCapacitiesDAOImpl implements PaperDeliveryDriver
     @Override
     public Mono<List<PaperDeliveryDriverCapacity>> retrieveUnifiedDeliveryDriversOnProvince(String tenderId, String geoKey, LocalDate deliveryDate) {
 
+        String dateToQuery = deliveryDate.atStartOfDay()
+                .atOffset(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"));
+
         QueryConditional keyCondition = QueryConditional.sortLessThanOrEqualTo(Key.builder()
                 .partitionValue(PaperDeliveryDriverCapacity.buildGsiKey(tenderId, geoKey))
-                .sortValue(deliveryDate.toString()).build());
+                .sortValue(dateToQuery).build());
 
         Map<String, AttributeValue> expressionValues = new HashMap<>();
-        expressionValues.put(":now", AttributeValue.builder().s(deliveryDate.toString()).build());
+        expressionValues.put(":now", AttributeValue.builder().s(dateToQuery).build());
 
         Map<String, String> expressionAttributeNames = new HashMap<>();
         expressionAttributeNames.put("#to", "activationDateTo");

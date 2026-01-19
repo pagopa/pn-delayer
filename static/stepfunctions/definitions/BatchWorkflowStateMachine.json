@@ -1,0 +1,521 @@
+{
+  "Comment": "Paper Delivery State Machine",
+  "StartAt": "GetActiveTender",
+  "States": {
+    "CleanUpInput": {
+      "Next": "MapSubmitEvaluateDriverCapacityJobs",
+      "Parameters": {
+        "actualTenderId.$": "$.actualTenderId",
+        "delayerToPaperChannelFirstSchedulerCron.$": "$.delayerToPaperChannelFirstSchedulerCron",
+        "delayerToPaperChannelFirstSchedulerStartDate.$": "$.delayerToPaperChannelFirstSchedulerStartDate",
+        "delayerToPaperChannelSecondSchedulerCron.$": "$.delayerToPaperChannelSecondSchedulerCron",
+        "delayerToPaperChannelSecondSchedulerStartDate.$": "$.delayerToPaperChannelSecondSchedulerStartDate",
+        "deliveryDateDayOfWeek.$": "$.deliveryDateDayOfWeek",
+        "deliveryWeek.$": "$.deliveryWeek",
+        "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
+        "paperDeliveryDriverCapacitiesTableName.$": "$.paperDeliveryDriverCapacitiesTableName",
+        "paperDeliveryDriverUsedCapacitiesTableName.$": "$.paperDeliveryDriverUsedCapacitiesTableName",
+        "paperDeliverySenderLimitTableName.$": "$.paperDeliverySenderLimitTableName",
+        "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+        "paperDeliveryUsedSenderLimitTableName.$": "$.paperDeliveryUsedSenderLimitTableName",
+        "printCapacity.$": "$.printCapacity",
+        "unifiedDeliveryDrivers.$": "$.tempGetParameterResult.unifiedDeliveryDrivers"
+      },
+      "Type": "Pass"
+    },
+    "GetActiveTender": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "Next": "retrieveProvince",
+      "Parameters": {
+        "FunctionName": "${TenderAPILambdaArn}",
+        "Payload": {
+          "operation": "GET_TENDER_ACTIVE"
+        }
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultSelector": {
+        "actualTenderId.$": "$.Payload.body.tenderId",
+        "delayerToPaperChannelFirstSchedulerCron.$": "$$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON",
+        "delayerToPaperChannelFirstSchedulerStartDate.$": "$$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE",
+        "delayerToPaperChannelSecondSchedulerCron.$": "$$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON",
+        "delayerToPaperChannelSecondSchedulerStartDate.$": "$$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE",
+        "deliveryDateDayOfWeek.$": "$$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK",
+        "deliveryWeek.$": "$$.Execution.Input.PN_DELAYER_DELIVERYWEEK",
+        "paperDeliveryCounterTableName.$": "$$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME",
+        "paperDeliveryDriverCapacitiesTableName.$": "$$.Execution.Input.PAPERDELIVERYDRIVERCAPACITIES_TABLENAME",
+        "paperDeliveryDriverUsedCapacitiesTableName.$": "$$.Execution.Input.PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME",
+        "paperDeliverySenderLimitTableName.$": "$$.Execution.Input.PAPERDELIVERYSENDERLIMIT_TABLENAME",
+        "paperDeliveryTableName.$": "$$.Execution.Input.PAPERDELIVERY_TABLENAME",
+        "paperDeliveryUsedSenderLimitTableName.$": "$$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME",
+        "printCapacity.$": "$$.Execution.Input.PN_DELAYER_PRINTCAPACITY"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "JitterStrategy": "FULL",
+          "MaxAttempts": 2
+        }
+      ],
+      "Type": "Task"
+    },
+    "GetUnifiedDeliveryDriverProvinceParameter": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "Next": "CleanUpInput",
+      "Parameters": {
+        "Name": "${UnifiedDeliveryDriverProvinceParameter}",
+        "WithDecryption": true
+      },
+      "Resource": "arn:aws:states:::aws-sdk:ssm:getParameter",
+      "ResultPath": "$.tempGetParameterResult",
+      "ResultSelector": {
+        "unifiedDeliveryDrivers.$": "States.StringToJson($.Parameter.Value)"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2
+        }
+      ],
+      "Type": "Task"
+    },
+    "MapSubmitEvaluateDriverCapacityJobs": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "InputPath": "$",
+      "ItemsPath": "$.unifiedDeliveryDrivers",
+      "Iterator": {
+        "StartAt": "submitEvaluateDriverCapacityJob",
+        "States": {
+          "EvaluateDriverCapacityFail": {
+            "Type": "Fail"
+          },
+          "submitEvaluateDriverCapacityJob": {
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "EvaluateDriverCapacityFail"
+              }
+            ],
+            "End": true,
+            "OutputPath": "$.Status",
+            "Parameters": {
+              "ArrayProperties": {
+                "Size.$": "States.ArrayLength($.provinces)"
+              },
+              "ContainerOverrides": {
+                "Environment": [
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME",
+                    "Value.$": "$.paperDeliveryDriverCapacitiesTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME",
+                    "Value.$": "$.paperDeliveryDriverUsedCapacitiesTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME",
+                    "Value.$": "$.paperDeliveryCounterTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYTABLENAME",
+                    "Value.$": "$.paperDeliveryTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYDATEDAYOFWEEK",
+                    "Value.$": "$.deliveryDateDayOfWeek"
+                  },
+                  {
+                    "Name": "PN_DELAYER_PRINTCAPACITY",
+                    "Value.$": "$.printCapacity"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON",
+                    "Value.$": "$.delayerToPaperChannelFirstSchedulerCron"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON",
+                    "Value.$": "$.delayerToPaperChannelSecondSchedulerCron"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE",
+                    "Value.$": "$.delayerToPaperChannelFirstSchedulerStartDate"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE",
+                    "Value.$": "$.delayerToPaperChannelSecondSchedulerStartDate"
+                  },
+                  {
+                    "Name": "PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER",
+                    "Value.$": "$.driver"
+                  },
+                  {
+                    "Name": "PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST",
+                    "Value.$": "States.JsonToString($.provinces)"
+                  },
+                  {
+                    "Name": "PN_DELAYER_ACTUALTENDERID",
+                    "Value.$": "$.actualTenderId"
+                  },
+                  {
+                    "Name": "PN_DELAYER_WORKFLOWSTEP",
+                    "Value": "EVALUATE_DRIVER_CAPACITY"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYWEEK",
+                    "Value.$": "$.deliveryWeek"
+                  }
+                ]
+              },
+              "JobDefinition": "${PnDelayerDriverCapacityJobDefinition}",
+              "JobName.$": "$.driver",
+              "JobQueue": "${PnDelayerDriverCapacityJobQueue}"
+            },
+            "Resource": "arn:aws:states:::batch:submitJob.sync",
+            "Type": "Task"
+          }
+        }
+      },
+      "MaxConcurrency": 40,
+      "Next": "MapSubmitEvaluateResidualCapacityJobs",
+      "Parameters": {
+        "actualTenderId.$": "$.actualTenderId",
+        "delayerToPaperChannelFirstSchedulerCron.$": "$.delayerToPaperChannelFirstSchedulerCron",
+        "delayerToPaperChannelFirstSchedulerStartDate.$": "$.delayerToPaperChannelFirstSchedulerStartDate",
+        "delayerToPaperChannelSecondSchedulerCron.$": "$.delayerToPaperChannelSecondSchedulerCron",
+        "delayerToPaperChannelSecondSchedulerStartDate.$": "$.delayerToPaperChannelSecondSchedulerStartDate",
+        "deliveryDateDayOfWeek.$": "$.deliveryDateDayOfWeek",
+        "deliveryWeek.$": "$.deliveryWeek",
+        "driver.$": "$$.Map.Item.Value.driver",
+        "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
+        "paperDeliveryDriverCapacitiesTableName.$": "$.paperDeliveryDriverCapacitiesTableName",
+        "paperDeliveryDriverUsedCapacitiesTableName.$": "$.paperDeliveryDriverUsedCapacitiesTableName",
+        "paperDeliverySenderLimitTableName.$": "$.paperDeliverySenderLimitTableName",
+        "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+        "paperDeliveryUsedSenderLimitTableName.$": "$.paperDeliveryUsedSenderLimitTableName",
+        "printCapacity.$": "$.printCapacity",
+        "provinces.$": "$$.Map.Item.Value.provinces"
+      },
+      "ResultPath": "$.ignoredMapResult",
+      "Type": "Map"
+    },
+    "MapSubmitEvaluateResidualCapacityJobs": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "InputPath": "$",
+      "ItemsPath": "$.unifiedDeliveryDrivers",
+      "Iterator": {
+        "StartAt": "submitEvaluateResidualCapacityJob",
+        "States": {
+          "EvaluateResidualCapacityFail": {
+            "Type": "Fail"
+          },
+          "submitEvaluateResidualCapacityJob": {
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "EvaluateResidualCapacityFail"
+              }
+            ],
+            "End": true,
+            "OutputPath": "$.Status",
+            "Parameters": {
+              "ArrayProperties": {
+                "Size.$": "States.ArrayLength($.provinces)"
+              },
+              "ContainerOverrides": {
+                "Environment": [
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME",
+                    "Value.$": "$.paperDeliveryDriverCapacitiesTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME",
+                    "Value.$": "$.paperDeliveryDriverUsedCapacitiesTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYTABLENAME",
+                    "Value.$": "$.paperDeliveryTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYDATEDAYOFWEEK",
+                    "Value.$": "$.deliveryDateDayOfWeek"
+                  },
+                  {
+                    "Name": "PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER",
+                    "Value.$": "$.driver"
+                  },
+                  {
+                    "Name": "PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_PROVINCELIST",
+                    "Value.$": "States.JsonToString($.provinces)"
+                  },
+                  {
+                    "Name": "PN_DELAYER_ACTUALTENDERID",
+                    "Value.$": "$.actualTenderId"
+                  },
+                  {
+                    "Name": "PN_DELAYER_WORKFLOWSTEP",
+                    "Value": "EVALUATE_RESIDUAL_CAPACITY"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME",
+                    "Value.$": "$.paperDeliveryCounterTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_PRINTCAPACITY",
+                    "Value.$": "$.printCapacity"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON",
+                    "Value.$": "$.delayerToPaperChannelFirstSchedulerCron"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON",
+                    "Value.$": "$.delayerToPaperChannelSecondSchedulerCron"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE",
+                    "Value.$": "$.delayerToPaperChannelFirstSchedulerStartDate"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE",
+                    "Value.$": "$.delayerToPaperChannelSecondSchedulerStartDate"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYWEEK",
+                    "Value.$": "$.deliveryWeek"
+                  }
+                ]
+              },
+              "JobDefinition": "${PnDelayerResidualCapacityJobDefinition}",
+              "JobName.$": "$.driver",
+              "JobQueue": "${PnDelayerResidualCapacityJobQueue}"
+            },
+            "Resource": "arn:aws:states:::batch:submitJob.sync",
+            "Type": "Task"
+          }
+        }
+      },
+      "MaxConcurrency": 40,
+      "Next": "WorkflowSuccess",
+      "Parameters": {
+        "actualTenderId.$": "$.actualTenderId",
+        "delayerToPaperChannelFirstSchedulerCron.$": "$.delayerToPaperChannelFirstSchedulerCron",
+        "delayerToPaperChannelFirstSchedulerStartDate.$": "$.delayerToPaperChannelFirstSchedulerStartDate",
+        "delayerToPaperChannelSecondSchedulerCron.$": "$.delayerToPaperChannelSecondSchedulerCron",
+        "delayerToPaperChannelSecondSchedulerStartDate.$": "$.delayerToPaperChannelSecondSchedulerStartDate",
+        "deliveryDateDayOfWeek.$": "$.deliveryDateDayOfWeek",
+        "deliveryWeek.$": "$.deliveryWeek",
+        "driver.$": "$$.Map.Item.Value.driver",
+        "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
+        "paperDeliveryDriverCapacitiesTableName.$": "$.paperDeliveryDriverCapacitiesTableName",
+        "paperDeliveryDriverUsedCapacitiesTableName.$": "$.paperDeliveryDriverUsedCapacitiesTableName",
+        "paperDeliverySenderLimitTableName.$": "$.paperDeliverySenderLimitTableName",
+        "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+        "paperDeliveryUsedSenderLimitTableName.$": "$.paperDeliveryUsedSenderLimitTableName",
+        "printCapacity.$": "$.printCapacity",
+        "provinces.$": "$$.Map.Item.Value.provinces"
+      },
+      "ResultPath": "$.ignoredMapResult",
+      "Type": "Map"
+    },
+    "MapSubmitSenderLimitJobs": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "InputPath": "$",
+      "ItemsPath": "$.provinces.Items",
+      "Iterator": {
+        "StartAt": "submitSenderLimitJob",
+        "States": {
+          "SenderLimitJobFail": {
+            "Type": "Fail"
+          },
+          "submitSenderLimitJob": {
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "SenderLimitJobFail"
+              }
+            ],
+            "End": true,
+            "OutputPath": "$.Status",
+            "Parameters": {
+              "ContainerOverrides": {
+                "Environment": [
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME",
+                    "Value.$": "$.paperDeliveryCounterTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME",
+                    "Value.$": "$.paperDeliverySenderLimitTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME",
+                    "Value.$": "$.paperDeliveryUsedSenderLimitTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME",
+                    "Value.$": "$.paperDeliveryDriverCapacitiesTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYTABLENAME",
+                    "Value.$": "$.paperDeliveryTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCE",
+                    "Value.$": "$.province"
+                  },
+                  {
+                    "Name": "PN_DELAYER_ACTUALTENDERID",
+                    "Value.$": "$.actualTenderId"
+                  },
+                  {
+                    "Name": "PN_DELAYER_WORKFLOWSTEP",
+                    "Value": "EVALUATE_SENDER_LIMIT"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYDATEDAYOFWEEK",
+                    "Value.$": "$.deliveryDateDayOfWeek"
+                  },
+                  {
+                    "Name": "PN_DELAYER_PRINTCAPACITY",
+                    "Value.$": "$.printCapacity"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON",
+                    "Value.$": "$.delayerToPaperChannelFirstSchedulerCron"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON",
+                    "Value.$": "$.delayerToPaperChannelSecondSchedulerCron"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE",
+                    "Value.$": "$.delayerToPaperChannelFirstSchedulerStartDate"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE",
+                    "Value.$": "$.delayerToPaperChannelSecondSchedulerStartDate"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYWEEK",
+                    "Value.$": "$.deliveryWeek"
+                  }
+                ]
+              },
+              "JobDefinition": "${PnDelayerSenderLimitJobDefinition}",
+              "JobName.$": "States.Format('{}', $.province)",
+              "JobQueue": "${PnDelayerSenderLimitJobQueue}"
+            },
+            "Resource": "arn:aws:states:::batch:submitJob.sync",
+            "Type": "Task"
+          }
+        }
+      },
+      "MaxConcurrency": 5,
+      "Next": "GetUnifiedDeliveryDriverProvinceParameter",
+      "Parameters": {
+        "actualTenderId.$": "$.actualTenderId",
+        "delayerToPaperChannelFirstSchedulerCron.$": "$.delayerToPaperChannelFirstSchedulerCron",
+        "delayerToPaperChannelFirstSchedulerStartDate.$": "$.delayerToPaperChannelFirstSchedulerStartDate",
+        "delayerToPaperChannelSecondSchedulerCron.$": "$.delayerToPaperChannelSecondSchedulerCron",
+        "delayerToPaperChannelSecondSchedulerStartDate.$": "$.delayerToPaperChannelSecondSchedulerStartDate",
+        "deliveryDateDayOfWeek.$": "$.deliveryDateDayOfWeek",
+        "deliveryWeek.$": "$.deliveryWeek",
+        "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
+        "paperDeliveryDriverCapacitiesTableName.$": "$.paperDeliveryDriverCapacitiesTableName",
+        "paperDeliveryDriverUsedCapacitiesTableName.$": "$.paperDeliveryDriverUsedCapacitiesTableName",
+        "paperDeliverySenderLimitTableName.$": "$.paperDeliverySenderLimitTableName",
+        "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+        "paperDeliveryUsedSenderLimitTableName.$": "$.paperDeliveryUsedSenderLimitTableName",
+        "printCapacity.$": "$.printCapacity",
+        "province.$": "$$.Map.Item.Value.province.S"
+      },
+      "ResultPath": "$.ignoredMapResult",
+      "Type": "Map"
+    },
+    "WorkflowFail": {
+      "Type": "Fail"
+    },
+    "WorkflowSuccess": {
+      "Type": "Succeed"
+    },
+    "retrieveProvince": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "Next": "MapSubmitSenderLimitJobs",
+      "Parameters": {
+        "ProjectionExpression": "province",
+        "TableName": "pn-PaperChannelProvince"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:scan",
+      "ResultPath": "$.provinces",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2
+        }
+      ],
+      "Type": "Task"
+    }
+  }
+}
