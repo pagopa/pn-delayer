@@ -393,6 +393,10 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  PreRunRetryLambdaName:
+    Type: String
+    Description: 'PreStartLambda function name'
+
   PreRunAlgorithmLambdaName:
     Type: String
     Description: 'PreRunAlgorithmLambdaName function name'
@@ -2060,6 +2064,86 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}/*"
 
   #########################################################
+  ###                  PreStartLambda                   ###
+  #########################################################
+
+  PreRunRetryLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PreRunRetryLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PreRunRetryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PreRunRetryLambdaName
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/preRunRetryLambda.zip"
+      Role: !GetAtt PreRunRetryLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          DELAYER_TO_PAPER_CHANNEL_FIRST_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
+          DELAYER_TO_PAPER_CHANNEL_SECOND_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
+        #  RETRY_ALGORITHM_STATE_MACHINE: !Ref RetryAlgorithmStateMachine
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 10
+
+  # Lambda function role
+  PreRunRetryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PreStartLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PreRunRetryLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PreRunRetryLambdaPolicy
+      Roles:
+        - !Ref PreRunRetryLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          ##- Effect: Allow
+         ##   Action:
+         ##     - states:ListExecutions
+        ##    Resource: !Ref RetryAlgorithmStateMachine
+          - Effect: Allow
+            Action:
+              - scheduler:GetSchedule
+            Resource:
+              - !Ref DelayerToPaperChannelDailyFirstScheduler
+              - !Ref DelayerToPaperChannelDailySecondScheduler
+
+
+  PreRunRetryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PreRunRetryLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  #########################################################
   ###         PreRunAlgorithmLambda                ###
   #########################################################
 
@@ -2408,7 +2492,7 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   # Lambda function IAM policy
   ExportDelayerDataLambdaPolicy:
@@ -2438,7 +2522,7 @@ Resources:
               - s3:GetObject
             Resource:
               - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/postalizzazione/*"
-              
+
   ExportDelayerDataLambdaAlarms:
     DependsOn:
       - ExportDelayerDataLambda
@@ -2512,7 +2596,7 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   # Lambda function IAM policy
   ExportDryRunDashboardDataLambdaPolicy:
