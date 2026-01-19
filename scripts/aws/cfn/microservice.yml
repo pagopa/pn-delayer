@@ -633,6 +633,10 @@ Parameters:
     Type: String
     Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
 
+  ResetUsedDataGlueJobName:
+    Type: String
+    Description: 'Reset Used Data Glue Job name'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
     PaperDeliveryLambdaKinesisSourceEnabled: !Equals [ !Ref EnablePaperDeliveryLambdaKinesisSource, "true" ]
@@ -3096,3 +3100,71 @@ Resources:
                   - ssm:GetParameter
                 Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
+
+  ResetUsedDataGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Ref ResetUsedDataGlueJobName
+      Role: !GetAtt ResetUsedDataGlueJobRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
+        PythonVersion: "3"
+      DefaultArguments:
+        "--job-language": "python"
+        "--used-capacities-table-name": !Ref PaperDeliveryDriverUsedCapacitiesTableName
+        "--used-sender-limit-table-name": !Ref PaperDeliveryUsedSenderLimitTableName
+        "--counter-table-name": !Ref PaperDeliveryCounterTableName
+        "--province-table-name": !Ref ProvinceTableName
+        "--driver-province-parameter": "{{resolve:ssm:/config/pn-delayer/unifiedDeliveryDriver-province}}"
+        "--parallelism": !Ref LightAlgorithmGlueJobParallelism
+        "--log-every": "20000"
+        "--enable-continuous-cloudwatch-log": "true"
+        "--enable-metrics": "true"
+        "--enable-spark-ui": "true"
+        "--TempDir": !Sub "s3://aws-glue-assets-${AWS::AccountId}-${AWS::Region}/temporary/"
+      MaxRetries: 0
+      Timeout: 480
+      GlueVersion: "5.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      ExecutionClass: STANDARD
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+
+  ResetUsedDataGlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-delayer-ResetUsedDataGlueJobRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: ResetUsedDataGlueJobPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:DeleteItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "${ProvinceTableArn}"
+                  - !Sub "${ProvinceTableArn}/*"

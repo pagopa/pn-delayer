@@ -21,7 +21,7 @@ args = getResolvedOptions(
         'JOB_NAME',
         'delivery-date',
         'used-capacities-table-name',
-        'used-limit-table-name',
+        'used-sender-limit-table-name',
         'counter-table-name',
         'province-table-name',
         'driver-province-parameter',
@@ -38,13 +38,17 @@ job.init(args['JOB_NAME'], args)
 
 DELIVERY_DATE = args['delivery-date']
 USED_CAPACITIES_TABLE_NAME = args['used-capacities-table-name']
-USED_LIMIT_TABLE_NAME = args['used-limit-table-name']
+USED_LIMIT_TABLE_NAME = args['used-sender-limit-table-name']
 COUNTER_TABLE_NAME = args['counter-table-name']
 PROVINCE_TABLE_NAME = args['province-table-name']
 DRIVER_PROVINCE_PARAMETER = args['driver-province-parameter']
 
 PARALLELISM = int(args.get("parallelism", "20"))
 LOG_EVERY = int(args.get("log-every", "5000"))
+
+# Index names
+USED_SENDER_LIMIT_INDEX = "deliveryDate-province-index"
+USED_CAPACITIES_INDEX = "deliveryDate-driver-index"
 
 # ----------------------------
 # Parse driver parameter
@@ -139,13 +143,15 @@ def batch_delete_with_retry(
         time.sleep(sleep)
 
 def process_partition_delete(
-        item_iter,
-        table_name: str,
-        sort_key_attr: str,
-        projection_expression: str,
-        key_builder,
-        progress_prefix: str,
-        done_prefix: str,
+    item_iter,
+    table_name: str,
+    index_name: str,
+    sort_key_attr: str,
+    projection_expression: str,
+    key_builder,
+    delivery_date: str,
+    progress_prefix: str,
+    done_prefix: str,
 ):
     import boto3
     from boto3.dynamodb.conditions import Key
@@ -163,8 +169,10 @@ def process_partition_delete(
 
         while True:
             q = {
-                "IndexName": "deliveryDate-index",
-                "KeyConditionExpression": Key("deliveryDate").eq(DELIVERY_DATE) & Key(sort_key_attr).eq(item_value),
+                "IndexName": index_name,
+                "KeyConditionExpression":
+                    Key("deliveryDate").eq(delivery_date) &
+                    Key(sort_key_attr).eq(item_value),
                 "ProjectionExpression": projection_expression,
             }
             if lek:
@@ -197,8 +205,6 @@ def process_partition_delete(
 # Pipeline: UsedSenderLimit per province
 # ----------------------------
 def process_partition_provinces(province_iter):
-    from boto3.dynamodb.types import TypeSerializer
-
     serializer = TypeSerializer()
 
     def to_ddb_key(it: dict) -> dict:
@@ -210,9 +216,11 @@ def process_partition_provinces(province_iter):
     yield from process_partition_delete(
         province_iter,
         table_name=USED_LIMIT_TABLE_NAME,
+        index_name=USED_SENDER_LIMIT_INDEX,
         sort_key_attr="province",
         projection_expression="pk, deliveryDate",
         key_builder=to_ddb_key,
+        delivery_date=DELIVERY_DATE,
         progress_prefix="USED_SENDER_LIMIT",
         done_prefix="USED_SENDER_LIMIT province",
     )
@@ -221,9 +229,6 @@ def process_partition_provinces(province_iter):
 # Pipeline: UsedCapacities per unifiedDeliveryDriver
 # ----------------------------
 def process_partition_drivers(driver_iter):
-    """Processa una partizione di drivers per la tabella UsedCapacities"""
-    from boto3.dynamodb.types import TypeSerializer
-
     serializer = TypeSerializer()
 
     def to_ddb_key(it: dict) -> dict:
@@ -235,9 +240,11 @@ def process_partition_drivers(driver_iter):
     yield from process_partition_delete(
         driver_iter,
         table_name=USED_CAPACITIES_TABLE_NAME,
+        index_name=USED_CAPACITIES_INDEX,
         sort_key_attr="unifiedDeliveryDriver",
         projection_expression="unifiedDeliveryDriverGeokey, deliveryDate",
         key_builder=to_ddb_key,
+        delivery_date=DELIVERY_DATE,
         progress_prefix="USED_CAPACITIES",
         done_prefix="USED_CAPACITIES driver",
     )
@@ -279,18 +286,13 @@ print(
     f"with numSlices={used_sender_limit_parallelism}"
 )
 
-used_sender_limit_deleted_counts = (
+used_sender_limit_deleted_total = sum(
     used_sender_limit_rdd
     .mapPartitions(process_partition_provinces)
     .collect()
 )
 
-used_sender_limit_deleted_total = sum(used_sender_limit_deleted_counts)
-
-print(
-    f"[USED_SENDER_LIMIT] Deletion completed. "
-    f"Total items deleted={used_sender_limit_deleted_total}\n"
-)
+print(f"[USED_SENDER_LIMIT] Deletion completed. Total items deleted={used_sender_limit_deleted_total}\n")
 
 # --------------------------------------------------
 # UsedCapacities deletion pipeline (by driver)
@@ -312,18 +314,13 @@ print(
     f"with numSlices={used_capacities_parallelism}"
 )
 
-used_capacities_deleted_counts = (
+used_capacities_deleted_total = sum(
     used_capacities_rdd
     .mapPartitions(process_partition_drivers)
     .collect()
 )
 
-used_capacities_deleted_total = sum(used_capacities_deleted_counts)
-
-print(
-    f"[USED_CAPACITIES] Deletion completed. "
-    f"Total items deleted={used_capacities_deleted_total}\n"
-)
+print(f"[USED_CAPACITIES] Deletion completed. Total items deleted={used_capacities_deleted_total}\n")
 
 # --------------------------------------------------
 # Delete PRINT counter

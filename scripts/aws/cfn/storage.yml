@@ -763,7 +763,18 @@ Resources:
       LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayer-BatchWorkflowStateMachine"
       RetentionInDays: !Ref LogRetention
 
+  ResetUsedDataGlueJobLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/aws-glue/jobs/${ProjectName}-delayer-ResetUsedDataGlueJob"
+      RetentionInDays: !Ref LogRetention
+
 Outputs:
+  ResetUsedDataGlueJobName:
+    Description: Name of the Glue Job to reset used data
+    Value: !Sub "${ProjectName}-delayer-ResetUsedDataGlueJob"
 
   LightAlgorithmGlueJobName:
     Description: Name of the Glue Job to run Light algorithm
