@@ -3112,7 +3112,7 @@ Resources:
         PythonVersion: "3"
       DefaultArguments:
         "--job-language": "python"
-        "--used-capacity-table-name": !Ref PaperDeliveryDriverUsedCapacitiesTableName
+        "--used-capacities-table-name": !Ref PaperDeliveryDriverUsedCapacitiesTableName
         "--used-sender-limit-table-name": !Ref PaperDeliveryUsedSenderLimitTableName
         "--counter-table-name": !Ref PaperDeliveryCounterTableName
         "--province-table-name": !Ref ProvinceTableName
@@ -3162,3 +3162,9 @@ Resources:
                   - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
                   - !Sub "${PaperDeliveryCounterTableArn}"
                   - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "${ProvinceTableArn}"
+                  - !Sub "${ProvinceTableArn}/*"
