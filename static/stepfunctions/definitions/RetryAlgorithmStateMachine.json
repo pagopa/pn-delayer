@@ -1,31 +1,36 @@
 {
   "Comment": "A description of my state machine",
-  "StartAt": "DisableDelayerToPaperChannelDailyFirstScheduler",
+  "StartAt": "PerRunRetryLambda",
   "States": {
-    "DisableDelayerToPaperChannelDailyFirstScheduler": {
+    "PerRunRetryLambda": {
       "Type": "Task",
-      "Arguments": {
-        "Name": "${DelayerToPaperChannelDailyFirstScheduler}",
-        "State": "DISABLED",
-        "FlexibleTimeWindow": {
-          "Mode": "OFF"
-        },
-        "ScheduleExpression": "${DelayerToPaperChannelFirstScheduleExpression}",
-        "Target": {
-          "Arn": "${DelayerToPaperChannelStateMachine}",
-          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PerRunRetryLambdaName}",
+        "Payload": {
+          "skipStepExecutionCheck.$": "$$.Execution.Input.SKIP_STEP_EXECUTION_CHECK",
+          "executionArn.$": "$$.Execution.Id"
         }
       },
-      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
-      "Next": "DisableDelayerToPaperChannelDailySecondScheduler",
+      "ResultSelector": {
+        "schedulerName.$": "$.Payload.schedulerName",
+        "schedulerExpression.$": "$.Payload.schedulerExpression",
+        "deliveryDate.$": "$.Payload.deliveryDate"
+      },
+      "ResultPath": "$.preRunRetryResponse",
+      "Next": "canExecuteRetryAlgorithm",
       "Retry": [
         {
           "ErrorEquals": [
-            "States.ALL"
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
           ],
-          "BackoffRate": 2,
           "IntervalSeconds": 1,
-          "MaxAttempts": 3
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
         }
       ],
       "Catch": [
@@ -33,34 +38,50 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "DisableRuleFail"
+          "Next": "RetryStepFail"
         }
       ]
     },
-    "DisableDelayerToPaperChannelDailySecondScheduler": {
+    "canExecuteRetryAlgorithm": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.preRunRetryResponse.executeRetryAlgorithm",
+          "BooleanEquals": false,
+          "Next": "RetryAlgorithmAlreadyExecuted"
+        }
+      ],
+      "Default": "DisableDelayerToPaperChannelDailyActiveScheduler"
+    },
+    "RetryAlgorithmAlreadyExecuted": {
+      "Type": "Fail"
+    },
+    "DisableDelayerToPaperChannelDailyActiveScheduler": {
       "Type": "Task",
-      "Arguments": {
-        "Name": "${DelayerToPaperChannelDailySecondScheduler}",
+      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
+      "Parameters": {
+        "Name.$": "$.preRunRetryResponse.schedulerName",
         "State": "DISABLED",
         "FlexibleTimeWindow": {
           "Mode": "OFF"
         },
-        "ScheduleExpression": "${DelayerToPaperChannelSecondScheduleExpression}",
+        "StartDate.$": "$$.State.EnteredTime",
+        "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
           "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
         }
       },
-      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
+      "ResultPath": null,
       "Next": "ResetDataJobGlue",
       "Retry": [
         {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "BackoffRate": 2,
           "IntervalSeconds": 1,
-          "MaxAttempts": 3
+          "MaxAttempts": 3,
+          "BackoffRate": 2
         }
       ],
       "Catch": [
@@ -70,29 +91,32 @@
           ],
           "Next": "DisableRuleFail"
         }
-      ]
-    },
-    "DisableRuleFail": {
-      "Type": "Fail"
+      ],
+      "ResultSelector": {
+        "schedulerName.$": "$.Payload.schedulerName",
+        "schedulerExpression.$": "$.Payload.schedulerExpression",
+        "deliveryDate.$": "$.Payload.deliveryDate"
+      }
     },
     "ResetDataJobGlue": {
       "Type": "Task",
       "Resource": "arn:aws:states:::glue:startJobRun",
-      "Arguments": {
+      "Parameters": {
         "JobName": "${ResetDataJobGlueName}",
         "Arguments": {
-          "--delivery-week": "{% $states.input.deliveryWeek %}"
+          "--delivery-date.$": "$.preRunRetryResponse.deliveryDate"
         }
       },
+      "ResultPath": null,
       "Next": "BatchWorkflowStateMachineStartExecution",
       "Retry": [
         {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "BackoffRate": 2,
           "IntervalSeconds": 1,
-          "MaxAttempts": 3
+          "MaxAttempts": 3,
+          "BackoffRate": 2
         }
       ],
       "Catch": [
@@ -104,13 +128,10 @@
         }
       ]
     },
-    "JobGlueFail": {
-      "Type": "Fail"
-    },
     "BatchWorkflowStateMachineStartExecution": {
       "Type": "Task",
       "Resource": "arn:aws:states:::states:startExecution.sync:2",
-      "Arguments": {
+      "Parameters": {
         "StateMachineArn": "${BatchWorkflowStateMachineArn}",
         "Input": {
           "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
@@ -128,17 +149,8 @@
           "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE": "${DelayerToPaperChannelSecondSchedulerStartDate}"
         }
       },
-      "Next": "EnableDelayerToPaperChannelDailyFirstScheduler",
-      "Retry": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "BackoffRate": 2,
-          "IntervalSeconds": 1,
-          "MaxAttempts": 3
-        }
-      ],
+      "ResultPath": null,
+      "Next": "EnableDelayerToPaperChannelDailyActiveScheduler",
       "Catch": [
         {
           "ErrorEquals": [
@@ -148,82 +160,55 @@
         }
       ]
     },
-    "RetryStepFail": {
+    "EnableDelayerToPaperChannelDailyActiveScheduler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
+      "Parameters": {
+        "Name.$": "$.preRunRetryResponse.schedulerName",
+        "State": "ENABLED",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
+        "Target": {
+          "Arn": "${DelayerToPaperChannelStateMachine}",
+          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "EnableRuleFail"
+        }
+      ],
+      "Next": "ExecutionCompleted"
+    },
+    "ExecutionCompleted": {
+      "Type": "Succeed"
+    },
+    "DisableRuleFail": {
       "Type": "Fail"
     },
-    "EnableDelayerToPaperChannelDailyFirstScheduler": {
-      "Type": "Task",
-      "Arguments": {
-        "Name": "${DelayerToPaperChannelDailyFirstScheduler}",
-        "State": "ENABLED",
-        "FlexibleTimeWindow": {
-          "Mode": "OFF"
-        },
-        "ScheduleExpression": "${DelayerToPaperChannelFirstScheduleExpression}",
-        "Target": {
-          "Arn": "${DelayerToPaperChannelStateMachine}",
-          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
-        }
-      },
-      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
-      "Retry": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "BackoffRate": 2,
-          "IntervalSeconds": 1,
-          "MaxAttempts": 3
-        }
-      ],
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "Next": "EnableRuleFail"
-        }
-      ],
-      "Next": "EnableDelayerToPaperChannelDailySecondScheduler"
+    "JobGlueFail": {
+      "Type": "Fail"
     },
-    "EnableDelayerToPaperChannelDailySecondScheduler": {
-      "Type": "Task",
-      "Arguments": {
-        "Name": "${DelayerToPaperChannelDailySecondScheduler}",
-        "State": "ENABLED",
-        "FlexibleTimeWindow": {
-          "Mode": "OFF"
-        },
-        "ScheduleExpression": "${DelayerToPaperChannelSecondScheduleExpression}",
-        "Target": {
-          "Arn": "${DelayerToPaperChannelStateMachine}",
-          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
-        }
-      },
-      "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
-      "End": true,
-      "Retry": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "BackoffRate": 2,
-          "IntervalSeconds": 1,
-          "MaxAttempts": 3
-        }
-      ],
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "Next": "EnableRuleFail"
-        }
-      ]
+    "RetryStepFail": {
+      "Type": "Fail"
     },
     "EnableRuleFail": {
       "Type": "Fail"
     }
-  },
-  "QueryLanguage": "JSONata"
+  }
 }

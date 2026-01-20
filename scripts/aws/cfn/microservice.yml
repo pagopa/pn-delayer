@@ -619,10 +619,6 @@ Parameters:
     AllowedValues: [ "true", "false" ]
     Default: "true"
 
-  ResetUsedDataGlueJobName:
-    Type: String
-    Description: 'Reset Used Data Glue Job name'
-
   SwitchOffAlgorithmWaitSeconds:
     Type: Number
     Description: 'Wait time in seconds before re run SwitchOffAlgorithmLambda'
@@ -2093,7 +2089,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           DELAYER_TO_PAPER_CHANNEL_FIRST_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
           DELAYER_TO_PAPER_CHANNEL_SECOND_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
-        #  RETRY_ALGORITHM_STATE_MACHINE_ARN: !Ref RetryAlgorithmStateMachine
+          RETRY_ALGORITHM_STATE_MACHINE_ARN: !Ref RetryAlgorithmStateMachine
       TracingConfig:
         Mode: Active
       Layers:
@@ -2127,10 +2123,10 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          ##- Effect: Allow
-         ##   Action:
-         ##     - states:ListExecutions
-        ##    Resource: !Ref RetryAlgorithmStateMachine
+          - Effect: Allow
+            Action:
+              - states:ListExecutions
+            Resource: !Ref RetryAlgorithmStateMachine
           - Effect: Allow
             Action:
               - scheduler:GetSchedule
@@ -2681,66 +2677,6 @@ Resources:
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDryRunDashboardDataLambdaSchedule.Arn
 
-  LightAlgorithmStateMachine:
-    Type: AWS::StepFunctions::StateMachine
-    DependsOn:
-      - LightAlgorithmStateMachinePolicy
-    Properties:
-      StateMachineName: LightAlgorithmStateMachine
-      RoleArn: !GetAtt LightAlgorithmStateMachineRole.Arn
-      DefinitionS3Location:
-        Bucket: !Ref MicroserviceBucketName
-        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/LightAlgorithmStateMachine.json"
-      DefinitionSubstitutions:
-          DelayerToPaperChannelDailyFirstScheduler: !Ref DelayerToPaperChannelDailyFirstScheduler
-          DelayerToPaperChannelFirstScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
-          DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
-          DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
-          DelayerToPaperChannelDailySecondScheduler:  !Ref DelayerToPaperChannelDailySecondScheduler
-          DelayerToPaperChannelSecondScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
-          LightAlgorithm: !Ref LightAlgorithmGlueJobName
-      TracingConfiguration:
-          Enabled: false
-
-  LightAlgorithmStateMachineRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - states.amazonaws.com
-            Action:
-              - sts:AssumeRole
-
-    # Lambda function IAM policy
-  LightAlgorithmStateMachinePolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${ProjectName}-delayer-lightAlgorithmStateMachinePolicy
-      Roles:
-        - !Ref LightAlgorithmStateMachineRole
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - scheduler:UpdateSchedule
-            Resource:
-              - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
-              - !GetAtt DelayerToPaperChannelDailySecondScheduler.Arn
-          - Effect: Allow
-            Action:
-              - glue:StartJobRun
-              - glue:GetJobRun
-              - glue:GetJobRuns
-              - glue:BatchStopJobRun
-            Resource:
-              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${LightAlgorithmGlueJobName}"
-
   SwitchOffAlgorithmStateMachine:
     Type: AWS::StepFunctions::StateMachine
     DependsOn:
@@ -2787,83 +2723,6 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
-
-  RetryAlgorithmStateMachine:
-    Type: AWS::StepFunctions::StateMachine
-    DependsOn:
-      - RetryAlgorithmStateMachinePolicy
-    Properties:
-      StateMachineName: RetryAlgorithmStateMachine
-      RoleArn: !GetAtt RetryAlgorithmStateMachineRole.Arn
-      DefinitionS3Location:
-        Bucket: !Ref MicroserviceBucketName
-        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
-        DefinitionSubstitutions:
-          DelayerToPaperChannelDailyFirstScheduler: !Ref DelayerToPaperChannelDailyFirstScheduler
-          DelayerToPaperChannelFirstScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
-          DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
-          DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
-          DelayerToPaperChannelDailySecondScheduler:  !Ref DelayerToPaperChannelDailySecondScheduler
-          DelayerToPaperChannelSecondScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
-          ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
-          BatchWorkflowStateMachineArn: !Ref PaperDeliveryStateMachine
-          PaperDeliveryTableName: !Ref PaperDeliveryTableName
-          PaperDeliveryDriverCapacitiesTableName: !Ref PaperDeliveryDriverCapacitiesTableName
-          PaperDeliveryDriverUsedCapacitiesTableName: !Ref PaperDeliveryDriverUsedCapacitiesTableName
-          PaperDeliverySenderLimitTableName: !Ref PaperDeliverySenderLimitTableName
-          PaperDeliveryUsedSenderLimitTableName: !Ref PaperDeliveryUsedSenderLimitTableName
-          PaperDeliveryCounterTableName: !Ref PaperDeliveryCounterTableName
-          PrintCapacity: !Ref PrintCapacity
-          DelayerToPaperChannelFirstSchedulerCron: !Ref DelayerToPaperChannelFirstSchedulerCron
-          DelayerToPaperChannelSecondSchedulerCron: !Ref DelayerToPaperChannelSecondSchedulerCron
-          DelayerToPaperChannelFirstSchedulerStartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
-          DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
-        TracingConfiguration:
-          Enabled: false
-
-  RetryAlgorithmStateMachineRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - states.amazonaws.com
-            Action:
-              - sts:AssumeRole
-
-    # Lambda function IAM policy
-  RetryAlgorithmStateMachinePolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachinePolicy
-      Roles:
-        - !Ref RetryAlgorithmStateMachineRole
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - scheduler:UpdateSchedule
-            Resource:
-              - !Ref DelayerToPaperChannelDailyFirstScheduler
-              - !Ref DelayerToPaperChannelDailySecondScheduler
-          - Effect: Allow
-            Action:
-              - glue:StartJobRun
-              - glue:GetJobRun
-              - glue:GetJobRuns
-              - glue:BatchStopJobRun
-            Resource:
-              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ResetUsedDataGlueJobName}"
-          - Effect: Allow
-            Action:
-              - states:StartExecution
-            Resource:
-              - !Ref PaperDeliveryStateMachine
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
@@ -2974,6 +2833,86 @@ Resources:
                 - logs:DescribeResourcePolicies
                 - logs:DescribeLogGroups
               Resource: "*"
+
+  RetryAlgorithmStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - RetryAlgorithmStateMachinePolicy
+    Properties:
+      StateMachineName: RetryAlgorithmStateMachine
+      RoleArn: !GetAtt RetryAlgorithmStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
+      DefinitionSubstitutions:
+        PreRunRetryLambdaName: !Ref PreRunRetryLambdaName
+        DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
+        DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+        ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
+        BatchWorkflowStateMachineArn: !Ref PaperDeliveryStateMachine
+        PaperDeliveryTableName: !Ref PaperDeliveryTableName
+        PaperDeliveryDriverCapacitiesTableName: !Ref PaperDeliveryDriverCapacitiesTableName
+        PaperDeliveryDriverUsedCapacitiesTableName: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+        PaperDeliverySenderLimitTableName: !Ref PaperDeliverySenderLimitTableName
+        PaperDeliveryUsedSenderLimitTableName: !Ref PaperDeliveryUsedSenderLimitTableName
+        PaperDeliveryCounterTableName: !Ref PaperDeliveryCounterTableName
+        PrintCapacity: !Ref PrintCapacity
+        DelayerToPaperChannelFirstSchedulerCron: !Ref DelayerToPaperChannelFirstSchedulerCron
+        DelayerToPaperChannelSecondSchedulerCron: !Ref DelayerToPaperChannelSecondSchedulerCron
+        DelayerToPaperChannelFirstSchedulerStartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+        DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+      TracingConfiguration:
+        Enabled: false
+
+  RetryAlgorithmStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+    # Lambda function IAM policy
+  RetryAlgorithmStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachinePolicy
+      Roles:
+        - !Ref RetryAlgorithmStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - scheduler:UpdateSchedule
+            Resource:
+              - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
+              - !GetAtt DelayerToPaperChannelDailySecondScheduler.Arn
+          - Effect: Allow
+            Action:
+              - glue:StartJobRun
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:BatchStopJobRun
+            Resource:
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ResetUsedDataGlueJobName}
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+              - !Ref PaperDeliveryStateMachine
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+
 
   DelayerToPaperChannelDailyFirstScheduler:
     Type: AWS::Scheduler::Schedule
