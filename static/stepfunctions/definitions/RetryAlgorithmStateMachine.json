@@ -100,7 +100,7 @@
     },
     "ResetDataJobGlue": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::glue:startJobRun",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
       "Parameters": {
         "JobName": "${ResetDataJobGlueName}",
         "Arguments": {

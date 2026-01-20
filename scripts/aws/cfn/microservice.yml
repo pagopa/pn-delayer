@@ -637,6 +637,10 @@ Parameters:
     Type: String
     Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
 
+  RetryAlgorithmStateMachineLogGroupARN:
+    Type: String
+    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
+
   ResetUsedDataGlueJobName:
     Type: String
     Description: 'Reset Used Data Glue Job name'
@@ -2778,13 +2782,6 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
-                - logs:CreateLogStream
-                - logs:PutLogEvents
-              Resource:
-                - !Ref PaperDeliveryStateMachineLogGroupARN
-                - !Sub "${PaperDeliveryStateMachineLogGroupARN}:*"
-            - Effect: Allow
-              Action:
                 - ssm:GetParameter
               Resource:
                 - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${UnifiedDeliveryDriverProvinceParameter}
@@ -2870,6 +2867,12 @@ Resources:
         DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
       TracingConfiguration:
         Enabled: false
+      LoggingConfiguration:
+        Level: ERROR
+        IncludeExecutionData: true
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
 
   RetryAlgorithmStateMachineRole:
     Type: AWS::IAM::Role
@@ -2897,15 +2900,6 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - events:PutRule
-              - events:PutTargets
-              - events:DescribeRule
-              - events:DeleteRule
-              - events:RemoveTargets
-            Resource:
-              - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventsForStepFunctionsExecutionRule"
-          - Effect: Allow
-            Action:
               - scheduler:UpdateSchedule
             Resource:
               - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
@@ -2928,6 +2922,28 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+          - Effect: Allow
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DescribeRule
+              - events:DeleteRule
+              - events:RemoveTargets
+              - events:TagResource
+              - events:ListTagsForResource
+              - events:PutPermission
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogDelivery
+              - logs:GetLogDelivery
+              - logs:UpdateLogDelivery
+              - logs:DeleteLogDelivery
+              - logs:ListLogDeliveries
+              - logs:PutResourcePolicy
+              - logs:DescribeResourcePolicies
+              - logs:DescribeLogGroups
+            Resource: "*"
 
 
   DelayerToPaperChannelDailyFirstScheduler:
@@ -3036,13 +3052,6 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-            Resource:
-              - !Ref DelayerToPaperChannelStateMachineLogGroupARN
-              - !Sub "${DelayerToPaperChannelStateMachineLogGroupARN}:*"
-          - Effect: Allow
-            Action:
               - dynamodb:UpdateItem
               - dynamodb:GetItem
             Resource:
@@ -3054,6 +3063,17 @@ Resources:
             Resource:
               - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
               - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}"
+          - Effect: Allow
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DescribeRule
+              - events:DeleteRule
+              - events:RemoveTargets
+              - events:TagResource
+              - events:ListTagsForResource
+              - events:PutPermission
+            Resource: "*"
           - Effect: Allow
             Action:
               - logs:CreateLogDelivery
