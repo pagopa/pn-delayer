@@ -2778,6 +2778,13 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Ref PaperDeliveryStateMachineLogGroupARN
+                - !Sub "${PaperDeliveryStateMachineLogGroupARN}:*"
+            - Effect: Allow
+              Action:
                 - ssm:GetParameter
               Resource:
                 - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${UnifiedDeliveryDriverProvinceParameter}
@@ -3018,6 +3025,13 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !Ref DelayerToPaperChannelStateMachineLogGroupARN
+              - !Sub "${DelayerToPaperChannelStateMachineLogGroupARN}:*"
           - Effect: Allow
             Action:
               - dynamodb:UpdateItem
