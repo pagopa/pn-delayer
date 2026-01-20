@@ -2131,8 +2131,8 @@ Resources:
             Action:
               - scheduler:GetSchedule
             Resource:
-              - !Ref DelayerToPaperChannelDailyFirstScheduler
-              - !Ref DelayerToPaperChannelDailySecondScheduler
+              - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
+              - !GetAtt DelayerToPaperChannelDailySecondScheduler.Arn
 
 
   PreRunRetryLambdaAlarms:
