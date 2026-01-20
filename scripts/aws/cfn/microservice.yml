@@ -2897,6 +2897,15 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DescribeRule
+              - events:DeleteRule
+              - events:RemoveTargets
+            Resource:
+              - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventsForStepFunctionsExecutionRule"
+          - Effect: Allow
+            Action:
               - scheduler:UpdateSchedule
             Resource:
               - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
