@@ -629,17 +629,17 @@ Parameters:
     Description: 'Maximum number of executions for SwitchOffAlgorithmLambda'
     Default: 5000
 
-  PaperDeliveryStateMachineLogGroupARN:
-    Type: String
-    Description: 'ARN of CloudWatch Log Group for Paper Delivery State Machine'
-
-  DelayerToPaperChannelStateMachineLogGroupARN:
-    Type: String
-    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
-
-  RetryAlgorithmStateMachineLogGroupARN:
-    Type: String
-    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
+#  PaperDeliveryStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Paper Delivery State Machine'
+#
+#  DelayerToPaperChannelStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
+#
+#  RetryAlgorithmStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
 
   ResetUsedDataGlueJobName:
     Type: String
@@ -2749,12 +2749,12 @@ Resources:
         PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
       TracingConfiguration:
           Enabled: false
-      LoggingConfiguration:
-        Level: ERROR
-        IncludeExecutionData: true
-        Destinations:
-          - CloudWatchLogsLogGroup:
-              LogGroupArn: !Ref PaperDeliveryStateMachineLogGroupARN
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref PaperDeliveryStateMachineLogGroupARN
 
   PaperDeliveryStateMachineRole:
     Type: AWS::IAM::Role
@@ -2867,12 +2867,12 @@ Resources:
         DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
       TracingConfiguration:
         Enabled: false
-      LoggingConfiguration:
-        Level: ERROR
-        IncludeExecutionData: true
-        Destinations:
-          - CloudWatchLogsLogGroup:
-              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
 
   RetryAlgorithmStateMachineRole:
     Type: AWS::IAM::Role
@@ -3020,12 +3020,12 @@ Resources:
         PreRunAlgorithmLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
       TracingConfiguration:
         Enabled: false
-      LoggingConfiguration:
-        Level: ERROR
-        IncludeExecutionData: true
-        Destinations:
-          - CloudWatchLogsLogGroup:
-              LogGroupArn: !Ref DelayerToPaperChannelStateMachineLogGroupARN
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref DelayerToPaperChannelStateMachineLogGroupARN
 
   DelayerToPaperChannelStateMachineRole:
     Type: AWS::IAM::Role
