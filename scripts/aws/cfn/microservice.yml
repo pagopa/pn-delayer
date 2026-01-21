@@ -299,7 +299,7 @@ Parameters:
 
   LambdaRuntime:
     Type: String
-    Default: nodejs20.x
+    Default: nodejs24.x
     Description: Runtime for Lambdas.
 
   KinesisPaperDeliveryLambdaDLQARN:
