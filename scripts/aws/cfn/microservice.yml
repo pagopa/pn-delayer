@@ -629,13 +629,17 @@ Parameters:
     Description: 'Maximum number of executions for SwitchOffAlgorithmLambda'
     Default: 5000
 
-  PaperDeliveryStateMachineLogGroupARN:
-    Type: String
-    Description: 'ARN of CloudWatch Log Group for Paper Delivery State Machine'
-
-  DelayerToPaperChannelStateMachineLogGroupARN:
-    Type: String
-    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
+#  PaperDeliveryStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Paper Delivery State Machine'
+#
+#  DelayerToPaperChannelStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
+#
+#  RetryAlgorithmStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
 
   ResetUsedDataGlueJobName:
     Type: String
@@ -2745,12 +2749,12 @@ Resources:
         PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
       TracingConfiguration:
           Enabled: false
-      LoggingConfiguration:
-        Level: ERROR
-        IncludeExecutionData: true
-        Destinations:
-          - CloudWatchLogsLogGroup:
-              LogGroupArn: !Ref PaperDeliveryStateMachineLogGroupARN
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref PaperDeliveryStateMachineLogGroupARN
 
   PaperDeliveryStateMachineRole:
     Type: AWS::IAM::Role
@@ -2863,6 +2867,12 @@ Resources:
         DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
       TracingConfiguration:
         Enabled: false
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
 
   RetryAlgorithmStateMachineRole:
     Type: AWS::IAM::Role
@@ -2912,6 +2922,28 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+          - Effect: Allow
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DescribeRule
+              - events:DeleteRule
+              - events:RemoveTargets
+              - events:TagResource
+              - events:ListTagsForResource
+              - events:PutPermission
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogDelivery
+              - logs:GetLogDelivery
+              - logs:UpdateLogDelivery
+              - logs:DeleteLogDelivery
+              - logs:ListLogDeliveries
+              - logs:PutResourcePolicy
+              - logs:DescribeResourcePolicies
+              - logs:DescribeLogGroups
+            Resource: "*"
 
 
   DelayerToPaperChannelDailyFirstScheduler:
@@ -2988,12 +3020,12 @@ Resources:
         PreRunAlgorithmLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
       TracingConfiguration:
         Enabled: false
-      LoggingConfiguration:
-        Level: ERROR
-        IncludeExecutionData: true
-        Destinations:
-          - CloudWatchLogsLogGroup:
-              LogGroupArn: !Ref DelayerToPaperChannelStateMachineLogGroupARN
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref DelayerToPaperChannelStateMachineLogGroupARN
 
   DelayerToPaperChannelStateMachineRole:
     Type: AWS::IAM::Role
@@ -3031,6 +3063,17 @@ Resources:
             Resource:
               - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
               - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}"
+          - Effect: Allow
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DescribeRule
+              - events:DeleteRule
+              - events:RemoveTargets
+              - events:TagResource
+              - events:ListTagsForResource
+              - events:PutPermission
+            Resource: "*"
           - Effect: Allow
             Action:
               - logs:CreateLogDelivery
