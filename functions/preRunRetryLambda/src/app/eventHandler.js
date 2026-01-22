@@ -4,7 +4,7 @@ const { calculateDeliveryDate } = require("./lib/utils");
 
 exports.handleEvent = async (event = {}) => {
   const {
-    deliveryDate
+    deliveryDate,
     skipStepExecutionCheck = false,
     executionArn
   } = event;
