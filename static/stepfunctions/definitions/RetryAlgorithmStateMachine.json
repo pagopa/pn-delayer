@@ -9,13 +9,15 @@
         "FunctionName": "${PerRunRetryLambdaName}",
         "Payload": {
           "skipStepExecutionCheck.$": "$$.Execution.Input.SKIP_STEP_EXECUTION_CHECK",
-          "executionArn.$": "$$.Execution.Id"
+          "executionArn.$": "$$.Execution.Id",
+          "deliveryDate.$": "$$.Execution.Input.DELIVERY_DATE"
         }
       },
       "ResultSelector": {
         "schedulerName.$": "$.Payload.schedulerName",
         "schedulerExpression.$": "$.Payload.schedulerExpression",
-        "deliveryDate.$": "$.Payload.deliveryDate"
+        "deliveryDate.$": "$.Payload.deliveryDate",
+        "executeRetryAlgorithm.$": "$.Payload.executeRetryAlgorithm"
       },
       "ResultPath": "$.preRunRetryResponse",
       "Next": "canExecuteRetryAlgorithm",
@@ -61,15 +63,17 @@
       "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
       "Parameters": {
         "Name.$": "$.preRunRetryResponse.schedulerName",
-        "State": "DISABLED",
+        "State": "DISABLE",
         "FlexibleTimeWindow": {
           "Mode": "OFF"
         },
         "StartDate.$": "$$.State.EnteredTime",
+        "EndDate": "${DelayerToPaperChannelFirstSchedulerEndDate}",
         "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
-          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}",
+          "Input.$": "States.JsonToString({\"PAPERDELIVERYCOUNTER_TABLENAME\": \"${PaperDeliveryCounterTableName}\",\"PAPERDELIVERY_TABLENAME\": \"${PaperDeliveryTableName}\",\"PN_DELAYER_DELIVERYDATEDAYOFWEEK\": \"${DeliveryDateDayOfWeek}\"})"
         }
       },
       "ResultPath": null,
@@ -91,12 +95,7 @@
           ],
           "Next": "DisableRuleFail"
         }
-      ],
-      "ResultSelector": {
-        "schedulerName.$": "$.Payload.schedulerName",
-        "schedulerExpression.$": "$.Payload.schedulerExpression",
-        "deliveryDate.$": "$.Payload.deliveryDate"
-      }
+      ]
     },
     "ResetDataJobGlue": {
       "Type": "Task",
@@ -169,10 +168,13 @@
         "FlexibleTimeWindow": {
           "Mode": "OFF"
         },
+        "StartDate.$": "$$.State.EnteredTime",
+        "EndDate": "${DelayerToPaperChannelFirstSchedulerEndDate}",
         "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
-          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}"
+          "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}",
+          "Input.$": "States.JsonToString({\"PAPERDELIVERYCOUNTER_TABLENAME\": \"${PaperDeliveryCounterTableName}\",\"PAPERDELIVERY_TABLENAME\": \"${PaperDeliveryTableName}\",\"PN_DELAYER_DELIVERYDATEDAYOFWEEK\": \"${DeliveryDateDayOfWeek}\"})"
         }
       },
       "Retry": [

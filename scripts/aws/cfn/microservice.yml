@@ -2271,7 +2271,7 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 10
+      Timeout: 900 #15 min
 
   # Lambda function role
   SwitchOffAlgorithmLambdaRole:
@@ -2845,7 +2845,7 @@ Resources:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
       DefinitionSubstitutions:
-        PreRunRetryLambdaName: !Ref PreRunRetryLambdaName
+        PerRunRetryLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
         DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
         DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
         ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
@@ -2912,6 +2912,11 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
 
 
   DelayerToPaperChannelDailyFirstScheduler:
@@ -2986,6 +2991,10 @@ Resources:
       DefinitionSubstitutions:
         DelayerToPaperChannelLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
         PreRunAlgorithmLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
+        DelayerToPaperChannelFirstSchedulerEndDate: !Ref DelayerToPaperChannelFirstSchedulerEndDate
+        PaperDeliveryCounterTableName: !Ref PaperDeliveryCounterTableName
+        PaperDeliveryTableName: !Ref PaperDeliveryTableName
+        DeliveryDateDayOfWeek: !Ref DeliveryDateDayOfWeek
       TracingConfiguration:
         Enabled: false
       LoggingConfiguration:
@@ -3204,6 +3213,11 @@ Resources:
                   - ssm:GetParameter
                 Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
 
   ResetUsedDataGlueJob:
     Type: AWS::Glue::Job
@@ -3272,3 +3286,8 @@ Resources:
                 Resource:
                   - !Sub "${ProvinceTableArn}"
                   - !Sub "${ProvinceTableArn}/*"
+              - Effect: Allow
+                Action:
+                    - s3:GetObject
+                Resource:
+                    - !Sub "arn:aws:s3:::${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"

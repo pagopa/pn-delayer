@@ -1,7 +1,25 @@
 const { DayOfWeek, TemporalAdjusters, Instant, ZoneOffset } = require('@js-joda/core');
 
+function toInstant(value) {
+  if (value instanceof Instant) return value;
+
+  // Date JS o stringa tipo "Wed Jan 21 2026 14:06:25 GMT+0000 ..."
+  if (value instanceof Date || typeof value === 'string') {
+    return Instant.ofEpochMilli(new Date(value).getTime());
+  }
+
+  // epoch millis
+  if (typeof value === 'number') {
+    return Instant.ofEpochMilli(value);
+  }
+
+  throw new Error('Unsupported executionDate type');
+}
+
 function isSameISOWeek(executionDate, deliveryDate) {
-  const executionLocalDate = executionDate
+  const executionInstant = toInstant(executionDate);
+
+  const executionLocalDate = executionInstant
     .atZone(ZoneOffset.UTC)
     .toLocalDate();
 

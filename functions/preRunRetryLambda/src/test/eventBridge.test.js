@@ -4,13 +4,14 @@ const {
   SchedulerClient,
   GetScheduleCommand
 } = require("@aws-sdk/client-scheduler");
+  const { LocalDate } = require("@js-joda/core");
 
 const { getActiveScheduler } = require("../app/lib/eventBridge");
 
 const schedulerMock = mockClient(SchedulerClient);
 
 describe("eventBridge", () => {
-  const deliveryDate = new Date("2025-01-20T00:00:00Z");
+  const deliveryDate = LocalDate.parse("2025-01-20");
 
   beforeEach(() => {
     schedulerMock.reset();
@@ -22,8 +23,8 @@ describe("eventBridge", () => {
     schedulerMock.on(GetScheduleCommand, { Name: "scheduler-1" }).resolves({
       Name: "scheduler-1",
       ScheduleExpression: "cron(0 2 ? * MON *)",
-      StartDate: "2025-01-01T00:00:00Z",
-      EndDate: "2025-12-31T23:59:59Z",
+      StartDate: new Date("2025-01-01T00:00:00Z"),
+      EndDate: new Date("2025-12-31T23:59:59Z"),
     });
 
     const scheduler = await getActiveScheduler(deliveryDate);
@@ -38,7 +39,7 @@ describe("eventBridge", () => {
     schedulerMock.on(GetScheduleCommand).resolves({
       Name: "scheduler-1",
       ScheduleExpression: "cron(0 2 ? * MON *)",
-      StartDate: "2025-02-01T00:00:00Z",
+      StartDate: new Date("2025-02-01T00:00:00Z"),
     });
 
     const scheduler = await getActiveScheduler(deliveryDate);
