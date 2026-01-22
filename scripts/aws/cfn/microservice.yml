@@ -2437,7 +2437,6 @@ Resources:
                   "tableName": ["pn-Timelines"],
                   "dynamodb": {
                     "NewImage": {
-                      "reworkId": { "S": [ { "exists": true } ] },
                       "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] }
                     }
                   }
