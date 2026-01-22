@@ -2271,6 +2271,7 @@ Resources:
           QUERY_LIMIT: !Ref PaperDeliveryQueryLimit
           DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
           PAPER_DELIVERY_PRIORITY_PARAMETER: "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
+          DELAY_SECONDS: !Ref SwitchOffAlgorithmWaitSeconds
       TracingConfig:
         Mode: Active
       Layers:
@@ -2692,9 +2693,8 @@ Resources:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/SwitchOffStateMachine.json"
       DefinitionSubstitutions:
-          WaitSeconds: !Ref SwitchOffAlgorithmWaitSeconds
-          SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
-          SwitchOffAlgorithmLambdaExecutionLimit: !Ref SwitchOffAlgorithmLambdaExecutionLimit
+        SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
+        SwitchOffAlgorithmLambdaExecutionLimit: !Ref SwitchOffAlgorithmLambdaExecutionLimit
       TracingConfiguration:
           Enabled: false
 

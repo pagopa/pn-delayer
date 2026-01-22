@@ -27,7 +27,8 @@ exports.handleEvent = async (event = {}) => {
     success: true,
     itemsProcessed: result.totalProcessedItems,
     lastEvaluatedKey: result.lastEvaluatedKey,
-    completed: !result.lastEvaluatedKey
+    completed: !result.lastEvaluatedKey,
+    delaySeconds: parseInt(process.env.DELAY_SECONDS, 10)
   };
 };
 

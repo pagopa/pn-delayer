@@ -53,8 +53,8 @@
     },
     "Wait": {
       "Type": "Wait",
-      "Seconds": "${WaitSeconds}",
-      "Next": "SwitchOffAlgorithmLambda"
+      "Next": "SwitchOffAlgorithmLambda",
+      "SecondsPath": "$.delaySeconds"
     },
     "Success": {
       "Type": "Succeed"
