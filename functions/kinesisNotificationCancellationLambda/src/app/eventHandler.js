@@ -16,7 +16,7 @@ exports.handleEvent = async (event) => {
      await Promise.all(
        cdcEvents.map(async cdcEvent => {
            const elements = await retrieveTimelineElements(
-             cdcEvent.dynamodb.NewImage.iun
+             cdcEvent.dynamodb.NewImage.iun.S
            );
 
            return elements.map(el => ({

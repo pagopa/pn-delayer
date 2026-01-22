@@ -73,7 +73,11 @@
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
           "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}",
-          "Input.$": "States.JsonToString({\"PAPERDELIVERYCOUNTER_TABLENAME\": \"${PaperDeliveryCounterTableName}\",\"PAPERDELIVERY_TABLENAME\": \"${PaperDeliveryTableName}\",\"PN_DELAYER_DELIVERYDATEDAYOFWEEK\": \"${DeliveryDateDayOfWeek}\"})"
+          "Input": {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
         }
       },
       "ResultPath": null,
@@ -174,7 +178,11 @@
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
           "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}",
-          "Input.$": "States.JsonToString({\"PAPERDELIVERYCOUNTER_TABLENAME\": \"${PaperDeliveryCounterTableName}\",\"PAPERDELIVERY_TABLENAME\": \"${PaperDeliveryTableName}\",\"PN_DELAYER_DELIVERYDATEDAYOFWEEK\": \"${DeliveryDateDayOfWeek}\"})"
+          "Input": {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
         }
       },
       "Retry": [
