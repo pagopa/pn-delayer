@@ -1,18 +1,18 @@
 {
-  "Comment": "A description of my state machine",
+  "Comment": "Switch off algorithm with DynamoDB pagination",
   "StartAt": "SwitchOffAlgorithmLambda",
   "States": {
     "SwitchOffAlgorithmLambda": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "Output": "{% $states.result.Payload %}",
-      "Arguments": {
-        "FunctionName": "${SwitchOffAlgorithmLambdaArn}",
+      "Parameters": {
         "Payload": {
           "executionLimit": "${SwitchOffAlgorithmLambdaExecutionLimit}",
-          "lastEvaluatedKey": "{% $states.input.lastEvaluatedKey %}"
-        }
+          "lastEvaluatedKey.$": "$.lastEvaluatedKey"
+        },
+        "FunctionName": "${SwitchOffAlgorithmLambdaArn}"
       },
+      "OutputPath": "$.Payload",
       "Retry": [
         {
           "ErrorEquals": [
@@ -44,8 +44,9 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "Wait",
-          "Condition": "{% $states.input.lastEvaluatedKey != null %}"
+          "Variable": "$.lastEvaluatedKey",
+          "IsPresent": true,
+          "Next": "Wait"
         }
       ],
       "Default": "Success"
@@ -58,6 +59,5 @@
     "Success": {
       "Type": "Succeed"
     }
-  },
-  "QueryLanguage": "JSONata"
+  }
 }
