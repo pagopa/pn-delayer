@@ -16,6 +16,7 @@
       "ResultSelector": {
         "schedulerName.$": "$.Payload.schedulerName",
         "schedulerExpression.$": "$.Payload.schedulerExpression",
+        "schedulerEndDate.$":"$.Payload.schedulerEndDate",
         "deliveryDate.$": "$.Payload.deliveryDate",
         "executeRetryAlgorithm.$": "$.Payload.executeRetryAlgorithm"
       },
@@ -68,7 +69,7 @@
           "Mode": "OFF"
         },
         "StartDate.$": "$$.State.EnteredTime",
-        "EndDate": "${DelayerToPaperChannelFirstSchedulerEndDate}",
+        "EndDate.$": "$.preRunRetryResponse.schedulerEndDate",
         "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
@@ -173,7 +174,7 @@
           "Mode": "OFF"
         },
         "StartDate.$": "$$.State.EnteredTime",
-        "EndDate": "${DelayerToPaperChannelFirstSchedulerEndDate}",
+        "EndDate.$": "$.preRunRetryResponse.schedulerEndDate",
         "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",

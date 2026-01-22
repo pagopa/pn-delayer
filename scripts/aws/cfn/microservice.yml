@@ -2348,7 +2348,7 @@ Resources:
           REGION: !Sub ${AWS::Region}
           DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
           KINESIS_BATCHSIZE: !Ref KinesisNotificationCancellationLambdaBatchSize
-          TIMELINE_SERVICE_BASE_PATH: !Ref ApplicationLoadBalancerDomain
+          TIMELINE_SERVICE_BASE_PATH: !Sub 'http://${ApplicationLoadBalancerDomain}:8080'
       TracingConfig:
         Mode: Active
       Layers:

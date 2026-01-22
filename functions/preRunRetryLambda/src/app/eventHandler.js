@@ -36,6 +36,7 @@ exports.handleEvent = async (event = {}) => {
     executeRetryAlgorithm : canExecuteRetryAlgorithm,
     schedulerName : scheduler.name,
     schedulerExpression : scheduler.scheduleExpression,
+    schedulerEndDate : scheduler.endDate,
     deliveryDate: finalDeliveryDate
   };
 };
