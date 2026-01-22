@@ -4,21 +4,29 @@ const { calculateDeliveryDate } = require("./lib/utils");
 
 exports.handleEvent = async (event = {}) => {
   const {
+    deliveryDate,
     skipStepExecutionCheck = false,
     executionArn
   } = event;
 
-  const deliveryDate = calculateDeliveryDate();
+  let finalDeliveryDate = deliveryDate
+
+  if(!finalDeliveryDate){
+     finalDeliveryDate = calculateDeliveryDate();
+  }
 
   let canExecuteRetryAlgorithm = true;
 
   if (!skipStepExecutionCheck){
-    canExecuteRetryAlgorithm = await executionWithDeliveryDateExists(deliveryDate, executionArn);
+    canExecuteRetryAlgorithm = await executionWithDeliveryDateExists(finalDeliveryDate, executionArn);
   }
 
   if (!canExecuteRetryAlgorithm) {
     return {
       executeRetryAlgorithm: false,
+      schedulerName : null,
+      schedulerExpression : null,
+      deliveryDate: null
     };
   }
 
@@ -27,7 +35,7 @@ exports.handleEvent = async (event = {}) => {
   return {
     executeRetryAlgorithm : canExecuteRetryAlgorithm,
     schedulerName : scheduler.name,
-    schedulerExpression : scheduler.expression,
-    deliveryDate: deliveryDate
+    schedulerExpression : scheduler.scheduleExpression,
+    deliveryDate: finalDeliveryDate
   };
 };

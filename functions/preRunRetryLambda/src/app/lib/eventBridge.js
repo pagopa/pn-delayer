@@ -2,6 +2,7 @@ const {
   SchedulerClient,
   GetScheduleCommand
 } = require("@aws-sdk/client-scheduler");
+const { Instant, ZoneId } = require("@js-joda/core");
 
 const schedulerClient = new SchedulerClient({});
 
@@ -17,18 +18,21 @@ async function getActiveScheduler(deliveryDate) {
     );
 
     const startDate = response.StartDate
-      ? new Date(response.StartDate)
+      ? Instant.parse(response.StartDate.toISOString())
+          .atZone(ZoneId.UTC)
+          .toLocalDate()
       : null;
-
     const endDate = response.EndDate
-      ? new Date(response.EndDate)
+      ? Instant.parse(response.EndDate.toISOString())
+          .atZone(ZoneId.UTC)
+          .toLocalDate()
       : null;
-
     if (!startDate) continue;
 
-    const isAfterStart = deliveryDate >= startDate;
-    const isBeforeEnd = !endDate || deliveryDate <= endDate;
-
+    const isAfterStart = !deliveryDate.isBefore(startDate);
+    const isBeforeEnd = !endDate || deliveryDate.isBefore(endDate);
+    console.log(isAfterStart);
+    console.log(isBeforeEnd);
     if (isAfterStart && isBeforeEnd) {
       return {
         name: response.Name,

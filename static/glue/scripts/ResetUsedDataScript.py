@@ -36,12 +36,12 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-DELIVERY_DATE = args['delivery-date']
-USED_CAPACITIES_TABLE_NAME = args['used-capacities-table-name']
-USED_LIMIT_TABLE_NAME = args['used-sender-limit-table-name']
-COUNTER_TABLE_NAME = args['counter-table-name']
-PROVINCE_TABLE_NAME = args['province-table-name']
-DRIVER_PROVINCE_PARAMETER = args['driver-province-parameter']
+DELIVERY_DATE = args['delivery_date']
+USED_CAPACITIES_TABLE_NAME = args['used_capacities_table_name']
+USED_LIMIT_TABLE_NAME = args['used_sender_limit_table_name']
+COUNTER_TABLE_NAME = args['counter_table_name']
+PROVINCE_TABLE_NAME = args['province_table_name']
+DRIVER_PROVINCE_PARAMETER = args['driver_province_parameter']
 
 PARALLELISM = int(args.get("parallelism", "20"))
 LOG_EVERY = int(args.get("log-every", "5000"))

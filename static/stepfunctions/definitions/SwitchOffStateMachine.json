@@ -52,7 +52,7 @@
     },
     "Wait": {
       "Type": "Wait",
-      "Seconds": "{% $states.input.waitSeconds %}",
+      "Seconds": "${WaitSeconds}",
       "Next": "SwitchOffAlgorithmLambda"
     },
     "Success": {

@@ -42,7 +42,7 @@ describe("eventHandler", () => {
     executionStub.resolves(true);
     schedulerStub.resolves({
       name: "test-scheduler",
-      expression: "cron(0 10 ? * MON *)",
+      scheduleExpression: "cron(0 10 ? * MON *)",
     });
 
     await LambdaTester(handler)
