@@ -22,7 +22,7 @@ describe("eventHandler", () => {
         getActiveScheduler: schedulerStub,
       },
       "../app/lib/utils": {
-        calculateDeliveryDate: () => LocalDate.parse("2025-01-20"),
+        normalizeToLocalDate: () => LocalDate.parse("2025-01-20"),
       },
     }).handleEvent;
 

@@ -36,4 +36,24 @@ function calculateDeliveryDate() {
     return monday;
 }
 
-module.exports = { isSameISOWeek, calculateDeliveryDate };
+function normalizeToLocalDate(deliveryDate) {
+  if (deliveryDate == null || deliveryDate === "") {
+    return calculateDeliveryDate();
+  }
+
+  if (deliveryDate instanceof Date) {
+    return Instant.ofEpochMilli(deliveryDate.getTime())
+      .atZone(ZoneOffset.UTC)
+      .toLocalDate();
+  }
+
+  // stringa YYYY-MM-DD
+  if (typeof deliveryDate === "string") {
+    return LocalDate.parse(deliveryDate);
+  }
+
+  // già LocalDate
+  return deliveryDate;
+}
+
+module.exports = { isSameISOWeek, calculateDeliveryDate, normalizeToLocalDate };

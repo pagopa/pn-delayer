@@ -64,7 +64,7 @@
       "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
       "Parameters": {
         "Name.$": "$.preRunRetryResponse.schedulerName",
-        "State": "DISABLE",
+        "State": "DISABLED",
         "FlexibleTimeWindow": {
           "Mode": "OFF"
         },
