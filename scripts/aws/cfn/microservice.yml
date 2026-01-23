@@ -3264,7 +3264,7 @@ Resources:
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
+                  - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
 
   ResetUsedDataGlueJob:
     Type: AWS::Glue::Job
@@ -3337,4 +3337,4 @@ Resources:
                 Action:
                     - s3:GetObject
                 Resource:
-                    - !Sub "arn:aws:s3:::${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
+                    - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
