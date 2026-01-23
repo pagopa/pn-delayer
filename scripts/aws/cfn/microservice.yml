@@ -2271,6 +2271,7 @@ Resources:
           QUERY_LIMIT: !Ref PaperDeliveryQueryLimit
           DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
           PAPER_DELIVERY_PRIORITY_PARAMETER: "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
+          DELAY_SECONDS: !Ref SwitchOffAlgorithmWaitSeconds
       TracingConfig:
         Mode: Active
       Layers:
@@ -2347,11 +2348,15 @@ Resources:
           REGION: !Sub ${AWS::Region}
           DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
           KINESIS_BATCHSIZE: !Ref KinesisNotificationCancellationLambdaBatchSize
-          TIMELINE_SERVICE_BASE_PATH: !Ref ApplicationLoadBalancerDomain
+          TIMELINE_SERVICE_BASE_PATH: !Sub 'http://${ApplicationLoadBalancerDomain}:8080'
       TracingConfig:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt KinesisNotificationCancellationLambdaSecGroup.GroupId
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
       Timeout: 10
 
   # Lambda function role
@@ -2370,6 +2375,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 
   # Lambda function IAM policy
   KinesisNotificationCancellationLambdaPolicy:
@@ -2436,7 +2442,6 @@ Resources:
                   "tableName": ["pn-Timelines"],
                   "dynamodb": {
                     "NewImage": {
-                      "reworkId": { "S": [ { "exists": true } ] },
                       "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] }
                     }
                   }
@@ -2692,9 +2697,8 @@ Resources:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/SwitchOffStateMachine.json"
       DefinitionSubstitutions:
-          WaitSeconds: !Ref SwitchOffAlgorithmWaitSeconds
-          SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
-          SwitchOffAlgorithmLambdaExecutionLimit: !Ref SwitchOffAlgorithmLambdaExecutionLimit
+        SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
+        SwitchOffAlgorithmLambdaExecutionLimit: !Ref SwitchOffAlgorithmLambdaExecutionLimit
       TracingConfiguration:
           Enabled: false
 
@@ -3260,7 +3264,7 @@ Resources:
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
+                  - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
 
   ResetUsedDataGlueJob:
     Type: AWS::Glue::Job
@@ -3333,4 +3337,4 @@ Resources:
                 Action:
                     - s3:GetObject
                 Resource:
-                    - !Sub "arn:aws:s3:::${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
+                    - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"

@@ -16,6 +16,7 @@
       "ResultSelector": {
         "schedulerName.$": "$.Payload.schedulerName",
         "schedulerExpression.$": "$.Payload.schedulerExpression",
+        "schedulerEndDate.$":"$.Payload.schedulerEndDate",
         "deliveryDate.$": "$.Payload.deliveryDate",
         "executeRetryAlgorithm.$": "$.Payload.executeRetryAlgorithm"
       },
@@ -63,17 +64,21 @@
       "Resource": "arn:aws:states:::aws-sdk:scheduler:updateSchedule",
       "Parameters": {
         "Name.$": "$.preRunRetryResponse.schedulerName",
-        "State": "DISABLE",
+        "State": "DISABLED",
         "FlexibleTimeWindow": {
           "Mode": "OFF"
         },
         "StartDate.$": "$$.State.EnteredTime",
-        "EndDate": "${DelayerToPaperChannelFirstSchedulerEndDate}",
+        "EndDate.$": "$.preRunRetryResponse.schedulerEndDate",
         "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
           "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}",
-          "Input.$": "States.JsonToString({\"PAPERDELIVERYCOUNTER_TABLENAME\": \"${PaperDeliveryCounterTableName}\",\"PAPERDELIVERY_TABLENAME\": \"${PaperDeliveryTableName}\",\"PN_DELAYER_DELIVERYDATEDAYOFWEEK\": \"${DeliveryDateDayOfWeek}\"})"
+          "Input": {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
         }
       },
       "ResultPath": null,
@@ -169,12 +174,16 @@
           "Mode": "OFF"
         },
         "StartDate.$": "$$.State.EnteredTime",
-        "EndDate": "${DelayerToPaperChannelFirstSchedulerEndDate}",
+        "EndDate.$": "$.preRunRetryResponse.schedulerEndDate",
         "ScheduleExpression.$": "$.preRunRetryResponse.schedulerExpression",
         "Target": {
           "Arn": "${DelayerToPaperChannelStateMachine}",
           "RoleArn": "${DelayerToPaperChannelDailyScheduleRuleRoleArn}",
-          "Input.$": "States.JsonToString({\"PAPERDELIVERYCOUNTER_TABLENAME\": \"${PaperDeliveryCounterTableName}\",\"PAPERDELIVERY_TABLENAME\": \"${PaperDeliveryTableName}\",\"PN_DELAYER_DELIVERYDATEDAYOFWEEK\": \"${DeliveryDateDayOfWeek}\"})"
+          "Input": {
+            "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
+            "PAPERDELIVERY_TABLENAME": "${PaperDeliveryTableName}",
+            "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "${DeliveryDateDayOfWeek}"
+          }
         }
       },
       "Retry": [

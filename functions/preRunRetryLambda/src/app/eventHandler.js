@@ -1,6 +1,6 @@
 const { executionWithDeliveryDateExists } = require("./lib/stepFunction");
 const { getActiveScheduler } = require("./lib/eventBridge");
-const { calculateDeliveryDate } = require("./lib/utils");
+const { calculateDeliveryDate, normalizeToLocalDate } = require("./lib/utils");
 
 exports.handleEvent = async (event = {}) => {
   const {
@@ -9,12 +9,7 @@ exports.handleEvent = async (event = {}) => {
     executionArn
   } = event;
 
-  let finalDeliveryDate = deliveryDate
-
-  if(!finalDeliveryDate){
-     finalDeliveryDate = calculateDeliveryDate();
-  }
-
+  const finalDeliveryDate = normalizeToLocalDate(deliveryDate);
   let canExecuteRetryAlgorithm = true;
 
   if (!skipStepExecutionCheck){
@@ -29,13 +24,13 @@ exports.handleEvent = async (event = {}) => {
       deliveryDate: null
     };
   }
-
-  const scheduler = await getActiveScheduler(deliveryDate);
+  const scheduler = await getActiveScheduler(finalDeliveryDate);
 
   return {
     executeRetryAlgorithm : canExecuteRetryAlgorithm,
     schedulerName : scheduler.name,
     schedulerExpression : scheduler.scheduleExpression,
+    schedulerEndDate : scheduler.endDate,
     deliveryDate: finalDeliveryDate
   };
 };

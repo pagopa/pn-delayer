@@ -36,7 +36,10 @@ async function getActiveScheduler(deliveryDate) {
     if (isAfterStart && isBeforeEnd) {
       return {
         name: response.Name,
-        scheduleExpression: response.ScheduleExpression
+        scheduleExpression: response.ScheduleExpression,
+        endDate: response.EndDate
+           ? response.EndDate.toISOString()
+           : null
       };
     }
   }

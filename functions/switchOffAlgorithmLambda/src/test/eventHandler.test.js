@@ -53,6 +53,7 @@ describe('eventHandler.js', () => {
   });
 
   it('handleEvent: processa items, fa batch write, completed=true se non c’è lastEvaluatedKey', async () => {
+    process.env.DELAY_SECONDS = '30';
     queryByPartitionKeyStub.resolves({
       items: [{ id: 1 }, { id: 2 }],
       lastEvaluatedKey: null,
@@ -82,6 +83,7 @@ describe('eventHandler.js', () => {
       itemsProcessed: 4,
       lastEvaluatedKey: null,
       completed: true,
+      delaySeconds: 30,
     });
   });
 

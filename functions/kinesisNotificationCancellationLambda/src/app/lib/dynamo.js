@@ -5,16 +5,19 @@ const {
   DynamoDBDocumentClient
 } = require("@aws-sdk/lib-dynamodb");
 const client = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(client);
+const docClient = DynamoDBDocumentClient.from(client, {
+  marshallOptions: {
+    removeUndefinedValues: true,
+  }});
 const paperDeliveryTable = process.env.DELAYER_PAPER_DELIVERY_TABLE_NAME;
 
 async function retrievePaperDelivery(requestId) {
   const queryParams = {
     TableName: paperDeliveryTable,
     IndexName: "requestId-CreatedAt-index",
-    KeyConditionExpression: "pk = :pk",
+    KeyConditionExpression: "requestId = :requestId",
     ExpressionAttributeValues: {
-      ":pk": requestId
+      ":requestId": requestId
     },
     ScanIndexForward: false,
     Limit: 1
