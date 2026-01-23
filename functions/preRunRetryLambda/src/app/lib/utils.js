@@ -1,4 +1,4 @@
-const { DayOfWeek, TemporalAdjusters, Instant, ZoneOffset } = require('@js-joda/core');
+const { DayOfWeek, TemporalAdjusters, Instant, ZoneOffset, LocalDate } = require('@js-joda/core');
 
 function toInstant(value) {
   if (value instanceof Instant) return value;

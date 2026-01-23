@@ -11,7 +11,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     priority: priority,
     productType: payload.productType,
     senderPaId: payload.senderPaId,
-    province: payload.province
+    province: payload.province,
     cap: payload.cap,
     attempt: payload.attempt,
     iun: payload.iun,
