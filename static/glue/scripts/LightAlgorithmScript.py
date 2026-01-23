@@ -33,6 +33,10 @@ args = getResolvedOptions(
         "print-capacity",
         "parallelism",
         "log-every",
+        "first-scheduler-start-date",
+        "second-scheduler-start-date",
+        "first-scheduler-cron",
+        "second-scheduler-cron"
     ],
 )
 
@@ -56,6 +60,10 @@ LOG_EVERY = int(args.get("log-every", "20000"))
 
 SOURCE_PK_VALUE = f"{DELIVERY_DATE}~EVALUATE_SENDER_LIMIT"
 
+FIRST_SCHEDULER_START_DATE = args["first_scheduler_start_date"]
+SECOND_SCHEDULER_START_DATE = args["second_scheduler_start_date"]
+FIRST_SCHEDULER_CRON = args["first_scheduler_cron"]
+SECOND_SCHEDULER_CRON = args["second_scheduler_cron"]
 # ----------------------------
 # Parse priority parameter
 # ----------------------------
@@ -76,7 +84,7 @@ dynamo_client = boto3.client("dynamodb")
 serializer = TypeSerializer()
 
 # ----------------------------
-# Utility functions (IDENTICHE)
+# Utility functions
 # ----------------------------
 def load_provinces():
     province_table = dynamodb.Table(PROVINCE_TABLE_NAME)
@@ -228,6 +236,84 @@ def process_province(province: str) -> int:
     print(f"[DONE] province={province} processed={processed}")
     return processed
 
+
+def count_cron_values(field: str, min_v: int, max_v: int) -> int:
+    field = field.strip()
+
+    if field in ("*", "?"):
+        return max_v - min_v + 1
+
+    if "," in field:
+        return len(field.split(","))
+
+    if "/" in field:
+        base, step_s = field.split("/")
+        step = int(step_s)
+
+        if base in ("*", "?"):
+            span = max_v - min_v + 1
+            return (span + step - 1) // step  # ceil
+
+        if "-" in base:
+            a, b = map(int, base.split("-"))
+            return len(range(a, b + 1, step))
+
+        v = int(base)
+        return len(range(v, max_v + 1, step))
+
+    if "-" in field:
+        a, b = map(int, field.split("-"))
+        return b - a + 1
+
+    return 1
+
+
+def count_executions_in_next_scheduled_day(cron):
+    """
+    Campi (6): minute hour day_of_month month day_of_week year
+    Conta quante esecuzioni al giorno in base a minute*hour.
+    """
+    parts = cron.strip().split()
+    if len(parts) != 6:
+        raise RuntimeError(f"Invalid cron expression format: {cron}. Expected 6 fields.")
+
+    minute, hour, day_of_month, month, day_of_week, year = parts
+
+    hours_count = count_cron_values(hour, 0, 23)
+    minutes_count = count_cron_values(minute, 0, 59)
+
+    return hours_count * minutes_count
+
+
+def calculate_daily_execution_number():
+    """
+    Calcola il numero di esecuzioni giornaliere basandosi sugli scheduler attivi.
+    """
+    now = datetime.now(timezone.utc)
+    # Parse delle date degli scheduler
+    first_start = datetime.fromisoformat(FIRST_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+    second_start = datetime.fromisoformat(SECOND_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+    # Verifica se gli scheduler sono attivi prima della delivery date
+    active_scheduler_before_delivery_date = first_start < now
+    next_scheduler_before_delivery_date = second_start < now
+    if not active_scheduler_before_delivery_date and not next_scheduler_before_delivery_date:
+        raise RuntimeError("Both scheduler start dates are after the delivery date - ERROR_SCHEDULERS_START_AFTER_DELIVERY_DATE")
+    cron = retrieve_cron(active_scheduler_before_delivery_date, next_scheduler_before_delivery_date)
+    return count_executions_in_next_scheduled_day(cron)
+
+
+def retrieve_cron(active_scheduler_before_delivery_date, next_scheduler_before_delivery_date):
+    """
+    Recupera il cron appropriato basandosi sullo stato degli scheduler.
+    """
+    if active_scheduler_before_delivery_date and next_scheduler_before_delivery_date:
+        first_start = datetime.fromisoformat(FIRST_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+        second_start = datetime.fromisoformat(SECOND_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+        cron = FIRST_SCHEDULER_CRON if first_start > second_start else SECOND_SCHEDULER_CRON
+    else:
+        cron = FIRST_SCHEDULER_CRON if active_scheduler_before_delivery_date else SECOND_SCHEDULER_CRON
+    return cron
+
 # ----------------------------
 # MAIN
 # ----------------------------
@@ -243,7 +329,7 @@ with ThreadPoolExecutor(max_workers=PARALLELISM) as executor:
 print(f"[TOTAL] processed_total={total}")
 
 # ----------------------------
-# Counter (IDENTICO)
+# Counter
 # ----------------------------
 ttl_value = calculate_print_counter_ttl(PRINT_COUNTER_TTL_DURATION_DAYS)
 daily_capacity = compute_daily_print_capacity(
@@ -251,12 +337,14 @@ daily_capacity = compute_daily_print_capacity(
     PRINT_CAPACITY_CONFIG,
 )
 
+dailyExecutionNumber = calculate_daily_execution_number()
+
 dynamodb.Table(COUNTER_TABLE_NAME).put_item(
     Item={
         "pk": "PRINT",
         "sk": DELIVERY_DATE,
         "dailyExecutionCounter": 0,
-        "dailyExecutionNumber": 0,
+        "dailyExecutionNumber": dailyExecutionNumber,
         "dailyPrintCapacity": daily_capacity,
         "weeklyPrintCapacity": daily_capacity * PRINT_CAPACITY_WEEKLY_WORKING_DAYS,
         "numberOfShipments": total,

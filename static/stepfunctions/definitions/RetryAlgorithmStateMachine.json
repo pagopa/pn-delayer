@@ -146,7 +146,7 @@
           "PAPERDELIVERYCOUNTER_TABLENAME": "${PaperDeliveryCounterTableName}",
           "PN_DELAYER_DELIVERYDATEDAYOFWEEK": "1",
           "PN_DELAYER_PRINTCAPACITY": "${PrintCapacity}",
-          "PN_DELAYER_DELIVERYWEEK": null,
+          "PN_DELAYER_DELIVERYWEEK.$": "$.preRunRetryResponse.deliveryDate",
           "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON": "${DelayerToPaperChannelFirstSchedulerCron}",
           "PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON": "${DelayerToPaperChannelSecondSchedulerCron}",
           "PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE": "${DelayerToPaperChannelFirstSchedulerStartDate}",

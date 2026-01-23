@@ -3204,6 +3204,10 @@ Resources:
         ScriptLocation: !Sub "s3://${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/LightAlgorithmScript.py"
         PythonVersion: "3"
       DefaultArguments:
+        "--first-scheduler-start-date": !Ref DelayerToPaperChannelFirstSchedulerStartDate
+        "--second-scheduler-start-date": !Ref DelayerToPaperChannelSecondSchedulerStartDate
+        "--first-scheduler-cron": !Ref DelayerToPaperChannelFirstSchedulerCron
+        "--second-scheduler-cron": !Ref DelayerToPaperChannelSecondSchedulerCron
         "--job-language": "python"
         "--paper-delivery-table-name": !Ref PaperDeliveryTableName
         "--province-table-name": !Ref ProvinceTableName
@@ -3257,6 +3261,12 @@ Resources:
                   - !Sub "${PaperDeliveryCounterTableArn}/*"
               - Effect: Allow
                 Action:
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "${ProvinceTableArn}"
+                  - !Sub "${ProvinceTableArn}/*"
+              - Effect: Allow
+                Action:
                   - ssm:GetParameter
                 Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
@@ -3264,7 +3274,7 @@ Resources:
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
+                  - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/LightAlgorithmScript.py"
 
   ResetUsedDataGlueJob:
     Type: AWS::Glue::Job
