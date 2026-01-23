@@ -35,8 +35,7 @@ exports.handleEvent = async (event) => {
     const results = [];
 
     for (const element of filteredTimelineElements) {
-         const paperDelivery = await retrievePaperDelivery(element);
-
+         const paperDelivery = await retrievePaperDelivery(element.elementId);
          if (paperDelivery && canCancel(paperDelivery)) {
            const result = await executeTransactions(
              [paperDelivery],
