@@ -2353,6 +2353,10 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt KinesisNotificationCancellationLambdaSecGroup.GroupId
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
       Timeout: 10
 
   # Lambda function role
