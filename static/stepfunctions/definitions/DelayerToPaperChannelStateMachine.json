@@ -70,8 +70,8 @@
       "Choices": [
         {
           "Next": "MapItem",
-          "Variable": "$.GetItemResponse",
-          "IsNull": false
+          "Variable": "$.GetItemResponse.Item",
+          "IsPresent": true
         }
       ],
       "Default": "NoItemToProcess",

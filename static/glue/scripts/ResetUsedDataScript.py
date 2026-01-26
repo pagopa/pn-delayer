@@ -12,6 +12,8 @@ from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
 
+from datetime import datetime, timedelta
+
 # ----------------------------
 # Args
 # ----------------------------
@@ -206,6 +208,10 @@ def process_partition_delete(
 # ----------------------------
 def process_partition_provinces(province_iter):
     serializer = TypeSerializer()
+
+    date_obj = datetime.strptime(DELIVERY_DATE, "%Y-%m-%d")
+    new_date_obj = date_obj - timedelta(weeks=1)
+    delivery_date = new_date_obj.strftime("%Y-%m-%d")
 
     def to_ddb_key(it: dict) -> dict:
         return {
