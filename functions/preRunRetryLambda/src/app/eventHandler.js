@@ -21,6 +21,7 @@ exports.handleEvent = async (event = {}) => {
       executeRetryAlgorithm: false,
       schedulerName : null,
       schedulerExpression : null,
+      schedulerEndDate : null,
       deliveryDate: null
     };
   }

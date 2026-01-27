@@ -447,13 +447,21 @@ Parameters:
       - DISABLED
     Description: 'State of the DelayerStartWorkflowRule'
 
-  DelayerToPaperChannelDailyScheduleRuleState:
+  DelayerToPaperChannelFirstSchedulerState:
     Type: String
     Default: DISABLED
     AllowedValues:
       - ENABLED
       - DISABLED
-    Description: 'State of the DelayerToPaperChannelDailyScheduleRuleState'
+    Description: 'State of the DelayerToPaperChannelFirstScheduler state'
+
+  DelayerToPaperChannelSecondSchedulerState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the DelayerToPaperChannelSecondScheduler state'
 
   ProvinceTableName:
     Type: String
@@ -2960,7 +2968,7 @@ Resources:
     Properties:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
-      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      State: !Ref DelayerToPaperChannelFirstSchedulerState
       StartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
       EndDate: !Ref DelayerToPaperChannelFirstSchedulerEndDate
       FlexibleTimeWindow:
@@ -2980,7 +2988,7 @@ Resources:
     Properties:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
-      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      State: !Ref DelayerToPaperChannelSecondSchedulerState
       StartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
       EndDate: !Ref DelayerToPaperChannelSecondSchedulerEndDate
       FlexibleTimeWindow:
