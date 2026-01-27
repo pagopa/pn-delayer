@@ -20,7 +20,7 @@
     "ExportDelayerDataLambdaCron": "0 7 ? * 3 *",
     "ExportDelayerDataRuleState": "DISABLED",
     "DelayerStartWorkflowRuleState": "DISABLED",
-    "DelayerToPaperChannelFirstSchedulerState": "ENABLED",
+    "DelayerToPaperChannelFirstSchedulerState": "DISABLED",
     "DelayerToPaperChannelSecondSchedulerState": "DISABLED",
     "VCPU": "1",
     "Memory": "4096",
