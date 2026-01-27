@@ -27,6 +27,7 @@
     "DelayerToPaperChannelFirstSchedulerStartDate": "2026-01-27T11:00:00.000Z",
     "DelayerToPaperChannelFirstSchedulerCron": "0 5-21 ? * MON-SUN *",
     "MaxPaperDeliveriesForExecution": "5000",
-    "LambdaRuntime": "nodejs24.x"
+    "LambdaRuntime": "nodejs24.x",
+    "EnablePaperDeliveryLambdaKinesisSource": "false"
   }
 }
