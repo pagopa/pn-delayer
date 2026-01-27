@@ -10,7 +10,7 @@ const {
   LocalDate
 } = require("@js-joda/core");
 
-const { executionWithDeliveryDateExists } = require("../app/lib/stepFunction");
+const { executionWithCurrentDateExists } = require("../app/lib/stepFunction");
 
 const sfnMock = mockClient(SFNClient);
 
@@ -33,7 +33,7 @@ describe("stepFunction", () => {
       ],
     });
 
-    const result = await executionWithDeliveryDateExists(deliveryDate);
+    const result = await executionWithCurrentDateExists(deliveryDate);
 
     expect(result).to.equal(false);
   });
@@ -43,7 +43,7 @@ describe("stepFunction", () => {
       executions: [],
     });
 
-    const result = await executionWithDeliveryDateExists(deliveryDate);
+    const result = await executionWithCurrentDateExists(deliveryDate);
 
     expect(result).to.equal(true);
   });

@@ -1,6 +1,7 @@
-const { executionWithDeliveryDateExists } = require("./lib/stepFunction");
+const { executionWithCurrentDateExists } = require("./lib/stepFunction");
 const { getActiveScheduler } = require("./lib/eventBridge");
 const { calculateDeliveryDate, normalizeToLocalDate } = require("./lib/utils");
+const { Instant, ZoneOffset, LocalDate } = require('@js-joda/core');
 
 exports.handleEvent = async (event = {}) => {
   const {
@@ -10,10 +11,11 @@ exports.handleEvent = async (event = {}) => {
   } = event;
 
   const finalDeliveryDate = normalizeToLocalDate(deliveryDate);
+  const currentDate = Instant.now().atZone(ZoneOffset.UTC).toLocalDate();
   let canExecuteRetryAlgorithm = true;
 
   if (!skipStepExecutionCheck){
-    canExecuteRetryAlgorithm = await executionWithDeliveryDateExists(finalDeliveryDate, executionArn);
+    canExecuteRetryAlgorithm = await executionWithCurrentDateExists(currentDate, executionArn);
   }
 
   if (!canExecuteRetryAlgorithm) {
@@ -25,7 +27,7 @@ exports.handleEvent = async (event = {}) => {
       deliveryDate: null
     };
   }
-  const scheduler = await getActiveScheduler(finalDeliveryDate);
+  const scheduler = await getActiveScheduler(currentDate);
 
   return {
     executeRetryAlgorithm : canExecuteRetryAlgorithm,
