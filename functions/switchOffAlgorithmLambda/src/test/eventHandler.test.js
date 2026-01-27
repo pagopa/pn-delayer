@@ -10,8 +10,6 @@ describe('eventHandler.js', () => {
   let insertItemsBatchStub;
   let buildPaperDeliveryRecordStub;
 
-  let localDateNowStub = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1)));
-
   beforeEach(() => {
     process.env.QUERY_LIMIT = '1000';
     process.env.DELIVERYDATEDAYOFWEEK = '1';
@@ -66,21 +64,21 @@ describe('eventHandler.js', () => {
 
     insertItemsBatchStub.resolves([]);
 
-    const res = await handler.handleEvent({ executionLimit: 10, lastEvaluatedKey: null });
+    const res = await handler.handleEvent({ executionLimit: 10, lastEvaluatedKey: null, currentWeek: true });
 
-    const expectedPk = localDateNowStub + '~EVALUATE_SENDER_LIMIT';
+    const expectedPk = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).toString() + '~EVALUATE_SENDER_LIMIT';
 
-    expect(queryByPartitionKeyStub.calledTwice).to.equal(true);
+    expect(queryByPartitionKeyStub.callCount).to.equal(1);
     expect(queryByPartitionKeyStub.firstCall.args[0]).to.equal(expectedPk);
     expect(queryByPartitionKeyStub.firstCall.args[1]).to.equal(10); // executionLimit - processedCount(0)
     expect(queryByPartitionKeyStub.firstCall.args[2]).to.equal(null);
 
-    expect(buildPaperDeliveryRecordStub.callCount).to.equal(4);
-    expect(insertItemsBatchStub.calledTwice).to.equal(true);
+    expect(buildPaperDeliveryRecordStub.callCount).to.equal(2);
+    expect(insertItemsBatchStub.callCount).to.equal(1);
 
     expect(res).to.deep.equal({
       success: true,
-      itemsProcessed: 4,
+      itemsProcessed: 2,
       lastEvaluatedKey: null,
       completed: true,
       delaySeconds: 30,
@@ -122,7 +120,7 @@ describe('eventHandler.js', () => {
     buildPaperDeliveryRecordStub.callsFake((item) => item);
     insertItemsBatchStub.resolves([]);
 
-    const res = await handler.handleEvent({ executionLimit: 3, lastEvaluatedKey: null });
+    const res = await handler.handleEvent({ executionLimit: 3, lastEvaluatedKey: null, currentWeek: true });
 
     expect(queryByPartitionKeyStub.callCount).to.equal(3);
 
@@ -141,27 +139,40 @@ describe('eventHandler.js', () => {
     expect(res.completed).to.equal(false);
   });
 
-  it('handleEvent: quando week1 finisce e c’è ancora spazio, processa week2', async () => {
+  it('handleEvent: quando week1 finisce termina', async () => {
     queryByPartitionKeyStub.onCall(0).resolves({
       items: [{ id: 1 }],
-      lastEvaluatedKey: null,
-    });
-    queryByPartitionKeyStub.onCall(1).resolves({
-      items: [{ id: 2 }],
       lastEvaluatedKey: null,
     });
 
     buildPaperDeliveryRecordStub.callsFake((i) => i);
     insertItemsBatchStub.resolves([]);
 
-    const res = await handler.handleEvent({ executionLimit: 10, lastEvaluatedKey: null });
+    const res = await handler.handleEvent({ executionLimit: 10, lastEvaluatedKey: null, currentWeek: true });
 
-    expect(queryByPartitionKeyStub.callCount).to.equal(2);
-    expect(queryByPartitionKeyStub.getCall(0).args[0]).to.equal(localDateNowStub + '~EVALUATE_SENDER_LIMIT');
-    expect(queryByPartitionKeyStub.getCall(1).args[0]).to.equal(localDateNowStub.plusWeeks(1) + '~EVALUATE_SENDER_LIMIT');
+    expect(queryByPartitionKeyStub.callCount).to.equal(1);
+    expect(queryByPartitionKeyStub.getCall(0).args[0]).to.equal(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).toString() + '~EVALUATE_SENDER_LIMIT');
 
-    expect(res.itemsProcessed).to.equal(2);
+    expect(res.itemsProcessed).to.equal(1);
     expect(res.completed).to.equal(true);
   });
+
+    it('handleEvent: quando week2 finisce termina', async () => {
+      queryByPartitionKeyStub.onCall(0).resolves({
+        items: [{ id: 1 }],
+        lastEvaluatedKey: null,
+      });
+
+      buildPaperDeliveryRecordStub.callsFake((i) => i);
+      insertItemsBatchStub.resolves([]);
+
+      const res = await handler.handleEvent({ executionLimit: 10, lastEvaluatedKey: null, currentWeek: false });
+
+      expect(queryByPartitionKeyStub.callCount).to.equal(1);
+      expect(queryByPartitionKeyStub.getCall(0).args[0]).to.equal(LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(1))).toString() + '~EVALUATE_SENDER_LIMIT');
+
+      expect(res.itemsProcessed).to.equal(1);
+      expect(res.completed).to.equal(true);
+    });
 
 });

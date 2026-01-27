@@ -1,13 +1,14 @@
 {
   "Comment": "Switch off algorithm with DynamoDB pagination",
-  "StartAt": "SwitchOffAlgorithmLambda",
+  "StartAt": "SwitchOffAlgorithmCurrentWeek",
   "States": {
-    "SwitchOffAlgorithmLambda": {
+    "SwitchOffAlgorithmCurrentWeek": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "Payload": {
           "executionLimit": "${SwitchOffAlgorithmLambdaExecutionLimit}",
+          "currentWeek": true,
           "lastEvaluatedKey.$": "$.lastEvaluatedKey"
         },
         "FunctionName": "${SwitchOffAlgorithmLambdaArn}"
@@ -27,7 +28,7 @@
           "JitterStrategy": "FULL"
         }
       ],
-      "Next": "LastEvaluatedKeyIsPresent?",
+      "Next": "CurrentWeekHasMoreItems?",
       "Catch": [
         {
           "ErrorEquals": [
@@ -37,24 +38,81 @@
         }
       ]
     },
-    "SwitchOffAlgorithmLambdaFail": {
-      "Type": "Fail"
-    },
-    "LastEvaluatedKeyIsPresent?": {
+    "CurrentWeekHasMoreItems?": {
       "Type": "Choice",
       "Choices": [
         {
           "Variable": "$.lastEvaluatedKey",
           "IsNull": false,
-          "Next": "Wait"
+          "Next": "WaitForCurrentWeek"
+        }
+      ],
+      "Default": "WaitBetweenAlgorithms"
+    },
+    "WaitForCurrentWeek": {
+      "Type": "Wait",
+      "SecondsPath": "$.delaySeconds",
+      "Next": "SwitchOffAlgorithmCurrentWeek"
+    },
+    "WaitBetweenAlgorithms": {
+      "Type": "Wait",
+      "SecondsPath": "$.delaySeconds",
+      "Next": "SwitchOffAlgorithmNextWeek"
+    },
+    "SwitchOffAlgorithmNextWeek": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${SwitchOffAlgorithmLambdaArn}",
+        "Payload": {
+          "executionLimit": "5000",
+          "currentWeek": false,
+          "lastEvaluatedKey": null
+        }
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "SwitchOffAlgorithmLambdaFail"
+        }
+      ],
+      "Next": "NextWeekHasMoreItems?"
+    },
+    "NextWeekHasMoreItems?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.lastEvaluatedKey",
+          "IsNull": false,
+          "Next": "WaitForNextWeek"
         }
       ],
       "Default": "Success"
     },
-    "Wait": {
+    "WaitForNextWeek": {
       "Type": "Wait",
-      "Next": "SwitchOffAlgorithmLambda",
+      "Next": "SwitchOffAlgorithmNextWeek",
       "SecondsPath": "$.delaySeconds"
+    },
+    "SwitchOffAlgorithmLambdaFail": {
+      "Type": "Fail"
     },
     "Success": {
       "Type": "Succeed"
