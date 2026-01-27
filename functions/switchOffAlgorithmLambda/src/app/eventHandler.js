@@ -13,7 +13,7 @@ exports.handleEvent = async (event = {}) => {
 
   const deliveryDate = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek)));
   let pk;
-  if(currentWeek){
+  if (currentWeek){
     pk = `${deliveryDate}~EVALUATE_SENDER_LIMIT`;
   }else{
     const nextDeliveryDate = deliveryDate.plusWeeks(1);

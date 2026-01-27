@@ -6,12 +6,12 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
+        "FunctionName": "${SwitchOffAlgorithmLambdaArn}",
         "Payload": {
           "executionLimit": "${SwitchOffAlgorithmLambdaExecutionLimit}",
           "currentWeek": true,
           "lastEvaluatedKey.$": "$.lastEvaluatedKey"
-        },
-        "FunctionName": "${SwitchOffAlgorithmLambdaArn}"
+        }
       },
       "OutputPath": "$.Payload",
       "Retry": [
@@ -65,9 +65,9 @@
       "Parameters": {
         "FunctionName": "${SwitchOffAlgorithmLambdaArn}",
         "Payload": {
-          "executionLimit": "5000",
+          "executionLimit": "${SwitchOffAlgorithmLambdaExecutionLimit}",
           "currentWeek": false,
-          "lastEvaluatedKey": null
+          "lastEvaluatedKey.$": "$.lastEvaluatedKey"
         }
       },
       "OutputPath": "$.Payload",
