@@ -20,11 +20,11 @@
     "ExportDelayerDataLambdaCron": "0 7 ? * 3 *",
     "ExportDelayerDataRuleState": "DISABLED",
     "DelayerStartWorkflowRuleState": "DISABLED",
-    "DelayerToPaperChannelFirstSchedulerState": "DISABLED",
+    "DelayerToPaperChannelFirstSchedulerState": "ENABLED",
     "DelayerToPaperChannelSecondSchedulerState": "DISABLED",
     "VCPU": "1",
     "Memory": "4096",
-    "DelayerToPaperChannelFirstSchedulerStartDate": "2025-11-24T00:00:00.000Z",
+    "DelayerToPaperChannelFirstSchedulerStartDate": "2026-01-27T11:00:00.000Z",
     "DelayerToPaperChannelFirstSchedulerCron": "0 5-21 ? * MON-SUN *",
     "MaxPaperDeliveriesForExecution": "5000",
     "LambdaRuntime": "nodejs24.x"
