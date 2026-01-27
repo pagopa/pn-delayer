@@ -16,7 +16,7 @@ describe("eventHandler", () => {
 
     handler = proxyquire("../app/eventHandler", {
       "../app/lib/stepFunction": {
-        executionWithDeliveryDateExists: executionStub,
+        executionWithCurrentDateExists: executionStub,
       },
       "../app/lib/eventBridge": {
         getActiveScheduler: schedulerStub,

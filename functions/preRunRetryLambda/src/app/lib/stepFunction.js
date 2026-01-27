@@ -6,12 +6,12 @@ const stateMachineArn = process.env.RETRY_ALGORITHM_STATE_MACHINE_ARN;
 
 /**
     * Check if there is an execution for the given state machine ARN
-    * in the same ISO week as the provided delivery date.
+    * in the same ISO week as the provided date.
     *
-    * @param {LocalDate} deliveryDate - The delivery date to compare against.
+    * @param {LocalDate} currentDate - The date to compare against.
     * @returns {Promise<boolean>} - Returns true if no execution exists in the same week, false otherwise.
     */
-async function executionWithDeliveryDateExists(deliveryDate, currentExecutionArn) {
+async function executionWithCurrentDateExists(currentDate, currentExecutionArn) {
     const response = await sfnClient.send(
         new ListExecutionsCommand({
           stateMachineArn,
@@ -57,7 +57,7 @@ async function executionWithDeliveryDateExists(deliveryDate, currentExecutionArn
 
     const lastCompletedExecutionStartDate = lastCompletedExecution.startDate;
 
-    if (isSameISOWeek(lastCompletedExecutionStartDate, deliveryDate)) {
+    if (isSameISOWeek(lastCompletedExecutionStartDate, currentDate)) {
         console.log("Execution found for the same week:", stateMachineArn);
         return false;
     }
@@ -66,4 +66,4 @@ async function executionWithDeliveryDateExists(deliveryDate, currentExecutionArn
     return true;
 }
 
-module.exports = { executionWithDeliveryDateExists };
+module.exports = { executionWithCurrentDateExists };

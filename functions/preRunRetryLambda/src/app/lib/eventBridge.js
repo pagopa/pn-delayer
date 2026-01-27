@@ -6,7 +6,7 @@ const { Instant, ZoneId } = require("@js-joda/core");
 
 const schedulerClient = new SchedulerClient({});
 
-async function getActiveScheduler(deliveryDate) {
+async function getActiveScheduler(currentDate) {
   const schedulerNames = [
     process.env.DELAYER_TO_PAPER_CHANNEL_FIRST_SCHEDULER,
     process.env.DELAYER_TO_PAPER_CHANNEL_SECOND_SCHEDULER
@@ -29,8 +29,8 @@ async function getActiveScheduler(deliveryDate) {
       : null;
     if (!startDate) continue;
 
-    const isAfterStart = !deliveryDate.isBefore(startDate);
-    const isBeforeEnd = !endDate || deliveryDate.isBefore(endDate);
+    const isAfterStart = !currentDate.isBefore(startDate);
+    const isBeforeEnd = !endDate || currentDate.isBefore(endDate);
     console.log(isAfterStart);
     console.log(isBeforeEnd);
     if (isAfterStart && isBeforeEnd) {
