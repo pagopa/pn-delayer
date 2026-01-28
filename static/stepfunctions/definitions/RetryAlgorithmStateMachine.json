@@ -41,7 +41,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "RetryStepFail"
+          "Next": "OnCallFail"
         }
       ]
     },
@@ -51,13 +51,10 @@
         {
           "Variable": "$.preRunRetryResponse.executeRetryAlgorithm",
           "BooleanEquals": false,
-          "Next": "RetryAlgorithmAlreadyExecuted"
+          "Next": "StandardFail"
         }
       ],
       "Default": "DisableDelayerToPaperChannelDailyActiveScheduler"
-    },
-    "RetryAlgorithmAlreadyExecuted": {
-      "Type": "Fail"
     },
     "DisableDelayerToPaperChannelDailyActiveScheduler": {
       "Type": "Task",
@@ -98,7 +95,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "DisableRuleFail"
+          "Next": "OnCallFail"
         }
       ]
     },
@@ -128,7 +125,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "JobGlueFail"
+          "Next": "StandardFail"
         }
       ]
     },
@@ -160,7 +157,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "RetryStepFail"
+          "Next": "StandardFail"
         }
       ]
     },
@@ -201,7 +198,7 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "EnableRuleFail"
+          "Next": "OnCallFail"
         }
       ],
       "Next": "ExecutionCompleted"
@@ -209,16 +206,10 @@
     "ExecutionCompleted": {
       "Type": "Succeed"
     },
-    "DisableRuleFail": {
+    "OnCallFail": {
       "Type": "Fail"
     },
-    "JobGlueFail": {
-      "Type": "Fail"
-    },
-    "RetryStepFail": {
-      "Type": "Fail"
-    },
-    "EnableRuleFail": {
+    "StandardFail": {
       "Type": "Fail"
     }
   }

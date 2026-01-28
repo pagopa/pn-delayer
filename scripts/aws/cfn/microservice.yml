@@ -622,11 +622,6 @@ Parameters:
     Type: String
     Description: 'SwitchOffAlgorithmLambda function name'
 
-  EnablePaperDeliveryLambdaKinesisSource:
-    Type: String
-    AllowedValues: [ "true", "false" ]
-    Default: "true"
-
   SwitchOffAlgorithmWaitSeconds:
     Type: Number
     Description: 'Wait time in seconds before re run SwitchOffAlgorithmLambda'
@@ -653,9 +648,16 @@ Parameters:
     Type: String
     Description: 'Reset Used Data Glue Job name'
 
+  PnCoreEventBusToDelayerInputsKinesisStatus:
+    Type: String
+    Default: ENABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'EventBridge Rule To toDelayerInputKinesis'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
-    PaperDeliveryLambdaKinesisSourceEnabled: !Equals [ !Ref EnablePaperDeliveryLambdaKinesisSource, "true" ]
 
 Resources:
   SenderLimitComputeEnvironment:
@@ -1383,6 +1385,7 @@ Resources:
       Description: Route Events from pn-core-event-bus to kinesis
       RoleArn: !GetAtt "DelayerInputsRole.Arn"
       EventBusName: !Sub '${ProjectName}-CoreEventBus'
+      State: !Ref PnCoreEventBusToDelayerInputsKinesisStatus
       EventPattern:
         detail-type: [ "PreparePhaseOneOutcomeEvent" ]
       Targets:
@@ -1590,7 +1593,6 @@ Resources:
   PaperDeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      Enabled: !If [ PaperDeliveryLambdaKinesisSourceEnabled , true, false]
       BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
