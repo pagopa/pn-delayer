@@ -25,9 +25,15 @@
     "VCPU": "1",
     "Memory": "4096",
     "DelayerToPaperChannelFirstSchedulerStartDate": "2026-01-27T11:00:00.000Z",
+    "DelayerToPaperChannelFirstSchedulerEndDate": "2098-12-31T23:00:00.000Z",
+    "DelayerToPaperChannelSecondSchedulerStartDate": "2099-01-01T00:00:00.000Z",
+    "DelayerToPaperChannelSecondSchedulerEndDate": "2099-01-01T23:00:00.000Z",
     "DelayerToPaperChannelFirstSchedulerCron": "0 5-21 ? * MON-SUN *",
+    "DelayerToPaperChannelSecondSchedulerCron": "0 5-21 ? * MON-SUN *",
     "MaxPaperDeliveriesForExecution": "5000",
+    "SwitchOffAlgorithmWaitSeconds": "3600",
+    "SwitchOffAlgorithmLambdaExecutionLimit": "5000",
     "LambdaRuntime": "nodejs24.x",
-    "EnablePaperDeliveryLambdaKinesisSource": "false"
+    "PnCoreEventBusToDelayerInputsKinesisStatus": "ENABLED"
   }
 }
