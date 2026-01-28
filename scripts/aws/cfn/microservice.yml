@@ -1252,27 +1252,64 @@ Resources:
 
   ## Enable retrying the step function execution when it fails, times out or is aborted.
   RetryAlgorithmStateMachineRule:
-   Type: AWS::Events::Rule
-   Properties:
-     Description: The EventBridge rule to match Step function execution state change
-     RoleArn: !GetAtt PnDelayerAlarmTopicPublisherRole.Arn
-     EventPattern:
-       source:
-         - aws.states
-       detail-type:
-         - Step Functions Execution Status Change
-       detail:
-         status:
-           - FAILED
-           - TIMED_OUT
-           - ABORTED
-         stateMachineArn:
-           - !Ref PaperDeliveryStateMachine
-     State: !Ref RetryAlgorithmStateMachineRuleState
-     Targets:
-      - Arn: !Ref RetryAlgorithmStateMachine
-        Id: !Sub "${ProjectName}-delayer-retry-algorithm"
-        RoleArn: !GetAtt RetryAlgorithmStateMachineRole.Arn
+    Type: AWS::Events::Rule
+    Properties:
+      Description: The EventBridge rule to match Step function execution state change
+      RoleArn: !GetAtt PnDelayerAlarmTopicPublisherRole.Arn
+      EventPattern:
+        source:
+          - aws.states
+        detail-type:
+           - Step Functions Execution Status Change
+        detail:
+          status:
+            - FAILED
+            - TIMED_OUT
+            - ABORTED
+          stateMachineArn:
+            - !Ref PaperDeliveryStateMachine
+      State: !Ref RetryAlgorithmStateMachineRuleState
+      Targets:
+        - Arn: !Ref RetryAlgorithmStateMachine
+          Id: !Sub "${ProjectName}-delayer-retry-algorithm"
+          RoleArn: !GetAtt RetryAlgorithmStateMachineEventRole.Arn
+          
+          InputTransformer:
+            InputPathsMap:
+              executionArn: "$.detail.executionArn"
+              stateMachineArn: "$.detail.stateMachineArn"
+              status: "$.detail.status"
+              startDate: "$.detail.startDate"
+              stopDate: "$.detail.stopDate"
+            InputTemplate: |
+              {
+                "failedExecutionArn": <executionArn>,
+                "stateMachineArn": <stateMachineArn>,
+                "status": <status>,
+                "startDate": <startDate>,
+                "stopDate": <stopDate>
+              }
+     
+  RetryAlgorithmStateMachineEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+
+      Policies:
+        - PolicyName: StartRetryStateMachine
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: !Ref RetryAlgorithmStateMachine
 
   ### Enable sending notifications to SNS topic when the step functions are in failed, aborted or timedOut status.
   BatchBridgeStateRule:
