@@ -639,10 +639,10 @@ Parameters:
 #  DelayerToPaperChannelStateMachineLogGroupARN:
 #    Type: String
 #    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
-#
-#  RetryAlgorithmStateMachineLogGroupARN:
-#    Type: String
-#    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
+
+  RetryAlgorithmStateMachineLogGroupARN:
+    Type: String
+    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
 
   ResetUsedDataGlueJobName:
     Type: String
@@ -1273,14 +1273,14 @@ Resources:
         - Arn: !Ref RetryAlgorithmStateMachine
           Id: !Sub "${ProjectName}-delayer-retry-algorithm"
           RoleArn: !GetAtt RetryAlgorithmStateMachineEventRole.Arn
-          
+
           InputTransformer:
             InputPathsMap:
-              FAILEDEXECUTIONARN: "$.detail.executionArn"
-              STATEMACHINEARN: "$.detail.stateMachineArn"
-              STATUS: "$.detail.status"
-              STARTDATE: "$.detail.startDate"
-              STOPDATE: "$.detail.stopDate"
+              executionArn: "$.detail.executionArn"
+              stateMachineArn: "$.detail.stateMachineArn"
+              status: "$.detail.status"
+              startDate: "$.detail.startDate"
+              stopDate: "$.detail.stopDate"
             InputTemplate: |
               {
                 "FAILEDEXECUTIONARN": <executionArn>,
@@ -2952,13 +2952,12 @@ Resources:
         DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
       TracingConfiguration:
         Enabled: false
-#      LoggingConfiguration:
-#        Level: ERROR
-#        IncludeExecutionData: true
-#        Destinations:
-#          - CloudWatchLogsLogGroup:
-#              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
-
+      LoggingConfiguration:
+        Level: ERROR
+        IncludeExecutionData: true
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
   RetryAlgorithmStateMachineRole:
     Type: AWS::IAM::Role
     Properties:
