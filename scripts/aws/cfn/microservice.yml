@@ -1276,18 +1276,20 @@ Resources:
           
           InputTransformer:
             InputPathsMap:
-              executionArn: "$.detail.executionArn"
-              stateMachineArn: "$.detail.stateMachineArn"
-              status: "$.detail.status"
-              startDate: "$.detail.startDate"
-              stopDate: "$.detail.stopDate"
+              FAILEDEXECUTIONARN: "$.detail.executionArn"
+              STATEMACHINEARN: "$.detail.stateMachineArn"
+              STATUS: "$.detail.status"
+              STARTDATE: "$.detail.startDate"
+              STOPDATE: "$.detail.stopDate"
             InputTemplate: |
               {
-                "failedExecutionArn": <executionArn>,
-                "stateMachineArn": <stateMachineArn>,
-                "status": <status>,
-                "startDate": <startDate>,
-                "stopDate": <stopDate>
+                "FAILEDEXECUTIONARN": <executionArn>,
+                "STATEMACHINEARN": <stateMachineArn>,
+                "STATUS": <status>,
+                "STARTDATE": <startDate>,
+                "STOPDATE": <stopDate>,
+                "SKIP_STEP_EXECUTION_CHECK": false,
+                "DELIVERY_DATE": null
               }
      
   RetryAlgorithmStateMachineEventRole:
@@ -2932,7 +2934,7 @@ Resources:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
       DefinitionSubstitutions:
-        PerRunRetryLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+        PreRunRetryLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
         DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
         DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
         ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
