@@ -299,7 +299,7 @@ Parameters:
 
   LambdaRuntime:
     Type: String
-    Default: nodejs20.x
+    Default: nodejs24.x
     Description: Runtime for Lambdas.
 
   KinesisPaperDeliveryLambdaDLQARN:
@@ -393,6 +393,10 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  PreRunRetryLambdaName:
+    Type: String
+    Description: 'PreRunRetryLambdaName function name'
+
   PreRunAlgorithmLambdaName:
     Type: String
     Description: 'PreRunAlgorithmLambdaName function name'
@@ -443,13 +447,21 @@ Parameters:
       - DISABLED
     Description: 'State of the DelayerStartWorkflowRule'
 
-  DelayerToPaperChannelDailyScheduleRuleState:
+  DelayerToPaperChannelFirstSchedulerState:
     Type: String
     Default: DISABLED
     AllowedValues:
       - ENABLED
       - DISABLED
-    Description: 'State of the DelayerToPaperChannelDailyScheduleRuleState'
+    Description: 'State of the DelayerToPaperChannelFirstScheduler state'
+
+  DelayerToPaperChannelSecondSchedulerState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the DelayerToPaperChannelSecondScheduler state'
 
   ProvinceTableName:
     Type: String
@@ -610,10 +622,27 @@ Parameters:
     Type: String
     Description: 'SwitchOffAlgorithmLambda function name'
 
-  EnablePaperDeliveryLambdaKinesisSource:
-    Type: String
-    AllowedValues: [ "true", "false" ]
-    Default: "true"
+  SwitchOffAlgorithmWaitSeconds:
+    Type: Number
+    Description: 'Wait time in seconds before re run SwitchOffAlgorithmLambda'
+    Default: 3600
+
+  SwitchOffAlgorithmLambdaExecutionLimit:
+    Type: Number
+    Description: 'Maximum number of executions for SwitchOffAlgorithmLambda'
+    Default: 5000
+
+#  PaperDeliveryStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Paper Delivery State Machine'
+#
+#  DelayerToPaperChannelStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
+#
+#  RetryAlgorithmStateMachineLogGroupARN:
+#    Type: String
+#    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
 
   ResetUsedDataGlueJobName:
     Type: String
@@ -627,9 +656,16 @@ Parameters:
       - DISABLED
     Description: 'State of the RetryAlgorithmStateMachineRuleState'
 
+  PnCoreEventBusToDelayerInputsKinesisStatus:
+    Type: String
+    Default: ENABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'EventBridge Rule To toDelayerInputKinesis'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
-    PaperDeliveryLambdaKinesisSourceEnabled: !Equals [ !Ref EnablePaperDeliveryLambdaKinesisSource, "true" ]
 
 Resources:
   SenderLimitComputeEnvironment:
@@ -1381,6 +1417,7 @@ Resources:
       Description: Route Events from pn-core-event-bus to kinesis
       RoleArn: !GetAtt "DelayerInputsRole.Arn"
       EventBusName: !Sub '${ProjectName}-CoreEventBus'
+      State: !Ref PnCoreEventBusToDelayerInputsKinesisStatus
       EventPattern:
         detail-type: [ "PreparePhaseOneOutcomeEvent" ]
       Targets:
@@ -1588,7 +1625,6 @@ Resources:
   PaperDeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      Enabled: !If [ PaperDeliveryLambdaKinesisSourceEnabled , true, false]
       BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref PnDelayerInputsKinesisDataStreamArn
@@ -2074,6 +2110,86 @@ Resources:
               - !Sub "${PaperDeliveryTableArn}/*"
 
   #########################################################
+  ###                  PreRunRetryLambdaName                   ###
+  #########################################################
+
+  PreRunRetryLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${PreRunRetryLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  PreRunRetryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref PreRunRetryLambdaName
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/preRunRetryLambda.zip"
+      Role: !GetAtt PreRunRetryLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          DELAYER_TO_PAPER_CHANNEL_FIRST_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
+          DELAYER_TO_PAPER_CHANNEL_SECOND_SCHEDULER: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
+          RETRY_ALGORITHM_STATE_MACHINE_ARN: !Ref RetryAlgorithmStateMachine
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 10
+
+  # Lambda function role
+  PreRunRetryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-PreRunRetryLambdaNameRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  PreRunRetryLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-PreRunRetryLambdaPolicy
+      Roles:
+        - !Ref PreRunRetryLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - states:ListExecutions
+            Resource: !Ref RetryAlgorithmStateMachine
+          - Effect: Allow
+            Action:
+              - scheduler:GetSchedule
+            Resource:
+              - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
+              - !GetAtt DelayerToPaperChannelDailySecondScheduler.Arn
+
+
+  PreRunRetryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PreRunRetryLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  #########################################################
   ###         PreRunAlgorithmLambda                ###
   #########################################################
 
@@ -2197,11 +2313,12 @@ Resources:
           QUERY_LIMIT: !Ref PaperDeliveryQueryLimit
           DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
           PAPER_DELIVERY_PRIORITY_PARAMETER: "{{resolve:ssm:/config/pn-delayer/paper-delivery-priority}}"
+          DELAY_SECONDS: !Ref SwitchOffAlgorithmWaitSeconds
       TracingConfig:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-      Timeout: 10
+      Timeout: 900 #15 min
 
   # Lambda function role
   SwitchOffAlgorithmLambdaRole:
@@ -2273,11 +2390,15 @@ Resources:
           REGION: !Sub ${AWS::Region}
           DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
           KINESIS_BATCHSIZE: !Ref KinesisNotificationCancellationLambdaBatchSize
-          TIMELINE_SERVICE_BASE_PATH: !Ref ApplicationLoadBalancerDomain
+          TIMELINE_SERVICE_BASE_PATH: !Sub 'http://${ApplicationLoadBalancerDomain}:8080'
       TracingConfig:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt KinesisNotificationCancellationLambdaSecGroup.GroupId
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
       Timeout: 10
 
   # Lambda function role
@@ -2296,6 +2417,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 
   # Lambda function IAM policy
   KinesisNotificationCancellationLambdaPolicy:
@@ -2362,7 +2484,6 @@ Resources:
                   "tableName": ["pn-Timelines"],
                   "dynamodb": {
                     "NewImage": {
-                      "reworkId": { "S": [ { "exists": true } ] },
                       "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] }
                     }
                   }
@@ -2422,7 +2543,7 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   # Lambda function IAM policy
   ExportDelayerDataLambdaPolicy:
@@ -2452,7 +2573,7 @@ Resources:
               - s3:GetObject
             Resource:
               - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/postalizzazione/*"
-              
+
   ExportDelayerDataLambdaAlarms:
     DependsOn:
       - ExportDelayerDataLambda
@@ -2526,7 +2647,7 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
   # Lambda function IAM policy
   ExportDryRunDashboardDataLambdaPolicy:
@@ -2607,43 +2728,26 @@ Resources:
       SourceAccount: !Ref "AWS::AccountId"
       SourceArn: !GetAtt ExportDryRunDashboardDataLambdaSchedule.Arn
 
-  RetryAlgorithmStateMachine:
+  SwitchOffAlgorithmStateMachine:
     Type: AWS::StepFunctions::StateMachine
     DependsOn:
-      - RetryAlgorithmStateMachinePolicy
+      - SwitchOffAlgorithmStateMachinePolicy
     Properties:
-      StateMachineName: RetryAlgorithmStateMachine
-      RoleArn: !GetAtt RetryAlgorithmStateMachineRole.Arn
+      StateMachineName: SwitchOffAlgorithmStateMachine
+      RoleArn: !GetAtt SwitchOffAlgorithmStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Ref MicroserviceBucketName
-        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
-        DefinitionSubstitutions:
-          DelayerToPaperChannelDailyFirstScheduler: !Ref DelayerToPaperChannelDailyFirstScheduler
-          DelayerToPaperChannelFirstScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
-          DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
-          DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
-          DelayerToPaperChannelDailySecondScheduler:  !Ref DelayerToPaperChannelDailySecondScheduler
-          DelayerToPaperChannelSecondScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
-          ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
-          BatchWorkflowStateMachineArn: !Ref PaperDeliveryStateMachine
-          PaperDeliveryTableName: !Ref PaperDeliveryTableName
-          PaperDeliveryDriverCapacitiesTableName: !Ref PaperDeliveryDriverCapacitiesTableName
-          PaperDeliveryDriverUsedCapacitiesTableName: !Ref PaperDeliveryDriverUsedCapacitiesTableName
-          PaperDeliverySenderLimitTableName: !Ref PaperDeliverySenderLimitTableName
-          PaperDeliveryUsedSenderLimitTableName: !Ref PaperDeliveryUsedSenderLimitTableName
-          PaperDeliveryCounterTableName: !Ref PaperDeliveryCounterTableName
-          PrintCapacity: !Ref PrintCapacity
-          DelayerToPaperChannelFirstSchedulerCron: !Ref DelayerToPaperChannelFirstSchedulerCron
-          DelayerToPaperChannelSecondSchedulerCron: !Ref DelayerToPaperChannelSecondSchedulerCron
-          DelayerToPaperChannelFirstSchedulerStartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
-          DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
-        TracingConfiguration:
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/SwitchOffStateMachine.json"
+      DefinitionSubstitutions:
+        SwitchOffAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
+        SwitchOffAlgorithmLambdaExecutionLimit: !Ref SwitchOffAlgorithmLambdaExecutionLimit
+      TracingConfiguration:
           Enabled: false
 
-  RetryAlgorithmStateMachineRole:
+  SwitchOffAlgorithmStateMachineRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
+      RoleName: !Sub ${ProjectName}-delayer-switchOffAlgorithmStateMachineRole
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -2655,34 +2759,20 @@ Resources:
               - sts:AssumeRole
 
     # Lambda function IAM policy
-  RetryAlgorithmStateMachinePolicy:
+  SwitchOffAlgorithmStateMachinePolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachinePolicy
+      PolicyName: !Sub ${ProjectName}-delayer-switchOffAlgorithmStateMachinePolicy
       Roles:
-        - !Ref RetryAlgorithmStateMachineRole
+        - !Ref SwitchOffAlgorithmStateMachineRole
       PolicyDocument:
         Version: 2012-10-17
         Statement:
           - Effect: Allow
             Action:
-              - scheduler:UpdateSchedule
+              - lambda:InvokeFunction
             Resource:
-              - !Ref DelayerToPaperChannelDailyFirstScheduler
-              - !Ref DelayerToPaperChannelDailySecondScheduler
-          - Effect: Allow
-            Action:
-              - glue:StartJobRun
-              - glue:GetJobRun
-              - glue:GetJobRuns
-              - glue:BatchStopJobRun
-            Resource:
-              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ResetUsedDataGlueJobName}"
-          - Effect: Allow
-            Action:
-              - states:StartExecution
-            Resource:
-              - !Ref PaperDeliveryStateMachine
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SwitchOffAlgorithmLambdaName}
 
   PaperDeliveryStateMachine:
     Type: AWS::StepFunctions::StateMachine
@@ -2691,431 +2781,26 @@ Resources:
     Properties:
       StateMachineName: BatchWorkflowStateMachine
       RoleArn: !GetAtt PaperDeliveryStateMachineRole.Arn
-      Definition:
-        Comment: "Paper Delivery State Machine"
-        StartAt: PreRunAlgorithmLambda
-        States:
-          PreRunAlgorithmLambda:
-            Type: Task
-            Resource: arn:aws:states:::lambda:invoke
-            Parameters:
-              Payload:
-                deliveryWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYWEEK
-              FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
-            Retry:
-              - ErrorEquals:
-                  - Lambda.ServiceException
-                  - Lambda.AWSLambdaException
-                  - Lambda.SdkClientException
-                  - Lambda.TooManyRequestsException
-                IntervalSeconds: 1
-                MaxAttempts: 3
-                BackoffRate: 2
-                JitterStrategy: FULL
-            Next: DynamoDB PutItem
-            ResultSelector:
-              deliveryWeek.$: $.Payload
-            ResultPath: $.preRunAlgorithmResponse
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-
-          DynamoDB PutItem:
-            Type: Task
-            Resource: arn:aws:states:::dynamodb:putItem
-            Parameters:
-              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
-              Item:
-                pk:
-                  S: PRINT
-                sk:
-                  S.$: $.preRunAlgorithmResponse.deliveryWeek
-                numberOfShipments:
-                  N: "0"
-                weeklyPrintCapacity:
-                  N: "0"
-                dailyPrintCapacity:
-                  N: "0"
-                dailyExecutionNumber:
-                  N: "0"
-                dailyExecutionCounter:
-                  N: "0"
-                sentToNextWeek:
-                  N: "0"
-                sentToPhaseTwo:
-                  N: "0"
-                stopSendToPhaseTwo:
-                  BOOL: "true"
-                lastEvaluatedKeyPhase2:
-                  M: { }
-                lastEvaluatedKeyNextWeek:
-                  M: { }
-            Next: GetActiveTender
-            Retry:
-              - ErrorEquals:
-                  - States.ALL
-                BackoffRate: 2
-                IntervalSeconds: 1
-                MaxAttempts: 3
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-            ResultPath: $.toDiscard
-          GetActiveTender:
-            Type: Task
-            Resource: arn:aws:states:::lambda:invoke
-            Parameters:
-              FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
-              Payload:
-                operation: GET_TENDER_ACTIVE
-            Retry:
-              - ErrorEquals:
-                  - Lambda.ServiceException
-                  - Lambda.AWSLambdaException
-                  - Lambda.SdkClientException
-                  - Lambda.TooManyRequestsException
-                IntervalSeconds: 1
-                MaxAttempts: !Ref StepFunctionStateMaxAttempts
-                BackoffRate: 2
-                JitterStrategy: FULL
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-            Next: retrieveProvince
-            ResultSelector:
-              actualTenderId.$: $.Payload.body.tenderId
-              deliveryWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYWEEK
-              paperDeliveryTableName.$: $$.Execution.Input.PAPERDELIVERY_TABLENAME
-              paperDeliveryDriverCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERCAPACITIES_TABLENAME
-              paperDeliveryDriverUsedCapacitiesTableName.$: $$.Execution.Input.PAPERDELIVERYDRIVERUSEDCAPACITIES_TABLENAME
-              paperDeliveryCounterTableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
-              paperDeliverySenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYSENDERLIMIT_TABLENAME
-              paperDeliveryUsedSenderLimitTableName.$: $$.Execution.Input.PAPERDELIVERYUSEDSENDERLIMIT_TABLENAME
-              deliveryDateDayOfWeek.$: $$.Execution.Input.PN_DELAYER_DELIVERYDATEDAYOFWEEK
-              printCapacity.$: $$.Execution.Input.PN_DELAYER_PRINTCAPACITY
-              delayerToPaperChannelFirstSchedulerCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
-              delayerToPaperChannelSecondSchedulerCron.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
-              delayerToPaperChannelFirstSchedulerStartDate.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
-              delayerToPaperChannelSecondSchedulerStartDate.$: $$.Execution.Input.PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
-          retrieveProvince:
-            Type: Task
-            Resource: arn:aws:states:::aws-sdk:dynamodb:scan
-            Parameters:
-              TableName: pn-PaperChannelProvince
-              ProjectionExpression: province
-            ResultPath: $.provinces
-            Next: MapSubmitSenderLimitJobs
-            Retry:
-              - ErrorEquals:
-                  - States.ALL
-                IntervalSeconds: 1
-                MaxAttempts: !Ref StepFunctionStateMaxAttempts
-                BackoffRate: 2
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-          MapSubmitSenderLimitJobs:
-            Type: Map
-            ItemsPath: $.provinces.Items
-            InputPath: $
-            MaxConcurrency: 5
-            Parameters:
-              province.$: $$.Map.Item.Value.province.S
-              actualTenderId.$: $.actualTenderId
-              deliveryWeek.$: $.deliveryWeek
-              paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
-              paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
-              paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
-              paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
-              paperDeliveryTableName.$: $.paperDeliveryTableName
-              deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-              printCapacity.$: $.printCapacity
-              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
-              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
-              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
-              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
-              paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
-            Iterator:
-              StartAt: submitSenderLimitJob
-              States:
-                submitSenderLimitJob:
-                  Type: Task
-                  Resource: arn:aws:states:::batch:submitJob.sync
-                  Parameters:
-                    JobName.$: States.Format('{}', $.province)
-                    JobQueue: !Ref SenderLimitJobQueue
-                    JobDefinition: !Ref SenderLimitJobDefinition
-                    ContainerOverrides:
-                      Environment:
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
-                          Value.$: $.paperDeliveryCounterTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME
-                          Value.$: $.paperDeliverySenderLimitTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME
-                          Value.$: $.paperDeliveryUsedSenderLimitTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
-                          Value.$: $.paperDeliveryDriverCapacitiesTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
-                          Value.$: $.paperDeliveryTableName
-                        - Name: PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCE
-                          Value.$: $.province
-                        - Name: PN_DELAYER_ACTUALTENDERID
-                          Value.$: $.actualTenderId
-                        - Name: PN_DELAYER_WORKFLOWSTEP
-                          Value: EVALUATE_SENDER_LIMIT
-                        - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
-                          Value.$: $.deliveryDateDayOfWeek
-                        - Name: PN_DELAYER_PRINTCAPACITY
-                          Value.$: $.printCapacity
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
-                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
-                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
-                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
-                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
-                        - Name: PN_DELAYER_DELIVERYWEEK
-                          Value.$: $.deliveryWeek
-#                  Retry:
-#                    - ErrorEquals:
-#                        - States.ALL
-#                      IntervalSeconds: 1
-#                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
-#                      BackoffRate: 2
-                  Catch:
-                    - ErrorEquals:
-                        - States.ALL
-                      Next: SenderLimitJobFail
-                  OutputPath: $.Status
-                  End: true
-                SenderLimitJobFail:
-                  Type: Fail
-            ResultPath: $.ignoredMapResult
-            Next: GetUnifiedDeliveryDriverProvinceParameter
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-          GetUnifiedDeliveryDriverProvinceParameter:
-            Type: Task
-            Resource: arn:aws:states:::aws-sdk:ssm:getParameter
-            Parameters:
-              Name: !Ref UnifiedDeliveryDriverProvinceParameter
-              WithDecryption: true
-            ResultSelector:
-              unifiedDeliveryDrivers.$: States.StringToJson($.Parameter.Value)
-            ResultPath: $.tempGetParameterResult
-            Next: CleanUpInput
-            Retry:
-              - ErrorEquals:
-                  - States.ALL
-                IntervalSeconds: 1
-                MaxAttempts: !Ref StepFunctionStateMaxAttempts
-                BackoffRate: 2
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-          CleanUpInput:
-            Type: Pass
-            Parameters:
-              paperDeliveryTableName.$: $.paperDeliveryTableName
-              deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-              paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
-              actualTenderId.$: $.actualTenderId
-              deliveryWeek.$: $.deliveryWeek
-              paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
-              paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
-              paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
-              paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
-              unifiedDeliveryDrivers.$: $.tempGetParameterResult.unifiedDeliveryDrivers
-              printCapacity.$: $.printCapacity
-              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
-              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
-              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
-              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
-            Next: MapSubmitEvaluateDriverCapacityJobs
-          MapSubmitEvaluateDriverCapacityJobs:
-            Type: Map
-            ItemsPath: $.unifiedDeliveryDrivers
-            InputPath: $
-            MaxConcurrency: 40
-            Parameters:
-              driver.$: $$.Map.Item.Value.driver
-              provinces.$: $$.Map.Item.Value.provinces
-              actualTenderId.$: $.actualTenderId
-              deliveryWeek.$: $.deliveryWeek
-              paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
-              paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
-              paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
-              paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
-              paperDeliveryTableName.$: $.paperDeliveryTableName
-              deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-              printCapacity.$: $.printCapacity
-              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
-              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
-              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
-              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
-              paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
-            Iterator:
-              StartAt: submitEvaluateDriverCapacityJob
-              States:
-                submitEvaluateDriverCapacityJob:
-                  Type: Task
-                  Resource: arn:aws:states:::batch:submitJob.sync
-                  Parameters:
-                    JobName.$: $.driver
-                    JobQueue: !Ref DriverCapacityJobQueue
-                    JobDefinition: !Ref DriverCapacityJobDefinition
-                    ArrayProperties:
-                      Size.$: States.ArrayLength($.provinces)
-                    ContainerOverrides:
-                      Environment:
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
-                          Value.$: $.paperDeliveryDriverCapacitiesTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
-                          Value.$: $.paperDeliveryDriverUsedCapacitiesTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
-                          Value.$: $.paperDeliveryCounterTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
-                          Value.$: $.paperDeliveryTableName
-                        - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
-                          Value.$: $.deliveryDateDayOfWeek
-                        - Name: PN_DELAYER_PRINTCAPACITY
-                          Value.$: $.printCapacity
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
-                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
-                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
-                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
-                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
-                        - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
-                          Value.$: $.driver
-                        - Name: PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST
-                          Value.$: States.JsonToString($.provinces)
-                        - Name: PN_DELAYER_ACTUALTENDERID
-                          Value.$: $.actualTenderId
-                        - Name: PN_DELAYER_WORKFLOWSTEP
-                          Value: EVALUATE_DRIVER_CAPACITY
-                        - Name: PN_DELAYER_DELIVERYWEEK
-                          Value.$: $.deliveryWeek
-#                  Retry:
-#                    - ErrorEquals:
-#                        - States.ALL
-#                      IntervalSeconds: 1
-#                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
-#                      BackoffRate: 2
-                  Catch:
-                    - ErrorEquals:
-                        - States.ALL
-                      Next: EvaluateDriverCapacityFail
-                  End: true
-                  OutputPath: $.Status
-                EvaluateDriverCapacityFail:
-                  Type: Fail
-            ResultPath: $.ignoredMapResult
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-            Next: MapSubmitEvaluateResidualCapacityJobs
-          MapSubmitEvaluateResidualCapacityJobs:
-            Type: Map
-            ItemsPath: $.unifiedDeliveryDrivers
-            InputPath: $
-            MaxConcurrency: 40
-            Parameters:
-              driver.$: $$.Map.Item.Value.driver
-              provinces.$: $$.Map.Item.Value.provinces
-              actualTenderId.$: $.actualTenderId
-              deliveryWeek.$: $.deliveryWeek
-              paperDeliveryCounterTableName.$: $.paperDeliveryCounterTableName
-              paperDeliverySenderLimitTableName.$: $.paperDeliverySenderLimitTableName
-              paperDeliveryUsedSenderLimitTableName.$: $.paperDeliveryUsedSenderLimitTableName
-              paperDeliveryDriverCapacitiesTableName.$: $.paperDeliveryDriverCapacitiesTableName
-              paperDeliveryTableName.$: $.paperDeliveryTableName
-              deliveryDateDayOfWeek.$: $.deliveryDateDayOfWeek
-              printCapacity.$: $.printCapacity
-              delayerToPaperChannelFirstSchedulerCron.$: $.delayerToPaperChannelFirstSchedulerCron
-              delayerToPaperChannelSecondSchedulerCron.$: $.delayerToPaperChannelSecondSchedulerCron
-              delayerToPaperChannelFirstSchedulerStartDate.$: $.delayerToPaperChannelFirstSchedulerStartDate
-              delayerToPaperChannelSecondSchedulerStartDate.$: $.delayerToPaperChannelSecondSchedulerStartDate
-              paperDeliveryDriverUsedCapacitiesTableName.$: $.paperDeliveryDriverUsedCapacitiesTableName
-            Iterator:
-              StartAt: submitEvaluateResidualCapacityJob
-              States:
-                submitEvaluateResidualCapacityJob:
-                  Type: Task
-                  Resource: arn:aws:states:::batch:submitJob.sync
-                  Parameters:
-                    JobName.$: $.driver
-                    JobQueue: !Ref ResidualCapacityJobQueue
-                    JobDefinition: !Ref ResidualCapacityJobDefinition
-                    ArrayProperties:
-                      Size.$: States.ArrayLength($.provinces)
-                    ContainerOverrides:
-                      Environment:
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME
-                          Value.$: $.paperDeliveryDriverCapacitiesTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME
-                          Value.$: $.paperDeliveryDriverUsedCapacitiesTableName
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
-                          Value.$: $.paperDeliveryTableName
-                        - Name: PN_DELAYER_DELIVERYDATEDAYOFWEEK
-                          Value.$: $.deliveryDateDayOfWeek
-                        - Name: PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER
-                          Value.$: $.driver
-                        - Name: PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_PROVINCELIST
-                          Value.$: States.JsonToString($.provinces)
-                        - Name: PN_DELAYER_ACTUALTENDERID
-                          Value.$: $.actualTenderId
-                        - Name: PN_DELAYER_WORKFLOWSTEP
-                          Value: EVALUATE_RESIDUAL_CAPACITY
-                        - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
-                          Value.$: $.paperDeliveryCounterTableName
-                        - Name: PN_DELAYER_PRINTCAPACITY
-                          Value.$: $.printCapacity
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON
-                          Value.$: $.delayerToPaperChannelFirstSchedulerCron
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON
-                          Value.$: $.delayerToPaperChannelSecondSchedulerCron
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE
-                          Value.$: $.delayerToPaperChannelFirstSchedulerStartDate
-                        - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
-                          Value.$: $.delayerToPaperChannelSecondSchedulerStartDate
-                        - Name: PN_DELAYER_DELIVERYWEEK
-                          Value.$: $.deliveryWeek
-#                  Retry:
-#                    - ErrorEquals:
-#                        - States.ALL
-#                      IntervalSeconds: 1
-#                      MaxAttempts: !Ref StepFunctionStateMaxAttempts
-#                      BackoffRate: 2
-                  Catch:
-                    - ErrorEquals:
-                        - States.ALL
-                      Next: EvaluateResidualCapacityFail
-                  End: true
-                  OutputPath: $.Status
-                EvaluateResidualCapacityFail:
-                  Type: Fail
-            ResultPath: $.ignoredMapResult
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: WorkflowFail
-            Next: WorkflowSuccess
-          WorkflowFail:
-            Type: Fail
-          WorkflowSuccess:
-            Type: Succeed
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/BatchWorkflowStateMachine.json"
+      DefinitionSubstitutions:
+        TenderAPILambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+        UnifiedDeliveryDriverProvinceParameter: !Ref UnifiedDeliveryDriverProvinceParameter
+        PnDelayerDriverCapacityJobDefinition: !Ref DriverCapacityJobDefinition
+        PnDelayerDriverCapacityJobQueue: !Ref DriverCapacityJobQueue
+        PnDelayerResidualCapacityJobDefinition: !Ref ResidualCapacityJobDefinition
+        PnDelayerResidualCapacityJobQueue: !Ref ResidualCapacityJobQueue
+        PnDelayerSenderLimitJobDefinition: !Ref SenderLimitJobDefinition
+        PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
+      TracingConfiguration:
+          Enabled: false
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref PaperDeliveryStateMachineLogGroupARN
 
   PaperDeliveryStateMachineRole:
     Type: AWS::IAM::Role
@@ -3176,7 +2861,6 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
-                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
             - Effect: Allow
               Action:
                 - events:PutRule
@@ -3188,13 +2872,137 @@ Resources:
                 - events:ListTagsForResource
                 - events:PutPermission
               Resource: "*"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogDelivery
+                - logs:GetLogDelivery
+                - logs:UpdateLogDelivery
+                - logs:DeleteLogDelivery
+                - logs:ListLogDeliveries
+                - logs:PutResourcePolicy
+                - logs:DescribeResourcePolicies
+                - logs:DescribeLogGroups
+              Resource: "*"
+
+  RetryAlgorithmStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - RetryAlgorithmStateMachinePolicy
+    Properties:
+      StateMachineName: RetryAlgorithmStateMachine
+      RoleArn: !GetAtt RetryAlgorithmStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
+      DefinitionSubstitutions:
+        PerRunRetryLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+        DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
+        DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+        ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
+        BatchWorkflowStateMachineArn: !Ref PaperDeliveryStateMachine
+        PaperDeliveryTableName: !Ref PaperDeliveryTableName
+        PaperDeliveryDriverCapacitiesTableName: !Ref PaperDeliveryDriverCapacitiesTableName
+        PaperDeliveryDriverUsedCapacitiesTableName: !Ref PaperDeliveryDriverUsedCapacitiesTableName
+        PaperDeliverySenderLimitTableName: !Ref PaperDeliverySenderLimitTableName
+        PaperDeliveryUsedSenderLimitTableName: !Ref PaperDeliveryUsedSenderLimitTableName
+        PaperDeliveryCounterTableName: !Ref PaperDeliveryCounterTableName
+        PrintCapacity: !Ref PrintCapacity
+        DelayerToPaperChannelFirstSchedulerCron: !Ref DelayerToPaperChannelFirstSchedulerCron
+        DelayerToPaperChannelSecondSchedulerCron: !Ref DelayerToPaperChannelSecondSchedulerCron
+        DelayerToPaperChannelFirstSchedulerStartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
+        DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+      TracingConfiguration:
+        Enabled: false
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
+
+  RetryAlgorithmStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+    # Lambda function IAM policy
+  RetryAlgorithmStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-delayer-retryAlgorithmStateMachinePolicy
+      Roles:
+        - !Ref RetryAlgorithmStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - scheduler:UpdateSchedule
+            Resource:
+              - !GetAtt DelayerToPaperChannelDailyFirstScheduler.Arn
+              - !GetAtt DelayerToPaperChannelDailySecondScheduler.Arn
+          - Effect: Allow
+            Action:
+              - glue:StartJobRun
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:BatchStopJobRun
+            Resource:
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ResetUsedDataGlueJobName}
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+              - !Ref PaperDeliveryStateMachine
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+          - Effect: Allow
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DescribeRule
+              - events:DeleteRule
+              - events:RemoveTargets
+              - events:TagResource
+              - events:ListTagsForResource
+              - events:PutPermission
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogDelivery
+              - logs:GetLogDelivery
+              - logs:UpdateLogDelivery
+              - logs:DeleteLogDelivery
+              - logs:ListLogDeliveries
+              - logs:PutResourcePolicy
+              - logs:DescribeResourcePolicies
+              - logs:DescribeLogGroups
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
+
 
   DelayerToPaperChannelDailyFirstScheduler:
     Type: AWS::Scheduler::Schedule
     Properties:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailyFirstScheduler'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelFirstSchedulerCron})
-      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      State: !Ref DelayerToPaperChannelFirstSchedulerState
       StartDate: !Ref DelayerToPaperChannelFirstSchedulerStartDate
       EndDate: !Ref DelayerToPaperChannelFirstSchedulerEndDate
       FlexibleTimeWindow:
@@ -3214,7 +3022,7 @@ Resources:
     Properties:
       Name: !Sub '${ProjectName}-delayerToPaperChannelDailySecondScheduler'
       ScheduleExpression: !Sub cron(${DelayerToPaperChannelSecondSchedulerCron})
-      State: !Ref DelayerToPaperChannelDailyScheduleRuleState
+      State: !Ref DelayerToPaperChannelSecondSchedulerState
       StartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
       EndDate: !Ref DelayerToPaperChannelSecondSchedulerEndDate
       FlexibleTimeWindow:
@@ -3255,318 +3063,24 @@ Resources:
     Properties:
       StateMachineName: DelayerToPaperChannelStateMachine
       RoleArn: !GetAtt DelayerToPaperChannelStateMachineRole.Arn
-      Definition:
-        Comment: Delayer to paper channel State Machine
-        StartAt: RetrieveCounter
-        States:
-          RetrieveCounter:
-            Type: Task
-            Resource: arn:aws:states:::aws-sdk:dynamodb:query
-            Parameters:
-              ExpressionAttributeValues:
-                ":pk":
-                  S: "PRINT"
-              KeyConditionExpression: "pk = :pk"
-              Limit: 1
-              ScanIndexForward: false
-              TableName.$: $$.Execution.Input.PAPERDELIVERYCOUNTER_TABLENAME
-            ResultPath: $.queryResult
-            Retry:
-              - ErrorEquals:
-                  - States.ALL
-                IntervalSeconds: 1
-                BackoffRate: 2
-                MaxAttempts: 2
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: RetrieveCounterOperationFail
-            Next: CheckIfCounterExists
-
-          CheckIfCounterExists:
-            Type: Choice
-            Choices:
-              - Variable: $.queryResult.Count
-                NumericGreaterThan: 0
-                Next: MapItem
-            Default: NoItemToProcess
-
-          RetrieveCounterOperationFail:
-            Type: Fail
-
-          UpdateCounterOperationFail:
-            Type: Fail
-
-          MapItem:
-            Type: Pass
-            Next: Parallel
-            Parameters:
-              paperDeliveryTableName.$: $.PAPERDELIVERY_TABLENAME
-              paperDeliveryCountersTableName.$: $.PAPERDELIVERYCOUNTER_TABLENAME
-              fixed:
-                dailyPrintCapacity.$: States.StringToJson($.queryResult.Items[0].dailyPrintCapacity.N)
-                executionDate.$: $$.Execution.StartTime
-                numberOfShipments.$: States.StringToJson($.queryResult.Items[0].numberOfShipments.N)
-                pk.$: $.queryResult.Items[0].pk.S
-                weeklyPrintCapacity.$: States.StringToJson($.queryResult.Items[0].weeklyPrintCapacity.N)
-                sentToNextWeek.$: States.StringToJson($.queryResult.Items[0].sentToNextWeek.N)
-                sentToPhaseTwo.$: States.StringToJson($.queryResult.Items[0].sentToPhaseTwo.N)
-                sk.$: $.queryResult.Items[0].sk.S
-                dailyExecutions.$: States.StringToJson($.queryResult.Items[0].dailyExecutionNumber.N)
-                dailyExecutionCounter.$: States.StringToJson($.queryResult.Items[0].dailyExecutionCounter.N)
-              variable:
-                sendToNextStepCounter: 0
-                sendToNextWeekCounter: 0
-                lastEvaluatedKeyNextWeek.$: $.queryResult.Items[0].lastEvaluatedKeyNextWeek.M
-                lastEvaluatedKeyPhase2.$: $.queryResult.Items[0].lastEvaluatedKeyPhase2.M
-                lastExecution: false
-                stopSendToPhaseTwo.$: $.queryResult.Items[0].stopSendToPhaseTwo.Bool
-
-
-          Parallel:
-            Type: Parallel
-            Next: IsLastEvaluatedKeyNextWeekNull
-            ResultPath: $.variable
-            Branches:
-              - StartAt: SendPrintCapacityExceedToNextWeek
-                States:
-                  SendPrintCapacityExceedToNextWeek:
-                    Type: Task
-                    Resource: arn:aws:states:::lambda:invoke
-                    Parameters:
-                      FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
-                      Payload:
-                        variable.$: $.variable
-                        fixed.$: $.fixed
-                        paperDeliveryTableName.$: $.paperDeliveryTableName
-                        executionDate.$: $$.Execution.StartTime
-                        processType: SEND_TO_NEXT_WEEK
-                    ResultSelector:
-                      lastEvaluatedKeyNextWeek.$: $.Payload.lastEvaluatedKeyNextWeek
-                      sendToNextWeekCounter.$: $.Payload.sendToNextWeekCounter
-                      lastExecution.$: $.Payload.lastExecution
-                    ResultPath: $.variable
-                    Retry:
-                      - ErrorEquals:
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                          - Lambda.TooManyRequestsException
-                        IntervalSeconds: 1
-                        BackoffRate: 2
-                        MaxAttempts: 2
-                        JitterStrategy: FULL
-                    Catch:
-                      - ErrorEquals:
-                          - States.ALL
-                        Next: SendPrintCapacityExceedToNextWeekFail
-                    Next: MoreItemsToSendToNextWeek
-
-                  MoreItemsToSendToNextWeek:
-                    Type: Choice
-                    Choices:
-                      - And:
-                          - Not:
-                              Variable: $.variable.lastEvaluatedKeyNextWeek
-                              IsNull: true
-                          - Variable: $.variable.sendToNextWeekCounter
-                            NumericLessThan: 250000
-                        Next: SendPrintCapacityExceedToNextWeek
-                    Default: ToNextWeekSuccessfully
-
-                  SendPrintCapacityExceedToNextWeekFail:
-                    Type: Fail
-
-                  ToNextWeekSuccessfully:
-                    Type: Succeed
-
-              - StartAt: SendPaperDeliveryToPreparePhase2
-                States:
-                  SendPaperDeliveryToPreparePhase2:
-                    Type: Task
-                    Resource: arn:aws:states:::lambda:invoke
-                    Parameters:
-                      FunctionName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
-                      Payload:
-                        variable.$: $.variable
-                        fixed.$: $.fixed
-                        paperDeliveryTableName.$: $.paperDeliveryTableName
-                        executionDate.$: $$.Execution.StartTime
-                        processType: SEND_TO_PHASE_2
-                    ResultSelector:
-                      lastEvaluatedKeyPhase2.$: $.Payload.lastEvaluatedKeyPhase2
-                      sendToNextStepCounter.$: $.Payload.sendToNextStepCounter
-                      lastExecution.$: $.Payload.lastExecution
-                      stopSendToPhaseTwo.$: $.Payload.stopSendToPhaseTwo
-                      numberOfShipmentsPerExecution.$: $.Payload.numberOfShipmentsPerExecution
-                    ResultPath: $.variable
-                    Retry:
-                      - ErrorEquals:
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                          - Lambda.TooManyRequestsException
-                        IntervalSeconds: 1
-                        BackoffRate: 2
-                        MaxAttempts: 2
-                        JitterStrategy: FULL
-                    Catch:
-                      - ErrorEquals:
-                          - States.ALL
-                        Next: SendPaperDeliveryToPreparePhase2Fail
-                    Next: MoreItemsToSendToPreparePhase2
-
-                  MoreItemsToSendToPreparePhase2:
-                    Type: Choice
-                    Choices:
-                      - And:
-                          - Not:
-                              Variable: $.variable.lastEvaluatedKeyPhase2
-                              IsNull: true
-                          - Variable: $.variable.sendToNextStepCounter
-                            NumericLessThanPath: $.fixed.dailyPrintCapacity
-                          - Variable: $.variable.sendToNextStepCounter
-                            NumericLessThanPath: $.variable.numberOfShipmentsPerExecution
-                        Next: SendPaperDeliveryToPreparePhase2
-                    Default: ToPreparePhase2Successfully
-
-                  SendPaperDeliveryToPreparePhase2Fail:
-                    Type: Fail
-
-                  ToPreparePhase2Successfully:
-                    Type: Succeed
-
-            ResultSelector:
-              lastEvaluatedKeyPhase2.$: $[1].variable.lastEvaluatedKeyPhase2
-              sendToNextStepCounter.$: $[1].variable.sendToNextStepCounter
-              lastEvaluatedKeyNextWeek.$: $[0].variable.lastEvaluatedKeyNextWeek
-              sendToNextWeekCounter.$: $[0].variable.sendToNextWeekCounter
-              lastExecution.$: $[1].variable.lastExecution
-              stopSendToPhaseTwo.$: $[1].variable.stopSendToPhaseTwo
-          IsLastEvaluatedKeyNextWeekNull:
-            Type: Choice
-            Choices:
-              - Variable: $.variable.lastEvaluatedKeyNextWeek
-                IsNull: true
-                Next: PatchNextWeekNull
-            Default: IsLastEvaluatedPhase2Null
-
-          IsLastEvaluatedPhase2Null:
-            Type: Choice
-            Choices:
-              - Variable: $.variable.lastEvaluatedKeyPhase2
-                IsNull: true
-                Next: PatchPhase2Null
-            Default: LastExecution
-
-          PatchPhase2Null:
-            Type: Pass
-            Next: LastExecution
-            ResultPath: $.variable
-            Parameters:
-              lastEvaluatedKeyPhase2: { }
-              lastEvaluatedKeyNextWeek.$: $.variable.lastEvaluatedKeyNextWeek
-              sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
-              sendToNextStepCounter.$: $.variable.sendToNextStepCounter
-              lastExecution.$: $.variable.lastExecution
-              stopSendToPhaseTwo: true
-
-          PatchNextWeekNull:
-            Type: Pass
-            Next: IsLastEvaluatedPhase2Null
-            ResultPath: $.variable
-            Parameters:
-              lastEvaluatedKeyNextWeek: { }
-              lastEvaluatedKeyPhase2.$: $.variable.lastEvaluatedKeyPhase2
-              sendToNextWeekCounter.$: $.variable.sendToNextWeekCounter
-              sendToNextStepCounter.$: $.variable.sendToNextStepCounter
-              lastExecution.$: $.variable.lastExecution
-              stopSendToPhaseTwo.$: $.variable.stopSendToPhaseTwo
-          LastExecution:
-            Type: Choice
-            Choices:
-              - And:
-                  - IsPresent: true
-                    Variable: $.variable.lastExecution
-                  - BooleanEquals: true
-                    Variable: $.variable.lastExecution
-                Next: UpdatePaperDeliveryCounterResetExecution
-            Default: UpdatePaperDeliveryCounter
-
-          UpdatePaperDeliveryCounterResetExecution:
-            Type: Task
-            Resource: arn:aws:states:::dynamodb:updateItem
-            Parameters:
-              ExpressionAttributeValues:
-                ":dailyExecutionCounterInc":
-                  N: "0"
-                ":nextWeekVal":
-                  M.$: $.variable.lastEvaluatedKeyNextWeek
-                ":phase2Val":
-                  M.$: $.variable.lastEvaluatedKeyPhase2
-                ":sentToNextWeekInc":
-                  "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
-                ":sentToPhaseTwoInc":
-                  "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
-                ":stopSendToPhaseTwoVal":
-                  BOOL.$: $.variable.stopSendToPhaseTwo
-              Key:
-                pk:
-                  S.$: $.fixed.pk
-                sk:
-                  S.$: $.fixed.sk
-              TableName.$: $.paperDeliveryCountersTableName
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, dailyExecutionCounter = :dailyExecutionCounterInc, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc"
-            End: true
-            Retry:
-              - ErrorEquals:
-                  - States.ALL
-                IntervalSeconds: 1
-                BackoffRate: 2
-                MaxAttempts: 3
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: UpdateCounterOperationFail
-
-          NoItemToProcess:
-            Type: Succeed
-
-          UpdatePaperDeliveryCounter:
-            Type: Task
-            Resource: arn:aws:states:::dynamodb:updateItem
-            Parameters:
-              ExpressionAttributeValues:
-                ":nextWeekVal":
-                  M.$: $.variable.lastEvaluatedKeyNextWeek
-                ":phase2Val":
-                  M.$: $.variable.lastEvaluatedKeyPhase2
-                ":sentToNextWeekInc":
-                  "N.$": "States.Format('{}', $.variable.sendToNextWeekCounter)"
-                ":sentToPhaseTwoInc":
-                  "N.$": "States.Format('{}', $.variable.sendToNextStepCounter)"
-                ":dailyExecutionCounterInc":
-                  N: "1"
-                ":stopSendToPhaseTwoVal":
-                  BOOL.$: $.variable.stopSendToPhaseTwo
-              Key:
-                pk:
-                  S.$: $.fixed.pk
-                sk:
-                  S.$: $.fixed.sk
-              TableName.$: $.paperDeliveryCountersTableName
-              UpdateExpression: "SET lastEvaluatedKeyPhase2 = :phase2Val, lastEvaluatedKeyNextWeek = :nextWeekVal, stopSendToPhaseTwo = :stopSendToPhaseTwoVal ADD sentToNextWeek :sentToNextWeekInc, sentToPhaseTwo :sentToPhaseTwoInc, dailyExecutionCounter :dailyExecutionCounterInc"
-            Retry:
-              - ErrorEquals:
-                  - States.ALL
-                IntervalSeconds: 1
-                BackoffRate: 2
-                MaxAttempts: 2
-            Catch:
-              - ErrorEquals:
-                  - States.ALL
-                Next: UpdateCounterOperationFail
-            End: true
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/DelayerToPaperChannelStateMachine.json"
+      DefinitionSubstitutions:
+        DelayerToPaperChannelLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}
+        PreRunAlgorithmLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
+        DelayerToPaperChannelFirstSchedulerEndDate: !Ref DelayerToPaperChannelFirstSchedulerEndDate
+        PaperDeliveryCounterTableName: !Ref PaperDeliveryCounterTableName
+        PaperDeliveryTableName: !Ref PaperDeliveryTableName
+        DeliveryDateDayOfWeek: !Ref DeliveryDateDayOfWeek
+      TracingConfiguration:
+        Enabled: false
+#      LoggingConfiguration:
+#        Level: ERROR
+#        IncludeExecutionData: true
+#        Destinations:
+#          - CloudWatchLogsLogGroup:
+#              LogGroupArn: !Ref DelayerToPaperChannelStateMachineLogGroupARN
 
   DelayerToPaperChannelStateMachineRole:
     Type: AWS::IAM::Role
@@ -3593,8 +3107,8 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - dynamodb:Query
               - dynamodb:UpdateItem
+              - dynamodb:GetItem
             Resource:
               - !Sub "${PaperDeliveryCounterTableArn}"
               - !Sub "${PaperDeliveryCounterTableArn}/*"
@@ -3603,6 +3117,29 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DelayerToPaperChannelLambdaName}"
+              - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}"
+          - Effect: Allow
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DescribeRule
+              - events:DeleteRule
+              - events:RemoveTargets
+              - events:TagResource
+              - events:ListTagsForResource
+              - events:PutPermission
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogDelivery
+              - logs:GetLogDelivery
+              - logs:UpdateLogDelivery
+              - logs:DeleteLogDelivery
+              - logs:ListLogDeliveries
+              - logs:PutResourcePolicy
+              - logs:DescribeResourcePolicies
+              - logs:DescribeLogGroups
+            Resource: "*"
 
   DelayerToPaperChannelPipe:
     Type: AWS::Pipes::Pipe
@@ -3709,6 +3246,10 @@ Resources:
         ScriptLocation: !Sub "s3://${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/LightAlgorithmScript.py"
         PythonVersion: "3"
       DefaultArguments:
+        "--first-scheduler-start-date": !Ref DelayerToPaperChannelFirstSchedulerStartDate
+        "--second-scheduler-start-date": !Ref DelayerToPaperChannelSecondSchedulerStartDate
+        "--first-scheduler-cron": !Ref DelayerToPaperChannelFirstSchedulerCron
+        "--second-scheduler-cron": !Ref DelayerToPaperChannelSecondSchedulerCron
         "--job-language": "python"
         "--paper-delivery-table-name": !Ref PaperDeliveryTableName
         "--province-table-name": !Ref ProvinceTableName
@@ -3762,6 +3303,90 @@ Resources:
                   - !Sub "${PaperDeliveryCounterTableArn}/*"
               - Effect: Allow
                 Action:
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "${ProvinceTableArn}"
+                  - !Sub "${ProvinceTableArn}/*"
+              - Effect: Allow
+                Action:
                   - ssm:GetParameter
                 Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PaperDeliveryPriorityParameterName}
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/LightAlgorithmScript.py"
+
+  ResetUsedDataGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Ref ResetUsedDataGlueJobName
+      Role: !GetAtt ResetUsedDataGlueJobRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"
+        PythonVersion: "3"
+      DefaultArguments:
+        "--job-language": "python"
+        "--used-capacities-table-name": !Ref PaperDeliveryDriverUsedCapacitiesTableName
+        "--used-sender-limit-table-name": !Ref PaperDeliveryUsedSenderLimitTableName
+        "--counter-table-name": !Ref PaperDeliveryCounterTableName
+        "--province-table-name": !Ref ProvinceTableName
+        "--driver-province-parameter": "{{resolve:ssm:/config/pn-delayer/unifiedDeliveryDriver-province}}"
+        "--parallelism": !Ref LightAlgorithmGlueJobParallelism
+        "--log-every": "20000"
+        "--enable-continuous-cloudwatch-log": "true"
+        "--enable-metrics": "true"
+        "--enable-spark-ui": "true"
+        "--TempDir": !Sub "s3://aws-glue-assets-${AWS::AccountId}-${AWS::Region}/temporary/"
+      MaxRetries: 0
+      Timeout: 480
+      GlueVersion: "5.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      ExecutionClass: STANDARD
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+
+  ResetUsedDataGlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-delayer-ResetUsedDataGlueJobRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: ResetUsedDataGlueJobPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:DeleteItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}"
+                  - !Sub "${PaperDeliveryDriverUsedCapacitiesTableArn}/*"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}"
+                  - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "${ProvinceTableArn}"
+                  - !Sub "${ProvinceTableArn}/*"
+              - Effect: Allow
+                Action:
+                    - s3:GetObject
+                Resource:
+                    - !Sub "arn:aws:s3:::${MicroserviceBucketName}/${MicroserviceBucketBaseKey}/static/glue/scripts/ResetUsedDataScript.py"

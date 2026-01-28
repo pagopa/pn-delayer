@@ -5,6 +5,11 @@ import json
 import boto3
 
 from datetime import date, datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from decimal import Decimal
+
+from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.types import TypeSerializer
 
 from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
@@ -28,51 +33,66 @@ args = getResolvedOptions(
         "print-capacity",
         "parallelism",
         "log-every",
+        "first-scheduler-start-date",
+        "second-scheduler-start-date",
+        "first-scheduler-cron",
+        "second-scheduler-cron"
     ],
 )
 
 sc = SparkContext()
 glueContext = GlueContext(sc)
-spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
-DELIVERY_DATE = args["delivery-date"]
-PAPER_DELIVERY_TABLE_NAME = args["paper-delivery-table-name"]
-PROVINCE_TABLE_NAME = args["province-table-name"]
-COUNTER_TABLE_NAME = args["counter-table-name"]
+DELIVERY_DATE = args["delivery_date"]
+PAPER_DELIVERY_TABLE_NAME = args["paper_delivery_table_name"]
+PROVINCE_TABLE_NAME = args["province_table_name"]
+COUNTER_TABLE_NAME = args["counter_table_name"]
 
-PRIORITY_PARAMETER = args["priority-parameter"]
-PRINT_COUNTER_TTL_DURATION_DAYS = int(args["counter-ttl-days"])
-PRINT_CAPACITY_WEEKLY_WORKING_DAYS = int(args["counter-working-days"])
-PRINT_CAPACITY_CONFIG = args["print-capacity"]
+PRIORITY_PARAMETER = args["priority_parameter"]
+PRINT_COUNTER_TTL_DURATION_DAYS = int(args["counter_ttl_days"])
+PRINT_CAPACITY_WEEKLY_WORKING_DAYS = int(args["counter_working_days"])
+PRINT_CAPACITY_CONFIG = args["print_capacity"]
 
 PARALLELISM = int(args.get("parallelism", "20"))
 LOG_EVERY = int(args.get("log-every", "20000"))
 
 SOURCE_PK_VALUE = f"{DELIVERY_DATE}~EVALUATE_SENDER_LIMIT"
 
+FIRST_SCHEDULER_START_DATE = args["first_scheduler_start_date"]
+SECOND_SCHEDULER_START_DATE = args["second_scheduler_start_date"]
+FIRST_SCHEDULER_CRON = args["first_scheduler_cron"]
+SECOND_SCHEDULER_CRON = args["second_scheduler_cron"]
 # ----------------------------
-# Parse priority parameter once
+# Parse priority parameter
 # ----------------------------
 if PRIORITY_PARAMETER is None:
     raise RuntimeError("priority-parameter not found")
 
-PRIORITY_OBJ = PRIORITY_PARAMETER if isinstance(PRIORITY_PARAMETER, dict) else json.loads(PRIORITY_PARAMETER)
-
-# Broadcast (Spark-safe)
-BC_PRIORITY_OBJ = sc.broadcast(PRIORITY_OBJ)
+PRIORITY_OBJ = (
+    PRIORITY_PARAMETER
+    if isinstance(PRIORITY_PARAMETER, dict)
+    else json.loads(PRIORITY_PARAMETER)
+)
 
 # ----------------------------
-# Driver-side helpers
+# Dynamo (driver scoped)
 # ----------------------------
-def load_provinces(dynamodb_resource, province_table_name: str) -> list[str]:
-    province_table = dynamodb_resource.Table(province_table_name)
+dynamodb = boto3.resource("dynamodb")
+dynamo_client = boto3.client("dynamodb")
+serializer = TypeSerializer()
+
+# ----------------------------
+# Utility functions
+# ----------------------------
+def load_provinces():
+    province_table = dynamodb.Table(PROVINCE_TABLE_NAME)
     resp = province_table.scan(ProjectionExpression="province")
-    provinces_set = {it.get("province") for it in resp.get("Items", []) if it.get("province")}
-    if not provinces_set:
+    provinces = {it.get("province") for it in resp.get("Items", []) if it.get("province")}
+    if not provinces:
         raise RuntimeError("No provinces found")
-    return list(provinces_set)
+    return list(provinces)
 
 def calculate_print_counter_ttl(days: int) -> int:
     expire_at = datetime.now(timezone.utc) + timedelta(days=days)
@@ -80,24 +100,66 @@ def calculate_print_counter_ttl(days: int) -> int:
 
 def compute_daily_print_capacity(delivery_date: date, print_capacity_config: str) -> int:
     capacities = sorted(
-            (
-                (date.fromisoformat(d.split(";")[0]), int(d.split(";")[1]))
-                for d in print_capacity_config.split(",")
-            ),
-            reverse=True,
-        )
+        (
+            (date.fromisoformat(d.split(";")[0]), int(d.split(";")[1]))
+            for d in print_capacity_config.split(",")
+        ),
+        reverse=True,
+    )
     for start, cap in capacities:
         if delivery_date >= start:
             return cap
-    raise RuntimeError(
-        f"No print capacity configured for delivery date {delivery_date}: "
-        f"delivery date is before all configured start dates in print-capacity."
-    )
+    raise RuntimeError("No print capacity configured")
 
-def remap_items(priority_obj: dict, items: list[dict], delivery_date: str) -> list[dict]:
-    return [build_paper_delivery_record(priority_obj, it, delivery_date) for it in items]
+def normalize_attempt(attempt) -> int:
+    if attempt is None:
+        raise RuntimeError("Missing required field 'attempt'")
+    if isinstance(attempt, bool):
+        raise RuntimeError("Invalid attempt value (bool)")
+    if isinstance(attempt, Decimal):
+        if attempt % 1 != 0:
+            raise RuntimeError(f"Invalid attempt value (non-integer): {attempt}")
+        attempt_i = int(attempt)
+    elif isinstance(attempt, int):
+        attempt_i = attempt
+    elif isinstance(attempt, str) and attempt.strip() in ("0", "1"):
+        attempt_i = int(attempt.strip())
+    else:
+        raise RuntimeError(f"Invalid attempt value: {attempt!r}")
+    if attempt_i not in (0, 1):
+        raise RuntimeError(f"Invalid attempt value: {attempt_i}")
 
-def build_paper_delivery_record(priority_obj: dict, payload: dict, delivery_date: str) -> dict:
+    return attempt_i
+
+def calculate_priority(priority_obj, product_type, attempt) -> int:
+    attempt_norm = normalize_attempt(attempt)
+    target_key = f"PRODUCT_{product_type}.ATTEMPT_{attempt_norm}"
+    for priority, values in priority_obj.items():
+        if target_key in values:
+            return int(priority)
+    raise RuntimeError(f"Priority not found for {target_key}")
+
+def retrieve_date(payload: dict) -> str:
+    attempt_norm = normalize_attempt(payload.get("attempt"))
+
+    if payload.get("productType") == "RS" or attempt_norm == 1:
+        d = payload.get("prepareRequestDate")
+        if not d:
+            raise RuntimeError("Missing prepareRequestDate")
+        return d
+
+    d = payload.get("notificationSentAt")
+    if not d:
+        raise RuntimeError("Missing notificationSentAt")
+    return d
+
+def build_pk(delivery_date: str) -> str:
+    return f"{delivery_date}~EVALUATE_PRINT_CAPACITY"
+
+def build_sk(priority: int, date_str: str, request_id: str) -> str:
+    return f"{priority}~{date_str}~{request_id}"
+
+def build_paper_delivery_record(priority_obj, payload, delivery_date):
     d = retrieve_date(payload)
     priority = calculate_priority(priority_obj, payload.get("productType"), payload.get("attempt"))
     return {
@@ -120,87 +182,172 @@ def build_paper_delivery_record(priority_obj: dict, payload: dict, delivery_date
         "workflowStep": "EVALUATE_PRINT_CAPACITY",
     }
 
-def retrieve_date(payload: dict) -> str:
-    attempt_norm = normalize_attempt(payload.get("attempt"))
-
-    if payload.get("productType") == "RS" or attempt_norm == 1:
-        d = payload.get("prepareRequestDate")
-        if not d:
-            raise RuntimeError(
-                f"Missing required field 'prepareRequestDate' for requestId={payload.get('requestId')} "
-                f"(productType={payload.get('productType')}, attempt={attempt_norm})"
-            )
-        return d
-
-    d = payload.get("notificationSentAt")
-    if not d:
-        raise RuntimeError(
-            f"Missing required field 'notificationSentAt' for requestId={payload.get('requestId')} "
-            f"(productType={payload.get('productType')}, attempt={attempt_norm})"
-        )
-    return d
-
-def normalize_attempt(attempt) -> int:
-    if attempt is None:
-        raise RuntimeError("Missing required field 'attempt'")
-    if isinstance(attempt, bool):
-        raise RuntimeError(f"Invalid attempt value (bool): {attempt!r} (expected 0 or 1)")
-    if isinstance(attempt, int):
-        attempt_i = attempt
-    elif isinstance(attempt, str):
-        s = attempt.strip()
-        if s not in ("0", "1"):
-            raise RuntimeError(f"Invalid attempt string: {attempt!r} (expected '0' or '1')")
-        attempt_i = int(s)
-    else:
-        raise RuntimeError(f"Invalid attempt type: {type(attempt).__name__} value={attempt!r} (expected 0/1)")
-
-    if attempt_i not in (0, 1):
-        raise RuntimeError(f"Invalid attempt value: {attempt_i} (expected 0 or 1)")
-
-    return attempt_i
-
-def build_pk(delivery_date: str) -> str:
-    return f"{delivery_date}~EVALUATE_PRINT_CAPACITY"
-
-def build_sk(priority: int, date_str: str, request_id: str) -> str:
-    return f"{priority}~{date_str}~{request_id}"
-
-def calculate_priority(priority_obj: dict, product_type: str, attempt) -> int:
-    attempt_norm = normalize_attempt(attempt)
-    target_key = f"PRODUCT_{product_type}.ATTEMPT_{attempt_norm}"
-    for priority, values in priority_obj.items():
-        if target_key in values:
-            return int(priority)
-    raise RuntimeError(f"Priority not found for {target_key}")
-
-def chunked(lst, size: int):
+def chunked(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i : i + size]
 
-def put_print_capacity_counter(
-    dynamodb_resource,
-    counter_table_name: str,
-    number_of_shipments: int,
-    delivery_date_str: str,
-    ttl_days: int,
-    weekly_working_days: int,
-    print_capacity_config: str,
-):
-    counters_table = dynamodb_resource.Table(counter_table_name)
+def batch_write_item_with_retry(table_name, items_ddb):
+    req = {table_name: [{"PutRequest": {"Item": it}} for it in items_ddb]}
+    while True:
+        resp = dynamo_client.batch_write_item(RequestItems=req)
+        unp = resp.get("UnprocessedItems", {})
+        if not unp:
+            return
+        req = unp
+        time.sleep(random.uniform(0.2, 1.0))
 
-    ttl_value = calculate_print_counter_ttl(ttl_days)
-    daily_capacity = compute_daily_print_capacity(date.fromisoformat(delivery_date_str), print_capacity_config)
-    weekly_capacity = daily_capacity * weekly_working_days
+# ----------------------------
+# CORE: process one province (PARALLEL)
+# ----------------------------
+def process_province(province: str) -> int:
+    table = dynamodb.Table(PAPER_DELIVERY_TABLE_NAME)
+    processed = 0
+    lek = None
 
-    item = {
+    while True:
+        q = {
+            "KeyConditionExpression": Key("pk").eq(SOURCE_PK_VALUE) & Key("sk").begins_with(province),
+        }
+        if lek:
+            q["ExclusiveStartKey"] = lek
+
+        resp = table.query(**q)
+        items = resp.get("Items", [])
+
+        if items:
+            remapped = [
+                build_paper_delivery_record(PRIORITY_OBJ, it, DELIVERY_DATE)
+                for it in items
+            ]
+            for chunk in chunked(remapped, 25):
+                ddb_items = [
+                    {k: serializer.serialize(v) for k, v in it.items()}
+                    for it in chunk
+                ]
+                batch_write_item_with_retry(PAPER_DELIVERY_TABLE_NAME, ddb_items)
+                processed += len(chunk)
+                if processed % LOG_EVERY == 0:
+                    print(f"[{province}] processed={processed}")
+
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+
+    print(f"[DONE] province={province} processed={processed}")
+    return processed
+
+
+def count_cron_values(field: str, min_v: int, max_v: int) -> int:
+    field = field.strip()
+
+    if field in ("*", "?"):
+        return max_v - min_v + 1
+
+    if "," in field:
+        return len(field.split(","))
+
+    if "/" in field:
+        base, step_s = field.split("/")
+        step = int(step_s)
+
+        if base in ("*", "?"):
+            span = max_v - min_v + 1
+            return (span + step - 1) // step  # ceil
+
+        if "-" in base:
+            a, b = map(int, base.split("-"))
+            return len(range(a, b + 1, step))
+
+        v = int(base)
+        return len(range(v, max_v + 1, step))
+
+    if "-" in field:
+        a, b = map(int, field.split("-"))
+        return b - a + 1
+
+    return 1
+
+
+def count_executions_in_next_scheduled_day(cron):
+    """
+    Campi (6): minute hour day_of_month month day_of_week year
+    Conta quante esecuzioni al giorno in base a minute*hour.
+    """
+    parts = cron.strip().split()
+    if len(parts) != 6:
+        raise RuntimeError(f"Invalid cron expression format: {cron}. Expected 6 fields.")
+
+    minute, hour, day_of_month, month, day_of_week, year = parts
+
+    hours_count = count_cron_values(hour, 0, 23)
+    minutes_count = count_cron_values(minute, 0, 59)
+
+    return hours_count * minutes_count
+
+
+def calculate_daily_execution_number():
+    """
+    Calcola il numero di esecuzioni giornaliere basandosi sugli scheduler attivi.
+    """
+    now = datetime.now(timezone.utc)
+    # Parse delle date degli scheduler
+    first_start = datetime.fromisoformat(FIRST_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+    second_start = datetime.fromisoformat(SECOND_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+    # Verifica se gli scheduler sono attivi prima della delivery date
+    active_scheduler_before_delivery_date = first_start < now
+    next_scheduler_before_delivery_date = second_start < now
+    if not active_scheduler_before_delivery_date and not next_scheduler_before_delivery_date:
+        raise RuntimeError("Both scheduler start dates are after the delivery date - ERROR_SCHEDULERS_START_AFTER_DELIVERY_DATE")
+    cron = retrieve_cron(active_scheduler_before_delivery_date, next_scheduler_before_delivery_date)
+    return count_executions_in_next_scheduled_day(cron)
+
+
+def retrieve_cron(active_scheduler_before_delivery_date, next_scheduler_before_delivery_date):
+    """
+    Recupera il cron appropriato basandosi sullo stato degli scheduler.
+    """
+    if active_scheduler_before_delivery_date and next_scheduler_before_delivery_date:
+        first_start = datetime.fromisoformat(FIRST_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+        second_start = datetime.fromisoformat(SECOND_SCHEDULER_START_DATE.replace('Z', '+00:00'))
+        cron = FIRST_SCHEDULER_CRON if first_start > second_start else SECOND_SCHEDULER_CRON
+    else:
+        cron = FIRST_SCHEDULER_CRON if active_scheduler_before_delivery_date else SECOND_SCHEDULER_CRON
+    return cron
+
+# ----------------------------
+# MAIN
+# ----------------------------
+provinces = load_provinces()
+print(f"Found {len(provinces)} provinces")
+
+total = 0
+with ThreadPoolExecutor(max_workers=PARALLELISM) as executor:
+    futures = [executor.submit(process_province, p) for p in provinces]
+    for f in as_completed(futures):
+        total += f.result()
+
+print(f"[TOTAL] processed_total={total}")
+
+# ----------------------------
+# Counter
+# ----------------------------
+ttl_value = calculate_print_counter_ttl(PRINT_COUNTER_TTL_DURATION_DAYS)
+daily_capacity = compute_daily_print_capacity(
+    date.fromisoformat(DELIVERY_DATE),
+    PRINT_CAPACITY_CONFIG,
+)
+
+dailyExecutionNumber = calculate_daily_execution_number()
+
+dynamodb.Table(COUNTER_TABLE_NAME).put_item(
+    Item={
         "pk": "PRINT",
-        "sk": delivery_date_str,
+        "sk": DELIVERY_DATE,
         "dailyExecutionCounter": 0,
-        "dailyExecutionNumber": 0,
+        "dailyExecutionNumber": dailyExecutionNumber,
         "dailyPrintCapacity": daily_capacity,
-        "weeklyPrintCapacity": weekly_capacity,
-        "numberOfShipments": number_of_shipments,
+        "weeklyPrintCapacity": daily_capacity * PRINT_CAPACITY_WEEKLY_WORKING_DAYS,
+        "numberOfShipments": total,
         "sentToNextWeek": 0,
         "sentToPhaseTwo": 0,
         "stopSendToPhaseTwo": False,
@@ -208,134 +355,7 @@ def put_print_capacity_counter(
         "lastEvaluatedKeyPhase2": {},
         "ttl": ttl_value,
     }
-
-    counters_table.put_item(Item=item)
-
-def batch_write_item_with_retry(
-    dynamo_client,
-    table_name: str,
-    items_ddb_typed: list[dict],
-    max_attempts: int = 10,
-    base: float = 0.2,
-):
-    request_items = {table_name: [{"PutRequest": {"Item": it}} for it in items_ddb_typed]}
-
-    attempt = 0
-    while True:
-        attempt += 1
-        resp = dynamo_client.batch_write_item(RequestItems=request_items)
-
-        unprocessed = resp.get("UnprocessedItems", {})
-        remaining = unprocessed.get(table_name, [])
-
-        if not remaining:
-            return
-
-        if attempt >= max_attempts:
-            raise RuntimeError(f"[DYNAMO BATCH WRITE] Max attempts reached ({max_attempts}) with unprocessed items: {len(remaining)}")
-
-        request_items = unprocessed
-        sleep_duration = base * (2 ** (attempt - 1))
-        sleep_duration += random.uniform(0, sleep_duration / 2)
-        print(f"[BATCH RETRY] unprocessed={len(remaining)} attempt={attempt} sleep={sleep_duration:.2f}s")
-        time.sleep(sleep_duration)
-
-
-# ----------------------------
-# Executor function factory
-# ----------------------------
-def make_process_partition(config: dict, bc_priority_obj):
-    def process_partition(province_iter):
-        import boto3
-        from boto3.dynamodb.conditions import Key
-        from boto3.dynamodb.types import TypeSerializer
-
-        priority_obj = bc_priority_obj.value
-
-        dynamodb_local = boto3.resource("dynamodb")
-        table = dynamodb_local.Table(config["paper_delivery_table_name"])
-
-        dynamo_client = boto3.client("dynamodb")
-        serializer = TypeSerializer()
-
-        def to_ddb_item(py_item: dict) -> dict:
-            return {k: serializer.serialize(v) for k, v in py_item.items()}
-
-        processed = 0
-
-        for prov in province_iter:
-            lek = None
-            local_count = 0
-
-            while True:
-                q = {
-                    "KeyConditionExpression": Key("pk").eq(config["source_pk_value"]) & Key("sk").begins_with(prov),
-                }
-                if lek:
-                    q["ExclusiveStartKey"] = lek
-
-                resp = table.query(**q)
-
-                page_items = resp.get("Items", [])
-                if page_items:
-                    remapped = remap_items(priority_obj, page_items, config["delivery_date"])
-
-                    for chunk in chunked(remapped, 25):
-                        ddb_chunk = [to_ddb_item(it) for it in chunk]
-                        batch_write_item_with_retry(dynamo_client, config["paper_delivery_table_name"], ddb_chunk)
-
-                        processed += len(chunk)
-                        local_count += len(chunk)
-                        if config["log_every"] > 0 and processed % config["log_every"] == 0:
-                            print(f"[PROGRESS] processed={processed}")
-
-                lek = resp.get("LastEvaluatedKey")
-                if not lek:
-                    break
-
-            print(f"[DONE province] {prov}: {local_count} items")
-
-        print(f"[PARTITION DONE] processed total in this partition: {processed}")
-        yield processed
-
-    return process_partition
-
-
-# ----------------------------
-# Driver
-# ----------------------------
-dynamodb_driver = boto3.resource("dynamodb")
-
-provinces = load_provinces(dynamodb_driver, PROVINCE_TABLE_NAME)
-print(f"Found {len(provinces)} provinces")
-
-num_slices = min(max(1, PARALLELISM), len(provinces))
-rdd = spark.sparkContext.parallelize(provinces, numSlices=num_slices)
-
-config = {
-    "delivery_date": DELIVERY_DATE,
-    "paper_delivery_table_name": PAPER_DELIVERY_TABLE_NAME,
-    "source_pk_value": SOURCE_PK_VALUE,
-    "log_every": LOG_EVERY,
-}
-
-process_partition_fn = make_process_partition(config, BC_PRIORITY_OBJ)
-
-print(f"Start processing pk={SOURCE_PK_VALUE} on {len(provinces)} provinces with numSlices={num_slices}")
-partition_counts = rdd.mapPartitions(process_partition_fn).collect()
-processed_total = sum(partition_counts)
-print(f"[TOTAL] processed_total={processed_total}")
-
-put_print_capacity_counter(
-    dynamodb_resource=dynamodb_driver,
-    counter_table_name=COUNTER_TABLE_NAME,
-    number_of_shipments=processed_total,
-    delivery_date_str=DELIVERY_DATE,
-    ttl_days=PRINT_COUNTER_TTL_DURATION_DAYS,
-    weekly_working_days=PRINT_CAPACITY_WEEKLY_WORKING_DAYS,
-    print_capacity_config=PRINT_CAPACITY_CONFIG,
 )
 
-print(f"Inserted print capacity counter for deliveryDate {DELIVERY_DATE} with {processed_total} shipments.")
 print("Completed")
 job.commit()

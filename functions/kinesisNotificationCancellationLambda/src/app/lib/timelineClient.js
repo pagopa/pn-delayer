@@ -16,8 +16,6 @@ async function retrieveTimelineElements(iun) {
       `${process.env.TIMELINE_SERVICE_BASE_PATH}/timeline-service-private/timelines/${iun}/elements`,
       { params }
     );
-
-    console.log("Timeline elements:", response.data);
     return response.data;
 
   } catch (error) {

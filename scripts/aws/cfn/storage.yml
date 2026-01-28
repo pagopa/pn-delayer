@@ -129,6 +129,8 @@ Resources:
           AttributeType: "S"
         - AttributeName: "deliveryDate"
           AttributeType: "S"
+        - AttributeName: "unifiedDeliveryDriver"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "unifiedDeliveryDriverGeokey"
           KeyType: "HASH"
@@ -139,6 +141,14 @@ Resources:
           KeySchema:
             - AttributeName: "deliveryDate"
               KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "deliveryDate-driver-index"
+          KeySchema:
+            - AttributeName: "deliveryDate"
+              KeyType: "HASH"
+            - AttributeName: "unifiedDeliveryDriver"
+              KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
@@ -256,11 +266,22 @@ Resources:
           AttributeType: "S"
         - AttributeName: "deliveryDate"
           AttributeType: "S"
+        - AttributeName: "province"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
           KeyType: "HASH"
         - AttributeName: "deliveryDate"
           KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "deliveryDate-province-index"
+          KeySchema:
+            - AttributeName: "deliveryDate"
+              KeyType: "HASH"
+            - AttributeName: "province"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
         AttributeName: "ttl"
@@ -687,6 +708,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  PreRunRetryLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-PreRunRetryLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   TestDelayerKmsBucket:
     Type: AWS::KMS::Key
     Properties:
@@ -726,7 +758,42 @@ Resources:
       LogGroupName: !Sub "/aws-glue/jobs/${ProjectName}-delayer-LightAlgorithmGlueJob"
       RetentionInDays: !Ref LogRetention
 
+#  DelayerToPaperChannelStateMachineLogGroup:
+#    Type: AWS::Logs::LogGroup
+#    UpdateReplacePolicy: Retain
+#    DeletionPolicy: Retain
+#    Properties:
+#      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayerToPaperChannelStateMachine"
+#      RetentionInDays: !Ref LogRetention
+#
+#  PaperDeliveryStateMachineLogGroup:
+#    Type: AWS::Logs::LogGroup
+#    UpdateReplacePolicy: Retain
+#    DeletionPolicy: Retain
+#    Properties:
+#      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayer-BatchWorkflowStateMachine"
+#      RetentionInDays: !Ref LogRetention
+#
+#  RetryAlgorithmStateMachineLogGroup:
+#    Type: AWS::Logs::LogGroup
+#    UpdateReplacePolicy: Retain
+#    DeletionPolicy: Retain
+#    Properties:
+#      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayer-RetryAlgorithmStateMachine"
+#      RetentionInDays: !Ref LogRetention
+
+  ResetUsedDataGlueJobLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/aws-glue/jobs/${ProjectName}-delayer-ResetUsedDataGlueJob"
+      RetentionInDays: !Ref LogRetention
+
 Outputs:
+  ResetUsedDataGlueJobName:
+    Description: Name of the Glue Job to reset used data
+    Value: !Sub "${ProjectName}-delayer-ResetUsedDataGlueJob"
 
   LightAlgorithmGlueJobName:
     Description: Name of the Glue Job to run Light algorithm
@@ -898,6 +965,9 @@ Outputs:
   DelayerNotificationOrdersLambdaName:
     Value: !Sub "${ProjectName}-delayer-notificationOrdersLambda"
 
+  PreRunRetryLambdaName:
+    Value: !Sub "${ProjectName}-delayer-PreRunRetryLambda"
+
   SwitchOffAlgorithmLambdaName:
     Value: !Sub "${ProjectName}-delayer-switchOffAlgorithmLambda"
 
@@ -925,3 +995,15 @@ Outputs:
   TestDelayerKmsBucketArn:
     Description: Arn of kms bucket for delayer tests automation
     Value: !Sub '${TestDelayerKmsBucket.Arn}'
+
+#  DelayerToPaperChannelStateMachineLogGroupARN:
+#    Description: ARN of Log Group for DelayerToPaperChannel State Machine
+#    Value: !GetAtt DelayerToPaperChannelStateMachineLogGroup.Arn
+#
+#  PaperDeliveryStateMachineLogGroupARN:
+#    Description: ARN of Log Group for Paper Delivery State Machine
+#    Value: !GetAtt PaperDeliveryStateMachineLogGroup.Arn
+#
+#  RetryAlgorithmStateMachineLogGroupARN:
+#    Description: ARN of Log Group for Retry Algorithm State Machine
+#    Value: !GetAtt RetryAlgorithmStateMachineLogGroup.Arn

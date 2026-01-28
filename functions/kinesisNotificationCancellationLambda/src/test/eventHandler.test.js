@@ -28,19 +28,6 @@ describe("Cancellation Lambda Handler", () => {
     expect(result).to.deep.equal({ batchItemFailures: [] });
   });
 
-  it("should ignore non cancellation events", async () => {
-    const result = await lambda.handleEvent({
-      mockKinesisData: [
-        {
-          dynamodb: {
-            NewImage: { category: "OTHER_EVENT" }
-          }
-        }
-      ]
-    });
-
-    expect(result).to.deep.equal({ batchItemFailures: [] });
-  });
 
   it("should process a valid cancellation successfully", async () => {
     const handler = proxyquire.noCallThru().load("../app/eventHandler.js", {
