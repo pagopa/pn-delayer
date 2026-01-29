@@ -1007,3 +1007,7 @@ Outputs:
   RetryAlgorithmStateMachineLogGroupARN:
     Description: ARN of Log Group for Retry Algorithm State Machine
     Value: !GetAtt RetryAlgorithmStateMachineLogGroup.Arn
+
+  RetryAlgorithmStateMachineLogGroupName:
+    Description: Name of Log Group for Retry Algorithm State Machine
+    Value: !Ref RetryAlgorithmStateMachineLogGroup
