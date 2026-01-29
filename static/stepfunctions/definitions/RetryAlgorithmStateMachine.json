@@ -49,12 +49,20 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.preRunRetryResponse.executeRetryAlgorithm",
-          "BooleanEquals": false,
-          "Next": "StandardFail"
+          "Next": "DisableDelayerToPaperChannelDailyActiveScheduler",
+          "And": [
+            {
+              "Variable": "$.preRunRetryResponse.executeRetryAlgorithm",
+              "IsPresent": true
+            },
+            {
+              "Variable": "$.preRunRetryResponse.executeRetryAlgorithm",
+              "BooleanEquals": true
+            }
+          ]
         }
       ],
-      "Default": "DisableDelayerToPaperChannelDailyActiveScheduler"
+      "Default": "StandardFail"
     },
     "DisableDelayerToPaperChannelDailyActiveScheduler": {
       "Type": "Task",
