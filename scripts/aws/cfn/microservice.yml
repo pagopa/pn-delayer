@@ -670,7 +670,7 @@ Parameters:
 
   OncallRetryAlgorithmStateMachineFilterPattern:
     Type: String
-    Default: '{ $.details.name = "OnCallFail" }'
+    Default: '{ $.details.name = \"OnCallFail\" }'
     Description: 'Filter pattern for OncallRetryAlgorithmStateMachineAlarm'
 
   ResetUsedDataGlueJobName:
@@ -3092,7 +3092,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Ref RetryAlgorithmStateMachineLogGroupName
-      FilterPattern: '{ $.details.name = "StandardFail" }'
+      FilterPattern: '{ $.details.name = \"StandardFail\" }'
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: StepFunctionFailures
