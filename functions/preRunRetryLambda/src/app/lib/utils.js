@@ -27,7 +27,11 @@ function isSameISOWeek(executionDate, deliveryDate) {
     TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)
   );
 
-  return executionWeekMonday.equals(deliveryDate);
+  const deliveryWeek = deliveryDate.with(
+       TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)
+     );
+
+  return executionWeekMonday.equals(deliveryWeek);
 }
 
 function calculateDeliveryDate() {
