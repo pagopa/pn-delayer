@@ -773,14 +773,14 @@ Resources:
 #    Properties:
 #      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayer-BatchWorkflowStateMachine"
 #      RetentionInDays: !Ref LogRetention
-#
-#  RetryAlgorithmStateMachineLogGroup:
-#    Type: AWS::Logs::LogGroup
-#    UpdateReplacePolicy: Retain
-#    DeletionPolicy: Retain
-#    Properties:
-#      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayer-RetryAlgorithmStateMachine"
-#      RetentionInDays: !Ref LogRetention
+
+  RetryAlgorithmStateMachineLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayer-RetryAlgorithmStateMachine"
+      RetentionInDays: !Ref LogRetention
 
   ResetUsedDataGlueJobLogGroup:
     Type: AWS::Logs::LogGroup
@@ -1004,6 +1004,6 @@ Outputs:
 #    Description: ARN of Log Group for Paper Delivery State Machine
 #    Value: !GetAtt PaperDeliveryStateMachineLogGroup.Arn
 #
-#  RetryAlgorithmStateMachineLogGroupARN:
-#    Description: ARN of Log Group for Retry Algorithm State Machine
-#    Value: !GetAtt RetryAlgorithmStateMachineLogGroup.Arn
+  RetryAlgorithmStateMachineLogGroupARN:
+    Description: ARN of Log Group for Retry Algorithm State Machine
+    Value: !GetAtt RetryAlgorithmStateMachineLogGroup.Arn

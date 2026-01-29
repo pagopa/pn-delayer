@@ -1,12 +1,12 @@
 {
   "Comment": "A description of my state machine",
-  "StartAt": "PerRunRetryLambda",
+  "StartAt": "PreRunRetryLambda",
   "States": {
-    "PerRunRetryLambda": {
+    "PreRunRetryLambda": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "${PerRunRetryLambdaName}",
+        "FunctionName": "${PreRunRetryLambdaName}",
         "Payload": {
           "skipStepExecutionCheck.$": "$$.Execution.Input.SKIP_STEP_EXECUTION_CHECK",
           "executionArn.$": "$$.Execution.Id",

@@ -639,14 +639,22 @@ Parameters:
 #  DelayerToPaperChannelStateMachineLogGroupARN:
 #    Type: String
 #    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
-#
-#  RetryAlgorithmStateMachineLogGroupARN:
-#    Type: String
-#    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
+
+  RetryAlgorithmStateMachineLogGroupARN:
+    Type: String
+    Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
 
   ResetUsedDataGlueJobName:
     Type: String
     Description: 'Reset Used Data Glue Job name'
+
+  RetryAlgorithmStateMachineRuleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: 'State of the RetryAlgorithmStateMachineRuleState'
 
   PnCoreEventBusToDelayerInputsKinesisStatus:
     Type: String
@@ -1241,6 +1249,69 @@ Resources:
                 Action:
                   - "sns:Publish"
                 Resource: !Ref AlarmSNSTopicArn
+
+  ## Enable retrying the step function execution when it fails, times out or is aborted.
+  RetryAlgorithmStateMachineRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: The EventBridge rule to match Step function execution state change
+      RoleArn: !GetAtt PnDelayerAlarmTopicPublisherRole.Arn
+      EventPattern:
+        source:
+          - aws.states
+        detail-type:
+           - Step Functions Execution Status Change
+        detail:
+          status:
+            - FAILED
+            - TIMED_OUT
+            - ABORTED
+          stateMachineArn:
+            - !Ref PaperDeliveryStateMachine
+      State: !Ref RetryAlgorithmStateMachineRuleState
+      Targets:
+        - Arn: !Ref RetryAlgorithmStateMachine
+          Id: !Sub "${ProjectName}-delayer-retry-algorithm"
+          RoleArn: !GetAtt RetryAlgorithmStateMachineEventRole.Arn
+
+          InputTransformer:
+            InputPathsMap:
+              executionArn: "$.detail.executionArn"
+              stateMachineArn: "$.detail.stateMachineArn"
+              status: "$.detail.status"
+              startDate: "$.detail.startDate"
+              stopDate: "$.detail.stopDate"
+            InputTemplate: |
+              {
+                "FAILEDEXECUTIONARN": <executionArn>,
+                "STATEMACHINEARN": <stateMachineArn>,
+                "STATUS": <status>,
+                "STARTDATE": <startDate>,
+                "STOPDATE": <stopDate>,
+                "SKIP_STEP_EXECUTION_CHECK": false,
+                "DELIVERY_DATE": null
+              }
+     
+  RetryAlgorithmStateMachineEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+
+      Policies:
+        - PolicyName: StartRetryStateMachine
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: !Ref RetryAlgorithmStateMachine
 
   ### Enable sending notifications to SNS topic when the step functions are in failed, aborted or timedOut status.
   BatchBridgeStateRule:
@@ -2863,7 +2934,7 @@ Resources:
         Bucket: !Ref MicroserviceBucketName
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/RetryAlgorithmStateMachine.json"
       DefinitionSubstitutions:
-        PerRunRetryLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
+        PreRunRetryLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunRetryLambdaName}
         DelayerToPaperChannelStateMachine: !Ref DelayerToPaperChannelStateMachine
         DelayerToPaperChannelDailyScheduleRuleRoleArn: !GetAtt DelayerToPaperChannelDailyScheduleRuleRole.Arn
         ResetDataJobGlueName: !Ref ResetUsedDataGlueJobName
@@ -2881,13 +2952,12 @@ Resources:
         DelayerToPaperChannelSecondSchedulerStartDate: !Ref DelayerToPaperChannelSecondSchedulerStartDate
       TracingConfiguration:
         Enabled: false
-#      LoggingConfiguration:
-#        Level: ERROR
-#        IncludeExecutionData: true
-#        Destinations:
-#          - CloudWatchLogsLogGroup:
-#              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
-
+      LoggingConfiguration:
+        Level: ERROR
+        IncludeExecutionData: true
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !Ref RetryAlgorithmStateMachineLogGroupARN
   RetryAlgorithmStateMachineRole:
     Type: AWS::IAM::Role
     Properties:
