@@ -1371,8 +1371,8 @@ Resources:
   FailedInvocationMetricAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${ProjectName}-delayer-FailedInvocation-Alarm"
-      AlarmDescription: "CloudWatch alarm for when pn-delayer step function executions fails."
+      AlarmName: !Sub "${ProjectName}-BatchWorkflowStateMachine-FailedAlarm"
+      AlarmDescription: "CloudWatch alarm for when BatchWorkflowStateMachine step function executions fails."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -2864,12 +2864,6 @@ Resources:
         PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
       TracingConfiguration:
           Enabled: false
-#      LoggingConfiguration:
-#        Level: ERROR
-#        IncludeExecutionData: true
-#        Destinations:
-#          - CloudWatchLogsLogGroup:
-#              LogGroupArn: !Ref PaperDeliveryStateMachineLogGroupARN
 
   PaperDeliveryStateMachineRole:
     Type: AWS::IAM::Role
@@ -3071,31 +3065,58 @@ Resources:
       FilterPattern: !Ref OncallRetryAlgorithmStateMachineFilterPattern
       MetricTransformations: 
         - MetricValue: 1
-          MetricNamespace: "OncallMetricsFailures"
-          MetricName: !Ref RetryAlgorithmStateMachine
-
+          MetricNamespace: "StepFunctionFailures"
+          MetricName: !Sub "oncall-${RetryAlgorithmStateMachine}"
 
   OncallRetryAlgorithmStateMachineErrorLogsMetricAlarm:
     Condition: HasOncallRetryAlgorithmStateMachineAlarmEnabled
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "oncall-${RetryAlgorithmStateMachine}-Alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on metric ${RetryAlgorithmStateMachine}."
+      AlarmName: !Sub "oncall-${ProjectName}-${RetryAlgorithmStateMachine}-FailedAlarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on metric oncall-${RetryAlgorithmStateMachine}."
       TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
-      #InsufficientDataActions:
-      #  - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: !Ref OncallRetryAlgorithmStateMachineAlarmPeriodDatapointsToAlarm
-      MetricName: !Ref RetryAlgorithmStateMachine
-      Namespace: "OncallMetricsFailures"
+      MetricName: !Sub "oncall-${RetryAlgorithmStateMachine}"
+      Namespace: "StepFunctionFailures"
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: !Ref OncallRetryAlgorithmStateMachineAlarmEvaluationPeriods
       Period: !Ref OncallRetryAlgorithmStateMachineAlarmPeriod
       Statistic: Sum 
       Threshold: !Ref OncallRetryAlgorithmStateMachineAlarmThreshold
+
+  MetricFilterRetryAlgorithmStateMachine: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: !Ref RetryAlgorithmStateMachineLogGroupName
+      FilterPattern: '{ $.details.name = "StandardFail" }'
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: StepFunctionFailures
+          MetricName: !Ref RetryAlgorithmStateMachine
+
+
+  RetryAlgorithmStateMachineErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${RetryAlgorithmStateMachine}-FailedAlarm"
+      AlarmDescription: !Sub "CloudWatch alarm on metric ${RetryAlgorithmStateMachine}."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Ref RetryAlgorithmStateMachine
+      Namespace: "StepFunctionFailures"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 6
+      Period: 300
+      Statistic: Sum 
+      Threshold: 1
 
 
   DelayerToPaperChannelDailyFirstScheduler:
@@ -3176,12 +3197,6 @@ Resources:
         DeliveryDateDayOfWeek: !Ref DeliveryDateDayOfWeek
       TracingConfiguration:
         Enabled: false
-#      LoggingConfiguration:
-#        Level: ERROR
-#        IncludeExecutionData: true
-#        Destinations:
-#          - CloudWatchLogsLogGroup:
-#              LogGroupArn: !Ref DelayerToPaperChannelStateMachineLogGroupARN
 
   DelayerToPaperChannelStateMachineRole:
     Type: AWS::IAM::Role

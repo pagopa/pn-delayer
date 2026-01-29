@@ -758,22 +758,6 @@ Resources:
       LogGroupName: !Sub "/aws-glue/jobs/${ProjectName}-delayer-LightAlgorithmGlueJob"
       RetentionInDays: !Ref LogRetention
 
-#  DelayerToPaperChannelStateMachineLogGroup:
-#    Type: AWS::Logs::LogGroup
-#    UpdateReplacePolicy: Retain
-#    DeletionPolicy: Retain
-#    Properties:
-#      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayerToPaperChannelStateMachine"
-#      RetentionInDays: !Ref LogRetention
-#
-#  PaperDeliveryStateMachineLogGroup:
-#    Type: AWS::Logs::LogGroup
-#    UpdateReplacePolicy: Retain
-#    DeletionPolicy: Retain
-#    Properties:
-#      LogGroupName: !Sub "/aws/stepfunctions/${ProjectName}-delayer-BatchWorkflowStateMachine"
-#      RetentionInDays: !Ref LogRetention
-
   RetryAlgorithmStateMachineLogGroup:
     Type: AWS::Logs::LogGroup
     UpdateReplacePolicy: Retain
@@ -996,14 +980,6 @@ Outputs:
     Description: Arn of kms bucket for delayer tests automation
     Value: !Sub '${TestDelayerKmsBucket.Arn}'
 
-#  DelayerToPaperChannelStateMachineLogGroupARN:
-#    Description: ARN of Log Group for DelayerToPaperChannel State Machine
-#    Value: !GetAtt DelayerToPaperChannelStateMachineLogGroup.Arn
-#
-#  PaperDeliveryStateMachineLogGroupARN:
-#    Description: ARN of Log Group for Paper Delivery State Machine
-#    Value: !GetAtt PaperDeliveryStateMachineLogGroup.Arn
-#
   RetryAlgorithmStateMachineLogGroupARN:
     Description: ARN of Log Group for Retry Algorithm State Machine
     Value: !GetAtt RetryAlgorithmStateMachineLogGroup.Arn
