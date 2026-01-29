@@ -640,6 +640,11 @@ Parameters:
 #    Type: String
 #    Description: 'ARN of CloudWatch Log Group for Delayer State Machine'
 
+  RetryAlgorithmStateMachineName:
+    Type: String
+    Description: 'Name of Retry Algorithm State Machine'
+    Default: RetryAlgorithmStateMachine
+
   RetryAlgorithmStateMachineLogGroupARN:
     Type: String
     Description: 'ARN of CloudWatch Log Group for Retry Algorithm State Machine'
@@ -670,7 +675,7 @@ Parameters:
 
   OncallRetryAlgorithmStateMachineFilterPattern:
     Type: String
-    Default: '{ $.details.name = \"OnCallFail\" }'
+    Default: '{ $.details.name = "OnCallFail" }'
     Description: 'Filter pattern for OncallRetryAlgorithmStateMachineAlarm'
 
   ResetUsedDataGlueJobName:
@@ -3066,21 +3071,21 @@ Resources:
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "StepFunctionFailures"
-          MetricName: !Sub "oncall-${RetryAlgorithmStateMachine}"
+          MetricName: !Sub "oncall-${RetryAlgorithmStateMachineName}"
 
   OncallRetryAlgorithmStateMachineErrorLogsMetricAlarm:
     Condition: HasOncallRetryAlgorithmStateMachineAlarmEnabled
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "oncall-${ProjectName}-${RetryAlgorithmStateMachine}-FailedAlarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on metric oncall-${RetryAlgorithmStateMachine}."
+      AlarmName: !Sub "oncall-${ProjectName}-${RetryAlgorithmStateMachineName}-FailedAlarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on metric oncall-${RetryAlgorithmStateMachineName}."
       TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: !Ref OncallRetryAlgorithmStateMachineAlarmPeriodDatapointsToAlarm
-      MetricName: !Sub "oncall-${RetryAlgorithmStateMachine}"
+      MetricName: !Sub "oncall-${RetryAlgorithmStateMachineName}"
       Namespace: "StepFunctionFailures"
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: !Ref OncallRetryAlgorithmStateMachineAlarmEvaluationPeriods
@@ -3092,25 +3097,24 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Ref RetryAlgorithmStateMachineLogGroupName
-      FilterPattern: '{ $.details.name = \"StandardFail\" }'
+      FilterPattern: '{ $.details.name = "StandardFail" }'
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: StepFunctionFailures
-          MetricName: !Ref RetryAlgorithmStateMachine
-
+          MetricName: !Sub "${RetryAlgorithmStateMachineName}"
 
   RetryAlgorithmStateMachineErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${ProjectName}-${RetryAlgorithmStateMachine}-FailedAlarm"
-      AlarmDescription: !Sub "CloudWatch alarm on metric ${RetryAlgorithmStateMachine}."
+      AlarmName: !Sub "${ProjectName}-${RetryAlgorithmStateMachineName}-FailedAlarm"
+      AlarmDescription: !Sub "CloudWatch alarm on metric ${RetryAlgorithmStateMachineName}."
       TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
-      MetricName: !Ref RetryAlgorithmStateMachine
+      MetricName: !Sub "${RetryAlgorithmStateMachineName}"
       Namespace: "StepFunctionFailures"
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 6
