@@ -72,6 +72,10 @@ exports.handleEvent = async (event) => {
       "SettimanaleEnteProvinciaProdotto",
       specificDate
     ),
+    SettimanaleOvercapacity: await prepareQuery(
+      "SettimanaleOvercapacity",
+      specificDate
+    ),
   };
   await runAllQueries(workgroupName, queries, database, monitoringBucketName, basePath, specificDate);
 };
