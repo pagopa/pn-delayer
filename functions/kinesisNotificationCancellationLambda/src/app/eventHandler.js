@@ -1,7 +1,7 @@
 const { extractKinesisData } = require("./lib/kinesis.js");
 const { executeTransactions, retrievePaperDelivery } = require("./lib/dynamo.js");
 const { retrieveTimelineElements } = require("./lib/timelineClient.js");
-const { ZonedDateTime, ZoneId, DayOfWeek } = require("@js-joda/core");
+const { ZonedDateTime, ZoneId, DayOfWeek, LocalDate } = require("@js-joda/core");
 
 exports.handleEvent = async (event) => {
     const cdcEvents = extractKinesisData(event);
@@ -67,6 +67,6 @@ exports.handleEvent = async (event) => {
   };
 
 function canCancel(paperDelivery) {
-    const isMonday = ZonedDateTime.now(ZoneId.UTC).dayOfWeek() === DayOfWeek.MONDAY;
-    return (paperDelivery?.workflowStep === "EVALUATE_SENDER_LIMIT" && !isMonday);
+    const isSameDay = LocalDate.parse(paperDelivery?.pk.split('~')[0]).equals(LocalDate.now(ZoneId.UTC));
+    return (paperDelivery?.workflowStep === "EVALUATE_SENDER_LIMIT" && !isSameDay);
 }

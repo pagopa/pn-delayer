@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const proxyquire = require("proxyquire").noPreserveCache();
+const { LocalDate, ZoneId } = require("@js-joda/core");
 
 describe("Cancellation Lambda Handler", () => {
 
@@ -59,7 +60,7 @@ describe("Cancellation Lambda Handler", () => {
       "../app/lib/dynamo.js": {
         retrievePaperDelivery: async () => ({
           workflowStep: "EVALUATE_SENDER_LIMIT",
-          pk: "PK",
+          pk: "2026-01-19~SENT_TO_PREPARE_PHASE_2",
           sk: "SK"
         }),
         executeTransactions: async () => ({
@@ -102,7 +103,8 @@ describe("Cancellation Lambda Handler", () => {
       },
       "../app/lib/dynamo.js": {
         retrievePaperDelivery: async () => ({
-          workflowStep: "EVALUATE_SENDER_LIMIT"
+          workflowStep: "EVALUATE_SENDER_LIMIT",
+          pk: "2026-01-19~SENT_TO_PREPARE_PHASE_2"
         }),
         executeTransactions: async () => ({
           success: false,
@@ -110,13 +112,13 @@ describe("Cancellation Lambda Handler", () => {
         })
       },
       "@js-joda/core": {
-        ZonedDateTime: {
-          now: () => ({
-            dayOfWeek: () => "TUESDAY"
-          })
+        LocalDate: {
+          parse: () => ({
+            equals: () => false
+          }),
+          now: () => ({})
         },
-        ZoneId: { UTC: {} },
-        DayOfWeek: { MONDAY: "MONDAY" }
+        ZoneId: { UTC: {} }
       }
     });
 
@@ -127,7 +129,7 @@ describe("Cancellation Lambda Handler", () => {
     });
   });
 
-  it("should skip when workflowStep is not cancellable", async () => {
+  it("should skip when workflowStep is not cancellable for workflowStep", async () => {
     const handler = proxyquire.noCallThru().load("../app/eventHandler.js", {
       "../app/lib/kinesis.js": {
         extractKinesisData: () => [
@@ -156,7 +158,50 @@ describe("Cancellation Lambda Handler", () => {
       },
       "../app/lib/dynamo.js": {
         retrievePaperDelivery: async () => ({
-          workflowStep: "OTHER_STEP"
+          workflowStep: "OTHER_STEP",
+          pk: "2026-01-20~SENT_TO_PREPARE_PHASE_2"
+        }),
+        executeTransactions: async () => {
+          throw new Error("Should not be called");
+        }
+      }
+    });
+
+    const result = await handler.handleEvent({});
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+  });
+
+  it("should skip when workflowStep is not cancellable for isSameDay", async () => {
+    const handler = proxyquire.noCallThru().load("../app/eventHandler.js", {
+      "../app/lib/kinesis.js": {
+        extractKinesisData: () => [
+          {
+            kinesisSequenceNumber: "seq-3",
+            dynamodb: {
+              NewImage: {
+                category: "NOTIFICATION_CANCELLATION_REQUEST",
+                iun: "IUN789"
+              }
+            }
+          }
+        ]
+      },
+      "../app/lib/timelineClient.js": {
+        retrieveTimelineElements: async () => [
+          {
+            category: "PREPARE_ANALOG_DOMICILE",
+            timelineElementId: "PREPARE_ANALOG_DOMICILE.IUN_IUN789.RECINDEX_0.ATTEMPT_0",
+          },
+          {
+            category: "PREPARE_SIMPLE_REGISTERED_LETTER",
+            timelineElementId: "PREPARE_SIMPLE_REGISTERED_LETTER.IUN_IUN789.RECINDEX_0.ATTEMPT_0",
+          }
+        ]
+      },
+      "../app/lib/dynamo.js": {
+        retrievePaperDelivery: async () => ({
+          workflowStep: "EVALUATE_SENDER_LIMIT",
+          pk: `${LocalDate.now(ZoneId.UTC).toString()}~SENT_TO_PREPARE_PHASE_2`
         }),
         executeTransactions: async () => {
           throw new Error("Should not be called");
