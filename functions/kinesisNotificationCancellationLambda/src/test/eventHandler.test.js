@@ -129,7 +129,7 @@ describe("Cancellation Lambda Handler", () => {
     });
   });
 
-  it("should skip when workflowStep is not cancellable for workflowStep", async () => {
+  it("should skip when a notification is not cancellable for workflowStep", async () => {
     const handler = proxyquire.noCallThru().load("../app/eventHandler.js", {
       "../app/lib/kinesis.js": {
         extractKinesisData: () => [
@@ -171,7 +171,7 @@ describe("Cancellation Lambda Handler", () => {
     expect(result).to.deep.equal({ batchItemFailures: [] });
   });
 
-  it("should skip when workflowStep is not cancellable for isSameDay", async () => {
+  it("should skip when a notification is not cancellable for isSameDay", async () => {
     const handler = proxyquire.noCallThru().load("../app/eventHandler.js", {
       "../app/lib/kinesis.js": {
         extractKinesisData: () => [
@@ -190,11 +190,12 @@ describe("Cancellation Lambda Handler", () => {
         retrieveTimelineElements: async () => [
           {
             category: "PREPARE_ANALOG_DOMICILE",
+            elementId: "PREPARE_ANALOG_DOMICILE.IUN_IUN789.RECINDEX_0.ATTEMPT_0",
             timelineElementId: "PREPARE_ANALOG_DOMICILE.IUN_IUN789.RECINDEX_0.ATTEMPT_0",
           },
           {
             category: "PREPARE_SIMPLE_REGISTERED_LETTER",
-            timelineElementId: "PREPARE_SIMPLE_REGISTERED_LETTER.IUN_IUN789.RECINDEX_0.ATTEMPT_0",
+            elementId: "PREPARE_SIMPLE_REGISTERED_LETTER.IUN_IUN789.RECINDEX_0.ATTEMPT_0",
           }
         ]
       },
