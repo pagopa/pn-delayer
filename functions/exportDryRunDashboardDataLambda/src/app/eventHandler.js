@@ -72,8 +72,8 @@ exports.handleEvent = async (event) => {
       "SettimanaleEnteProvinciaProdotto",
       specificDate
     ),
-    SettimanaleOvercapacity: await prepareQuery(
-      "SettimanaleOvercapacity",
+    SettimanaleRecapitista: await prepareQuery(
+      "SettimanaleRecapitista",
       specificDate
     ),
   };
