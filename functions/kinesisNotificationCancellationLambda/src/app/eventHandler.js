@@ -71,17 +71,23 @@ exports.handleEvent = async (event) => {
   };
 
 function canCancel(paperDelivery) {
-  const dateString = paperDelivery?.pk?.split('~')[0];
-  
-  // check if dateString is a valid date in ISO format (YYYY-MM-DD)
-  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-  if (!datePattern.test(dateString)) {
+    const deliveryDateStr = paperDelivery?.pk?.split('~')[0];
+    const parsedDeliveryDate = getParsedDate(deliveryDateStr, paperDelivery);
+    if(!parsedDeliveryDate) {
+        console.warn(`Cannot determine delivery date for paper delivery with pk: ${paperDelivery?.pk}, skipping cancellation`);
+        return false;
+    }
+    const nowIsDeliveryDate = parsedDeliveryDate.equals(LocalDate.now(ZoneId.UTC));
+    const canCancelResult = paperDelivery?.workflowStep === "EVALUATE_SENDER_LIMIT" && !nowIsDeliveryDate;
+    console.log(`Paper delivery with last workflow step ${paperDelivery?.workflowStep} and isSameDay ${nowIsDeliveryDate} canCancel: ${canCancelResult}`);
+    return canCancelResult;
+}
+
+function getParsedDate(deliveryDateStr, paperDelivery) {
+try {
+    return LocalDate.parse(deliveryDateStr);
+  } catch (e) {
     console.warn(`Invalid date format in pk: ${paperDelivery?.pk}`);
-    return false;
+    return null;
   }
-  // check if delivery date is today, if so, cancellation is not allowed because the delivery process may be in progress
-  const nowIsDeliveryDate = LocalDate.parse(dateString).equals(LocalDate.now(ZoneId.UTC));
-  const canCancelResult = paperDelivery?.workflowStep === "EVALUATE_SENDER_LIMIT" && !nowIsDeliveryDate;
-  console.log(`Paper delivery with last workflow step ${paperDelivery?.workflowStep} and isSameDay ${nowIsDeliveryDate} canCancel: ${canCancelResult}`);
-  return canCancelResult;
 }

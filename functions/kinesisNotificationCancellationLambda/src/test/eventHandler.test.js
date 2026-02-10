@@ -202,7 +202,7 @@ describe("Cancellation Lambda Handler", () => {
       "../app/lib/dynamo.js": {
       retrievePaperDelivery: async () => ({
         workflowStep: "EVALUATE_SENDER_LIMIT",
-        pk: "2026-01-19~SENT_TO_PREPARE_PHASE_2"
+        pk: "2026-01-19~EVALUATE_SENDER_LIMIT"
       }),
       executeTransactions: async () => {
         throw new Error("Should not be called");
