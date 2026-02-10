@@ -200,9 +200,57 @@ describe("Cancellation Lambda Handler", () => {
         ]
       },
       "../app/lib/dynamo.js": {
+      retrievePaperDelivery: async () => ({
+        workflowStep: "EVALUATE_SENDER_LIMIT",
+        pk: "2026-01-19~SENT_TO_PREPARE_PHASE_2"
+      }),
+      executeTransactions: async () => {
+        throw new Error("Should not be called");
+      }
+      },
+      "@js-joda/core": {
+      LocalDate: {
+        parse: () => ({
+        equals: () => true
+        }),
+        now: () => LocalDate.parse("2026-01-19")
+      },
+      ZoneId: { UTC: {} }
+      }
+    });
+
+    const result = await handler.handleEvent({});
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+  });
+
+  it("should skip cancellation when pk has invalid date format", async () => {
+    const handler = proxyquire.noCallThru().load("../app/eventHandler.js", {
+      "../app/lib/kinesis.js": {
+        extractKinesisData: () => [
+          {
+            kinesisSequenceNumber: "seq-4",
+            dynamodb: {
+              NewImage: {
+                category: "NOTIFICATION_CANCELLATION_REQUEST",
+                iun: "IUN999"
+              }
+            }
+          }
+        ]
+      },
+      "../app/lib/timelineClient.js": {
+        retrieveTimelineElements: async () => [
+          {
+            category: "PREPARE_ANALOG_DOMICILE",
+            elementId: "PREPARE_ANALOG_DOMICILE.IUN_IUN999.RECINDEX_0.ATTEMPT_0",
+            timelineElementId: "PREPARE_ANALOG_DOMICILE.IUN_IUN999.RECINDEX_0.ATTEMPT_0",
+          }
+        ]
+      },
+      "../app/lib/dynamo.js": {
         retrievePaperDelivery: async () => ({
           workflowStep: "EVALUATE_SENDER_LIMIT",
-          pk: `${LocalDate.now(ZoneId.UTC).toString()}~SENT_TO_PREPARE_PHASE_2`
+          pk: "INVALID_DATE~SENT_TO_PREPARE_PHASE_2"
         }),
         executeTransactions: async () => {
           throw new Error("Should not be called");
