@@ -75,7 +75,8 @@ not_passed AS (
         province,
         productType,
         COUNT(DISTINCT requestId) AS tot_not_passed,
-        COUNT(DISTINCT IF(attempt = '1', requestId, NULL)) AS tot_not_passed_sec_tent
+        COUNT(DISTINCT IF(attempt = '1', requestId, NULL)) AS tot_not_passed_sec_tent,
+        COUNT(DISTINCT IF(productType = 'RS', requestId, NULL)) AS tot_not_passed_rs
     FROM (
         SELECT DISTINCT requestId, attempt, productType, senderPaId, province
         FROM pn_delayer_paper_delivery_json_view
@@ -148,7 +149,7 @@ joined AS (
         TRY_CAST(p.tot_passed AS INTEGER) AS tot_passed,
         TRY_CAST(n.tot_not_passed AS INTEGER) AS tot_not_passed,
         TRY_CAST(n.tot_not_passed_sec_tent AS INTEGER) AS tot_not_passed_sec_tent,
-
+        TRY_CAST(n.tot_not_passed_rs AS INTEGER) AS tot_not_passed_rs,
         TRY_CAST(f.in_prepare_fase_2 AS INTEGER) AS in_prepare_fase_2
 
     FROM commessa c
@@ -194,7 +195,7 @@ SELECT
     COALESCE(SUM(tot_passed), 0) AS tot_passed,
     COALESCE(SUM(tot_not_passed), 0) AS tot_not_passed,
     COALESCE(SUM(tot_not_passed_sec_tent), 0) AS tot_not_passed_sec_tent,
-
+    COALESCE(SUM(tot_not_passed_rs), 0) AS tot_not_passed_rs,
     COALESCE(SUM(in_prepare_fase_2), 0) AS in_prepare_fase_2
 
 FROM joined
