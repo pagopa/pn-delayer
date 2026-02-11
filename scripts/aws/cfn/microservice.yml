@@ -1303,6 +1303,10 @@ Resources:
             - ABORTED
           stateMachineArn:
             - !Ref PaperDeliveryStateMachine
+          input: 
+            - anything-but:
+                "wildcard": 
+                  - "*Mock*"
       State: !Ref RetryAlgorithmStateMachineRuleState
       Targets:
         - Arn: !Ref RetryAlgorithmStateMachine
