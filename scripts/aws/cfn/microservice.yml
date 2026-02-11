@@ -2918,9 +2918,9 @@ Resources:
                 - batch:SubmitJob
                 - batch:DescribeJobs
               Resource:
-                  - !Ref SenderLimitJobDefinition
-                  - !Ref ResidualCapacityJobDefinition
-                  - !Ref DriverCapacityJobDefinition
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-sender-limit-job-definition:*"
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-residual-capacity-job-definition:*"
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-driver-capacity-job-definition:*"
                   - !Ref SenderLimitJobQueue
                   - !Ref ResidualCapacityJobQueue
                   - !Ref DriverCapacityJobQueue
