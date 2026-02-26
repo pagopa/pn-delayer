@@ -16,35 +16,45 @@ exports.handleEvent = async (event = {}) => {
     const allEstimates = [];
 
     const records = event.Records ?? [];
-    for (const record of records) {
-        console.debug(`[HANDLER] Raw SQS record: ${JSON.stringify(record)}`);
-        const body = JSON.parse(record.body);
-        const fileKey = body.key;
+    const batchItemFailures = [];
 
-        const { Count = 0 } = await existsSenderLimitByFileKey(fileKey);
-        if (Count > 0) {
-            console.info(`[HANDLER] Duplicato: fileKey "${fileKey}" già presente. Skip & exit.`);
-            return {
-              statusCode: 200,
-              body: JSON.stringify({ processed: 0, skipped: 1, reason: "duplicate", fileKey }),
-            };
-        }
+    for (const record of records) {
+        try {
+            console.debug(`[HANDLER] Raw SQS record: ${JSON.stringify(record)}`);
+            const body = JSON.parse(record.body);
+            const fileKey = body.key;
+
+            const { Count = 0 } = await existsSenderLimitByFileKey(fileKey);
+            if (Count > 0) {
+                console.info(`[HANDLER] Duplicato: fileKey "${fileKey}" già presente. Skip`);
+                    continue;
+            }
 
         console.debug(`[HANDLER] fileKey="${fileKey}"`);
 
-        // 1. Scarica il JSON commessa
-        const estimateJson = await downloadJson(fileKey);
+            // 1. Scarica il JSON commessa
+            const estimateJson = await downloadJson(fileKey);
+            const estimates = await calculateWeeklyEstimates(
+                estimateJson,
+                region => getProvinceDistribution(region),
+                fileKey
+            );
+            allEstimates.push(...estimates);
 
-        const estimates = await calculateWeeklyEstimates(
-            estimateJson,
-            region => getProvinceDistribution(region),
-            fileKey
-        );
-        allEstimates.push(...estimates);
+        } catch (error) {
+            console.error(`[HANDLER] Errore nel record ${record.messageId}:`, error );
+
+            batchItemFailures.push({
+                itemIdentifier: record.messageId
+            });
+        }
     }
 
+    console.info(`[HANDLER] processed estimates : ${allEstimates.length}`);
+    console.info(`[HANDLER] Completed. Processed files: ${records.length - batchItemFailures.length}, Failed: ${batchItemFailures.length}`);
+
+
     return {
-        statusCode: 200,
-        body: JSON.stringify({ processed: allEstimates.length })
+        batchItemFailures
     };
-}
+};
