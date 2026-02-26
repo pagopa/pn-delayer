@@ -698,6 +698,18 @@ Parameters:
       - DISABLED
     Description: 'EventBridge Rule To toDelayerInputKinesis'
 
+  DelayerReceiverOrdersSendersReservedConcurrentExecutions:
+    Type: Number
+    Description: 'Reserved concurrent executions for pn-delayer lambdas'
+
+  DelayerReceiverOrdersSendersBatchSize:
+    Type: Number
+    Description: 'Batch size for DelayerReceiverOrdersSendersLambda'
+
+  DelayerReceiverOrdersSendersMaxBatchWindowInSeconds:
+    Type: Number
+    Description: 'Maximum batching window in seconds for DelayerReceiverOrdersSendersLambda'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
     HasOncallRetryAlgorithmStateMachineAlarmEnabled: !Not [ !Equals [ !Ref OncallRetryAlgorithmStateMachineAlarmThreshold, '0' ] ]
@@ -1918,6 +1930,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref DelayerReceiverOrdersSendersLambdaName
+      ReservedConcurrentExecutions: !Ref DelayerReceiverOrdersSendersReservedConcurrentExecutions
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
       Code:
@@ -2004,11 +2017,13 @@ Resources:
   DelayerReceiverOrdersSendersLambdaSQSSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      BatchSize: 1
+      BatchSize: !Ref DelayerReceiverOrdersSendersBatchSize
       EventSourceArn: !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
       FunctionName: !Ref DelayerReceiverOrdersSendersLambda
       Enabled: true
-      MaximumBatchingWindowInSeconds: 0
+      MaximumBatchingWindowInSeconds: !Ref DelayerReceiverOrdersSendersMaxBatchWindowInSeconds
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
 
   #########################################################
   ###         TestDelayerLambda                ###
