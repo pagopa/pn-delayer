@@ -710,6 +710,10 @@ Parameters:
     Type: Number
     Description: 'Maximum batching window in seconds for DelayerReceiverOrdersSendersLambda'
 
+  DelayerNotificationOrdersReservedConcurrentExecutions:
+    Type: Number
+    Description: 'Reserved concurrent executions for pn-delayer notification orders lambda'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
     HasOncallRetryAlgorithmStateMachineAlarmEnabled: !Not [ !Equals [ !Ref OncallRetryAlgorithmStateMachineAlarmThreshold, '0' ] ]
@@ -1832,6 +1836,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref DelayerNotificationOrdersLambdaName
+      ReservedConcurrentExecutions: !Ref DelayerNotificationOrdersReservedConcurrentExecutions
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
       Code:

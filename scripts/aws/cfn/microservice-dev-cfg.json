@@ -38,6 +38,7 @@
     "PnCoreEventBusToDelayerInputsKinesisStatus": "ENABLED",
     "DelayerReceiverOrdersSendersReservedConcurrentExecutions": "5",
     "DelayerReceiverOrdersSendersBatchSize": "10",
-    "DelayerReceiverOrdersSendersMaxBatchWindowInSeconds": "60"
+    "DelayerReceiverOrdersSendersMaxBatchWindowInSeconds": "60",
+    "DelayerNotificationOrdersReservedConcurrentExecutions": "5"
   }
 }

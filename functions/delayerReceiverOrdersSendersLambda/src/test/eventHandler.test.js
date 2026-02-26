@@ -1,5 +1,3 @@
-const eventHandler = require('../app/eventHandler');
-
 const { expect } = require('chai');
 const proxyquire = require('proxyquire');
 const lambdaTester = require('lambda-tester');

@@ -26,8 +26,8 @@ exports.handleEvent = async (event = {}) => {
 
             const { Count = 0 } = await existsSenderLimitByFileKey(fileKey);
             if (Count > 0) {
-            console.info(`[HANDLER] Duplicato: fileKey "${fileKey}" già presente. Skip`);
-                continue;
+                console.info(`[HANDLER] Duplicato: fileKey "${fileKey}" già presente. Skip`);
+                    continue;
             }
 
         console.debug(`[HANDLER] fileKey="${fileKey}"`);
@@ -50,7 +50,9 @@ exports.handleEvent = async (event = {}) => {
         }
     }
 
-    console.info(`[HANDLER] Completed. Processed: ${records.length - batchItemFailures.length}, Failed: ${batchItemFailures.length}`);
+    console.info(`[HANDLER] processed estimates : ${allEstimates.length}`);
+    console.info(`[HANDLER] Completed. Processed files: ${records.length - batchItemFailures.length}, Failed: ${batchItemFailures.length}`);
+
 
     return {
         batchItemFailures
