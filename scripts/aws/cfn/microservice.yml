@@ -71,6 +71,10 @@ Parameters:
     Type: String
     Description: 'Where to send CDC'
 
+  CdcKinesisSourceStreamName:
+    Type: String
+    Description: "Kinesis source CDC stream name"
+
   CdcKinesisSourceStreamKeyArn:
     Description: "Kinesis source CDC stream crypto key ARN"
     Type: String
@@ -257,6 +261,10 @@ Parameters:
     Type: String
     Description: 'pn-delayer_inputs kinesis stream ARN'
 
+  PnDelayerInputsKinesisDataStreamName:
+    Type: String
+    Description: 'pn-delayer_inputs kinesis stream name'
+
   PnDelayerInputsKinesisDataStreamKMSArn:
     Type: String
     Description: 'pn-delayer_inputs kinesis stream KMS ARN'
@@ -302,10 +310,6 @@ Parameters:
     Default: nodejs24.x
     Description: Runtime for Lambdas.
 
-  KinesisPaperDeliveryLambdaDLQARN:
-    Type: String
-    Description: 'DLQ ARN for KinesisPaperDeliveryLambda'
-
   KinesisPaperDeliveryLambdaMaxRetry:
     Type: Number
     Default: 1
@@ -328,10 +332,6 @@ Parameters:
   KinesisNotificationCancellationLambdaName:
     Type: String
     Description: 'KinesisNotificationCancellationLambdaName function name'
-
-  KinesisNotificationCancellationLambdaDLQARN:
-    Type: String
-    Description: 'DLQ ARN for KinesisNotificationCancellationLambda'
 
   KinesisNotificationCancellationLambdaMaxRetry:
     Type: Number
@@ -697,6 +697,22 @@ Parameters:
       - ENABLED
       - DISABLED
     Description: 'EventBridge Rule To toDelayerInputKinesis'
+
+  ESMKinesisFailureNotificationsBucketName:
+    Type: String
+    Description: "S3 bucket name for ESM Kinesis failure notifications"
+
+  PaperDeliveryLambdaRecordMaximumRecordAge:
+    Type: Number
+    Description: 'Maximum record age in seconds for paper delivery lambda'
+    Default: 604800 # 7 days in seconds
+
+  NotificationCancellationLambdaRecordMaximumRecordAge:
+    Type: Number
+    Description: 'Maximum record age in seconds for notification cancellation lambda'
+    Default: 604800 # 7 days in seconds
+
+
 
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
@@ -1687,21 +1703,23 @@ Resources:
               - !Ref PaperDeliveryCounterTableArn
           - Effect: Allow
             Action:
-              - sqs:ChangeMessageVisibility
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-              - sqs:SendMessage
-            Resource:
-              !Ref KinesisPaperDeliveryLambdaDLQARN
-          - Effect: Allow
-            Action:
               - dynamodb:BatchGetItem
               - dynamodb:BatchWriteItem
             Resource: !Ref PaperDeliveryKinesisEventTableArn
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource: !Sub arn:aws:s3:::${ESMKinesisFailureNotificationsBucketName}
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: !Sub arn:aws:s3:::${ESMKinesisFailureNotificationsBucketName}/*
 
 
   PaperDeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
+    DependsOn: KinesisPaperDeliveryLambdaPolicy
     Properties:
       BatchSize: !Sub ${KinesisPaperDeliveryLambdaBatchSize}
       BisectBatchOnFunctionError: true
@@ -1711,10 +1729,35 @@ Resources:
         - ReportBatchItemFailures
       MaximumBatchingWindowInSeconds: !Sub ${KinesisPaperDeliveryLambdaMaxBatchWindowInSeconds}
       MaximumRetryAttempts: !Ref KinesisPaperDeliveryLambdaMaxRetry
+      MaximumRecordAgeInSeconds: !Ref PaperDeliveryLambdaRecordMaximumRecordAge
       StartingPosition: TRIM_HORIZON
       DestinationConfig:
         OnFailure:
-          Destination: !Ref KinesisPaperDeliveryLambdaDLQARN
+          Destination: !Sub arn:aws:s3:::${ESMKinesisFailureNotificationsBucketName}
+
+  PaperDeliveryKinesisFailuresAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-PaperDeliveryLambda-ESM-Alarm"
+      AlarmDescription: "CloudWatch alarm for when PaperDeliveryLambda has Kinesis stream read failures, which can indicate problems with the function processing or with the stream itself."
+      TreatMissingData: notBreaching        
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      Dimensions:
+        - Value: !Ref KinesisPaperDeliveryLambda
+          Name: FunctionName
+        - Value: !Ref PnDelayerInputsKinesisDataStreamName
+          Name: StreamName
+      DatapointsToAlarm: 1           
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 6
+      Period: 600
+      Namespace: ESM/Kinesis   
+      MetricName: ProcessingFailures
+      Statistic: Maximum      
+      Threshold: 1
 
   KinesisPaperDeliveryLambdaAlarms:
     Type: AWS::CloudFormation::Stack
@@ -2531,16 +2574,18 @@ Resources:
             Resource: !Ref CdcKinesisSourceStreamKeyArn
           - Effect: Allow
             Action:
-              - sqs:ChangeMessageVisibility
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-              - sqs:SendMessage
-            Resource:
-              !Ref KinesisNotificationCancellationLambdaDLQARN
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource: !Sub arn:aws:s3:::${ESMKinesisFailureNotificationsBucketName}
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: !Sub arn:aws:s3:::${ESMKinesisFailureNotificationsBucketName}/*
 
   # CDC to NotificationCancellationLambda
   KinesisNotificationCancellationLambdaSource:
     Type: AWS::Lambda::EventSourceMapping
+    DependsOn: KinesisNotificationCancellationLambdaPolicy
     Properties:
       BatchSize: !Sub ${KinesisNotificationCancellationLambdaBatchSize}
       BisectBatchOnFunctionError: true
@@ -2550,10 +2595,11 @@ Resources:
         - ReportBatchItemFailures
       MaximumBatchingWindowInSeconds: !Sub ${KinesisNotificationCancellationLambdaBatchWindowInSeconds}
       MaximumRetryAttempts: !Ref KinesisNotificationCancellationLambdaMaxRetry
+      MaximumRecordAgeInSeconds: !Ref  NotificationCancellationLambdaRecordMaximumRecordAge
       StartingPosition: TRIM_HORIZON
       DestinationConfig:
         OnFailure:
-          Destination: !Ref KinesisNotificationCancellationLambdaDLQARN
+          Destination: !Sub arn:aws:s3:::${ESMKinesisFailureNotificationsBucketName}
       FilterCriteria:
         Filters:
           - Pattern: >
@@ -2567,6 +2613,31 @@ Resources:
                   }
                 }
               }
+
+  KinesisNotificationCancellationFailuresAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-KinesisNotificationCancellation-ESM-Alarm"
+      AlarmDescription: "CloudWatch alarm for when KinesisNotificationCancellationLambda has Kinesis stream read failures, which can indicate problems with the function processing or with the stream itself."
+      TreatMissingData: notBreaching        
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      Dimensions:
+        - Value: !Ref KinesisNotificationCancellationLambda
+          Name: FunctionName
+        - Value: !Ref CdcKinesisSourceStreamName
+          Name: StreamName
+      DatapointsToAlarm: 1           
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 6
+      Period: 600
+      Namespace: ESM/Kinesis   
+      MetricName: ProcessingFailures
+      Statistic: Maximum      
+      Threshold: 1
+  
 
   KinesisNotificationCancellationLambdaAlarms:
     Type: AWS::CloudFormation::Stack
