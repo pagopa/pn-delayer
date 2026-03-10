@@ -40,6 +40,11 @@ const OPERATIONS = {
 exports.handleEvent = async (event = {}) => {
     const { operationType, parameters } = event;
 
+    console.log("handleEvent input:", {
+        operationType,
+        parameters,
+    });
+
     const operation = OPERATIONS[operationType];
     if (!operation) {
         return {
