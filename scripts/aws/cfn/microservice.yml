@@ -714,6 +714,22 @@ Parameters:
 
 
 
+  DelayerReceiverOrdersSendersReservedConcurrentExecutions:
+    Type: Number
+    Description: 'Reserved concurrent executions for pn-delayer lambdas'
+
+  DelayerReceiverOrdersSendersBatchSize:
+    Type: Number
+    Description: 'Batch size for DelayerReceiverOrdersSendersLambda'
+
+  DelayerReceiverOrdersSendersMaxBatchWindowInSeconds:
+    Type: Number
+    Description: 'Maximum batching window in seconds for DelayerReceiverOrdersSendersLambda'
+
+  DelayerNotificationOrdersReservedConcurrentExecutions:
+    Type: Number
+    Description: 'Reserved concurrent executions for pn-delayer notification orders lambda'
+
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
     HasOncallRetryAlgorithmStateMachineAlarmEnabled: !Not [ !Equals [ !Ref OncallRetryAlgorithmStateMachineAlarmThreshold, '0' ] ]
@@ -1740,7 +1756,7 @@ Resources:
     Properties:
       AlarmName: !Sub "${ProjectName}-PaperDeliveryLambda-ESM-Alarm"
       AlarmDescription: "CloudWatch alarm for when PaperDeliveryLambda has Kinesis stream read failures, which can indicate problems with the function processing or with the stream itself."
-      TreatMissingData: notBreaching        
+      TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
       OKActions:
@@ -1750,13 +1766,13 @@ Resources:
           Name: FunctionName
         - Value: !Ref PnDelayerInputsKinesisDataStreamName
           Name: StreamName
-      DatapointsToAlarm: 1           
+      DatapointsToAlarm: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 6
       Period: 600
-      Namespace: ESM/Kinesis   
+      Namespace: ESM/Kinesis
       MetricName: ProcessingFailures
-      Statistic: Maximum      
+      Statistic: Maximum
       Threshold: 1
 
   KinesisPaperDeliveryLambdaAlarms:
@@ -1863,6 +1879,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref DelayerNotificationOrdersLambdaName
+      ReservedConcurrentExecutions: !Ref DelayerNotificationOrdersReservedConcurrentExecutions
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
       Code:
@@ -1961,6 +1978,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref DelayerReceiverOrdersSendersLambdaName
+      ReservedConcurrentExecutions: !Ref DelayerReceiverOrdersSendersReservedConcurrentExecutions
       Runtime: !Ref LambdaRuntime
       Handler: "index.handler"
       Code:
@@ -2047,11 +2065,13 @@ Resources:
   DelayerReceiverOrdersSendersLambdaSQSSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      BatchSize: 1
+      BatchSize: !Ref DelayerReceiverOrdersSendersBatchSize
       EventSourceArn: !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
       FunctionName: !Ref DelayerReceiverOrdersSendersLambda
       Enabled: true
-      MaximumBatchingWindowInSeconds: 0
+      MaximumBatchingWindowInSeconds: !Ref DelayerReceiverOrdersSendersMaxBatchWindowInSeconds
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
 
   #########################################################
   ###         TestDelayerLambda                ###
@@ -2619,7 +2639,7 @@ Resources:
     Properties:
       AlarmName: !Sub "${ProjectName}-KinesisNotificationCancellation-ESM-Alarm"
       AlarmDescription: "CloudWatch alarm for when KinesisNotificationCancellationLambda has Kinesis stream read failures, which can indicate problems with the function processing or with the stream itself."
-      TreatMissingData: notBreaching        
+      TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
       OKActions:
@@ -2629,15 +2649,15 @@ Resources:
           Name: FunctionName
         - Value: !Ref CdcKinesisSourceStreamName
           Name: StreamName
-      DatapointsToAlarm: 1           
+      DatapointsToAlarm: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 6
       Period: 600
-      Namespace: ESM/Kinesis   
+      Namespace: ESM/Kinesis
       MetricName: ProcessingFailures
-      Statistic: Maximum      
+      Statistic: Maximum
       Threshold: 1
-  
+
 
   KinesisNotificationCancellationLambdaAlarms:
     Type: AWS::CloudFormation::Stack
