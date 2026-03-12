@@ -72,21 +72,37 @@ exports.deleteData = async (params = []) => {
 
         console.log(`Retrieved ${allEntities.length} entities from DynamoDB`);
 
-        if(allEntities.length > 0){
+        if (allEntities.length > 0) {
+
+            const entitiesByWeek = allEntities.reduce((acc, e) => {
+                const week = e.pk.split('~')[0];
+                if (!acc[week]) acc[week] = [];
+                acc[week].push(e);
+                return acc;
+            }, {});
+
+            console.log(`Found ${Object.keys(entitiesByWeek).length} distinct deliveryWeek(s): ${Object.keys(entitiesByWeek).join(', ')}`);
+
             // Terza fase: delete parallele
-            const deliveryWeek = allEntities[0].pk.split('~')[0];
-            const previousDeliveryWeek = LocalDate.parse(deliveryWeek).with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).minusWeeks(1).toString();
             await Promise.all([
                 batchDeleteEntities(paperDeliveryTableName, allEntities),
-                (async () => {
-                    const grouped = groupRecordsByProductAndProvince(allEntities);
-                    await batchDeleteCounters(countersTableName, grouped, deliveryWeek);
-                })(),
-                batchDeleteUsedSenderLimit(senderUsedLimitTableName, allEntities, previousDeliveryWeek),
-                (async () => {
-                    const printCapacitiesEntities = allEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
-                    await batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, printCapacitiesEntities, deliveryWeek);
-                })()
+
+                ...Object.entries(entitiesByWeek).map(([deliveryWeek, weekEntities]) => {
+                    const previousDeliveryWeek = LocalDate.parse(deliveryWeek).with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).minusWeeks(1).toString();
+                    console.log(`Processing deliveryWeek=${deliveryWeek}, previousDeliveryWeek=${previousDeliveryWeek}, entities=${weekEntities.length}`);
+
+                    return Promise.all([
+                        (async () => {
+                            const grouped = groupRecordsByProductAndProvince(weekEntities);
+                            await batchDeleteCounters(countersTableName, grouped, deliveryWeek);
+                        })(),
+                        batchDeleteUsedSenderLimit(senderUsedLimitTableName, weekEntities, previousDeliveryWeek),
+                        (async () => {
+                            const printCapacitiesEntities = weekEntities.filter(e => e.pk.endsWith('EVALUATE_PRINT_CAPACITY'));
+                            await batchDeleteUsedCapacity(deliveryDriverUsedCapacitiesTableName, printCapacitiesEntities, deliveryWeek);
+                        })()
+                    ]);
+                })
             ]);
         }
 
