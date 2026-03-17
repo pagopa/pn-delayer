@@ -23,6 +23,8 @@ const CONCURRENT_BATCHES = 5; // Numero di batch paralleli
 /**
 * DELETE_DATA operation: downloads the CSV and delete rows to DynamoDB.
 * @param {Array<string>} params[fileName]
+* @param {Array<string>} params - Ordered array in the form
+* [paperDeliveryTableName, deliveryDriverUsedCapacitiesTableName,senderUsedLimitTableName, countersTableName, fileName?]
 * @returns {Promise<{message:string, processed:number}>}
 */
 exports.deleteData = async (params = []) => {
@@ -156,7 +158,9 @@ exports.deleteData = async (params = []) => {
 };
 
 /**
-* Query entities in parallel with concurrency control
+* Delete entities from DynamoDB in parallel with concurrency control and retry handling.
+* Splits the provided keys into batches, performs batched delete operations,
+* and retries unprocessed items up to a fixed number of attempts, waiting between retries.
 */
 async function batchDeleteGeneric(tableName, keys, keyBuilder) {
     if (!keys?.length) return;
