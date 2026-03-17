@@ -6,6 +6,6 @@
     "PaperDeliverySenderLimitGlueTableName": "pn_paper_delivery_sender_limit",
     "PaperDeliveryCounterGlueTableName": "pn_paper_delivery_counters",
     "PnNotificationOrdersTableName": "pn_notification_orders",
-    "PaperChannelProvinceTableName": "pn_paper_channel_province"
+    "ProvinceGlueTableName": "pn_paper_channel_province"
   }
 }
