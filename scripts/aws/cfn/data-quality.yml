@@ -22,12 +22,23 @@ Parameters:
     Type: String
     Description: DynamoDB table name for delayer paper delivery
 
+  PaperDeliveryMockTableName:
+    Type: String
+    Description: DynamoDB mock table name for delayer paper delivery
+
   PaperDeliveryGlueTableName:
     Type: String
     Description: Glue table name for delayer paper delivery
     AllowedPattern: ^[a-z_]+$
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_delayer_paper_delivery
+
+  PaperDeliveryMockGlueTableName:
+    Type: String
+    Description: Mock glue table name for delayer paper delivery
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Mock glue table name must contain only lowercase letters and underscores.
+    Default: pn_delayer_paper_delivery_mock
 
   PaperDeliveryDriverUsedCapacitiesTableName:
     Type: String
@@ -92,6 +103,43 @@ Resources:
       Parameters:
         DynamoTableName: !Ref PaperDeliveryTableName
         GlueTableName: !Ref PaperDeliveryGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>,
+            attempt:struct<N:string>,
+            cap:struct<S:string>,
+            createdAt:struct<S:string>,
+            iun:struct<S:string>,
+            notificationSentAt:struct<S:string>,
+            prepareRequestDate:struct<S:string>,
+            productType:struct<S:string>,
+            province:struct<S:string>,
+            recipientId:struct<S:string>,
+            requestId:struct<S:string>,
+            senderPaId:struct<S:string>,
+            tenderId:struct<S:string>,
+            unifiedDeliveryDriver:struct<S:string>,
+            priority:struct<N:string>,
+            deliveryDate:struct<S:string>,
+            workflowStep:struct<S:string>
+          >
+
+  PaperDeliveryMockDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryMockTableName
+        GlueTableName: !Ref PaperDeliveryMockGlueTableName
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName
