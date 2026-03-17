@@ -356,6 +356,20 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
        assert.strictEqual(typeof body.processed, "number");
+
+       //verifica che siano state fatte delete per entrambe le deliveryWeek
+       const batchCalls = ddbMock.commandCalls(BatchWriteCommand);
+       const countersDeletes = batchCalls
+         .flatMap(call => call.args[0].input.RequestItems["pn-PaperDeliveryCounters"] || [])
+         .filter(req => req.DeleteRequest);
+
+       const deletedPrintPKs = countersDeletes
+         .map(req => req.DeleteRequest.Key)
+         .filter(key => key.pk === "PRINT")
+         .map(key => key.sk);
+
+       assert(deletedPrintPKs.includes("2025-08-25"));
+       assert(deletedPrintPKs.includes("2025-09-01"));
    });
 
    it("DELETE_DATA with custom fileName", async () => {
@@ -376,6 +390,30 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
    });
+
+    it("DELETE_DATA gestisce retry su BatchWriteCommand", async () => {
+        const csvPath = path.join(__dirname, "sample.csv");
+        const csvData = fs.readFileSync(csvPath, "utf8");
+        s3Mock.on(GetObjectCommand).resolves({
+            Body: Readable.from([csvData])
+        });
+        ddbMock.on(QueryCommand).resolves({ Items: [
+            { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", unifiedDeliveryDriver: "driver1", cap: "00178" }
+        ] });
+        // Primo tentativo: UnprocessedItems, poi successo
+        ddbMock.on(BatchWriteCommand).resolves(
+      { UnprocessedItems: { "pn-DelayerPaperDelivery": [
+        { DeleteRequest: { Key: { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1" } } }
+      ] } },
+      {}
+    );
+
+        const result = await handler({ operationType: "DELETE_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverUsedCapacities", "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters"] });
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.message, "Delete completed");
+        assert.strictEqual(typeof body.processed, "number");
+    });
 
    it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
        const fakeItems = [
