@@ -7,6 +7,7 @@ Repository contenente i componenti realizzati per gestire in modo efficiente i p
 
 ## Panoramica
 Si compone di:
+
 - AWS **Step Functions**:
     - **BatchWorkflowStateMachine**: definisce il workflow di pianificazione delle spedizioni coordinando l'esecuzione
       dei job di valutazione dei limiti garantiti al mittente, della capacità di recapito settimanali, e dei residui delle capacità di recapito settimanale. (1 volta a settimana il Lunedì)
