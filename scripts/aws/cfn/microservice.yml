@@ -2956,11 +2956,11 @@ Resources:
       DefinitionSubstitutions:
         TenderAPILambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
         UnifiedDeliveryDriverProvinceParameter: !Ref UnifiedDeliveryDriverProvinceParameter
-        PnDelayerDriverCapacityJobDefinition: !Ref DriverCapacityJobDefinition
+        PnDelayerDriverCapacityJobDefinition: !Sub '${ProjectName}-delayer-driver-capacity-job-definition'
         PnDelayerDriverCapacityJobQueue: !Ref DriverCapacityJobQueue
-        PnDelayerResidualCapacityJobDefinition: !Ref ResidualCapacityJobDefinition
+        PnDelayerResidualCapacityJobDefinition: !Sub '${ProjectName}-delayer-residual-capacity-job-definition'
         PnDelayerResidualCapacityJobQueue: !Ref ResidualCapacityJobQueue
-        PnDelayerSenderLimitJobDefinition: !Ref SenderLimitJobDefinition
+        PnDelayerSenderLimitJobDefinition: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
         PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
       TracingConfiguration:
           Enabled: false
