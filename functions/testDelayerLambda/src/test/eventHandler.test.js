@@ -5,8 +5,11 @@ const fs = require("fs");
 const path = require("path");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
+process.env.AWS_REGION = "eu-south-1";
 process.env.BUCKET_NAME = "test-bucket";
 process.env.OBJECT_KEY = "test-key.csv";
+process.env.ATHENA_DATABASE_NAME = "test-db";
+process.env.ATHENA_WORKGROUP_NAME = "test-wg";
 process.env.SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:BatchWorkflowStateMachine";
 process.env.DELAYERTOPAPERCHANNEL_SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:delayerToPaperChannelStateMachine";
 process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON = "cron(0 8 ? * MON-FRI *)";
@@ -15,14 +18,19 @@ process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE = "2025-07-01T08:00:00.
 process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
 
 const { mockClient } = require("aws-sdk-client-mock");
-const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, GetObjectCommand , CopyObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand } = require("@aws-sdk/client-athena");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
+
+const s3Presigner = require("@aws-sdk/s3-request-presigner");
+s3Presigner.getSignedUrl = async () => "https://fake-presigned-url.s3.amazonaws.com/test.csv";
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
 const lambdaMock = mockClient(LambdaClient);
+const athenaMock = mockClient(AthenaClient);
 
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
@@ -30,6 +38,7 @@ describe("Lambda Delayer Dispatcher", () => {
         ddbMock.reset();
         sfnMock.reset();
         lambdaMock.reset();
+        athenaMock.reset();
     });
 
     it("Unsupported operation returns 400", async () => {
@@ -758,4 +767,74 @@ describe("Lambda Delayer Dispatcher", () => {
      assert.strictEqual(result.statusCode,200);
      assert.strictEqual(JSON.parse(result.body).message, "Item not found");
     });
+
+    it("GET_RESIDUAL_PAPERS returns downloadUrl on success", async () => {
+     athenaMock.on(StartQueryExecutionCommand).resolves({ QueryExecutionId: "exec-123" });
+     athenaMock.on(GetQueryExecutionCommand).resolves({
+         QueryExecution: {
+             Status: { State: "SUCCEEDED" },
+             ResultConfiguration: { OutputLocation: "s3://test-bucket/residual-papers/exec-123.csv" }
+         }
+     });
+     const csvContent = "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1";
+     s3Mock.on(CopyObjectCommand).resolves({});
+     s3Mock.on(DeleteObjectCommand).resolves({});
+     s3Mock.on(GetObjectCommand).resolves({
+         Body: {
+             transformToString: async () => csvContent
+         }
+     });
+     s3Mock.on(PutObjectCommand).resolves({});
+
+     const result = await handler({
+         operationType: "GET_RESIDUAL_PAPERS",
+         parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
+     });
+
+     assert.strictEqual(result.statusCode, 200);
+     const body = JSON.parse(result.body);
+     assert.ok(body.downloadUrl);
+     assert.strictEqual(body.expiresIn, 300);
+    });
+
+    it("GET_RESIDUAL_PAPERS csv separator is converted to semicolon", async () => {
+     athenaMock.reset();
+     s3Mock.reset();
+     athenaMock.on(StartQueryExecutionCommand).resolves({ QueryExecutionId: "exec-456" });
+     athenaMock.on(GetQueryExecutionCommand).resolves({
+         QueryExecution: {
+             Status: { State: "SUCCEEDED" },
+             ResultConfiguration: { OutputLocation: "s3://bucket/residual-papers/exec-456.csv" }
+         }
+     });
+     s3Mock.on(CopyObjectCommand).resolves({});
+     s3Mock.on(DeleteObjectCommand).resolves({});
+     const csvContent = "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1";
+     s3Mock.on(GetObjectCommand).resolves({
+         Body: {
+             transformToString: async () => csvContent
+         }
+     });
+     s3Mock.on(PutObjectCommand).resolves({});
+
+     await handler({
+         operationType: "GET_RESIDUAL_PAPERS",
+         parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
+     });
+
+     const putCalls = s3Mock.commandCalls(PutObjectCommand);
+     assert.ok(putCalls.length > 0, "PutObjectCommand should have been called");
+     const uploadedContent = putCalls[0].args[0].input.Body;
+     assert.ok(uploadedContent.includes(";"), "CSV should use semicolon separator");
+     assert.ok(!uploadedContent.includes(","), "CSV should not contain commas");
+    });
+
+   it("GET_RESIDUAL_PAPERS prepareQuery throws if sql file not found", async () => {
+    const result = await handler({
+        operationType: "GET_RESIDUAL_PAPERS",
+        parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
+    });
+
+    assert.strictEqual(result.statusCode, 500);
+   });
 });
