@@ -88,12 +88,23 @@ Parameters:
     Type: String
     Description: DynamoDB table name for paper delivery counters
 
+  PaperDeliveryCounterMockTableName:
+    Type: String
+    Description: DynamoDB mock table name for paper delivery counters
+
   PaperDeliveryCounterGlueTableName:
     Type: String
     Description: Glue table name for paper delivery counters
     AllowedPattern: ^[a-z_]+$
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_paper_delivery_counters
+
+  PaperDeliveryCounterMockGlueTableName:
+    Type: String
+    Description: Mock glue table name for paper delivery counters
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Mock glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_counters_mock
 
   NotificationOrdersTableName:
     Type: String
@@ -323,6 +334,32 @@ Resources:
               sentToNextWeek:struct<N:string>,
               ttl:struct<N:string>
             >
+
+  PaperDeliveryCounterMockGlueDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryCounterMockTableName
+        GlueTableName: !Ref PaperDeliveryCounterMockGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>,
+            numberOfShipments:struct<N:string>,
+            dailyPrintCapacity:struct<N:string>,
+            weeklyPrintCapacity:struct<N:string>,
+            sentToNextWeek:struct<N:string>,
+            ttl:struct<N:string>
+          >
 
   NotificationOrdersDataQualityStack:
     Type: AWS::CloudFormation::Stack
