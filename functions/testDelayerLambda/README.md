@@ -16,7 +16,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **DELAYER_TO_PAPER_CHANNEL**   | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                   | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                             |
 | **GET_STATUS_EXECUTION**       | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                               | `["executionArn"]`                                                                                                                                                                                                               |
 | **GET_PAPER_DELIVERY**         | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                     | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
-| **GET_SENDER_LIMIT**           | Restituisce le stime dichiarate dai mittenti filtrate per settimana di spedizione e provincia dalla tabella `pn-PaperDeliverySenderLimit`.                          | `[ "deliveryDate (yyyy-MM-dd)", "province", "lastEvaluatedKey" ]` lastEvaluatedKey opzionale                                                                                                                                     |
+| **GET_SENDER_LIMIT**           | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.    | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? }` |
 | **GET_PRESIGNED_URL**          | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                         | `["filename","checksum"]`                                                                                                                                                                                                        |
 | **GET_DECLARED_CAPACITY**      | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
 | **INSERT_MOCK_CAPACITIES**     | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                          | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
@@ -83,19 +83,36 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 
 *GET_SENDER_LIMIT*
 
-- Senza lastEvaluatedKey
+- Caso standard 
 
 ```json
 {
   "operationType": "GET_SENDER_LIMIT",
-  "parameters": ["2025-06-30", "RM"]
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "province": "RM"
+  }
 }
 ```
 - Con lastEvaluatedKey
 ```json
 {
   "operationType": "GET_SENDER_LIMIT",
-  "parameters": ["2025-06-30", "RM", "<lek>"]
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "province": "RM",
+    "lastEvaluatedKey": "<lek>"
+  }
+}
+```
+- Con pk
+```json
+{
+  "operationType": "GET_SENDER_LIMIT",
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "pk": "paId~productType~province"
+  }
 }
 ```
 *GET_BY_REQUEST_ID*
@@ -105,6 +122,8 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   "parameters": ["PREPARE_ANALOG_DOMICILE.IUN_ADTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0"]
 }
 ```
+> Se viene passato `pk`, il parametro `province` non è necessario e l'operazione esegue una `GetItem` sulla chiave `{ pk, sk: deliveryDate }`. 
+> In caso contrario, esegue una `Query` sulla GSI `deliveryDateProvince-index` filtrando per `deliveryDate` e `province` (se presente) e paginando con `lastEvaluatedKey` (se presente).
 
 *GET_STATUS_EXECUTION*
 ```json
