@@ -44,12 +44,23 @@ Parameters:
     Type: String
     Description: DynamoDB table name for paper delivery driver used capacities
 
+  PaperDeliveryDriverUsedCapacitiesMockTableName:
+    Type: String
+    Description: DynamoDB mock table name for paper delivery driver used capacities
+
   PaperDeliveryDriverUsedCapacitiesGlueTableName:
     Type: String
     Description: Glue table name for paper delivery driver used capacities
     AllowedPattern: ^[a-z_]+$
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_paper_delivery_driver_used_capacities
+
+  PaperDeliveryDriverUsedCapacitiesMockGlueTableName:
+    Type: String
+    Description: Mock glue table name for paper delivery driver used capacities
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Mock glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_driver_used_capacities_mock
 
   PaperDeliveryUsedSenderLimitTableName:
     Type: String
@@ -188,6 +199,31 @@ Resources:
       Parameters:
         DynamoTableName: !Ref PaperDeliveryDriverUsedCapacitiesTableName
         GlueTableName: !Ref PaperDeliveryDriverUsedCapacitiesGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            unifiedDeliveryDriverGeokey:struct<S:string>,
+            deliveryDate:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            unifiedDeliveryDriverGeokey:struct<S:string>,
+            deliveryDate:struct<S:string>,
+            declaredCapacity:struct<N:string>,
+            geoKey:struct<S:string>,
+            unifiedDeliveryDriver:struct<S:string>,
+            usedCapacity:struct<N:string>
+          >
+
+  PaperDeliveryDriverUsedCapacitiesMockDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryDriverUsedCapacitiesMockTableName
+        GlueTableName: !Ref PaperDeliveryDriverUsedCapacitiesMockGlueTableName
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName

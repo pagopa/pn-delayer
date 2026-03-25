@@ -3,6 +3,7 @@
     "PaperDeliveryGlueTableName": "pn_delayer_paper_delivery",
     "PaperDeliveryMockGlueTableName": "pn_delayer_paper_delivery_mock",
     "PaperDeliveryDriverUsedCapacitiesGlueTableName": "pn_paper_delivery_driver_used_capacities",
+    "PaperDeliveryDriverUsedCapacitiesMockGlueTableName": "pn_paper_delivery_driver_used_capacities_mock",
     "PaperDeliveryUsedSenderLimitGlueTableName": "pn_paper_delivery_used_sender_limit",
     "PaperDeliverySenderLimitGlueTableName": "pn_paper_delivery_sender_limit",
     "PaperDeliveryCounterGlueTableName": "pn_paper_delivery_counters",
