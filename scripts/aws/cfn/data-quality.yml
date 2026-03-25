@@ -84,6 +84,17 @@ Parameters:
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_notification_orders
 
+  ProvinceTableName:
+    Type: String
+    Description: DynamoDB table name for paper channel province
+
+  ProvinceGlueTableName:
+    Type: String
+    Description: Glue table name for paper channel province
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_channel_province
+
 Resources:
   PaperDeliveryDataQualityStack:
     Type: AWS::CloudFormation::Stack
@@ -253,3 +264,25 @@ Resources:
                   lastUpdateOrder:struct<S:string>,
                   createdAt:struct<S:string>
               >
+
+  ProvinceDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref ProvinceTableName
+        GlueTableName: !Ref ProvinceGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+              region:struct<S:string>,
+              province:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+              region:struct<S:string>,
+              province:struct<S:string>,
+              percentageDistribution:struct<N:string>
+          >
