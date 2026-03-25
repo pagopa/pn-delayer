@@ -5,6 +5,7 @@
     "PaperDeliveryDriverUsedCapacitiesGlueTableName": "pn_paper_delivery_driver_used_capacities",
     "PaperDeliveryDriverUsedCapacitiesMockGlueTableName": "pn_paper_delivery_driver_used_capacities_mock",
     "PaperDeliveryUsedSenderLimitGlueTableName": "pn_paper_delivery_used_sender_limit",
+    "PaperDeliveryUsedSenderLimitMockGlueTableName": "pn_paper_delivery_used_sender_limit_mock",
     "PaperDeliverySenderLimitGlueTableName": "pn_paper_delivery_sender_limit",
     "PaperDeliveryCounterGlueTableName": "pn_paper_delivery_counters",
     "PaperDeliveryCounterMockGlueTableName": "pn_paper_delivery_counters_mock",
