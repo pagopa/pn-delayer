@@ -25,6 +25,11 @@ function prepareQueryCondition(queryFile, mdate, viewName) {
 
 function prepareQueryPlaceholdersMap(mDate, viewName) {
   const baseDate = new Date(mDate);
+
+  if (Number.isNaN(baseDate.getTime())) {
+    throw new Error(`Invalid date: ${mDate}`);
+  }
+
   const nextWeek = new Date(baseDate);
   const lastWeek = new Date(baseDate);
 
@@ -49,11 +54,15 @@ function generatePartitionConditionWithBetween(startDateStr, endDateStr) {
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
 
-  if (start >= end) {
-    throw new Error("La data di inizio deve essere precedente alla data di fine");
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error(
+      `Invalid date range: start=${startDateStr}, end=${endDateStr}`
+    );
   }
 
-  end.setDate(end.getDate());
+  if (start > end) {
+    throw new Error("La data di inizio deve essere precedente o uguale alla data di fine");
+  }
 
   const result = [];
   const current = new Date(start);
