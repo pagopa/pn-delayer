@@ -2204,8 +2204,8 @@ Resources:
             Resource:
               - !Sub "${TestDelayerBucketArn}"
               - !Sub "${TestDelayerBucketArn}/*"
-              - !Sub arn:aws:s3:::${TestDelayerBucketName}
-              - !Sub arn:aws:s3:::${TestDelayerBucketName}/*
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
           - Sid: DecryptObjects
             Effect: Allow
             Action:
@@ -2274,40 +2274,6 @@ Resources:
               - !Sub "${PaperDeliveryCounterTableArn}/*"
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
-          - Effect: Allow
-            Action:
-              - athena:StartQueryExecution
-              - athena:GetQueryExecution
-              - athena:GetQueryResults
-            Resource:
-              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
-          - Effect: Allow
-            Action:
-              - glue:GetDatabase
-              - glue:GetDatabases
-              - glue:GetTable
-              - glue:GetTables
-              - glue:GetPartition
-              - glue:GetPartitions
-            Resource:
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
-              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/*
-          - Effect: Allow
-            Action:
-              - s3:PutObject
-              - s3:GetObject
-              - s3:ListBucket
-              - s3:GetBucketLocation
-              - s3:DeleteObject
-            Resource:
-              - !Sub arn:aws:s3:::${TestDelayerBucketName}
-              - !Sub arn:aws:s3:::${TestDelayerBucketName}/*
-          - Effect: Allow
-            Action:
-              - kms:Decrypt
-            Resource:
-              - "*"
 
   #########################################################
   ###                  PreRunRetryLambdaName                   ###

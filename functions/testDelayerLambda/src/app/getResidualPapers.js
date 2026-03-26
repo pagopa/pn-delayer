@@ -12,8 +12,8 @@ exports.getResidualPapers = async (params = []) => {
   const database = process.env.ATHENA_DATABASE_NAME;
   const bucket = process.env.BUCKET_NAME;
   const workgroup = process.env.ATHENA_WORKGROUP_NAME;
-  const athenaResultsPrefix = "athena-results/residual-papers";
-  const finalPrefix = "residual-papers";
+  const athenaResultsPrefix = `athena-results/residual-papers`;
+  const finalPrefix = `residual-papers`;
 
   console.log(`Environment:
   - Date:      ${specificDate}
