@@ -2108,6 +2108,8 @@ Resources:
           DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+          ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
+          ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
       TracingConfig:
         Mode: Active
       Layers:
@@ -2249,6 +2251,40 @@ Resources:
               - !Sub "${PaperDeliveryCounterTableArn}/*"
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
+          - Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+            Resource:
+              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
+          - Effect: Allow
+            Action:
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetTable
+              - glue:GetTables
+              - glue:GetPartition
+              - glue:GetPartitions
+            Resource:
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/*
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:DeleteObject
+            Resource:
+              - !Sub arn:aws:s3:::${TestDelayerBucketName}
+              - !Sub arn:aws:s3:::${TestDelayerBucketName}/*
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource:
+              - "*"
 
   #########################################################
   ###                  PreRunRetryLambdaName                   ###
@@ -2956,11 +2992,11 @@ Resources:
       DefinitionSubstitutions:
         TenderAPILambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
         UnifiedDeliveryDriverProvinceParameter: !Ref UnifiedDeliveryDriverProvinceParameter
-        PnDelayerDriverCapacityJobDefinition: !Ref DriverCapacityJobDefinition
+        PnDelayerDriverCapacityJobDefinition: !Sub '${ProjectName}-delayer-driver-capacity-job-definition'
         PnDelayerDriverCapacityJobQueue: !Ref DriverCapacityJobQueue
-        PnDelayerResidualCapacityJobDefinition: !Ref ResidualCapacityJobDefinition
+        PnDelayerResidualCapacityJobDefinition: !Sub '${ProjectName}-delayer-residual-capacity-job-definition'
         PnDelayerResidualCapacityJobQueue: !Ref ResidualCapacityJobQueue
-        PnDelayerSenderLimitJobDefinition: !Ref SenderLimitJobDefinition
+        PnDelayerSenderLimitJobDefinition: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
         PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
       TracingConfiguration:
           Enabled: false
@@ -3016,6 +3052,9 @@ Resources:
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-sender-limit-job-definition:*"
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-residual-capacity-job-definition:*"
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-driver-capacity-job-definition:*"
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-sender-limit-job-definition"
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-residual-capacity-job-definition"
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-driver-capacity-job-definition"
                   - !Ref SenderLimitJobQueue
                   - !Ref ResidualCapacityJobQueue
                   - !Ref DriverCapacityJobQueue

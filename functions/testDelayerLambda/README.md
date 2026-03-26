@@ -21,6 +21,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_DECLARED_CAPACITY**      | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
 | **INSERT_MOCK_CAPACITIES**     | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                          | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
 | **GET_PRINT_CAPACITY_COUNTER** | Restituisce l'entità del contatore per la verifica della capacità di stampa settimanale.                                                                            | `["paperDeliveryCountersTableName, deliveryDate"]`                                                                                                                                                                               |
+| **GET_RESIDUAL_PAPERS**        | Esegue l'upload di un CSV su S3 e restituisce al chiamante l'url per recuperare il file.                                                                            | `["delayerPaperDeliveryTableName, deliveryDate"]`                                                                                                                                                                                |
 
 ### Esempi di payload
 
@@ -201,6 +202,14 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 }
 ```
 
+*GET_RESIDUAL_PAPERS*
+```json
+{
+  "operationType": "GET_RESIDUAL_PAPERS",
+  "parameters": ["pn_delayer_paper_delivery_json_view","2026-03-24"]
+}
+```
+
 ### Output GET_DECLARED_CAPACITY
 
 * Items trovati → 
@@ -378,6 +387,15 @@ Un esempio di risposta è il seguente:
 }
  ```
 
+### Output GET_RESIDUAL_PAPERS
+
+  ```json
+{
+  "statusCode": 200,
+  "body": "{\"downloadUrl\":\"https://pn-delayer-storage-dev-pn-test-delayer-bucket.s3.eu-south-1.amazonaws.com/residual-papers/20260324094718.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIA4CS2QL4MUTC2IBP4%2F20260324%2Feu-south-1%2Fs3%2Faws4_request&X-Amz-Date=20260324T094719Z&X-Amz-Expires=300&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEMr%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCmV1LXNvdXRoLTEiRzBFAiEAkq1MLkSu84Ab%2F5WSXrzGexiAHeFTQmfW7GnlLmvZO58CIHAPdNMhRdsrphstSP7mEoLNfYYn28Ez59DvPFzGkyi1KoAECJP%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMODMwMTkyMjQ2NTUzIgwfnBdBTw43Yymk8scq1AOi48GW8BmuXXlcMJTnm5aa2gdbVzsBUELaKakXwLCuXRSiUSC%2BzpyRz9zBz8a07n9plJn%2FdmtkKy84%2BHrAHG3O7oGja%2BYru9MSlNmmxsuHVnDHQYttol%2BX49SuvI5I5yZNjWMaOfirsue%2B9SUAm8LiJ%2Bi%2F35fedfLfW8U01fzN94gKjLTp6J5nP%2F9ecbJY1%2FvwvqBpPD8CfQ0sg0ti3gT2qUa77jpQrbrd%2B0P8WMulRG1lcH8T6Jgwed%2F2OsNOk2GI8QbpnGvxmkr50PRAYrv0SfsZ0bJF6AsOVTjBcdkjDCjkpeFQWEyOc6%2BZjfaqQhVNwCUvIEmMAN0997%2FKGhe5ozPtcQYSWjusp0n1GjtwFShf8oUzI1C40IxDS%2BoJg4jc3EsaARRwq566zBfjZdJ9azTdtDBC0s7fJSVC5QltQxZw6KKi81FCaHt0dt2Ofu%2Fvf3GmNb%2Fn0IK3Q2yAwN2I%2FFg0TUF13pnCndvgDPtnDVG8XvTluWF%2B2rJ8LtnKs8iJ0EnLENQH6n6nyBmwRUODeoyr7CPvmnv99Qw2xKcJVNP3y6cegBbGe1EiYwmx3tcNxd3DMIPCJ0CEOeB0cMGBZ9mDejDDl6eqBXpQo%2B7olMDeEJkworuJzgY6oQFtEh6XTiHgAlNc7IUSYsAcRfJFVPVTfoFhwdxYJD%2Fr0ycup1G6soXluxzmd5b98XfDVnUDl5zJUrZXfR4yHyuVtAsr9B60s135GMtwgsBoc873W4OOBZswGcP8BxAEg6ftvgGCZmt%2FkidokFQqcXGUVBajNMyD1qoEqsY5a14fL0uPA%2FXSeQmRfVyD2hmokONA%2B9KlCMAigbs5cUoZtB8BxQ%3D%3D&X-Amz-Signature=a5874d4a17ec6cafa1cb7af14f46d27aac6c78445e563dad6e206ec18681a67e&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject\",\"expiresIn\":300,\"key\":\"residual-papers/20260324094718.csv\"}"
+}
+  ```
+
 > Aggiungi nuove operazioni creando un nuovo modulo e registrandolo in `eventHandler.js` dentro l’oggetto `OPERATIONS`.
 
 ## Struttura del progetto
@@ -400,6 +418,11 @@ Un esempio di risposta è il seguente:
 │       ├── getStatusExecution.js                       # Implementazione operazione GET_STATUS_EXECUTION
 │       ├── insertMockCapacities.js                     # Implementazione operazione INSERT_MOCK_CAPACITIES
 │       └── getPrintCapacityCounter.js                  # Implementazione operazione GET_PRINT_CAPACITY_COUNTER
+│       └── getResidualPapers.js                        # Implementazione operazione GET_RESIDUAL_PAPERS
+│       └── lib/
+│            ├── athena.js # Athena client
+│            └── s3.js     # S3 client
+│            └── utils.js  # Classe di utils 
 │   └── test/
 │       ├── eventHandler.test.js # Test unitari (Nyc + aws-sdk-client-mock)
 │       └── sample.csv     # Fixture di esempio
