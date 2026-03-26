@@ -355,7 +355,8 @@ describe("Lambda Delayer Dispatcher", () => {
        ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
         unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
         unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
-        unifiedDeliveryDriver: "driver1", cap: "20100" }] });
+        unifiedDeliveryDriver: "driver1", cap: "20100" },{ pk: "2025-09-01~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId",
+        unifiedDeliveryDriver: "driver1", cap: "00178" }] });
        ddbMock.on(BatchWriteCommand).resolves({});
        ddbMock.on(BatchWriteCommand).resolves({});
 
@@ -364,6 +365,20 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
        assert.strictEqual(typeof body.processed, "number");
+
+       //verifica che siano state fatte delete per entrambe le deliveryWeek
+       const batchCalls = ddbMock.commandCalls(BatchWriteCommand);
+       const countersDeletes = batchCalls
+         .flatMap(call => call.args[0].input.RequestItems["pn-PaperDeliveryCounters"] || [])
+         .filter(req => req.DeleteRequest);
+
+       const deletedPrintPKs = countersDeletes
+         .map(req => req.DeleteRequest.Key)
+         .filter(key => key.pk === "PRINT")
+         .map(key => key.sk);
+
+       assert(deletedPrintPKs.includes("2025-08-25"));
+       assert(deletedPrintPKs.includes("2025-09-01"));
    });
 
    it("DELETE_DATA with custom fileName", async () => {
@@ -384,6 +399,48 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
    });
+
+    it("DELETE_DATA handles retry on BatchWriteCommand", async () => {
+        const csvPath = path.join(__dirname, "sample.csv");
+        const csvData = fs.readFileSync(csvPath, "utf8");
+        s3Mock.on(GetObjectCommand).resolves({
+            Body: Readable.from([csvData])
+        });
+        ddbMock.on(QueryCommand).resolves({ Items: [
+            { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", unifiedDeliveryDriver: "driver1", cap: "00178" }
+        ] });
+        // First attempt: UnprocessedItems, then success
+        ddbMock.on(BatchWriteCommand).resolves(
+      { UnprocessedItems: { "pn-DelayerPaperDelivery": [
+        { DeleteRequest: { Key: { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1" } } }
+      ] } },
+      {}
+    );
+
+        const result = await handler({ operationType: "DELETE_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverUsedCapacities", "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters"] });
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.message, "Delete completed");
+        assert.strictEqual(typeof body.processed, "number");
+        // Verify that the BatchWriteCommand has been called at least twice for the same table (retry)
+        const batchWriteCalls = ddbMock.commandCalls(BatchWriteCommand);
+        const delayerCalls = batchWriteCalls.filter(call =>
+            call.args[0].input.RequestItems["pn-DelayerPaperDelivery"]
+        );
+        assert.ok(
+            delayerCalls.length >= 2,
+            "BatchWriteCommand deve essere chiamato almeno due volte per pn-DelayerPaperDelivery (retry incluso)"
+        );
+        // Verify that the second call includes all the requests from the first (retry)
+        const firstCall = delayerCalls[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"];
+        const secondCall = delayerCalls[1].args[0].input.RequestItems["pn-DelayerPaperDelivery"];
+        firstCall.forEach(req => {
+          assert(
+            secondCall.some(r => JSON.stringify(r) === JSON.stringify(req)),
+            "La seconda chiamata deve includere la richiesta della prima (retry)"
+          );
+        });
+    });
 
    it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
        const fakeItems = [
@@ -412,7 +469,7 @@ describe("Lambda Delayer Dispatcher", () => {
        const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30" };
        ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
 
-       const params = ["2025-06-30", "RM"];
+       const params = {"deliveryDate":"2025-06-30", "province":"RM"};
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
 
        assert.strictEqual(result.statusCode, 200);
@@ -423,10 +480,40 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
    });
 
+  it("GET_SENDER_LIMIT returns the item with pk", async () => {
+      const fakeItem = {
+          pk: "PA2~PT2~RM",
+          deliveryDate: "2025-06-30",
+          weeklyEstimate: 150,
+          monthlyEstimate: 600,
+          originalEstimate: 700,
+          paId: "PA2",
+          productType: "PT2",
+          province: "RM"
+      };
+
+      ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+      const params = {
+          deliveryDate: "2025-06-30",
+          pk: "PA2~PT2~RM"
+      };
+
+      const result = await handler({
+          operationType: "GET_SENDER_LIMIT",
+          parameters: params
+      });
+
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.strictEqual(body.items.length, 1);
+      assert.strictEqual(body.items[0].weeklyEstimate, 150);
+  });
+
    it("GET_SENDER_LIMIT if no items found", async () => {
 
        ddbMock.on(QueryCommand).resolves({ Items: [] });
-       const params = ["2025-06-30", "RM"];
+      const params = {"deliveryDate":"2025-06-30", "province":"RM"};
 
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
        const body = JSON.parse(result.body);
@@ -435,8 +522,8 @@ describe("Lambda Delayer Dispatcher", () => {
 
    it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
 
-      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
-      assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, province]");
+      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: {} });
+      assert.strictEqual(JSON.parse(result.body).message, "Parameters must include deliveryDate and (province or pk)");
    });
 
    it("should throw error when parameter is missing", async () => {

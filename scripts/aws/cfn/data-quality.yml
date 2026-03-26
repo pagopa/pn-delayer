@@ -22,6 +22,10 @@ Parameters:
     Type: String
     Description: DynamoDB table name for delayer paper delivery
 
+  PaperDeliveryMockTableName:
+    Type: String
+    Description: DynamoDB mock table name for delayer paper delivery
+
   PaperDeliveryGlueTableName:
     Type: String
     Description: Glue table name for delayer paper delivery
@@ -29,9 +33,20 @@ Parameters:
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_delayer_paper_delivery
 
+  PaperDeliveryMockGlueTableName:
+    Type: String
+    Description: Mock glue table name for delayer paper delivery
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Mock glue table name must contain only lowercase letters and underscores.
+    Default: pn_delayer_paper_delivery_mock
+
   PaperDeliveryDriverUsedCapacitiesTableName:
     Type: String
     Description: DynamoDB table name for paper delivery driver used capacities
+
+  PaperDeliveryDriverUsedCapacitiesMockTableName:
+    Type: String
+    Description: DynamoDB mock table name for paper delivery driver used capacities
 
   PaperDeliveryDriverUsedCapacitiesGlueTableName:
     Type: String
@@ -40,9 +55,20 @@ Parameters:
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_paper_delivery_driver_used_capacities
 
+  PaperDeliveryDriverUsedCapacitiesMockGlueTableName:
+    Type: String
+    Description: Mock glue table name for paper delivery driver used capacities
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Mock glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_driver_used_capacities_mock
+
   PaperDeliveryUsedSenderLimitTableName:
     Type: String
     Description: DynamoDB table name for paper delivery used sender limits
+
+  PaperDeliveryUsedSenderLimitMockTableName:
+    Type: String
+    Description: DynamoDB mock table name for paper delivery used sender limits
 
   PaperDeliveryUsedSenderLimitGlueTableName:
     Type: String
@@ -50,6 +76,13 @@ Parameters:
     AllowedPattern: ^[a-z_]+$
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_paper_delivery_used_sender_limit
+
+  PaperDeliveryUsedSenderLimitMockGlueTableName:
+    Type: String
+    Description: Mock glue table name for paper delivery used sender limits
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Mock glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_used_sender_limit_mock
 
   PaperDeliverySenderLimitTableName:
     Type: String
@@ -66,12 +99,23 @@ Parameters:
     Type: String
     Description: DynamoDB table name for paper delivery counters
 
+  PaperDeliveryCounterMockTableName:
+    Type: String
+    Description: DynamoDB mock table name for paper delivery counters
+
   PaperDeliveryCounterGlueTableName:
     Type: String
     Description: Glue table name for paper delivery counters
     AllowedPattern: ^[a-z_]+$
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_paper_delivery_counters
+
+  PaperDeliveryCounterMockGlueTableName:
+    Type: String
+    Description: Mock glue table name for paper delivery counters
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Mock glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_delivery_counters_mock
 
   NotificationOrdersTableName:
     Type: String
@@ -84,6 +128,17 @@ Parameters:
     ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
     Default: pn_notification_orders
 
+  ProvinceTableName:
+    Type: String
+    Description: DynamoDB table name for paper channel province
+
+  ProvinceGlueTableName:
+    Type: String
+    Description: Glue table name for paper channel province
+    AllowedPattern: ^[a-z_]+$
+    ConstraintDescription: Glue table name must contain only lowercase letters and underscores.
+    Default: pn_paper_channel_province
+
 Resources:
   PaperDeliveryDataQualityStack:
     Type: AWS::CloudFormation::Stack
@@ -92,6 +147,43 @@ Resources:
       Parameters:
         DynamoTableName: !Ref PaperDeliveryTableName
         GlueTableName: !Ref PaperDeliveryGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>,
+            attempt:struct<N:string>,
+            cap:struct<S:string>,
+            createdAt:struct<S:string>,
+            iun:struct<S:string>,
+            notificationSentAt:struct<S:string>,
+            prepareRequestDate:struct<S:string>,
+            productType:struct<S:string>,
+            province:struct<S:string>,
+            recipientId:struct<S:string>,
+            requestId:struct<S:string>,
+            senderPaId:struct<S:string>,
+            tenderId:struct<S:string>,
+            unifiedDeliveryDriver:struct<S:string>,
+            priority:struct<N:string>,
+            deliveryDate:struct<S:string>,
+            workflowStep:struct<S:string>
+          >
+
+  PaperDeliveryMockDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryMockTableName
+        GlueTableName: !Ref PaperDeliveryMockGlueTableName
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName
@@ -147,6 +239,31 @@ Resources:
             usedCapacity:struct<N:string>
           >
 
+  PaperDeliveryDriverUsedCapacitiesMockDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryDriverUsedCapacitiesMockTableName
+        GlueTableName: !Ref PaperDeliveryDriverUsedCapacitiesMockGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            unifiedDeliveryDriverGeokey:struct<S:string>,
+            deliveryDate:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            unifiedDeliveryDriverGeokey:struct<S:string>,
+            deliveryDate:struct<S:string>,
+            declaredCapacity:struct<N:string>,
+            geoKey:struct<S:string>,
+            unifiedDeliveryDriver:struct<S:string>,
+            usedCapacity:struct<N:string>
+          >
+
   PaperDeliveryUsedSenderLimitDataQualityStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -154,6 +271,33 @@ Resources:
       Parameters:
         DynamoTableName: !Ref PaperDeliveryUsedSenderLimitTableName
         GlueTableName: !Ref PaperDeliveryUsedSenderLimitGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            deliveryDate:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            deliveryDate:struct<S:string>,
+            numberOfShipment:struct<N:string>,
+            paId:struct<S:string>,
+            productType:struct<S:string>,
+            province:struct<S:string>,
+            senderLimit:struct<N:string>,
+            ttl:struct<N:string>
+          >
+
+  PaperDeliveryUsedSenderLimitMockDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryUsedSenderLimitMockTableName
+        GlueTableName: !Ref PaperDeliveryUsedSenderLimitMockGlueTableName
         GlueServiceRoleArn: !Ref GlueServiceRoleArn
         LogsBucketName: !Ref LogsBucketName
         GlueDatabaseName: !Ref GlueDatabaseName
@@ -229,6 +373,32 @@ Resources:
               ttl:struct<N:string>
             >
 
+  PaperDeliveryCounterMockGlueDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref PaperDeliveryCounterMockTableName
+        GlueTableName: !Ref PaperDeliveryCounterMockGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+            pk:struct<S:string>,
+            sk:struct<S:string>,
+            numberOfShipments:struct<N:string>,
+            dailyPrintCapacity:struct<N:string>,
+            weeklyPrintCapacity:struct<N:string>,
+            sentToNextWeek:struct<N:string>,
+            ttl:struct<N:string>
+          >
+
   NotificationOrdersDataQualityStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -253,3 +423,25 @@ Resources:
                   lastUpdateOrder:struct<S:string>,
                   createdAt:struct<S:string>
               >
+
+  ProvinceDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: !Ref ProvinceTableName
+        GlueTableName: !Ref ProvinceGlueTableName
+        GlueServiceRoleArn: !Ref GlueServiceRoleArn
+        LogsBucketName: !Ref LogsBucketName
+        GlueDatabaseName: !Ref GlueDatabaseName
+        DynamoDBKeysStructure: |
+          struct<
+              region:struct<S:string>,
+              province:struct<S:string>
+          >
+        DynamoDBNewImageStructure: |
+          struct<
+              region:struct<S:string>,
+              province:struct<S:string>,
+              percentageDistribution:struct<N:string>
+          >
