@@ -412,7 +412,7 @@ describe("Lambda Delayer Dispatcher", () => {
        const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30" };
        ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
 
-       const params = ["2025-06-30", "RM"];
+       const params = {"deliveryDate":"2025-06-30", "province":"RM"};
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
 
        assert.strictEqual(result.statusCode, 200);
@@ -423,10 +423,40 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
    });
 
+    it("GET_SENDER_LIMIT returns the item with pk", async () => {
+         const fakeItem = {
+             pk: "PA2~PT2~RM",
+             deliveryDate: "2025-06-30",
+             weeklyEstimate: 150,
+             monthlyEstimate: 600,
+             originalEstimate: 700,
+             paId: "PA2",
+             productType: "PT2",
+             province: "RM"
+         };
+
+         ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+         const params = {
+             deliveryDate: "2025-06-30",
+             pk: "PA2~PT2~RM"
+         };
+
+         const result = await handler({
+             operationType: "GET_SENDER_LIMIT",
+             parameters: params
+         });
+
+         assert.strictEqual(result.statusCode, 200);
+         const body = JSON.parse(result.body);
+         assert.strictEqual(body.items.length, 1);
+         assert.strictEqual(body.items[0].weeklyEstimate, 150);
+     });
+
    it("GET_SENDER_LIMIT if no items found", async () => {
 
        ddbMock.on(QueryCommand).resolves({ Items: [] });
-       const params = ["2025-06-30", "RM"];
+      const params = {"deliveryDate":"2025-06-30", "province":"RM"};
 
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
        const body = JSON.parse(result.body);
@@ -434,9 +464,8 @@ describe("Lambda Delayer Dispatcher", () => {
    });
 
    it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
-
-      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
-      assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, province]");
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: {} });
+       assert.strictEqual(JSON.parse(result.body).message, "Parameters must include deliveryDate and (province or pk)");
    });
 
    it("should throw error when parameter is missing", async () => {

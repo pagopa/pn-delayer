@@ -62,7 +62,6 @@ describe("utils.js", () => {
 
   it("generatePartitionConditionWithBetween lancia errore se la data di inizio è >= della data di fine", () => {
     const { generatePartitionConditionWithBetween } = proxyquire("../../app/lib/utils", {});
-    assert.throws(() => generatePartitionConditionWithBetween("2024-03-05", "2024-03-01"), /La data di inizio deve essere precedente alla data di fine/);
-    assert.throws(() => generatePartitionConditionWithBetween("2024-03-01", "2024-03-01"), /La data di inizio deve essere precedente alla data di fine/);
+    assert.throws(() => generatePartitionConditionWithBetween("2024-03-05", "2024-03-01"), /La data di inizio deve essere precedente o uguale alla data di fine/);
   });
 });
