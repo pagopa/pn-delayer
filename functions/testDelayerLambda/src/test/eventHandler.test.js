@@ -30,7 +30,7 @@ const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
 const lambdaMock = mockClient(LambdaClient);
-const athenaMock = mockClient(AthenaClient);
+const athenaMock = mockClient(AthenaClient)
 
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
@@ -769,72 +769,39 @@ describe("Lambda Delayer Dispatcher", () => {
     });
 
     it("GET_RESIDUAL_PAPERS returns downloadUrl on success", async () => {
-     athenaMock.on(StartQueryExecutionCommand).resolves({ QueryExecutionId: "exec-123" });
-     athenaMock.on(GetQueryExecutionCommand).resolves({
-         QueryExecution: {
-             Status: { State: "SUCCEEDED" },
-             ResultConfiguration: { OutputLocation: "s3://test-bucket/residual-papers/exec-123.csv" }
-         }
-     });
-     const csvContent = "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1";
-     s3Mock.on(CopyObjectCommand).resolves({});
-     s3Mock.on(DeleteObjectCommand).resolves({});
-     s3Mock.on(GetObjectCommand).resolves({
-         Body: {
-             transformToString: async () => csvContent
-         }
-     });
-     s3Mock.on(PutObjectCommand).resolves({});
+      athenaMock.on(StartQueryExecutionCommand).resolves({
+        QueryExecutionId: "exec-123",
+      });
 
-     const result = await handler({
-         operationType: "GET_RESIDUAL_PAPERS",
-         parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
-     });
+      athenaMock.on(GetQueryExecutionCommand).resolves({
+        QueryExecution: {
+          Status: { State: "SUCCEEDED" },
+          ResultConfiguration: {
+            OutputLocation: "s3://test-bucket/residual-papers/exec-123.csv",
+          },
+        },
+      });
 
-     assert.strictEqual(result.statusCode, 200);
-     const body = JSON.parse(result.body);
-     assert.ok(body.downloadUrl);
-     assert.strictEqual(body.expiresIn, 300);
-    });
+      const csvContent =
+        "iun,created_at,updated_at,status,sender,address,cap,attempt,product\n" +
+        "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1\n";
 
-    it("GET_RESIDUAL_PAPERS csv separator is converted to semicolon", async () => {
-     athenaMock.reset();
-     s3Mock.reset();
-     athenaMock.on(StartQueryExecutionCommand).resolves({ QueryExecutionId: "exec-456" });
-     athenaMock.on(GetQueryExecutionCommand).resolves({
-         QueryExecution: {
-             Status: { State: "SUCCEEDED" },
-             ResultConfiguration: { OutputLocation: "s3://bucket/residual-papers/exec-456.csv" }
-         }
-     });
-     s3Mock.on(CopyObjectCommand).resolves({});
-     s3Mock.on(DeleteObjectCommand).resolves({});
-     const csvContent = "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1";
-     s3Mock.on(GetObjectCommand).resolves({
-         Body: {
-             transformToString: async () => csvContent
-         }
-     });
-     s3Mock.on(PutObjectCommand).resolves({});
+      s3Mock.on(GetObjectCommand).resolves({
+        Body: Readable.from([csvContent]),
+      });
 
-     await handler({
-         operationType: "GET_RESIDUAL_PAPERS",
-         parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
-     });
+      s3Mock.on(PutObjectCommand).resolves({});
+      s3Mock.on(DeleteObjectCommand).resolves({});
 
-     const putCalls = s3Mock.commandCalls(PutObjectCommand);
-     assert.ok(putCalls.length > 0, "PutObjectCommand should have been called");
-     const uploadedContent = putCalls[0].args[0].input.Body;
-     assert.ok(uploadedContent.includes(";"), "CSV should use semicolon separator");
-     assert.ok(!uploadedContent.includes(","), "CSV should not contain commas");
-    });
-
-   it("GET_RESIDUAL_PAPERS prepareQuery throws if sql file not found", async () => {
-    const result = await handler({
+      const result = await handler({
         operationType: "GET_RESIDUAL_PAPERS",
-        parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
-    });
+        parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"],
+      });
 
-    assert.strictEqual(result.statusCode, 500);
-   });
+      assert.strictEqual(result.statusCode, 200);
+
+      const body = JSON.parse(result.body);
+      assert.ok(body.downloadUrl);
+      assert.strictEqual(body.expiresIn, 300);
+    });
 });

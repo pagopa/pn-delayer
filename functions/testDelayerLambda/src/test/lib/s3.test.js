@@ -31,7 +31,6 @@ describe("s3.js", () => {
     return proxyquire("../../app/lib/s3", {
       "@aws-sdk/client-s3": {
         S3Client: function () { return s3ClientMock; },
-        CopyObjectCommand: function (input) { this.input = input; },
         DeleteObjectCommand: function (input) { this.input = input; },
         GetObjectCommand: function (input) { this.input = input; },
         PutObjectCommand: function (input) { this.input = input; }
@@ -42,15 +41,6 @@ describe("s3.js", () => {
     });
   }
 
-  it("copyS3Object chiama CopyObjectCommand e restituisce la risposta", async () => {
-    const { copyS3Object } = getS3Lib();
-    sendReturnValue = { CopyObjectResult: "ok" };
-    const res = await copyS3Object("bucket", "old", "new");
-    assert.strictEqual(sendCallCount, 1);
-    assert.deepStrictEqual(sendArgs[0].input, { Bucket: "bucket", CopySource: "old", Key: "new" });
-    assert.deepStrictEqual(res, { CopyObjectResult: "ok" });
-  });
-
   it("deleteS3Object chiama DeleteObjectCommand e restituisce la risposta", async () => {
     const { deleteS3Object } = getS3Lib();
     sendReturnValue = { DeleteObjectResult: "ok" };
@@ -60,25 +50,22 @@ describe("s3.js", () => {
     assert.deepStrictEqual(res, { DeleteObjectResult: "ok" });
   });
 
-  it("getS3Object chiama GetObjectCommand e restituisce il body trasformato", async () => {
-    const { getS3Object } = getS3Lib();
-    let transformCalled = 0;
-    let transformArg = null;
-    const fakeBody = {
-      transformToString: async function(enc) {
-        transformCalled++;
-        transformArg = enc;
-        return "file-content";
-      }
-    };
-    sendReturnValue = { Body: fakeBody };
-    const res = await getS3Object("bucket", "key");
-    assert.strictEqual(sendCallCount, 1);
-    assert.deepStrictEqual(sendArgs[0].input, { Bucket: "bucket", Key: "key" });
-    assert.strictEqual(transformCalled, 1);
-    assert.strictEqual(transformArg, "utf-8");
-    assert.strictEqual(res, "file-content");
-  });
+    it("getS3Object chiama GetObjectCommand e restituisce response.Body", async () => {
+      const { getS3Object } = getS3Lib();
+
+      const fakeBody = {
+        pipe: () => {},
+        on: () => {},
+      };
+
+      sendReturnValue = { Body: fakeBody };
+
+      const res = await getS3Object("bucket", "key");
+
+      assert.strictEqual(sendCallCount, 1);
+      assert.deepStrictEqual(sendArgs[0].input, { Bucket: "bucket", Key: "key" });
+      assert.strictEqual(res, fakeBody);
+    });
 
   it("putS3Object chiama PutObjectCommand con i parametri corretti", async () => {
     const { putS3Object } = getS3Lib();
