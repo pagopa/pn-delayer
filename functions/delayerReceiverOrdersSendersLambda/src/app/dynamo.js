@@ -114,7 +114,7 @@ async function persistWeeklyEstimates(estimates, fileKey) {
 
   // Helper per gestire PARTIAL_START / PARTIAL_END
   /**
-   * Esegue l'upsert parziale della stima settimanale su DynamoDB per le settimana
+   * Esegue l'upsert parziale della stima settimanale su DynamoDB per le settimane
    * di confine tra due mesi.
    *
    * Se la prima settimana calcolata non inizia il giorno 1 del mese, il metodo

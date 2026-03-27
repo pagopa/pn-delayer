@@ -18,7 +18,8 @@ const { persistWeeklyEstimates } = require('./dynamo');
  * @param {object}  commessa                Parsed JSON of the commessa.
  * @param {function(region:string):Promise<Array<{province:string, percentageDistribution:number}>>} getProvinceDistribution
  *                                          Async function returning province distribution for a region.
- * @param fileKey fileKey of Safe Storage
+ * @param fileKey                           fileKey of Safe Storage
+ * @param archiveProcessedAt                Timestamp obtained from Safe Storage tags, or Date.now() (current time) if not present.
  * @returns {Promise<Array<Object>>}        List of weekly‑granularity records.
  */
 async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey, archiveProcessedAt) {
@@ -169,7 +170,7 @@ function buildRecord({ commessa,
         originalEstimate,
         lastUpdate: commessa.last_update,
         weekType,                 // "FULL" | "PARTIAL_START" | "PARTIAL_END"
-        daysInWeekInMonth ,        // 7 for FULL, <7 for partials
+        daysInWeekInMonth,       // 7 for FULL, <7 for partials
         archiveProcessedAt
     };
 }
