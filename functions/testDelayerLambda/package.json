@@ -19,7 +19,8 @@
     "@aws-sdk/client-sfn": "3.995.0",
     "@aws-sdk/s3-request-presigner": "3.995.0",
     "csv-parser": "^3.0.0",
-    "@js-joda/core": "^5.6.5"
+    "@js-joda/core": "^5.6.5",
+    "@aws-sdk/client-athena": "3.995.0"
   },
   "devDependencies": {
     "aws-sdk-client-mock": "^2.0.2",
