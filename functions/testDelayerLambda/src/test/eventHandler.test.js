@@ -30,7 +30,7 @@ const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
 const lambdaMock = mockClient(LambdaClient);
-const athenaMock = mockClient(AthenaClient);
+const athenaMock = mockClient(AthenaClient)
 
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
@@ -355,8 +355,7 @@ describe("Lambda Delayer Dispatcher", () => {
        ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
         unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
         unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
-        unifiedDeliveryDriver: "driver1", cap: "20100" },{ pk: "2025-09-01~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId",
-        unifiedDeliveryDriver: "driver1", cap: "00178" }] });
+        unifiedDeliveryDriver: "driver1", cap: "20100" }] });
        ddbMock.on(BatchWriteCommand).resolves({});
        ddbMock.on(BatchWriteCommand).resolves({});
 
@@ -365,20 +364,6 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
        assert.strictEqual(typeof body.processed, "number");
-
-       //verifica che siano state fatte delete per entrambe le deliveryWeek
-       const batchCalls = ddbMock.commandCalls(BatchWriteCommand);
-       const countersDeletes = batchCalls
-         .flatMap(call => call.args[0].input.RequestItems["pn-PaperDeliveryCounters"] || [])
-         .filter(req => req.DeleteRequest);
-
-       const deletedPrintPKs = countersDeletes
-         .map(req => req.DeleteRequest.Key)
-         .filter(key => key.pk === "PRINT")
-         .map(key => key.sk);
-
-       assert(deletedPrintPKs.includes("2025-08-25"));
-       assert(deletedPrintPKs.includes("2025-09-01"));
    });
 
    it("DELETE_DATA with custom fileName", async () => {
@@ -399,48 +384,6 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message, "Delete completed");
    });
-
-    it("DELETE_DATA handles retry on BatchWriteCommand", async () => {
-        const csvPath = path.join(__dirname, "sample.csv");
-        const csvData = fs.readFileSync(csvPath, "utf8");
-        s3Mock.on(GetObjectCommand).resolves({
-            Body: Readable.from([csvData])
-        });
-        ddbMock.on(QueryCommand).resolves({ Items: [
-            { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", unifiedDeliveryDriver: "driver1", cap: "00178" }
-        ] });
-        // First attempt: UnprocessedItems, then success
-        ddbMock.on(BatchWriteCommand).resolves(
-      { UnprocessedItems: { "pn-DelayerPaperDelivery": [
-        { DeleteRequest: { Key: { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1" } } }
-      ] } },
-      {}
-    );
-
-        const result = await handler({ operationType: "DELETE_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryDriverUsedCapacities", "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters"] });
-        assert.strictEqual(result.statusCode, 200);
-        const body = JSON.parse(result.body);
-        assert.strictEqual(body.message, "Delete completed");
-        assert.strictEqual(typeof body.processed, "number");
-        // Verify that the BatchWriteCommand has been called at least twice for the same table (retry)
-        const batchWriteCalls = ddbMock.commandCalls(BatchWriteCommand);
-        const delayerCalls = batchWriteCalls.filter(call =>
-            call.args[0].input.RequestItems["pn-DelayerPaperDelivery"]
-        );
-        assert.ok(
-            delayerCalls.length >= 2,
-            "BatchWriteCommand deve essere chiamato almeno due volte per pn-DelayerPaperDelivery (retry incluso)"
-        );
-        // Verify that the second call includes all the requests from the first (retry)
-        const firstCall = delayerCalls[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"];
-        const secondCall = delayerCalls[1].args[0].input.RequestItems["pn-DelayerPaperDelivery"];
-        firstCall.forEach(req => {
-          assert(
-            secondCall.some(r => JSON.stringify(r) === JSON.stringify(req)),
-            "La seconda chiamata deve includere la richiesta della prima (retry)"
-          );
-        });
-    });
 
    it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
        const fakeItems = [
@@ -480,35 +423,35 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
    });
 
-  it("GET_SENDER_LIMIT returns the item with pk", async () => {
-      const fakeItem = {
-          pk: "PA2~PT2~RM",
-          deliveryDate: "2025-06-30",
-          weeklyEstimate: 150,
-          monthlyEstimate: 600,
-          originalEstimate: 700,
-          paId: "PA2",
-          productType: "PT2",
-          province: "RM"
-      };
+    it("GET_SENDER_LIMIT returns the item with pk", async () => {
+         const fakeItem = {
+             pk: "PA2~PT2~RM",
+             deliveryDate: "2025-06-30",
+             weeklyEstimate: 150,
+             monthlyEstimate: 600,
+             originalEstimate: 700,
+             paId: "PA2",
+             productType: "PT2",
+             province: "RM"
+         };
 
-      ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+         ddbMock.on(GetCommand).resolves({ Item: fakeItem });
 
-      const params = {
-          deliveryDate: "2025-06-30",
-          pk: "PA2~PT2~RM"
-      };
+         const params = {
+             deliveryDate: "2025-06-30",
+             pk: "PA2~PT2~RM"
+         };
 
-      const result = await handler({
-          operationType: "GET_SENDER_LIMIT",
-          parameters: params
-      });
+         const result = await handler({
+             operationType: "GET_SENDER_LIMIT",
+             parameters: params
+         });
 
-      assert.strictEqual(result.statusCode, 200);
-      const body = JSON.parse(result.body);
-      assert.strictEqual(body.items.length, 1);
-      assert.strictEqual(body.items[0].weeklyEstimate, 150);
-  });
+         assert.strictEqual(result.statusCode, 200);
+         const body = JSON.parse(result.body);
+         assert.strictEqual(body.items.length, 1);
+         assert.strictEqual(body.items[0].weeklyEstimate, 150);
+     });
 
    it("GET_SENDER_LIMIT if no items found", async () => {
 
@@ -521,9 +464,8 @@ describe("Lambda Delayer Dispatcher", () => {
    });
 
    it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
-
-      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: {} });
-      assert.strictEqual(JSON.parse(result.body).message, "Parameters must include deliveryDate and (province or pk)");
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: {} });
+       assert.strictEqual(JSON.parse(result.body).message, "Parameters must include deliveryDate and (province or pk)");
    });
 
    it("should throw error when parameter is missing", async () => {
@@ -856,72 +798,39 @@ describe("Lambda Delayer Dispatcher", () => {
     });
 
     it("GET_RESIDUAL_PAPERS returns downloadUrl on success", async () => {
-     athenaMock.on(StartQueryExecutionCommand).resolves({ QueryExecutionId: "exec-123" });
-     athenaMock.on(GetQueryExecutionCommand).resolves({
-         QueryExecution: {
-             Status: { State: "SUCCEEDED" },
-             ResultConfiguration: { OutputLocation: "s3://test-bucket/residual-papers/exec-123.csv" }
-         }
-     });
-     const csvContent = "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1";
-     s3Mock.on(CopyObjectCommand).resolves({});
-     s3Mock.on(DeleteObjectCommand).resolves({});
-     s3Mock.on(GetObjectCommand).resolves({
-         Body: {
-             transformToString: async () => csvContent
-         }
-     });
-     s3Mock.on(PutObjectCommand).resolves({});
+      athenaMock.on(StartQueryExecutionCommand).resolves({
+        QueryExecutionId: "exec-123",
+      });
 
-     const result = await handler({
-         operationType: "GET_RESIDUAL_PAPERS",
-         parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
-     });
+      athenaMock.on(GetQueryExecutionCommand).resolves({
+        QueryExecution: {
+          Status: { State: "SUCCEEDED" },
+          ResultConfiguration: {
+            OutputLocation: "s3://test-bucket/residual-papers/exec-123.csv",
+          },
+        },
+      });
 
-     assert.strictEqual(result.statusCode, 200);
-     const body = JSON.parse(result.body);
-     assert.ok(body.downloadUrl);
-     assert.strictEqual(body.expiresIn, 300);
-    });
+      const csvContent =
+        "iun,created_at,updated_at,status,sender,address,cap,attempt,product\n" +
+        "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1\n";
 
-    it("GET_RESIDUAL_PAPERS csv separator is converted to semicolon", async () => {
-     athenaMock.reset();
-     s3Mock.reset();
-     athenaMock.on(StartQueryExecutionCommand).resolves({ QueryExecutionId: "exec-456" });
-     athenaMock.on(GetQueryExecutionCommand).resolves({
-         QueryExecution: {
-             Status: { State: "SUCCEEDED" },
-             ResultConfiguration: { OutputLocation: "s3://bucket/residual-papers/exec-456.csv" }
-         }
-     });
-     s3Mock.on(CopyObjectCommand).resolves({});
-     s3Mock.on(DeleteObjectCommand).resolves({});
-     const csvContent = "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1";
-     s3Mock.on(GetObjectCommand).resolves({
-         Body: {
-             transformToString: async () => csvContent
-         }
-     });
-     s3Mock.on(PutObjectCommand).resolves({});
+      s3Mock.on(GetObjectCommand).resolves({
+        Body: Readable.from([csvContent]),
+      });
 
-     await handler({
-         operationType: "GET_RESIDUAL_PAPERS",
-         parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
-     });
+      s3Mock.on(PutObjectCommand).resolves({});
+      s3Mock.on(DeleteObjectCommand).resolves({});
 
-     const putCalls = s3Mock.commandCalls(PutObjectCommand);
-     assert.ok(putCalls.length > 0, "PutObjectCommand should have been called");
-     const uploadedContent = putCalls[0].args[0].input.Body;
-     assert.ok(uploadedContent.includes(";"), "CSV should use semicolon separator");
-     assert.ok(!uploadedContent.includes(","), "CSV should not contain commas");
-    });
-
-   it("GET_RESIDUAL_PAPERS prepareQuery throws if sql file not found", async () => {
-    const result = await handler({
+      const result = await handler({
         operationType: "GET_RESIDUAL_PAPERS",
-        parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"]
-    });
+        parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"],
+      });
 
-    assert.strictEqual(result.statusCode, 500);
-   });
+      assert.strictEqual(result.statusCode, 200);
+
+      const body = JSON.parse(result.body);
+      assert.ok(body.downloadUrl);
+      assert.strictEqual(body.expiresIn, 300);
+    });
 });

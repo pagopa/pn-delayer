@@ -7,12 +7,12 @@ const formatDate = (dateObj) => {
   return { yyyy, mm, dd, full: `${yyyy}-${mm}-${dd}` };
 };
 
-function prepareQueryCondition(queryFile, mdate, database) {
+function prepareQueryCondition(queryFile, mdate, viewName) {
   if (!fs.existsSync(queryFile)) {
     throw new Error(`Query file not found: ${queryFile}`);
   }
-  
-  const map = prepareQueryPlaceholdersMap(mdate, database);
+
+  const map = prepareQueryPlaceholdersMap(mdate, viewName);
 
   let query = fs.readFileSync(queryFile, 'utf8');
   for (const [key, value] of Object.entries(map)) {
@@ -23,11 +23,16 @@ function prepareQueryCondition(queryFile, mdate, database) {
   return query
 }
 
-function prepareQueryPlaceholdersMap(mDate, database) {
+function prepareQueryPlaceholdersMap(mDate, viewName) {
   const baseDate = new Date(mDate);
+
+  if (Number.isNaN(baseDate.getTime())) {
+    throw new Error(`Invalid date: ${mDate}`);
+  }
+
   const nextWeek = new Date(baseDate);
   const lastWeek = new Date(baseDate);
-  
+
   nextWeek.setDate(baseDate.getDate() + 7);
   lastWeek.setDate(baseDate.getDate() - 7);
 
@@ -41,7 +46,7 @@ function prepareQueryPlaceholdersMap(mDate, database) {
     DD: base.dd,
     'YYYY-MM-DD-NEXT-WEEK': next.full,
     QUERY_CONDITION_Q1: `${generatePartitionConditionWithBetween(last.full, base.full)} AND pk='${base.full}~EVALUATE_SENDER_LIMIT'`,
-    PAPER_DELIVERY_JSON_VIEW : database
+    PAPER_DELIVERY_JSON_VIEW : viewName
   };
 }
 
@@ -49,11 +54,15 @@ function generatePartitionConditionWithBetween(startDateStr, endDateStr) {
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
 
-  if (start >= end) {
-    throw new Error("La data di inizio deve essere precedente alla data di fine");
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error(
+      `Invalid date range: start=${startDateStr}, end=${endDateStr}`
+    );
   }
 
-  end.setDate(end.getDate());
+  if (start > end) {
+    throw new Error("La data di inizio deve essere precedente o uguale alla data di fine");
+  }
 
   const result = [];
   const current = new Date(start);
