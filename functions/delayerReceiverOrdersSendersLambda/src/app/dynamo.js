@@ -126,7 +126,11 @@ async function persistWeeklyEstimates(estimates, fileKey) {
    * dell'altra porzione settimanale. Se il record non esiste, viene creato con
    * la sola quota calcolata per i giorni del mese corrente.
    *
-   * L'attributo fileKey viene valorizzato sempre con la chiave del file relativo alla delivery date
+   * L'attributo fileKey rappresenta la chiave del file associato alla delivery date.
+   * Nel caso di settimana parziale di inizio mese (isStartMonth = true), se il record
+   * esiste già la fileKey preesistente (tipicamente quella del mese precedente) viene
+   * mantenuto; se il record non esiste, la fileKey viene inizializzata con la chiave
+   * del file corrente.
    * es. Commesse Giugno/Luglio 2026 --> settimana parziale deliveryDate = 2026-06-29 (2d Giugno - 5d Luglio)
    * - fileKey = commessa giugno
    * - weeklyEstimate = stima per 2 giorni di Giugno + stima per 5 giorni di Luglio
