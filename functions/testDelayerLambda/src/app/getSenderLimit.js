@@ -26,7 +26,7 @@ async function getSenderLimit(params = {}) {
             TableName: TABLE_NAME,
             Key: {
                 pk: pk,
-                sk: deliveryDate,
+                deliveryDate: deliveryDate,
             },
         };
         const command = new GetCommand(getParams);
