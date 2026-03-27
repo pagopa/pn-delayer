@@ -99,7 +99,7 @@ async function persistWeeklyEstimates(estimates, fileKey) {
 
     for (const item of estimates) {
       const counterPk = item.deliveryDate;
-      const counterSk = `SUM_ESTIMATES~${item.productType}~${item.province}~${item.lastUpdate}`;
+      const counterSk = `SUM_ESTIMATES~${item.productType}~${item.province}~${item.lastUpdate}~${item.archiveProcessedAt}`;
       await client.send(
         new UpdateCommand({
           TableName: COUNTERS_TABLE,
@@ -112,16 +112,33 @@ async function persistWeeklyEstimates(estimates, fileKey) {
     }
   }
 
-// Helper per gestire PARTIAL_START / PARTIAL_END
-  async function upsertPartial(p, ttlValue, fileKey, isStart) {
-    const pk = `${p.paId}~${p.productType}~${p.province}`;
-    const portionAttr = isStart ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
-    const otherPortionAttr = isStart ? 'firstWeekWeeklyEstimate' : 'secondWeekWeeklyEstimate';
+  // Helper per gestire PARTIAL_START / PARTIAL_END
+  /**
+   * Esegue l'upsert parziale della stima settimanale su DynamoDB per le settimana
+   * di confine tra due mesi.
+   *
+   * Se la prima settimana calcolata non inizia il giorno 1 del mese, il metodo
+   * aggiorna o crea il record relativo alla settimana precedente, valorizzando
+   * solo la porzione di competenza del mese corrente.
+   *
+   * Se il record esiste, la stima settimanale viene ricalcolata sommando la
+   * quota della settimana corrente alla quota eventualmente già presente
+   * dell'altra porzione settimanale. Se il record non esiste, viene creato con
+   * la sola quota calcolata per i giorni del mese corrente.
+   *
+   * L'attributo fileKey viene valorizzato sempre con la chiave del file relativo alla delivery date
+   * es. Commesse Giugno/Luglio 2026 --> settimana parziale deliveryDate = 2026-06-29 (2d Giugno - 5d Luglio)
+   * - fileKey = commessa giugno
+   * - weeklyEstimate = stima per 2 giorni di Giugno + stima per 5 giorni di Luglio
+   * - secondWeekWeeklyEstimate = stima per 5 giorni di Luglio
+   * - firstWeekWeeklyEstimate = stima per 2 giorni di Giugno
+  */
+  async function upsertPartial(p, ttlValue, fileKey, isStartMonth) {
+      const pk = `${p.paId}~${p.productType}~${p.province}`;
+      const portionAttr = isStartMonth ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
+      const otherPortionAttr = isStartMonth ? 'firstWeekWeeklyEstimate' : 'secondWeekWeeklyEstimate';
 
-    await client.send(new UpdateCommand({
-      TableName: LIMIT_TABLE,
-      Key: { pk, deliveryDate: p.deliveryDate },
-      UpdateExpression: [
+      const updateParts = [
         'SET weeklyEstimate = if_not_exists(#otherWeekPortion, :zero) + :portion,',
         '#portion = :portion,',
         'monthlyEstimate  = if_not_exists(monthlyEstimate, :me),',
@@ -129,15 +146,13 @@ async function persistWeeklyEstimates(estimates, fileKey) {
         'productType      = if_not_exists(productType, :pt),',
         'province         = if_not_exists(province, :pr),',
         'paId             = if_not_exists(paId, :pa),',
-        'fileKey          = if_not_exists(fileKey, :fk),',
+        isStartMonth
+            ? 'fileKey = if_not_exists(fileKey, :fk),'
+            : 'fileKey = :fk,',
         '#ttl             = if_not_exists(#ttl, :ttl) '
-      ].join(' '),
-      ExpressionAttributeNames: {
-        '#portion': portionAttr,
-        '#otherWeekPortion': otherPortionAttr,
-        '#ttl': 'ttl'
-      },
-      ExpressionAttributeValues: {
+      ];
+
+      const expressionValues = {
         ':zero': 0,
         ':portion': p.weeklyEstimate,
         ':me': p.monthlyEstimate,
@@ -145,11 +160,22 @@ async function persistWeeklyEstimates(estimates, fileKey) {
         ':pt': p.productType,
         ':pr': p.province,
         ':pa': p.paId,
-        ':fk': fileKey,
-        ':ttl': ttlValue
-      }
-    }));
-  }
+        ':ttl': ttlValue,
+        ':fk': fileKey
+      };
+
+      await client.send(new UpdateCommand({
+        TableName: LIMIT_TABLE,
+        Key: { pk, deliveryDate: p.deliveryDate },
+        UpdateExpression: updateParts.join(' '),
+        ExpressionAttributeNames: {
+          '#portion': portionAttr,
+          '#otherWeekPortion': otherPortionAttr,
+          '#ttl': 'ttl'
+        },
+        ExpressionAttributeValues: expressionValues
+      }));
+    }
 
 
 /**
