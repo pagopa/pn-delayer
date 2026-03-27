@@ -137,4 +137,58 @@ describe('persistWeeklyEstimates — mesi separati (senza Jest)', () => {
     assert.strictEqual(endUpd.ExpressionAttributeValues[':portion'], 4);
     assert.strictEqual(endUpd.ExpressionAttributeValues[':fk'], 'fileKey_MAR');
   });
+
+  describe('persistWeeklyEstimates — fileKey nei parziali', () => {
+    beforeEach(() => {
+      ddbMock.reset();
+
+      ddbMock.on(BatchWriteCommand).resolves({ UnprocessedItems: {} });
+      ddbMock.on(UpdateCommand).resolves({});
+      ddbMock.on(QueryCommand).resolves({ Items: [] });
+    });
+
+    it('PARTIAL_START usa if_not_exists(fileKey, :fk) per preservare il fileKey esistente', async () => {
+      await persistWeeklyEstimates(firstFeb(), 'fileKey_FEB');
+
+      const updCalls = ddbMock.commandCalls(UpdateCommand);
+      const partialUpdates = updCalls
+        .map(c => c.args[0].input)
+        .filter(u => typeof u.UpdateExpression === 'string' && u.UpdateExpression.includes('#portion'));
+
+      const startUpd = partialUpdates.find(u => u.Key.deliveryDate === '2025-01-27');
+      assert.ok(startUpd, 'Manca l\'update PARTIAL_START');
+
+      assert.ok(
+        startUpd.UpdateExpression.includes('fileKey = if_not_exists(fileKey, :fk)'),
+        `PARTIAL_START deve preservare il fileKey esistente. UpdateExpression trovata: ${startUpd.UpdateExpression}`
+      );
+
+      assert.ok(
+        !startUpd.UpdateExpression.includes('fileKey = :fk'),
+        `PARTIAL_START non deve fare overwrite diretto del fileKey. UpdateExpression trovata: ${startUpd.UpdateExpression}`
+      );
+    });
+
+    it('PARTIAL_END usa fileKey = :fk per sovrascrivere sempre il fileKey', async () => {
+      await persistWeeklyEstimates(firstFeb(), 'fileKey_FEB');
+
+      const updCalls = ddbMock.commandCalls(UpdateCommand);
+      const partialUpdates = updCalls
+        .map(c => c.args[0].input)
+        .filter(u => typeof u.UpdateExpression === 'string' && u.UpdateExpression.includes('#portion'));
+
+      const endUpd = partialUpdates.find(u => u.Key.deliveryDate === '2025-02-24');
+      assert.ok(endUpd, 'Manca l\'update PARTIAL_END');
+
+      assert.ok(
+        endUpd.UpdateExpression.includes('fileKey = :fk'),
+        `PARTIAL_END deve sovrascrivere il fileKey. UpdateExpression trovata: ${endUpd.UpdateExpression}`
+      );
+
+      assert.ok(
+        !endUpd.UpdateExpression.includes('fileKey = if_not_exists(fileKey, :fk)'),
+        `PARTIAL_END non deve preservare il fileKey esistente. UpdateExpression trovata: ${endUpd.UpdateExpression}`
+      );
+    });
+  });
 });
