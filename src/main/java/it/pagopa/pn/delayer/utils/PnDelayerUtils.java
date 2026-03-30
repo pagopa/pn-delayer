@@ -7,7 +7,6 @@ import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
@@ -17,8 +16,8 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
@@ -146,19 +145,35 @@ public class PnDelayerUtils {
     }
 
     /**
+     * Filtra le spedizioni separando quelle con priorità RS o di secondo tentativo da quelle standard.
      *
-     * @param items spedizioni in input
-     * @param senderLimitJobProcessObjects contiene nel campo sendToDriverCapacityStep le spedizioni che sono RS e secondo tentativi
-     * @return le spedizioni che non sono nè RS nè secondi tentativi
+     * @param items lista delle spedizioni in input
+     * @param senderLimitJobProcessObjects oggetto che verrà popolato con le spedizioni da indirizzare
+     * @return lista delle spedizioni con priorità 3
      * <p>
-     * partitioned.get(true) -> spedizioni che sono RS o secondi tentativi
-     * partitioned.get(false) -> spedizioni che non sono nè RS nè secondi tentativi
+     * Le restanti spedizioni vengono suddivise come segue:
+     * <ul>
+     *     <li>Priorità 1 e 2 → inviate a sendToDriverCapacityStep</li>
+     *     <li>Priorità 4 → inviate a sendToResidualCapacityStep</li>
+     * </ul>
      */
     public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
-        Predicate<PaperDelivery> shouldExclude = paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1;
-        Map<Boolean, List<PaperDelivery>> partitioned = items.stream().collect(Collectors.partitioningBy(shouldExclude));
-        senderLimitJobProcessObjects.setSendToDriverCapacityStep(partitioned.get(true));
-        return partitioned.get(false);
+
+        Map<Integer, List<PaperDelivery>> grouped = items.stream()
+                .collect(Collectors.groupingBy(PaperDelivery::getPriority));
+
+        senderLimitJobProcessObjects.setSendToDriverCapacityStep(
+                Stream.concat(
+                        grouped.getOrDefault(1, List.of()).stream(),
+                        grouped.getOrDefault(2, List.of()).stream()
+                ).collect(Collectors.toList())
+        );
+
+        senderLimitJobProcessObjects.setSendToResidualCapacityStep(
+                new ArrayList<>(grouped.getOrDefault(4, Collections.emptyList()))
+        );
+
+        return new ArrayList<>(grouped.getOrDefault(3, Collections.emptyList()));
     }
 
     public Integer retrieveActualPrintCapacity(LocalDate deliveryWeek) {

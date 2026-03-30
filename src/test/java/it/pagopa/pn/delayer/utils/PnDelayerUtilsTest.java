@@ -48,10 +48,10 @@ class PnDelayerUtilsTest {
     void testGroupByCap() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
 
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0, 1));
 
         Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.groupByCap(paperDeliveries);
         assertEquals(2, grouped.size());
@@ -64,11 +64,11 @@ class PnDelayerUtilsTest {
     void groupByPaIdProductTypeProvince() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
 
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0, 1));
 
 
         Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.groupByPaIdProductTypeProvince(paperDeliveries);
@@ -84,11 +84,11 @@ class PnDelayerUtilsTest {
     void groupByPaIdProductTypeProvinceAndCount() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
 
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0, 1));
 
 
         Map<String, Long> grouped = pnDelayerUtils.groupByPaIdProductTypeProvinceAndCount(paperDeliveries);
@@ -119,11 +119,11 @@ class PnDelayerUtilsTest {
     void groupByCapAndProductType() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
 
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0, 1));
 
         Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.groupByCapAndProductType(paperDeliveries);
         assertEquals(3, grouped.size());
@@ -135,8 +135,8 @@ class PnDelayerUtilsTest {
     @Test
     void mapItemForResidualCapacityStep() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0, 1));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
         List<PaperDelivery> result = pnDelayerUtils.mapItemForResidualCapacityStep(paperDeliveries, deliveryWeek);
@@ -149,8 +149,8 @@ class PnDelayerUtilsTest {
     @Test
     void mapItemForEvaluateDriverCapacityStep() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0,1 ));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0, 1));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
         List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(paperDeliveries, deliveryWeek);
@@ -163,8 +163,8 @@ class PnDelayerUtilsTest {
     @Test
     void mapItemForEvaluatePrintCapacityStep() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0, 1));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
         List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluatePrintCapacityStep(paperDeliveries, deliveryWeek);
@@ -177,8 +177,8 @@ class PnDelayerUtilsTest {
     @Test
     void mapItemForEvaluateSenderLimitOnNextWeek() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0, 1));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
         List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(paperDeliveries, deliveryWeek);
@@ -191,8 +191,8 @@ class PnDelayerUtilsTest {
     @Test
     void filterOnResidualDriverCapacity(){
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0));
-        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0, 1));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
         Integer result = pnDelayerUtils.filterOnResidualDriverCapacity(paperDeliveries, Tuples.of(10,5), new ArrayList<>(), new ArrayList<>(), deliveryWeek);
@@ -208,13 +208,13 @@ class PnDelayerUtilsTest {
                 "paId2~890~RM", Tuples.of(2, 0)));
 
         List<PaperDelivery> deliveries1 = new ArrayList<>();
-        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
-        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
-        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
+        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1));
+        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1));
+        deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1));
 
         List<PaperDelivery> deliveries2 = new ArrayList<>();
-        deliveries2.add(createPaperDelivery("890", "00179", "RM", "paId2", 0));
-        deliveries2.add(createPaperDelivery("890", "00179", "RM", "paId2", 0));
+        deliveries2.add(createPaperDelivery("890", "00179", "RM", "paId2", 0, 1));
+        deliveries2.add(createPaperDelivery("890", "00179", "RM", "paId2", 0, 1));
 
         Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId = Map.of(
                 "paId1~AR~RM", deliveries1,
@@ -238,17 +238,34 @@ class PnDelayerUtilsTest {
 
     @Test
     void excludeRsAndSecondAttempt() {
-        PaperDelivery paperDelivery1 = createPaperDelivery("RS", "00178", "RM", "paId1", 0);
-        PaperDelivery paperDelivery2 = createPaperDelivery("RS", "00179", "RM", "paId2", 1);
-        PaperDelivery paperDelivery3 = createPaperDelivery("AR", "00180", "RM", "paId3", 0);
-        PaperDelivery paperDelivery4 = createPaperDelivery("890", "00181", "RM", "paId4", 1);
+        PaperDelivery paperDelivery1 = createPaperDelivery("RS", "00178", "RM", "paId1", 0, 1);
+        PaperDelivery paperDelivery2 = createPaperDelivery("RS", "00179", "RM", "paId2", 1, 1);
+        PaperDelivery paperDelivery3 = createPaperDelivery("AR", "00180", "RM", "paId3", 0, 1);
+        PaperDelivery paperDelivery4 = createPaperDelivery("890", "00181", "RM", "paId4", 1, 1);
+        List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3, paperDelivery4);
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+
+        List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects);
+
+        assertEquals(0, result.size());
+        assertEquals(4, senderLimitJobProcessObjects.getSendToDriverCapacityStep().size());
+    }
+
+    @Test
+    void handle_delivery_priority() {
+        PaperDelivery paperDelivery1 = createPaperDelivery("RS", "00178", "RM", "paId1", 0, 1);
+        PaperDelivery paperDelivery2 = createPaperDelivery("RS", "00179", "RM", "paId2", 1, 2);
+        PaperDelivery paperDelivery3 = createPaperDelivery("AR", "00180", "RM", "paId3", 0, 3);
+        PaperDelivery paperDelivery4 = createPaperDelivery("890", "00181", "RM", "paId4", 1, 4);
+
         List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3, paperDelivery4);
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
         List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects);
 
         assertEquals(1, result.size());
-        assertEquals(3, senderLimitJobProcessObjects.getSendToDriverCapacityStep().size());
+        assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().size());
+        assertEquals(2, senderLimitJobProcessObjects.getSendToDriverCapacityStep().size());
     }
 
     private PaperChannelDeliveryDriver createPaperChannelDeliveryDriver(String geoKey, String product, String driver) {
@@ -260,7 +277,7 @@ class PnDelayerUtilsTest {
     }
 
 
-    private PaperDelivery createPaperDelivery(String productType, String cap, String province, String senderPaId, Integer attempt) {
+    private PaperDelivery createPaperDelivery(String productType, String cap, String province, String senderPaId, Integer attempt, Integer priority) {
         PaperDelivery delivery = new PaperDelivery();
         delivery.setCap(cap);
         delivery.setProvince(province);
@@ -270,7 +287,7 @@ class PnDelayerUtilsTest {
         delivery.setNotificationSentAt("2023-10-01T12:00:00Z");
         delivery.setSenderPaId(senderPaId);
         delivery.setDeliveryDate("2023-10-02");
-        delivery.setPriority(1);
+        delivery.setPriority(priority);
         delivery.setAttempt(attempt);
         delivery.setDeliveryDate("2023-10-02");
         delivery.setPk("2023-10-02~EVALUATE_RESIDUAL_CAPACITY");
