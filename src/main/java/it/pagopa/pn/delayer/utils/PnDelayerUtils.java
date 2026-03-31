@@ -2,9 +2,7 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
-import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
-import it.pagopa.pn.delayer.model.WorkflowStepEnum;
+import it.pagopa.pn.delayer.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.util.function.Tuple2;
@@ -15,9 +13,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
@@ -158,22 +158,24 @@ public class PnDelayerUtils {
      * </ul>
      */
     public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
-
-        Map<Integer, List<PaperDelivery>> grouped = items.stream()
-                .collect(Collectors.groupingBy(PaperDelivery::getPriority));
-
-        senderLimitJobProcessObjects.setSendToDriverCapacityStep(
-                Stream.concat(
-                        grouped.getOrDefault(1, List.of()).stream(),
-                        grouped.getOrDefault(2, List.of()).stream()
-                ).collect(Collectors.toList())
-        );
-
+        var partitionedByCommType = items.stream().collect(Collectors.partitioningBy(this::isInformal));
+        var informalItems = partitionedByCommType.get(true);
+        var legalItems = partitionedByCommType.get(false);
+        var byRsOrSecondAttempt = legalItems.stream().collect(Collectors.partitioningBy(this::isRsOrSecondAttempt));
+        senderLimitJobProcessObjects.setSendToDriverCapacityStep(byRsOrSecondAttempt.get(true));
         senderLimitJobProcessObjects.setSendToResidualCapacityStep(
-                new ArrayList<>(grouped.getOrDefault(4, Collections.emptyList()))
+                new ArrayList<>(informalItems)
         );
 
-        return new ArrayList<>(grouped.getOrDefault(3, Collections.emptyList()));
+        return new ArrayList<>(byRsOrSecondAttempt.get(false));
+    }
+
+    private boolean isInformal(PaperDelivery paperDelivery) {
+        return CommunicationType.INFORMAL.name().equalsIgnoreCase(paperDelivery.getCommunicationType());
+    }
+
+    private boolean isRsOrSecondAttempt(PaperDelivery paperDelivery) {
+        return ProductType.RS.getValue().equalsIgnoreCase(paperDelivery.getProductType()) || paperDelivery.getAttempt() == 1;
     }
 
     public Integer retrieveActualPrintCapacity(LocalDate deliveryWeek) {
