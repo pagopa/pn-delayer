@@ -24,7 +24,14 @@ exports.handleEvent = async (event = {}) => {
             const body = JSON.parse(record.body);
             const fileKey = body.key;
             const archiveProcessedAtDefault = new Date().toISOString();
-            const archiveProcessedAt = body.tags?.archiveProcessedAt?.[0] ?? archiveProcessedAtDefault;
+            const archiveProcessedAt = body.tags?.archiveProcessedAt?.[0];
+            if (!archiveProcessedAt || archiveProcessedAt.trim() === '') {
+                console.error(`[HANDLER] Errore nel record ${record.messageId}: tag archiveProcessedAt is required`);
+                batchItemFailures.push({
+                    itemIdentifier: record.messageId
+                });
+                continue;
+            }
             console.debug(`[HANDLER] fileKey="${fileKey}", archiveProcessedAt="${archiveProcessedAt}"`);
 
             const { Count = 0 } = await existsSenderLimitByFileKey(fileKey);
