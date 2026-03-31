@@ -23,7 +23,6 @@ exports.handleEvent = async (event = {}) => {
             console.debug(`[HANDLER] Raw SQS record: ${JSON.stringify(record)}`);
             const body = JSON.parse(record.body);
             const fileKey = body.key;
-            const archiveProcessedAtDefault = new Date().toISOString();
             const archiveProcessedAt = body.tags?.archiveProcessedAt?.[0];
             if (!archiveProcessedAt || archiveProcessedAt.trim() === '') {
                 console.error(`[HANDLER] Errore nel record ${record.messageId}: tag archiveProcessedAt is required`);

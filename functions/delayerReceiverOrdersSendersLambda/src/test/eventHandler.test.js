@@ -23,7 +23,7 @@ describe('handleEvent Lambda', () => {
   it('processa correttamente un record non duplicato', async () => {
     const event = {
       Records: [
-        { messageId: 'msg1', body: JSON.stringify({ key: 'file1' }) }
+        { messageId: 'msg1', body: JSON.stringify({ key: 'file1', tags: {"archiveProcessedAt":["2026-01-01T00:00:00Z"]}}) }
       ]
     };
 
@@ -44,7 +44,7 @@ describe('handleEvent Lambda', () => {
 
     const event = {
       Records: [
-        { messageId: 'msg2', body: JSON.stringify({ key: 'file2' }) }
+        { messageId: 'msg2', body: JSON.stringify({ key: 'file2', tags: {"archiveProcessedAt":["2026-01-01T00:00:00Z"]}}) }
       ]
     };
 
@@ -65,7 +65,7 @@ describe('handleEvent Lambda', () => {
 
     const event = {
       Records: [
-        { messageId: 'msg3', body: JSON.stringify({ key: 'file3' }) }
+        { messageId: 'msg3', body: JSON.stringify({ key: 'file3', tags: {"archiveProcessedAt":["2026-01-01T00:00:00Z"]}}) }
       ]
     };
 
@@ -96,9 +96,9 @@ describe('handleEvent Lambda', () => {
 
     const event = {
       Records: [
-        { messageId: 'msgA', body: JSON.stringify({ key: 'fileA' }) },
-        { messageId: 'msgB', body: JSON.stringify({ key: 'fileB' }) },
-        { messageId: 'msgC', body: JSON.stringify({ key: 'fileC' }) }
+        { messageId: 'msgA', body: JSON.stringify({ key: 'fileA', tags: {"archiveProcessedAt":["2026-01-01T00:00:00Z"]}}) },
+        { messageId: 'msgB', body: JSON.stringify({ key: 'fileB', tags: {"archiveProcessedAt":["2026-01-01T00:00:00Z"]}}) },
+        { messageId: 'msgC', body: JSON.stringify({ key: 'fileC', tags: {"archiveProcessedAt":["2026-01-01T00:00:00Z"]}}) }
       ]
     };
 
