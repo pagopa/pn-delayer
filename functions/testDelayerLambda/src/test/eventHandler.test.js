@@ -5,8 +5,11 @@ const fs = require("fs");
 const path = require("path");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
+process.env.AWS_REGION = "eu-south-1";
 process.env.BUCKET_NAME = "test-bucket";
 process.env.OBJECT_KEY = "test-key.csv";
+process.env.ATHENA_DATABASE_NAME = "test-db";
+process.env.ATHENA_WORKGROUP_NAME = "test-wg";
 process.env.SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:BatchWorkflowStateMachine";
 process.env.DELAYERTOPAPERCHANNEL_SFN_ARN = "arn:aws:states:eu-south-1:123456789012:stateMachine:delayerToPaperChannelStateMachine";
 process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON = "cron(0 8 ? * MON-FRI *)";
@@ -15,14 +18,19 @@ process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE = "2025-07-01T08:00:00.
 process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
 
 const { mockClient } = require("aws-sdk-client-mock");
-const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, GetObjectCommand , CopyObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand } = require("@aws-sdk/client-athena");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
+
+const s3Presigner = require("@aws-sdk/s3-request-presigner");
+s3Presigner.getSignedUrl = async () => "https://fake-presigned-url.s3.amazonaws.com/test.csv";
 
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
 const lambdaMock = mockClient(LambdaClient);
+const athenaMock = mockClient(AthenaClient)
 
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
@@ -30,6 +38,7 @@ describe("Lambda Delayer Dispatcher", () => {
         ddbMock.reset();
         sfnMock.reset();
         lambdaMock.reset();
+        athenaMock.reset();
     });
 
     it("Unsupported operation returns 400", async () => {
@@ -403,7 +412,7 @@ describe("Lambda Delayer Dispatcher", () => {
        const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30" };
        ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
 
-       const params = ["2025-06-30", "RM"];
+       const params = {"deliveryDate":"2025-06-30", "province":"RM"};
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
 
        assert.strictEqual(result.statusCode, 200);
@@ -414,10 +423,40 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
    });
 
+    it("GET_SENDER_LIMIT returns the item with pk", async () => {
+         const fakeItem = {
+             pk: "PA2~PT2~RM",
+             deliveryDate: "2025-06-30",
+             weeklyEstimate: 150,
+             monthlyEstimate: 600,
+             originalEstimate: 700,
+             paId: "PA2",
+             productType: "PT2",
+             province: "RM"
+         };
+
+         ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+         const params = {
+             deliveryDate: "2025-06-30",
+             pk: "PA2~PT2~RM"
+         };
+
+         const result = await handler({
+             operationType: "GET_SENDER_LIMIT",
+             parameters: params
+         });
+
+         assert.strictEqual(result.statusCode, 200);
+         const body = JSON.parse(result.body);
+         assert.strictEqual(body.items.length, 1);
+         assert.strictEqual(body.items[0].weeklyEstimate, 150);
+     });
+
    it("GET_SENDER_LIMIT if no items found", async () => {
 
        ddbMock.on(QueryCommand).resolves({ Items: [] });
-       const params = ["2025-06-30", "RM"];
+      const params = {"deliveryDate":"2025-06-30", "province":"RM"};
 
        const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: params });
        const body = JSON.parse(result.body);
@@ -425,9 +464,8 @@ describe("Lambda Delayer Dispatcher", () => {
    });
 
    it("GET_SENDER_LIMIT throws error if parameters are missing", async () => {
-
-      const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: [] });
-      assert.strictEqual(JSON.parse(result.body).message, "Parameters must be [deliveryDate, province]");
+       const result = await handler({ operationType: "GET_SENDER_LIMIT", parameters: {} });
+       assert.strictEqual(JSON.parse(result.body).message, "Parameters must include deliveryDate and (province or pk)");
    });
 
    it("should throw error when parameter is missing", async () => {
@@ -757,5 +795,42 @@ describe("Lambda Delayer Dispatcher", () => {
      const body = JSON.parse(result.body);
      assert.strictEqual(result.statusCode,200);
      assert.strictEqual(JSON.parse(result.body).message, "Item not found");
+    });
+
+    it("GET_RESIDUAL_PAPERS returns downloadUrl on success", async () => {
+      athenaMock.on(StartQueryExecutionCommand).resolves({
+        QueryExecutionId: "exec-123",
+      });
+
+      athenaMock.on(GetQueryExecutionCommand).resolves({
+        QueryExecution: {
+          Status: { State: "SUCCEEDED" },
+          ResultConfiguration: {
+            OutputLocation: "s3://test-bucket/residual-papers/exec-123.csv",
+          },
+        },
+      });
+
+      const csvContent =
+        "iun,created_at,updated_at,status,sender,address,cap,attempt,product\n" +
+        "PREPARE_ANALOG_DOMICILE.IUN_YDTA-XNPA-UXVL-202506-M-1.RECINDEX_0.ATTEMPT_0,1970-01-05T00:00:00Z,1970-01-05T00:00:00Z,AR,idMittente1,NA,80124,0,YDTA-XNPA-UXVL-202506-M-1\n";
+
+      s3Mock.on(GetObjectCommand).resolves({
+        Body: Readable.from([csvContent]),
+      });
+
+      s3Mock.on(PutObjectCommand).resolves({});
+      s3Mock.on(DeleteObjectCommand).resolves({});
+
+      const result = await handler({
+        operationType: "GET_RESIDUAL_PAPERS",
+        parameters: ["pn_delayer_paper_delivery_json_view", "2025-06-16"],
+      });
+
+      assert.strictEqual(result.statusCode, 200);
+
+      const body = JSON.parse(result.body);
+      assert.ok(body.downloadUrl);
+      assert.strictEqual(body.expiresIn, 300);
     });
 });
