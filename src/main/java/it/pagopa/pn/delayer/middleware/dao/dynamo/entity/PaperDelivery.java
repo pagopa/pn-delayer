@@ -30,6 +30,7 @@ public class PaperDelivery {
     public static final String COL_RECIPIENT_ID = "recipientId";
     public static final String COL_DELIVERY_DATE = "deliveryDate";
     public static final String COL_WORKFLOW_STEP = "workflowStep";
+    public static final String COL_COMMUNICATION_TYPE = "communicationType";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
@@ -67,6 +68,8 @@ public class PaperDelivery {
     private String deliveryDate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_WORKFLOW_STEP)}))
     private String workflowStep;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_COMMUNICATION_TYPE)}))
+    private String communicationType;
 
     public PaperDelivery(){}
 
