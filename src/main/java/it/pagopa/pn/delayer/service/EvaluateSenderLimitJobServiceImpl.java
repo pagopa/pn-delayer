@@ -181,9 +181,11 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
             try {
                 return objectMapper.readValue(parameterValue, new TypeReference<>() {});
             } catch (JsonProcessingException e) {
+                log.error("Error parsing paper delivery priority map from SSM parameter store for parameter name: {}", pnDelayerConfigs.getPaperDeliveryPriorityParameterName(), e);
                 throw new PnInternalException("Failed to retrieve paper delivery priority map from SSM parameter store", PAPER_DELIVERY_PRIORITY_MAP_ERROR);
             }
         }
+        log.error("Priority parameter not found on parameter store for parameter name: {}", pnDelayerConfigs.getPaperDeliveryPriorityParameterName());
         throw new PnInternalException("Priority parameter not found on parameter store", PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND);
     }
 }

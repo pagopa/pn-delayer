@@ -104,10 +104,10 @@ public class DeliveryDriverUtils {
 
     private static Integer findPriorityOnMap(Map<Integer, List<PaperDeliveryPriority>> priorityMap, PaperDelivery paperDelivery) {
         return priorityMap.entrySet().stream()
-                .filter(entry -> entry.getValue() != null && entry.getValue().stream().anyMatch(priority ->
+                .filter(entry -> !CollectionUtils.isEmpty(entry.getValue()) && entry.getValue().stream().anyMatch(priority ->
                         Objects.equals(priority.getProduct(), paperDelivery.getProductType()) &&
                         Objects.equals(priority.getAttempt(), paperDelivery.getAttempt()) &&
-                        Objects.equals(priority.getCommunicationType().name(), Optional.ofNullable(paperDelivery.getCommunicationType()).orElse(LEGAL.name()))
+                        Objects.equals(Optional.ofNullable(priority.getCommunicationType()).orElse(LEGAL).name(), Optional.ofNullable(paperDelivery.getCommunicationType()).orElse(LEGAL.name()))
                 ))
                 .map(Map.Entry::getKey)
                 .findFirst()
