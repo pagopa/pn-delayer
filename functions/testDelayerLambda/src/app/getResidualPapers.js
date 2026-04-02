@@ -1,3 +1,4 @@
+"use strict";
 const { prepareQueryCondition } = require("./lib/utils");
 const { queryExecution } = require("./lib/athena");
 const {
@@ -7,7 +8,7 @@ const {
 } = require("./lib/s3");
 
 exports.getResidualPapers = async (params = []) => {
-  const [paperDeliveryTableName, deliveryDate] = params;
+  const [paperDeliveryJsonView, deliveryDate] = params;
   const specificDate = deliveryDate;
   const database = process.env.ATHENA_DATABASE_NAME;
   const bucket = process.env.BUCKET_NAME;
@@ -24,7 +25,7 @@ exports.getResidualPapers = async (params = []) => {
   const athenaOutputPath = `s3://${bucket}/${athenaResultsPrefix}/`;
 
   // Prepara SQL SELECT normale, senza UNLOAD
-  const sql = await prepareQuery( "queryNotPassed", specificDate, paperDeliveryTableName);
+  const sql = await prepareQuery( "queryNotPassed", specificDate, paperDeliveryJsonView);
 
   // Esegue la SELECT su Athena e ottiene il path del CSV standard Athena
   const athenaResultPath = await queryExecution(workgroup, sql, database, athenaOutputPath);
@@ -47,7 +48,7 @@ exports.getResidualPapers = async (params = []) => {
 
   // 4. Converte il CSV Athena da "," a ";" e salva il file finale
   await convertAthenaCsvToSemicolonCsv(bucket, athenaResultPath, targetKey);
-  const sourceKey = athenaResultPath.replace("s3://", "");
+  const sourceKey = athenaResultPath.replace(`s3://${bucket}/`, "");
   await deleteS3Object(bucket, sourceKey);
   await deleteS3Object(bucket, `${sourceKey}.metadata`);
 
@@ -61,13 +62,13 @@ exports.getResidualPapers = async (params = []) => {
   };
 };
 
-async function prepareQuery(fileName, date, paperDeliveryTableName) {
+async function prepareQuery(fileName, date, paperDeliveryJsonView) {
   console.log(`Preparing query "${fileName}" for date: ${date}`);
 
   const query = prepareQueryCondition(
     `./resources/${fileName}.sql`,
     date,
-    paperDeliveryTableName
+    paperDeliveryJsonView
   );
 
   console.log(`Query "${fileName}" prepared.`);

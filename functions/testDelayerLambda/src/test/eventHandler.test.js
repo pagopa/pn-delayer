@@ -1,6 +1,5 @@
 const assert = require('assert');
 const { Readable } = require("stream");
-const { handler } = require("../../index");
 const fs = require("fs");
 const path = require("path");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
@@ -23,14 +22,15 @@ const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand } = r
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
-const s3Presigner = require("@aws-sdk/s3-request-presigner");
-s3Presigner.getSignedUrl = async () => "https://fake-presigned-url.s3.amazonaws.com/test.csv";
-
 const s3Mock = mockClient(S3Client);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
 const lambdaMock = mockClient(LambdaClient);
-const athenaMock = mockClient(AthenaClient)
+const athenaMock = mockClient(AthenaClient);
+
+const proxyquire = require("proxyquire").noCallThru();
+
+let handler;
 
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
@@ -39,6 +39,17 @@ describe("Lambda Delayer Dispatcher", () => {
         sfnMock.reset();
         lambdaMock.reset();
         athenaMock.reset();
+
+        ({ handler } = proxyquire("../../index", {
+            "./src/app/lib/s3": {
+                convertAthenaCsvToSemicolonCsv: async () => ({
+                    bucket: "test-bucket",
+                    key: "athena-results/residual-papers/test.csv",
+                }),
+                generatePresignedDownloadUrl: async () =>
+                    "https://fake-presigned-url.s3.amazonaws.com/test.csv",
+            },
+        }));
     });
 
     it("Unsupported operation returns 400", async () => {

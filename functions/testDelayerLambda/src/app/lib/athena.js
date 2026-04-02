@@ -1,3 +1,4 @@
+"use strict";
 const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand } = require("@aws-sdk/client-athena");
 
 const client = new AthenaClient();
