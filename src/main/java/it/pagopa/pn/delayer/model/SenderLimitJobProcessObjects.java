@@ -16,6 +16,6 @@ public class SenderLimitJobProcessObjects {
     private Map<String, Tuple2<Integer, Integer>> senderLimitMap = new HashMap<>();
     private Map<String, Integer> totalEstimateCounter = new HashMap<>();
     private List<IncrementUsedSenderLimitDto> incrementUsedSenderLimitDtoList = new ArrayList<>();
-    private Map<Integer, List<String>> priorityMap;
+    private Map<Integer, List<PaperDeliveryPriority>> priorityMap;
 
 }

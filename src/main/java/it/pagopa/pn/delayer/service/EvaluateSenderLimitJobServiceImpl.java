@@ -1,5 +1,8 @@
 package it.pagopa.pn.delayer.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.config.SsmParameterConsumerActivation;
@@ -14,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
@@ -27,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.PAPER_DELIVERY_PRIORITY_MAP_ERROR;
 import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND;
 
 @Component
@@ -41,6 +46,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
     private final SsmParameterConsumerActivation ssmParameterConsumerActivation;
     private final SenderLimitUtils senderLimitUtils;
     private final PaperDeliverySenderLimitDAO paperDeliverySenderLimitDAO;
+    private final ObjectMapper objectMapper;
 
 
     @Override
@@ -126,7 +132,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      * If the drivers are not found in the cache, it retrieves them from the Paper Channel Lambda,
      * assigns them to the paper deliveries, and updates the cache accordingly.
      */
-    private Mono<List<PaperDelivery>> retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(List<PaperDelivery> paperDelivery, String tenderId, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<String>> priorityMap) {
+    private Mono<List<PaperDelivery>> retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(List<PaperDelivery> paperDelivery, String tenderId, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<PaperDeliveryPriority>> priorityMap) {
         if (driversTotalCapacity.size() == 1 && driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().size() == 1) {
             String unifiedDeliveryDriver = driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().getFirst();
             return Mono.just(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDelivery, unifiedDeliveryDriver, tenderId, priorityMap));
@@ -147,7 +153,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
         }
     }
 
-    private List<PaperDelivery> retrieveFromCacheAndEnrichPaperDelivery(String tenderId, Map<Integer, List<String>> priorityMap, Map.Entry<String, List<PaperDelivery>> capProductTypeEntry, Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache) {
+    private List<PaperDelivery> retrieveFromCacheAndEnrichPaperDelivery(String tenderId, Map<Integer, List<PaperDeliveryPriority>> priorityMap, Map.Entry<String, List<PaperDelivery>> capProductTypeEntry, Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache) {
         return deliveryDriverUtils.retrieveFromCache(capProductTypeEntry.getKey())
                 .map(unifiedDeliveryDriver -> deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(capProductTypeEntry.getValue(), unifiedDeliveryDriver, tenderId, priorityMap))
                 .orElseGet(() -> {
@@ -156,7 +162,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 });
     }
 
-    private Mono<List<PaperDelivery>> callPaperChannelAndRetrieveEnrichedPaperDelivery(String tenderId, Map<Integer, List<String>> priorityMap, Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache) {
+    private Mono<List<PaperDelivery>> callPaperChannelAndRetrieveEnrichedPaperDelivery(String tenderId, Map<Integer, List<PaperDeliveryPriority>> priorityMap, Map<String, List<PaperDelivery>> groupedByCapProductTypeNotInCache) {
 
         return Flux.fromIterable(groupedByCapProductTypeNotInCache.keySet())
                 .map(capProductTypeKey -> new DeliveryDriverRequest(capProductTypeKey.split("~")[0], capProductTypeKey.split("~")[1]))
@@ -169,10 +175,17 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .defaultIfEmpty(List.of());
     }
 
-    private Map<Integer, List<String>> getPriorityMap() {
-        return ((Map<String, List<String>>) ssmParameterConsumerActivation.getParameterValue(pnDelayerConfigs.getPaperDeliveryPriorityParameterName(), Map.class)
-                .orElseThrow(() -> new PnInternalException("Failed to retrieve paper delivery priority map from SSM parameter store", PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND)))
-                .entrySet().stream()
-                .collect(Collectors.toMap(e -> Integer.parseInt(e.getKey()), Map.Entry::getValue));
+    private Map<Integer, List<PaperDeliveryPriority>> getPriorityMap() {
+        String parameterValue = ssmParameterConsumerActivation.getParameter(pnDelayerConfigs.getPaperDeliveryPriorityParameterName());
+        if(StringUtils.hasText(parameterValue)){
+            try {
+                return objectMapper.readValue(parameterValue, new TypeReference<>() {});
+            } catch (JsonProcessingException e) {
+                log.error("Error parsing paper delivery priority map from SSM parameter store for parameter name: {}", pnDelayerConfigs.getPaperDeliveryPriorityParameterName(), e);
+                throw new PnInternalException("Failed to retrieve paper delivery priority map from SSM parameter store", PAPER_DELIVERY_PRIORITY_MAP_ERROR);
+            }
+        }
+        log.error("Priority parameter not found on parameter store for parameter name: {}", pnDelayerConfigs.getPaperDeliveryPriorityParameterName());
+        throw new PnInternalException("Priority parameter not found on parameter store", PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND);
     }
 }
