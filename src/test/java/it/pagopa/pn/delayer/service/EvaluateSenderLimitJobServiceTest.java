@@ -1,5 +1,6 @@
 package it.pagopa.pn.delayer.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.config.SsmParameterConsumerActivation;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -31,7 +33,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
-import static it.pagopa.pn.delayer.model.WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY;
 import static it.pagopa.pn.delayer.model.WorkflowStepEnum.EVALUATE_SENDER_LIMIT;
 import static org.mockito.Mockito.*;
 
@@ -58,6 +59,9 @@ class EvaluateSenderLimitJobServiceTest {
     @Mock
     private PaperDeliveryCounterDAO paperDeliveryCounterDAO;
 
+    @Spy
+    private ObjectMapper objectMapper;
+
     private final String province = "RM";
     private final String tenderId = "TENDERID";
 
@@ -78,15 +82,12 @@ class EvaluateSenderLimitJobServiceTest {
                 deliveryDriverUtils,
                 ssmParameterConsumerActivation,
                 new SenderLimitUtils(paperDeliverySenderLimitDAO, pnDelayerUtils, paperDeliveryCounterDAO),
-                paperDeliverySenderLimitDAO
+                paperDeliverySenderLimitDAO,
+                objectMapper
         );
 
-        Map<String, List<String>> priorityMap = Map.of(
-                "1", List.of("PRODUCT_RS.ATTEMPT_0"),
-                "2", List.of("PRODUCT_AR.ATTEMPT_1", "PRODUCT_890.ATTEMPT_1"),
-                "3", List.of("PRODUCT_AR.ATTEMPT_0", "PRODUCT_890.ATTEMPT_0"));
-        when(ssmParameterConsumerActivation.getParameterValue(eq("priority-param"), eq(Map.class)))
-                .thenReturn(Optional.of(priorityMap));
+        when(ssmParameterConsumerActivation.getParameter(eq("priority-param")))
+                .thenReturn("{\"1\":[{\"product\":\"RS\",\"attempt\":\"0\",\"communicationType\":\"LEGAL\"}],\"2\":[{\"product\":\"AR\",\"attempt\":\"1\",\"communicationType\":\"LEGAL\"},{\"product\":\"890\",\"attempt\":\"1\",\"communicationType\":\"LEGAL\"}],\"3\":[{\"product\":\"AR\",\"attempt\":\"0\",\"communicationType\":\"LEGAL\"},{\"product\":\"890\",\"attempt\":\"0\",\"communicationType\":\"LEGAL\"}],\"4\":[{\"product\":\"RS\",\"attempt\":\"0\",\"communicationType\":\"INFORMAL\"}]}");
     }
 
     @Test
