@@ -8,12 +8,25 @@ const formatDate = (dateObj) => {
   return { yyyy, mm, dd, full: `${yyyy}-${mm}-${dd}` };
 };
 
-function prepareQueryCondition(queryFile, mdate, viewName) {
+function parseDateOrNull(dateStr) {
+  if (!dateStr) {
+    return null;
+  }
+
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date: ${dateStr}`);
+  }
+
+  return date;
+}
+
+function prepareQueryCondition(queryFile, deliveryDate, executionDate, viewName) {
   if (!fs.existsSync(queryFile)) {
     throw new Error(`Query file not found: ${queryFile}`);
   }
 
-  const map = prepareQueryPlaceholdersMap(mdate, viewName);
+  const map = prepareQueryPlaceholdersMap(deliveryDate, executionDate, viewName);
 
   let query = fs.readFileSync(queryFile, 'utf8');
   for (const [key, value] of Object.entries(map)) {
@@ -24,31 +37,56 @@ function prepareQueryCondition(queryFile, mdate, viewName) {
   return query
 }
 
-function prepareQueryPlaceholdersMap(mDate, viewName) {
-  const baseDate = new Date(mDate);
+function prepareQueryPlaceholdersMap(deliveryDate, executionDate, viewName) {
+  const delivery = parseDateOrNull(deliveryDate);
+  const execution = parseDateOrNull(executionDate);
 
-  if (Number.isNaN(baseDate.getTime())) {
-    throw new Error(`Invalid date: ${mDate}`);
+  if (!delivery) {
+    throw new Error("deliveryDate is required");
   }
 
-  const nextWeek = new Date(baseDate);
-  const lastWeek = new Date(baseDate);
+  const nextWeek = new Date(delivery);
+  const lastWeek = new Date(delivery);
 
-  nextWeek.setDate(baseDate.getDate() + 7);
-  lastWeek.setDate(baseDate.getDate() - 7);
+  nextWeek.setDate(delivery.getDate() + 7);
+  lastWeek.setDate(delivery.getDate() - 7);
 
-  const base = formatDate(baseDate);
-  const next = formatDate(nextWeek);
-  const last = formatDate(lastWeek);
+  const deliveryFmt = formatDate(delivery);
+  const executionFmt = execution ? formatDate(execution) : null;
+  const nextFmt = formatDate(nextWeek);
+  const lastFmt = formatDate(lastWeek);
+
+  const referenceDate = executionFmt ?? deliveryFmt;
+
+  const queryConditionQ1 = executionFmt
+    ? `${generateExactPartitionCondition(
+        executionFmt.full
+      )} AND pk='${deliveryFmt.full}~EVALUATE_SENDER_LIMIT'`
+    : `${generatePartitionConditionWithBetween(
+        lastFmt.full,
+        deliveryFmt.full
+      )} AND pk='${deliveryFmt.full}~EVALUATE_SENDER_LIMIT'`;
 
   return {
-    YYYY: base.yyyy,
-    MM: base.mm,
-    DD: base.dd,
-    'YYYY-MM-DD-NEXT-WEEK': next.full,
-    QUERY_CONDITION_Q1: `${generatePartitionConditionWithBetween(last.full, base.full)} AND pk='${base.full}~EVALUATE_SENDER_LIMIT'`,
-    PAPER_DELIVERY_JSON_VIEW : viewName
+    YYYY: referenceDate.yyyy,
+    MM: referenceDate.mm,
+    DD: referenceDate.dd,
+    "YYYY-MM-DD-NEXT-WEEK": nextFmt.full,
+    QUERY_CONDITION_Q1: queryConditionQ1,
+    PAPER_DELIVERY_JSON_VIEW: viewName,
   };
+}
+
+function generateExactPartitionCondition(dateStr) {
+  const date = new Date(dateStr);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date: ${dateStr}`);
+  }
+
+  const { yyyy, mm, dd } = formatDate(date);
+
+  return `(p_year = '${yyyy}' AND p_month = '${mm}' AND CAST(p_day AS INT) = ${Number(dd)})`;
 }
 
 function generatePartitionConditionWithBetween(startDateStr, endDateStr) {
@@ -62,7 +100,9 @@ function generatePartitionConditionWithBetween(startDateStr, endDateStr) {
   }
 
   if (start > end) {
-    throw new Error("La data di inizio deve essere precedente o uguale alla data di fine");
+    throw new Error(
+      "La data di inizio deve essere precedente o uguale alla data di fine"
+    );
   }
 
   const result = [];
@@ -86,12 +126,20 @@ function generatePartitionConditionWithBetween(startDateStr, endDateStr) {
         : endOfMonth.getDate();
 
     result.push(
-      `(p_year = '${y}' AND p_month = '${String(m).padStart(2, "0")}' AND CAST(p_day AS INT) BETWEEN ${fromDay} AND ${toDay})`
+      `(p_year = '${y}' AND p_month = '${String(m).padStart(
+        2,
+        "0"
+      )}' AND CAST(p_day AS INT) BETWEEN ${fromDay} AND ${toDay})`
     );
 
     current.setMonth(current.getMonth() + 1, 1);
   }
-  return `${result.length === 1 ? result[0] : `(${result.join(" OR ")})`}`;
+
+  return result.length === 1 ? result[0] : `(${result.join(" OR ")})`;
 }
 
-module.exports = { prepareQueryCondition, generatePartitionConditionWithBetween };
+module.exports = {
+  prepareQueryCondition,
+  generatePartitionConditionWithBetween,
+  generateExactPartitionCondition,
+};

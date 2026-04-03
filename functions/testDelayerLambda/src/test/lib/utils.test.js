@@ -29,7 +29,7 @@ describe("utils.js", () => {
     readFileSyncReturn = "SELECT * FROM <PAPER_DELIVERY_JSON_VIEW> WHERE <QUERY_CONDITION_Q1>";
     const mdate = "2024-03-01";
     const database = "mydb";
-    const query = utils.prepareQueryCondition("dummy.sql", mdate, database);
+    const query = utils.prepareQueryCondition("dummy.sql", mdate, null, database);
     assert.ok(query.includes("mydb"));
     assert.ok(query.includes("pk='"));
     assert.ok(query.includes("p_year"));
@@ -39,7 +39,7 @@ describe("utils.js", () => {
 
   it("prepareQueryCondition lancia errore se il file non esiste", () => {
     existsSyncReturn = false;
-    assert.throws(() => utils.prepareQueryCondition("notfound.sql", "2024-03-01", "db"), /Query file not found/);
+    assert.throws(() => utils.prepareQueryCondition("notfound.sql", "2024-03-01", null, "db"), /Query file not found/);
     assert.deepStrictEqual(existsSyncCalls, ["notfound.sql"]);
   });
 
