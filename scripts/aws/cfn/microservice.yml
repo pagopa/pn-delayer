@@ -384,6 +384,10 @@ Parameters:
     Type: String
     Description: 'Arn of kms bucket for delayer tests automation'
 
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: 'Arn of kms key for logs bucket'
+
   TestDelayerObjectKeyBucket:
     Type: String
     Description: 'TestDelayerLambda object key of bucket'
@@ -2228,13 +2232,10 @@ Resources:
             Action:
               - kms:DescribeKey
               - kms:GenerateDataKey
-            Resource:
-              - !Sub "${TestDelayerKmsBucketArn}"
-          - Effect: Allow
-            Action:
               - kms:Decrypt
             Resource:
-              - "*"
+              - !Sub "${TestDelayerKmsBucketArn}"
+              - !Sub "${LogsBucketKmsKeyArn}"
           - Effect: Allow
             Action:
               - states:StartExecution
@@ -2914,7 +2915,7 @@ Resources:
             Action:
               - kms:Decrypt
             Resource:
-              - "*"
+              - !Sub "${LogsBucketKmsKeyArn}"
 
   ExportDryRunDashboardDataLambdaAlarms:
     Type: AWS::CloudFormation::Stack
