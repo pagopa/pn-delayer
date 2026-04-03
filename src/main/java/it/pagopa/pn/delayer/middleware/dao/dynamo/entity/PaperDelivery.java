@@ -92,6 +92,7 @@ public class PaperDelivery {
         this.recipientId = paperDelivery.getRecipientId();
         this.deliveryDate = paperDelivery.getDeliveryDate();
         this.workflowStep = workflowStepEnum.name();
+        this.communicationType = paperDelivery.getCommunicationType();
     }
 
     @DynamoDbIgnore
