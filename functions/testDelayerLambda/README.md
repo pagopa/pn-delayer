@@ -20,8 +20,8 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_PRESIGNED_URL**          | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                          | `["filename","checksum"]`                                                                                                                                                                                                        |
 | **GET_DECLARED_CAPACITY**      | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                 | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
 | **INSERT_MOCK_CAPACITIES**     | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                           | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
-| **GET_PRINT_CAPACITY_COUNTER** | Restituisce l'entità del contatore per la verifica della capacità di stampa settimanale.                                                                             | `["paperDeliveryCountersTableName, deliveryDate"]`                                                                                                                                                                               |
-| **GET_RESIDUAL_PAPERS**        | Esegue una query Athena per ottenere le spedizioni spostate alla settimana successiva, salva il CSV risultante su S3 e restituisce un URL presigned per il download. | `["delayerPaperDeliveryJsonView, deliveryDate"]`                                                                                                                                                                                 |
+| **GET_PRINT_CAPACITY_COUNTER** | Restituisce l'entità del contatore per la verifica della capacità di stampa settimanale.                                                                             | `["paperDeliveryCountersTableName", "deliveryDate"]`                                                                                                                                                                             |
+| **GET_RESIDUAL_PAPERS**        | Esegue una query Athena per ottenere le spedizioni spostate alla settimana successiva, salva il CSV risultante su S3 e restituisce un URL presigned per il download. | `["delayerPaperDeliveryJsonView", "deliveryDate", "executionDate"]` executionDate opzionale se diverso da deliveryDate                                                                                                           |
 
 ### Esempi di payload
 
@@ -206,7 +206,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```json
 {
   "operationType": "GET_RESIDUAL_PAPERS",
-  "parameters": ["pn_delayer_paper_delivery_json_view","2026-03-24"]
+  "parameters": ["pn_delayer_paper_delivery_json_view","2026-03-24", "2026-04-03"]
 }
 ```
 

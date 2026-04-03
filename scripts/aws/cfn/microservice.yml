@@ -2226,11 +2226,15 @@ Resources:
           - Sid: DecryptObjects
             Effect: Allow
             Action:
-              - kms:Decrypt
               - kms:DescribeKey
               - kms:GenerateDataKey
             Resource:
               - !Sub "${TestDelayerKmsBucketArn}"
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource:
+              - "*"
           - Effect: Allow
             Action:
               - states:StartExecution

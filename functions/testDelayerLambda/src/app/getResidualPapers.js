@@ -8,8 +8,7 @@ const {
 } = require("./lib/s3");
 
 exports.getResidualPapers = async (params = []) => {
-  const [paperDeliveryJsonView, deliveryDate] = params;
-  const specificDate = deliveryDate;
+  const [paperDeliveryJsonView, deliveryDate, executionDate] = params;
   const database = process.env.ATHENA_DATABASE_NAME;
   const bucket = process.env.BUCKET_NAME;
   const workgroup = process.env.ATHENA_WORKGROUP_NAME;
@@ -17,7 +16,7 @@ exports.getResidualPapers = async (params = []) => {
   const finalPrefix = `residual-papers`;
 
   console.log(`Environment:
-  - Date:      ${specificDate}
+  - Date:      ${deliveryDate}
   - Database:  ${database}
   - Bucket:    ${bucket}
   - Workgroup: ${workgroup}`);
@@ -25,7 +24,7 @@ exports.getResidualPapers = async (params = []) => {
   const athenaOutputPath = `s3://${bucket}/${athenaResultsPrefix}/`;
 
   // Prepara SQL SELECT normale, senza UNLOAD
-  const sql = await prepareQuery( "queryNotPassed", specificDate, paperDeliveryJsonView);
+  const sql = await prepareQuery( "queryNotPassed", deliveryDate, executionDate, paperDeliveryJsonView);
 
   // Esegue la SELECT su Athena e ottiene il path del CSV standard Athena
   const athenaResultPath = await queryExecution(workgroup, sql, database, athenaOutputPath);
@@ -62,12 +61,13 @@ exports.getResidualPapers = async (params = []) => {
   };
 };
 
-async function prepareQuery(fileName, date, paperDeliveryJsonView) {
-  console.log(`Preparing query "${fileName}" for date: ${date}`);
+async function prepareQuery(fileName, deliveryDate, executionDate, paperDeliveryJsonView) {
+  console.log(`Preparing query "${fileName}" for date: ${deliveryDate}`);
 
   const query = prepareQueryCondition(
     `./resources/${fileName}.sql`,
-    date,
+    deliveryDate,
+    executionDate,
     paperDeliveryJsonView
   );
 
