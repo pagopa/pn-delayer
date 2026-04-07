@@ -17,7 +17,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_STATUS_EXECUTION**       | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                                | `["executionArn"]`                                                                                                                                                                                                               |
 | **GET_PAPER_DELIVERY**         | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                      | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
 | **GET_SENDER_LIMIT**           | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? }`                                                                                                                                                      |
-| **GET_PRESIGNED_URL**          | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                          | `["filename","checksum"]`                                                                                                                                                                                                        |
+| **GET_PRESIGNED_URL**          | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                          | `{ "filename", "checksum"?, "presignedUrlType"? }`                                                                                                                                                                               |
 | **GET_DECLARED_CAPACITY**      | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                 | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
 | **INSERT_MOCK_CAPACITIES**     | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                           | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
 | **GET_PRINT_CAPACITY_COUNTER** | Restituisce l'entità del contatore per la verifica della capacità di stampa settimanale.                                                                             | `["paperDeliveryCountersTableName", "deliveryDate"]`                                                                                                                                                                             |
@@ -187,10 +187,15 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **deliveryDateDayOfWeek**                 | Intero che indica il giorno della settimana su cui l'algoritmo di pianificazione deve partire (default = 1, cioè lunedì).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | ---                                                             |
 
 *GET_PRESIGNED_URL*
+
 ```json
 {
   "operationType": "GET_PRESIGNED_URL",
-  "parameters": ["example.csv","abcd1234efgh5678ijkl9012mnop3456"]
+  "parameters": {
+    "fileName": "example.csv",
+    "checksum": "abcd1234efgh5678ijkl9012mnop3456",
+    "presignedUrlType": "UPLOAD"
+  }
 }
 ```
 
@@ -340,6 +345,7 @@ Un esempio di risposta è il seguente:
   ```json
   {
     "uploadUrl": "",
+    "downloadUrl": "",
     "key" :  "<filename>",
     "requiredHeaders": {
       "Content-Type": "text/csv",
