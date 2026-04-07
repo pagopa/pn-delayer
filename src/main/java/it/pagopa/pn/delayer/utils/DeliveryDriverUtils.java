@@ -30,7 +30,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND;
-import static it.pagopa.pn.delayer.model.CommunicationTypeEnum.LEGAL;
+import static it.pagopa.pn.delayer.model.CommunicationType.LEGAL;
 
 @Component
 @Slf4j
@@ -188,7 +188,6 @@ public class DeliveryDriverUtils {
      * Groups drivers by intersecting product sets.
      * If a driver has products that intersect with an existing group, the driver is merged into that group.
      * Otherwise, a new group is created for that PaperDeliveryDriverCapacity entity.
-     *
      * For example, given three PaperDeliveryDriverCapacity entities with product lists: ["RS", "AR"], ["RS"], and ["890"],
      * the resulting map will have two entries with keys ["AR", "RS"] and ["890"],
      * and values containing the corresponding PaperDeliveryDriverCapacity entities.

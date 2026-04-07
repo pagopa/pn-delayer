@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class PaperDeliveryPriority {
     private String product;
     private Integer attempt;
-    private CommunicationTypeEnum communicationType;
+    private CommunicationType communicationType;
 }

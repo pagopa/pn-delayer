@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static it.pagopa.pn.delayer.model.CommunicationTypeEnum.INFORMAL;
+import static it.pagopa.pn.delayer.model.CommunicationType.INFORMAL;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -245,10 +245,10 @@ class DeliveryDriverUtilsTest {
         );
 
         Map<Integer, List<PaperDeliveryPriority>> priorityMap = Map.of(
-                3, List.of(new PaperDeliveryPriority("AR", 0, CommunicationTypeEnum.LEGAL)),
-                1, List.of(new PaperDeliveryPriority("RS", 0, CommunicationTypeEnum.LEGAL)),
+                3, List.of(new PaperDeliveryPriority("AR", 0, CommunicationType.LEGAL)),
+                1, List.of(new PaperDeliveryPriority("RS", 0, CommunicationType.LEGAL)),
                 4, List.of(new PaperDeliveryPriority("RS", 0, INFORMAL)),
-                2, List.of(new PaperDeliveryPriority("AR", 1, CommunicationTypeEnum.LEGAL))
+                2, List.of(new PaperDeliveryPriority("AR", 1, CommunicationType.LEGAL))
         );
 
         List<PaperDelivery> result = deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(
@@ -268,10 +268,10 @@ class DeliveryDriverUtilsTest {
         paperDeliveries.add(createPaperDelivery("RS","00179", "RM", "paId2", 0));
         paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
         Map<Integer, List<PaperDeliveryPriority>> priorityMap = Map.of(
-                3, List.of(new PaperDeliveryPriority("AR", 0, CommunicationTypeEnum.LEGAL)),
-                1, List.of(new PaperDeliveryPriority("RS", 0, CommunicationTypeEnum.LEGAL)),
+                3, List.of(new PaperDeliveryPriority("AR", 0, CommunicationType.LEGAL)),
+                1, List.of(new PaperDeliveryPriority("RS", 0, CommunicationType.LEGAL)),
                 4, List.of(new PaperDeliveryPriority("RS", 0, INFORMAL)),
-                2, List.of(new PaperDeliveryPriority("AR", 1, CommunicationTypeEnum.LEGAL))
+                2, List.of(new PaperDeliveryPriority("AR", 1, CommunicationType.LEGAL))
         );
 
 
