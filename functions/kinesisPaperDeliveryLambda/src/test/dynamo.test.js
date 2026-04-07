@@ -50,13 +50,13 @@ describe('updateExcludeCounter', () => {
     it('updates counters for RS and non-RS with correct filtering', async () => {
       const excludeGroupedRecords = {
         'MILANO~RS': [
-          { communicationType: 'LEGAL', kinesisSeqNumber: 'seq-rs-1' },
-          { communicationType: 'INFORMAL', kinesisSeqNumber: 'seq-rs-2' }
+          { entity: {communicationType: 'LEGAL'}, kinesisSeqNumber: 'seq-rs-1' },
+          { entity: {communicationType: 'INFORMAL'}, kinesisSeqNumber: 'seq-rs-2' }
         ],
         'ROMA~890': [
-          { attempt: '1',  kinesisSeqNumber: 'seq-2' },
-          { attempt: '1',  communicationType: 'LEGAL', kinesisSeqNumber: 'seq-3' },
-          { attempt: '1', communicationType: 'INFORMAL', kinesisSeqNumber: 'seq-4' }
+          { entity: {attempt: '1'},  kinesisSeqNumber: 'seq-2' },
+          { entity: {attempt: '1',  communicationType: 'LEGAL'}, kinesisSeqNumber: 'seq-3' },
+          { entity: {attempt: '1', communicationType: 'INFORMAL'}, kinesisSeqNumber: 'seq-4' }
         ]
       };
       mockSend.resolves({});
@@ -82,8 +82,8 @@ describe('updateExcludeCounter', () => {
 
     it('does not call Dynamo when all grouped records are filtered out', async () => {
       const excludeGroupedRecords = {
-        'MILANO~RS': [{ communicationType: 'INFORMAL', kinesisSeqNumber: 'seq-rs' }],
-        'ROMA~890': [{ attempt: '0', communicationType: 'LEGAL', kinesisSeqNumber: 'seq-non-rs' }]
+        'MILANO~RS': [{entity: { communicationType: 'INFORMAL'}, kinesisSeqNumber: 'seq-rs' }],
+        'ROMA~890': [{entity: { attempt: '0', communicationType: 'LEGAL'}, kinesisSeqNumber: 'seq-non-rs' }]
       };
 
       const result = await dynamo.updateExcludeCounter(excludeGroupedRecords, []);
@@ -95,11 +95,11 @@ describe('updateExcludeCounter', () => {
     it('adds only failed group sequence numbers when one update fails and continues others', async () => {
       const excludeGroupedRecords = {
         'MILANO~RS': [
-          { communicationType: 'LEGAL', kinesisSeqNumber: 'seq-rs-1' },
-          { communicationType: 'LEGAL', kinesisSeqNumber: 'seq-rs-2' }
+          { entity: {communicationType: 'LEGAL'}, kinesisSeqNumber: 'seq-rs-1' },
+          { entity:{communicationType: 'LEGAL'}, kinesisSeqNumber: 'seq-rs-2' }
         ],
         'ROMA~890': [
-          { attempt: '1', communicationType: 'LEGAL', kinesisSeqNumber: 'seq-ok-1' }
+          { entity:{attempt: '1', communicationType: 'LEGAL'}, kinesisSeqNumber: 'seq-ok-1' }
         ]
       };
 
@@ -135,7 +135,7 @@ describe('updateExcludeCounter', () => {
 
       const now = Math.floor(Date.now() / 1000);
       await dynamo.updateExcludeCounter({
-        'MILANO~RS': [{ communicationType: 'REGISTERED_LETTER', kinesisSeqNumber: 'seq1' }]
+        'MILANO~RS': [{entity:{ communicationType: 'REGISTERED_LETTER'}, kinesisSeqNumber: 'seq1' }]
       }, []);
 
       const ttl = mockSend.firstCall.args[0].params.ExpressionAttributeValues[':ttl'];

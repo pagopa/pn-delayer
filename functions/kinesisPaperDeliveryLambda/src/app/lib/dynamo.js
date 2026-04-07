@@ -27,11 +27,11 @@ function retrieveCounterMap(excludeGroupedRecords) {
 
         if (productTypeKey === "RS") {
             filteredRecords = records.filter(
-               record => record.communicationType !== "INFORMAL"
+               record => record.entity.communicationType !== "INFORMAL"
             );
         } else {
           filteredRecords = records.filter(
-            record => record.attempt && parseInt(record.attempt, 10) === 1 && record.communicationType !== "INFORMAL"
+            record => record.entity.attempt && parseInt(record.entity.attempt, 10) === 1 && record.entity.communicationType !== "INFORMAL"
           );
         }
 
