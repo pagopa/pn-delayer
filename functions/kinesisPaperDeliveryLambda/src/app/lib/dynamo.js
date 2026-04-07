@@ -25,13 +25,15 @@ function retrieveCounterMap(excludeGroupedRecords) {
 
     let filteredRecords;
 
-    if (productTypeKey === "RS") {
-      filteredRecords = records;
-    } else {
-      filteredRecords = records.filter(
-        record => record.entity.attempt && parseInt(record.entity.attempt, 10) === 1
-      );
-    }
+        if (productTypeKey === "RS") {
+            filteredRecords = records.filter(
+               record => record.entity.communicationType !== "INFORMAL"
+            );
+        } else {
+          filteredRecords = records.filter(
+            record => record.entity.attempt && parseInt(record.entity.attempt, 10) === 1 && record.entity.communicationType !== "INFORMAL"
+          );
+        }
 
     if (filteredRecords.length > 0) {
       result[key] = filteredRecords.length;

@@ -2,12 +2,9 @@ package it.pagopa.pn.delayer.utils;
 
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
-import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
-import it.pagopa.pn.delayer.model.WorkflowStepEnum;
+import it.pagopa.pn.delayer.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
@@ -16,8 +13,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
-import java.util.*;
-import java.util.function.Predicate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Component
@@ -146,19 +145,35 @@ public class PnDelayerUtils {
     }
 
     /**
+     * Filtra e smista le spedizioni in base al prodotto, tentativo e tipo di comunicazione(LEGAL / INFORMAL).
+     * Il metodo esegue separa le spedizioni in INFORMAL e LEGAL.<
+     * Tra le LEGAL Le RS o i secondi tentativi vengono inviati allo step EVALUATE_DRIVER_CAPACITY.
+     * Le restanti vengono restituite come risultato del metodo
+     * Tutte le spedizioni INFORMAL vengono inviate allo step EVALUATE_RESIDUAL_CAPACITY.
      *
-     * @param items spedizioni in input
-     * @param senderLimitJobProcessObjects contiene nel campo sendToDriverCapacityStep le spedizioni che sono RS e secondo tentativi
-     * @return le spedizioni che non sono nè RS nè secondi tentativi
-     * <p>
-     * partitioned.get(true) -> spedizioni che sono RS o secondi tentativi
-     * partitioned.get(false) -> spedizioni che non sono nè RS nè secondi tentativi
+     * @param items lista delle spedizioni in input
+     * @param senderLimitJobProcessObjects oggetto popolato con le spedizioni suddivise per step di processamento
+     * @return lista delle spedizioni non-INFORMAL che non sono né RS né di secondo tentativo
      */
     public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
-        Predicate<PaperDelivery> shouldExclude = paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1;
-        Map<Boolean, List<PaperDelivery>> partitioned = items.stream().collect(Collectors.partitioningBy(shouldExclude));
-        senderLimitJobProcessObjects.setSendToDriverCapacityStep(partitioned.get(true));
-        return partitioned.get(false);
+        var partitionedByCommType = items.stream().collect(Collectors.partitioningBy(this::isInformal));
+        var informalItems = partitionedByCommType.get(true);
+        var legalItems = partitionedByCommType.get(false);
+        var byRsOrSecondAttempt = legalItems.stream().collect(Collectors.partitioningBy(this::isRsOrSecondAttempt));
+        senderLimitJobProcessObjects.setSendToDriverCapacityStep(byRsOrSecondAttempt.get(true));
+        senderLimitJobProcessObjects.setSendToResidualCapacityStep(
+                new ArrayList<>(informalItems)
+        );
+
+        return new ArrayList<>(byRsOrSecondAttempt.get(false));
+    }
+
+    private boolean isInformal(PaperDelivery paperDelivery) {
+        return CommunicationType.INFORMAL.name().equalsIgnoreCase(paperDelivery.getCommunicationType());
+    }
+
+    private boolean isRsOrSecondAttempt(PaperDelivery paperDelivery) {
+        return ProductType.RS.getValue().equalsIgnoreCase(paperDelivery.getProductType()) || paperDelivery.getAttempt() == 1;
     }
 
     public Integer retrieveActualPrintCapacity(LocalDate deliveryWeek) {

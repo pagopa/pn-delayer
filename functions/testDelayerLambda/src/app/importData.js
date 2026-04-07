@@ -105,10 +105,12 @@ function retrieveCounterMap(excludeGroupedRecords) {
     let filteredRecords;
 
     if (productTypeKey === "RS") {
-      filteredRecords = records;
+        filteredRecords = records.filter(
+            record => record.communicationType !== "INFORMAL"
+          );
     } else {
       filteredRecords = records.filter(
-        record => record.attempt && parseInt(record.attempt, 10) === 1
+        record => record.attempt && parseInt(record.attempt, 10) === 1 && record.communicationType !== "INFORMAL"
       );
     }
 
@@ -173,6 +175,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
         attempt: parseInt(payload.attempt, 10),
         iun: payload.iun,
         workflowStep: 'EVALUATE_SENDER_LIMIT',
+        communicationType: payload.communicationType || 'LEGAL',
     };
 }
 

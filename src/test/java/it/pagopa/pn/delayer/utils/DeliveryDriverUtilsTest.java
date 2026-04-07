@@ -9,9 +9,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDriverUsedCapacitiesDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryDriverCapacity;
-import it.pagopa.pn.delayer.model.DeliveryDriverRequest;
-import it.pagopa.pn.delayer.model.IncrementUsedCapacityDto;
-import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
+import it.pagopa.pn.delayer.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static it.pagopa.pn.delayer.model.CommunicationType.INFORMAL;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -232,7 +231,11 @@ class DeliveryDriverUtilsTest {
         List<PaperDelivery> deliveries1 = new ArrayList<>();
         deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0));
         List<PaperDelivery> deliveries2 = new ArrayList<>();
-        deliveries2.add(createPaperDelivery("RS", "00179", "RM", "paId2", 1));
+        deliveries2.add(createPaperDelivery("RS", "00179", "RM", "paId2", 0));
+        PaperDelivery paperDelivery = createPaperDelivery("RS", "00179", "RM", "paId2", 0);
+        paperDelivery.setCommunicationType(INFORMAL.name());
+        deliveries2.add(paperDelivery);
+
 
         when(cacheService.getFromCache("00178~AR")).thenReturn(Optional.of("driverX"));
         when(cacheService.getFromCache("00179~RS")).thenReturn(Optional.of("driverY"));
@@ -241,18 +244,21 @@ class DeliveryDriverUtilsTest {
                 "00179~RS", deliveries2
         );
 
-        Map<Integer, List<String>> priorityMap = Map.of(
-                1, List.of("PRODUCT_AR.ATTEMPT_0"),
-                2, List.of("PRODUCT_RS.ATTEMPT_1")
+        Map<Integer, List<PaperDeliveryPriority>> priorityMap = Map.of(
+                3, List.of(new PaperDeliveryPriority("AR", 0, CommunicationType.LEGAL)),
+                1, List.of(new PaperDeliveryPriority("RS", 0, CommunicationType.LEGAL)),
+                4, List.of(new PaperDeliveryPriority("RS", 0, INFORMAL)),
+                2, List.of(new PaperDeliveryPriority("AR", 1, CommunicationType.LEGAL))
         );
 
         List<PaperDelivery> result = deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(
                 grouped, "tenderTest", priorityMap
         );
 
-        assertEquals(2, result.size());
-        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverX") && d.getPriority() == 1));
-        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverY") && d.getPriority() == 2));
+        assertEquals(3, result.size());
+        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverX") && d.getPriority() == 3));
+        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverY") && d.getPriority() == 1));
+        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverY") && d.getPriority() == 4));
     }
 
     @Test
@@ -261,10 +267,13 @@ class DeliveryDriverUtilsTest {
         paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1));
         paperDeliveries.add(createPaperDelivery("RS","00179", "RM", "paId2", 0));
         paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0));
-        Map<Integer, List<String>> priorityMap = Map.of(
-                1, List.of("PRODUCT_RS.ATTEMPT_0"),
-                2, List.of("PRODUCT_AR.ATTEMPT_1","PRODUCT_890.ATTEMPT_1"),
-                3, List.of("PRODUCT_AR.ATTEMPT_0","PRODUCT_890.ATTEMPT_0"));
+        Map<Integer, List<PaperDeliveryPriority>> priorityMap = Map.of(
+                3, List.of(new PaperDeliveryPriority("AR", 0, CommunicationType.LEGAL)),
+                1, List.of(new PaperDeliveryPriority("RS", 0, CommunicationType.LEGAL)),
+                4, List.of(new PaperDeliveryPriority("RS", 0, INFORMAL)),
+                2, List.of(new PaperDeliveryPriority("AR", 1, CommunicationType.LEGAL))
+        );
+
 
         List<PaperDelivery> result = deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(paperDeliveries, "driver2", "tenderId", priorityMap);
 
