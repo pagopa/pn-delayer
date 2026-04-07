@@ -22,20 +22,17 @@ const EXPIRES_IN = 300;
  */
 
 exports.getPresignedUrl = async (params = {}) => {
-  const { fileName, checksumSha256B64, presignedUrlType } = params;
+  const { fileName, checksumSha256B64, presignedUrlType = PresignedUrlType.UPLOAD } = params;
 
   const BUCKET_NAME = process.env.BUCKET_NAME;
   if (!BUCKET_NAME) {throw new Error("Environment variable BUCKET_NAME must be defined");}
 
-  //default upload
-  const type = (presignedUrlType || PresignedUrlType.UPLOAD).toUpperCase();
-
   //validate enum value
-  if (!Object.values(PresignedUrlType).includes(type)) {
+  if (!Object.values(PresignedUrlType).includes(presignedUrlType)) {
     throw new Error(`presignedUrlType must be one of: ${Object.values(PresignedUrlType).join(", ")}`);
   }
 
-  if (type === PresignedUrlType.DOWNLOAD) {
+  if (presignedUrlType === PresignedUrlType.DOWNLOAD) {
     return generateDownloadUrl({
       fileName,
       bucketName: BUCKET_NAME,
