@@ -384,6 +384,10 @@ Parameters:
     Type: String
     Description: 'Arn of kms bucket for delayer tests automation'
 
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: 'Arn of kms key for logs bucket'
+
   TestDelayerObjectKeyBucket:
     Type: String
     Description: 'TestDelayerLambda object key of bucket'
@@ -2108,6 +2112,8 @@ Resources:
           DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
           PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+          ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
+          ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
       TracingConfig:
         Mode: Active
       Layers:
@@ -2197,17 +2203,39 @@ Resources:
               - s3:ListBucket
               - s3:GetObjectTagging
               - s3:PutObject
+              - s3:GetBucketLocation
+              - s3:DeleteObject
+              - s3:CreateMultipartUpload
+              - s3:UploadPart
+              - s3:CompleteMultipartUpload
+              - s3:AbortMultipartUpload
+              - s3:ListMultipartUploadParts
             Resource:
               - !Sub "${TestDelayerBucketArn}"
               - !Sub "${TestDelayerBucketArn}/*"
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:AbortMultipartUpload
+              - s3:ListMultipartUploadParts
+              - s3:CreateMultipartUpload
+              - s3:UploadPart
+              - s3:CompleteMultipartUpload
+            Resource:
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
+              - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
           - Sid: DecryptObjects
             Effect: Allow
             Action:
-              - kms:Decrypt
               - kms:DescribeKey
               - kms:GenerateDataKey
+              - kms:Decrypt
             Resource:
               - !Sub "${TestDelayerKmsBucketArn}"
+              - !Sub "${LogsBucketKmsKeyArn}"
           - Effect: Allow
             Action:
               - states:StartExecution
@@ -2226,6 +2254,25 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+          - Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+            Resource:
+              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
+          - Effect: Allow
+            Action:
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetTable
+              - glue:GetTables
+              - glue:GetPartition
+              - glue:GetPartitions
+            Resource:
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/*
 
   TestDelayerLambdaNotProdPolicy:
     Type: AWS::IAM::Policy
@@ -2868,7 +2915,7 @@ Resources:
             Action:
               - kms:Decrypt
             Resource:
-              - "*"
+              - !Sub "${LogsBucketKmsKeyArn}"
 
   ExportDryRunDashboardDataLambdaAlarms:
     Type: AWS::CloudFormation::Stack
