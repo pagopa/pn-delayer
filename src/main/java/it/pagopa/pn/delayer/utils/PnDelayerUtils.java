@@ -145,17 +145,15 @@ public class PnDelayerUtils {
     }
 
     /**
-     * Filtra le spedizioni separando quelle con priorità RS o di secondo tentativo da quelle standard.
+     * Filtra e smista le spedizioni in base al prodotto, tentativo e tipo di comunicazione(LEGAL / INFORMAL).
+     * Il metodo esegue separa le spedizioni in INFORMAL e LEGAL.<
+     * Tra le LEGAL Le RS o i secondi tentativi vengono inviati allo step EVALUATE_DRIVER_CAPACITY.
+     * Le restanti vengono restituite come risultato del metodo
+     * Tutte le spedizioni INFORMAL vengono inviate allo step EVALUATE_RESIDUAL_CAPACITY.
      *
      * @param items lista delle spedizioni in input
-     * @param senderLimitJobProcessObjects oggetto che verrà popolato con le spedizioni da indirizzare
-     * @return lista delle spedizioni con priorità 3
-     * <p>
-     * Le restanti spedizioni vengono suddivise come segue:
-     * <ul>
-     *     <li>Priorità 1 e 2 → inviate a sendToDriverCapacityStep</li>
-     *     <li>Priorità 4 → inviate a sendToResidualCapacityStep</li>
-     * </ul>
+     * @param senderLimitJobProcessObjects oggetto popolato con le spedizioni suddivise per step di processamento
+     * @return lista delle spedizioni non-INFORMAL che non sono né RS né di secondo tentativo
      */
     public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         var partitionedByCommType = items.stream().collect(Collectors.partitioningBy(this::isInformal));
