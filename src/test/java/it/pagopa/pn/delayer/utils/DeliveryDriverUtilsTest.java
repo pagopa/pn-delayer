@@ -235,13 +235,19 @@ class DeliveryDriverUtilsTest {
         PaperDelivery paperDelivery = createPaperDelivery("RS", "00179", "RM", "paId2", 0);
         paperDelivery.setCommunicationType(INFORMAL.name());
         deliveries2.add(paperDelivery);
+        List<PaperDelivery> deliveries3 = new ArrayList<>();
+        PaperDelivery paperDelivery3 = createPaperDelivery("AR", "00180", "RM", "paId2", 1);
+        paperDelivery3.setCommunicationType(INFORMAL.name());
+        deliveries3.add(paperDelivery3);
 
 
         when(cacheService.getFromCache("00178~AR")).thenReturn(Optional.of("driverX"));
         when(cacheService.getFromCache("00179~RS")).thenReturn(Optional.of("driverY"));
+        when(cacheService.getFromCache("00180~AR")).thenReturn(Optional.of("driverZ"));
         Map<String, List<PaperDelivery>> grouped = Map.of(
                 "00178~AR", deliveries1,
-                "00179~RS", deliveries2
+                "00179~RS", deliveries2,
+                "00180~AR", deliveries3
         );
 
         Map<Integer, List<PaperDeliveryPriority>> priorityMap = Map.of(
@@ -255,10 +261,11 @@ class DeliveryDriverUtilsTest {
                 grouped, "tenderTest", priorityMap
         );
 
-        assertEquals(3, result.size());
+        assertEquals(4, result.size());
         assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverX") && d.getPriority() == 3));
         assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverY") && d.getPriority() == 1));
         assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverY") && d.getPriority() == 4));
+        assertTrue(result.stream().anyMatch(d -> d.getUnifiedDeliveryDriver().equals("driverZ") && d.getPriority() == 4));
     }
 
     @Test

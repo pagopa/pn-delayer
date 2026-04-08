@@ -143,7 +143,7 @@ class PnDelayerUtilsTest {
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY.name())
-        && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getUnifiedDeliveryDriver(), delivery.getProvince(), "2023-10-01T12:00:00Z", delivery.getRequestId()))));
+        && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getUnifiedDeliveryDriver(), delivery.getProvince(), String.valueOf(delivery.getPriority()),  "2023-10-01T12:00:00Z", delivery.getRequestId()))));
     }
 
     @Test
