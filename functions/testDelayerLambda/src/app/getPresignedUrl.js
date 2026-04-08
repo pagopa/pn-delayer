@@ -81,15 +81,21 @@ async function generateUploadUrl({ fileName, checksumSha256B64, bucketName }) {
     throw new Error("checksumSha256B64 is required");
   }
 
-  if (!/\.csv$/i.test(fileName)) {
-    throw new Error("fileName must end with .csv");
+  if (!/\.csv$/i.test(fileName) && !/\.zip$/i.test(fileName)) {
+    throw new Error("fileName must end with .csv or .zip");
   }
 
-  const key = `${Date.now()}-${fileName}`;
+  let key = `${Date.now()}-${fileName}`;
+
+  let contentType = "text/csv";
+  if (/\.zip$/i.test(fileName)){
+    key = fileName;
+    contentType = "application/zip"
+  }
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: key,
-    ContentType: "text/csv",
+    ContentType: contentType,
     ChecksumSHA256: checksumSha256B64,
   });
 
@@ -101,7 +107,7 @@ async function generateUploadUrl({ fileName, checksumSha256B64, bucketName }) {
     uploadUrl,
     key,
     requiredHeaders: {
-      "Content-Type": "text/csv",
+      "Content-Type": contentType,
       "x-amz-checksum-sha256": checksumSha256B64,
     },
     expiresIn: EXPIRES_IN,
