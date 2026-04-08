@@ -551,7 +551,7 @@ describe("Lambda Delayer Dispatcher", () => {
      const params = { fileName: "example.json", checksumSha256B64: "sha256checksumB64" };
      const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
      assert.strictEqual(result.statusCode, 500);
-     assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv");
+     assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv or .zip");
    });
 
    it("GET_PRESIGNED_URL download success", async () => {
@@ -591,7 +591,20 @@ describe("Lambda Delayer Dispatcher", () => {
     assert.ok(body.key);
     assert.ok(body.key.endsWith("-example.csv"));
     assert.strictEqual(body.expiresIn, 300);
+    assert.strictEqual(body.requiredHeaders["Content-Type"], "text/csv");
   });
+
+    it("GET_PRESIGNED_URL upload success zip", async () => {
+      const params = { fileName: "example.zip", checksumSha256B64: "sha256checksumB64" , presignedUrlType: "UPLOAD"};
+      const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.ok(body.uploadUrl);
+      assert.ok(body.key);
+      assert.strictEqual(body.key, "example.zip");
+      assert.strictEqual(body.expiresIn, 300);
+      assert.strictEqual(body.requiredHeaders["Content-Type"], "application/zip");
+      });
 
    it("GET_STATUS_EXECUTION returns the status of a successful execution", async () => {
        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
