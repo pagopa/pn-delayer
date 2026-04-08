@@ -111,7 +111,7 @@ public class DeliveryDriverUtils {
                 ))
                 .map(Map.Entry::getKey)
                 .findFirst()
-                .orElse(3);
+                .orElse(Collections.max(priorityMap.keySet()));
     }
 
     public Mono<Tuple2<Integer, Integer>> retrieveDeclaredAndUsedCapacity(String geoKey, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {

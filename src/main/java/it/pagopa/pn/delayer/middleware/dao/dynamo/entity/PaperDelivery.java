@@ -102,10 +102,8 @@ public class PaperDelivery {
         return switch (workflowStepEnum) {
             case EVALUATE_SENDER_LIMIT ->
                     String.join("~", paperDelivery.getProvince(), date, paperDelivery.getRequestId());
-            case EVALUATE_DRIVER_CAPACITY ->
+            case EVALUATE_DRIVER_CAPACITY, EVALUATE_RESIDUAL_CAPACITY ->
                     String.join("~", paperDelivery.getUnifiedDeliveryDriver(), paperDelivery.getProvince(), String.valueOf(paperDelivery.getPriority()), date, paperDelivery.getRequestId());
-            case EVALUATE_RESIDUAL_CAPACITY ->
-                    String.join("~", paperDelivery.getUnifiedDeliveryDriver(), paperDelivery.getProvince(), date, paperDelivery.getRequestId());
             case EVALUATE_PRINT_CAPACITY ->
                     String.join("~", String.valueOf(paperDelivery.getPriority()), date, paperDelivery.getRequestId());
             case SENT_TO_PREPARE_PHASE_2 ->
