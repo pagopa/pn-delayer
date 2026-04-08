@@ -23,6 +23,15 @@ exports.handleEvent = async (event = {}) => {
             console.debug(`[HANDLER] Raw SQS record: ${JSON.stringify(record)}`);
             const body = JSON.parse(record.body);
             const fileKey = body.key;
+            const archiveProcessedAt = body.tags?.archiveProcessedAt?.[0];
+            if (!archiveProcessedAt || archiveProcessedAt.trim() === '') {
+                console.error(`[HANDLER] Errore nel record ${record.messageId}: tag archiveProcessedAt is required`);
+                batchItemFailures.push({
+                    itemIdentifier: record.messageId
+                });
+                continue;
+            }
+            console.debug(`[HANDLER] fileKey="${fileKey}", archiveProcessedAt="${archiveProcessedAt}"`);
 
             const { Count = 0 } = await existsSenderLimitByFileKey(fileKey);
             if (Count > 0) {
@@ -37,7 +46,8 @@ exports.handleEvent = async (event = {}) => {
             const estimates = await calculateWeeklyEstimates(
                 estimateJson,
                 region => getProvinceDistribution(region),
-                fileKey
+                fileKey,
+                archiveProcessedAt
             );
             allEstimates.push(...estimates);
 

@@ -18,10 +18,11 @@ const { persistWeeklyEstimates } = require('./dynamo');
  * @param {object}  commessa                Parsed JSON of the commessa.
  * @param {function(region:string):Promise<Array<{province:string, percentageDistribution:number}>>} getProvinceDistribution
  *                                          Async function returning province distribution for a region.
- * @param fileKey fileKey of Safe Storage
+ * @param fileKey                           fileKey of Safe Storage
+ * @param archiveProcessedAt                Timestamp obtained from Safe Storage tags, or Date.now() (current time) if not present.
  * @returns {Promise<Array<Object>>}        List of weekly‑granularity records.
  */
-async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey) {
+async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey, archiveProcessedAt) {
     const { segments, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
     const partialStart = segments.filter(s => s.weekType === 'PARTIAL_START').length;
     const partialEnd   = segments.filter(s => s.weekType === 'PARTIAL_END').length;
@@ -51,6 +52,7 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileK
                     commessa,
                     daysInMonth,
                     segments,
+                    archiveProcessedAt
                 });
 
                 results.push(...provinceRecords);
@@ -116,7 +118,8 @@ function buildProvinceRecords({
                                   productType,
                                   commessa,
                                   daysInMonth,
-                                  segments
+                                  segments,
+                                  archiveProcessedAt
                               }) {
     const records = [];
     const monthlyRegionalEstimate = regionale.valore;
@@ -138,7 +141,8 @@ function buildProvinceRecords({
             monthlyEstimate: monthlyProvEstimate,
             originalEstimate: monthlyRegionalEstimate,
             weekType,
-            daysInWeekInMonth
+            daysInWeekInMonth,
+            archiveProcessedAt
         }));
         }
     }
@@ -154,7 +158,8 @@ function buildRecord({ commessa,
                          monthlyEstimate,
                          originalEstimate,
                          weekType,
-                         daysInWeekInMonth }) {
+                         daysInWeekInMonth,
+                         archiveProcessedAt}) {
     return {
         paId: commessa.idEnte,
         productType,
@@ -165,7 +170,8 @@ function buildRecord({ commessa,
         originalEstimate,
         lastUpdate: commessa.last_update,
         weekType,                 // "FULL" | "PARTIAL_START" | "PARTIAL_END"
-        daysInWeekInMonth         // 7 for FULL, <7 for partials
+        daysInWeekInMonth,       // 7 for FULL, <7 for partials
+        archiveProcessedAt
     };
 }
 
