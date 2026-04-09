@@ -17,6 +17,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_STATUS_EXECUTION**       | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                                | `["executionArn"]`                                                                                                                                                                                                               |
 | **GET_PAPER_DELIVERY**         | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                      | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
 | **GET_SENDER_LIMIT**           | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? }`                                                                                                                                                      |
+| **GET_USED_SENDER_LIMIT**      | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? , table}`                                                                                                                                               |
 | **GET_PRESIGNED_URL**          | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                          | `["filename","checksum"]`                                                                                                                                                                                                        |
 | **GET_DECLARED_CAPACITY**      | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                 | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
 | **INSERT_MOCK_CAPACITIES**     | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                           | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
@@ -116,6 +117,45 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   }
 }
 ```
+
+*GET_USED_SENDER_LIMIT*
+
+- Caso standard
+
+```json
+{
+  "operationType": "GET_USED_SENDER_LIMIT",
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "province": "RM",
+    "table": "pn-PaperDeliveryUsedSenderLimit"
+  }
+}
+```
+- Con lastEvaluatedKey
+```json
+{
+  "operationType": "GET_USED_SENDER_LIMIT",
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "province": "RM",
+    "lastEvaluatedKey": "<lek>",
+    "table":  "pn-PaperDeliveryUsedSenderLimit"
+  }
+}
+```
+- Con pk
+```json
+{
+  "operationType": "GET_USED_SENDER_LIMIT",
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "pk": "paId~productType~province",
+    "table":  "pn-PaperDeliveryUsedSenderLimit"
+  }
+}
+```
+
 *GET_BY_REQUEST_ID*
 ```json
 {
@@ -276,6 +316,32 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
  { "items": [] }
 ```
 
+### Output GET_USED_SENDER_LIMIT
+
+* Items trovati → array di oggetti, ad esempio:
+  ```json
+  {
+    "items":[
+      {
+        "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
+        "deliveryDate": "2025-09-29",
+        "weeklyEstimate": 100,
+        "monthlyEstimate": 400,
+        "originalEstimate": 500,
+        "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
+        "productType": "AR",
+        "province": "RM"
+      }
+    ],
+    "lastEvaluatedKey": {}
+  }
+  ```
+
+* Item assente →
+```json
+ { "items": [] }
+```
+
 ### Output GET_BY_REQUEST_ID
 Se trovate, viene restituito un array di oggetti (tutte le righe con quel requestId); se non ci sono risultati l’array è vuoto ([]).
 
@@ -410,6 +476,7 @@ Un esempio di risposta è il seguente:
 │       ├── getDelayerPaperDeliveriesByRequestId.js.js  # Implementazione operazione GET_BY_REQUEST_ID
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
 │       ├── getSenderLimit.js                           # Implementazione operazione GET_SENDER_LIMIT
+│       ├── getUsedSenderLimit.js                       # Implementazione operazione GET_USED_SENDER_LIMIT
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
 │       ├── getDeclaredCapacity.js                      # Implementazione operazione GET_DECLARED_CAPACITY
