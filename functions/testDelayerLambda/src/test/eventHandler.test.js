@@ -852,7 +852,7 @@ describe("Lambda Delayer Dispatcher", () => {
 
       assert.strictEqual(result.statusCode, 200);
       const body = JSON.parse(result.body);
-      assert.strictEqual(body.dailyExecutionNumber, 4);
+      assert.strictEqual(body.items[0].dailyExecutionNumber, 4);
     });
 
     it("GET_COUNTERS PRINT no record", async () => {
@@ -869,20 +869,20 @@ describe("Lambda Delayer Dispatcher", () => {
 
       assert.strictEqual(result.statusCode, 200);
       const body = JSON.parse(result.body);
-      assert.strictEqual(body.message, "Item not found");
+      assert.strictEqual(body.items.length, 0);
     });
 
-    it("GET_COUNTERS SUM_ESTIMATE base", async () => {
+    it("GET_COUNTERS SUM_ESTIMATES base", async () => {
       ddbMock.on(QueryCommand).resolves({
-        Items: [{ sk: "SUM_ESTIMATE" }],
+        Items: [{ sk: "SUM_ESTIMATES" }],
         LastEvaluatedKey: { pk: "lek" }
       });
 
       const result = await handler({
         operationType: "GET_COUNTERS",
         parameters: {
-          table: "pn-paperDeliveryCounters",
-          counterType: "SUM_ESTIMATE",
+          table: "pn-PaperDeliveryCounters",
+          counterType: "SUM_ESTIMATES",
           deliveryDate: "2025-11-24"
         }
       });
@@ -894,12 +894,12 @@ describe("Lambda Delayer Dispatcher", () => {
     });
 
 
-    it("GET_COUNTERS SUM_ESTIMATE error province without product", async () => {
+    it("GET_COUNTERS SUM_ESTIMATES error province without product", async () => {
       const result = await handler({
         operationType: "GET_COUNTERS",
         parameters: {
-          table: "pn-paperDeliveryCounters",
-          counterType: "SUM_ESTIMATE",
+          table: "pn-PaperDeliveryCounters",
+          counterType: "SUM_ESTIMATES",
           deliveryDate: "2025-11-24",
           province: "MI"
         }
@@ -918,7 +918,7 @@ describe("Lambda Delayer Dispatcher", () => {
       const result = await handler({
         operationType: "GET_COUNTERS",
         parameters: {
-          table: "pn-paperDeliveryCounters",
+          table: "pn-PaperDeliveryCounters",
           counterType: "EXCLUDE",
           deliveryDate: "2025-11-24"
         }
@@ -937,7 +937,7 @@ describe("Lambda Delayer Dispatcher", () => {
       const result = await handler({
         operationType: "GET_COUNTERS",
         parameters: {
-          table: "pn-paperDeliveryCounters",
+          table: "pn-PaperDeliveryCounters",
           counterType: "EXCLUDE",
           deliveryDate: "2025-11-24",
           province: "MI",
@@ -947,15 +947,14 @@ describe("Lambda Delayer Dispatcher", () => {
 
       assert.strictEqual(result.statusCode, 200);
       const body = JSON.parse(result.body);
-
-      assert.strictEqual(body.sk, "EXCLUDE~MI~RS");
+      assert.strictEqual(body.items[0].sk, "EXCLUDE~MI~RS");
     });
 
     it("GET_COUNTERS EXCLUDE errore product without province", async () => {
       const result = await handler({
         operationType: "GET_COUNTERS",
         parameters: {
-          table: "pn-paperDeliveryCounters",
+          table: "pn-PaperDeliveryCounters",
           counterType: "EXCLUDE",
           deliveryDate: "2025-11-24",
           productType: "RS"

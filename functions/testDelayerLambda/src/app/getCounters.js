@@ -21,7 +21,7 @@ async function getCounters(params = {}) {
         case "PRINT":
             return handlePrint(params);
 
-        case "SUM_ESTIMATE":
+        case "SUM_ESTIMATES":
             return handleSumEstimate(params);
 
         case "EXCLUDE":
@@ -47,13 +47,13 @@ async function handleSumEstimate({ table, deliveryDate, province, productType, l
     let skPrefix;
 
     if (province == null && productType == null) {
-        skPrefix = "SUM_ESTIMATE";
+        skPrefix = "SUM_ESTIMATES";
     } else if (province == null && productType != null) {
-        skPrefix = `SUM_ESTIMATE~${productType}`;
+        skPrefix = `SUM_ESTIMATES~${productType}`;
     } else if (province != null && productType != null) {
-        skPrefix = `SUM_ESTIMATE~${productType}~${province}`;
+        skPrefix = `SUM_ESTIMATES~${productType}~${province}`;
     } else {
-        throw new Error("productType is required when province is provided for SUM_ESTIMATE counter");
+        throw new Error("productType is required when province is provided for SUM_ESTIMATES counter");
     }
 
     return executeQuery({
@@ -67,20 +67,18 @@ async function handleSumEstimate({ table, deliveryDate, province, productType, l
 //EXCLUDE
 async function handleExclude({ table, deliveryDate, province, productType, lastEvaluatedKey }) {
 
-    if (province != null && productType != null) {
-        return executeGet({
-            table,
-            pk: deliveryDate,
-            sk: `EXCLUDE~${province}~${productType}`
-        });
-    }
-
     let skPrefix;
 
     if (province == null && productType == null) {
         skPrefix = "EXCLUDE";
     } else if (province != null && productType == null) {
         skPrefix = `EXCLUDE~${province}`;
+    } else if (province != null && productType != null) {
+       return executeGet({
+                table,
+                pk: deliveryDate,
+                sk: `EXCLUDE~${province}~${productType}`
+       });
     } else {
         throw new Error("province is required when productType is provided for EXCLUDE counter");
     }
@@ -128,10 +126,10 @@ async function executeGet({ table, pk, sk }) {
     const { Item } = await docClient.send(command);
 
     if (!Item) {
-        return { message: "Item not found" };
+        return { items: [] };
     }
 
-    return Item;
+    return { items: [Item] };
 }
 
 module.exports = { getCounters };
