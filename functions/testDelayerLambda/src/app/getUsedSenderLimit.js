@@ -2,12 +2,12 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, QueryCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
 
-const GSI_NAME = "deliveryDateProvince-index";
+const GSI_NAME = "deliveryDate-province-index";
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 /**
- * GET_SENDER_LIMIT operation
+ * GET_USED_SENDER_LIMIT operation
  * Supporta:
  *  - Object: { deliveryDate, province, lastEvaluatedKey?, pk?, table}
  */

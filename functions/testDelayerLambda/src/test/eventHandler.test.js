@@ -484,9 +484,8 @@ describe("Lambda Delayer Dispatcher", () => {
           {
               pk: "PA1~PT1~RM",
               deliveryDate: "2025-06-30",
-              weeklyEstimate: 100,
-              monthlyEstimate: 400,
-              originalEstimate: 500,
+              numberOfShipment: 120,
+              senderLimit: 300,
               paId: "PA1",
               productType: "PT1",
               province: "RM"
@@ -494,9 +493,8 @@ describe("Lambda Delayer Dispatcher", () => {
           {
               pk: "PA2~PT2~RM",
               deliveryDate: "2025-06-30",
-              weeklyEstimate: 150,
-              monthlyEstimate: 600,
-              originalEstimate: 700,
+              numberOfShipment: 80,
+              senderLimit: 200,
               paId: "PA2",
               productType: "PT2",
               province: "RM"
@@ -512,29 +510,72 @@ describe("Lambda Delayer Dispatcher", () => {
       assert.strictEqual(result.statusCode, 200);
       const body = JSON.parse(result.body);
       assert.strictEqual(body.items.length, 2);
-      assert.strictEqual(body.items[0].weeklyEstimate, 100);
-      assert.strictEqual(body.items[1].weeklyEstimate, 150);
+      assert.strictEqual(body.items[0].numberOfShipment, 120);
+      assert.strictEqual(body.items[1].senderLimit, 200);
       assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
   });
 
    it("GET_USED_SENDER_LIMIT returns the item with pk", async () => {
         const fakeItem = {
-            pk: "PA2~PT2~RM",
-            deliveryDate: "2025-06-30",
-            weeklyEstimate: 150,
-            monthlyEstimate: 600,
-            originalEstimate: 700,
-            paId: "PA2",
-            productType: "PT2",
-            province: "RM"
-        };
+           pk: "PA1~AR~RM",
+           deliveryDate: "2025-06-30",
+           numberOfShipment: 150,
+           senderLimit: 400,
+           paId: "PA1",
+           productType: "AR",
+           province: "RM"
+         };
 
-        ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+         ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+         const params = {
+           deliveryDate: "2025-06-30",
+           pk: "PA1~AR~RM",
+           table: "pn-PaperDeliveryUsedSenderLimit"
+         };
+
+         const result = await handler({
+           operationType: "GET_USED_SENDER_LIMIT",
+           parameters: params
+         });
+
+         assert.strictEqual(result.statusCode, 200);
+         const body = JSON.parse(result.body);
+         assert.strictEqual(body.items.length, 1);
+         assert.strictEqual(body.items[0].numberOfShipment, 150);
+         assert.strictEqual(body.items[0].senderLimit, 400);
+       });
+
+
+   it("GET_USED_SENDER_LIMIT with Mock table", async () => {
+        const fakeItems = [
+      {
+        pk: "PA1~PT1~RM",
+        deliveryDate: "2025-06-30",
+        numberOfShipment: 120,
+        senderLimit: 300,
+        paId: "PA1",
+        productType: "PT1",
+        province: "RM"
+      },
+      {
+        pk: "PA2~PT2~RM",
+        deliveryDate: "2025-06-30",
+        numberOfShipment: 80,
+        senderLimit: 200,
+        paId: "PA2",
+        productType: "PT2",
+        province: "RM"
+      }
+    ];
+
+        const fakeLastEvaluatedKey = { pk: "PA2~PT2~RM", deliveryDate: "2025-06-30" };
+        ddbMock.on(QueryCommand).resolves({ Items: fakeItems, LastEvaluatedKey: fakeLastEvaluatedKey });
 
         const params = {
             deliveryDate: "2025-06-30",
-            pk: "PA2~PT2~RM",
-            table: "pn-PaperDeliveryUsedSenderLimit"
+            province: "RM",
+            table: "pn-PaperDeliveryUsedSenderLimitMock"
         };
 
         const result = await handler({
@@ -544,16 +585,18 @@ describe("Lambda Delayer Dispatcher", () => {
 
         assert.strictEqual(result.statusCode, 200);
         const body = JSON.parse(result.body);
-        assert.strictEqual(body.items.length, 1);
-        assert.strictEqual(body.items[0].weeklyEstimate, 150);
-    });
+        assert.strictEqual(body.items.length, 2);
+        assert.strictEqual(body.items[0].numberOfShipment, 120);
+        assert.strictEqual(body.items[1].senderLimit, 200);
+        assert.deepStrictEqual(body.lastEvaluatedKey, fakeLastEvaluatedKey);
+  });
 
   it("GET_USED_SENDER_LIMIT if no items found", async () => {
 
       ddbMock.on(QueryCommand).resolves({ Items: [] });
-     const params = {"deliveryDate":"2025-06-30", "province":"RM", "table": "pn-PaperDeliveryUsedSenderLimitMock"};
+      const params = {"deliveryDate":"2025-06-30", "province":"RM", "table": "pn-PaperDeliveryUsedSenderLimit"};
 
-      const result = await handler({ operationType: "GET_USED_SENDER_LIMIT", parameters: params });
+      const result = await handler({ operationType: "GET_USED_SENDER_LIMIT", parameters: params});
       const body = JSON.parse(result.body);
       assert.deepStrictEqual(body, { items: [] });
   });
@@ -561,37 +604,6 @@ describe("Lambda Delayer Dispatcher", () => {
   it("GET_USED_SENDER_LIMIT throws error if parameters are missing", async () => {
       const result = await handler({ operationType: "GET_USED_SENDER_LIMIT", parameters: {} });
       assert.strictEqual(JSON.parse(result.body).message, "Parameters must include deliveryDate, (province or pk) and table");
-  });
-
-  it("GET_USED_SENDER_LIMIT from Mock table", async () => {
-      const fakeItem = {
-          pk: "PA2~PT2~RM",
-          deliveryDate: "2025-06-30",
-          weeklyEstimate: 150,
-          monthlyEstimate: 600,
-          originalEstimate: 700,
-          paId: "PA2",
-          productType: "PT2",
-          province: "RM"
-      };
-
-      ddbMock.on(GetCommand).resolves({ Item: fakeItem });
-
-      const params = {
-          deliveryDate: "2025-06-30",
-          pk: "PA2~PT2~RM",
-          table: "pn-PaperDeliveryUsedSenderLimitMock"
-      };
-
-      const result = await handler({
-          operationType: "GET_USED_SENDER_LIMIT",
-          parameters: params
-      });
-
-      assert.strictEqual(result.statusCode, 200);
-      const body = JSON.parse(result.body);
-      assert.strictEqual(body.items.length, 1);
-      assert.strictEqual(body.items[0].weeklyEstimate, 150);
   });
 
    it("should throw error when parameter is missing", async () => {

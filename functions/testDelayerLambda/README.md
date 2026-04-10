@@ -17,7 +17,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_STATUS_EXECUTION**       | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                                | `["executionArn"]`                                                                                                                                                                                                               |
 | **GET_PAPER_DELIVERY**         | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                      | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
 | **GET_SENDER_LIMIT**           | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? }`                                                                                                                                                      |
-| **GET_USED_SENDER_LIMIT**      | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? , table}`                                                                                                                                               |
+| **GET_USED_SENDER_LIMIT**      | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? , "table": "usedSenderLimitTableName"}`                                                                                                                 |
 | **GET_PRESIGNED_URL**          | Restituisce l'url su cui fare l'upload dei csv delle spedizioni o delle capacità dichiarate dai recapitisti                                                          | `["filename","checksum"]`                                                                                                                                                                                                        |
 | **GET_DECLARED_CAPACITY**      | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                 | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
 | **INSERT_MOCK_CAPACITIES**     | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                           | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
@@ -325,12 +325,11 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
       {
         "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
         "deliveryDate": "2025-09-29",
-        "weeklyEstimate": 100,
-        "monthlyEstimate": 400,
-        "originalEstimate": 500,
+        "numberOfShipment": 396,
         "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
         "productType": "AR",
-        "province": "RM"
+        "province": "RM",
+        "senderLimit": 2573
       }
     ],
     "lastEvaluatedKey": {}
