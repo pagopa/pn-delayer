@@ -227,10 +227,27 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **deliveryDateDayOfWeek**                 | Intero che indica il giorno della settimana su cui l'algoritmo di pianificazione deve partire (default = 1, cioè lunedì).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | ---                                                             |
 
 *GET_PRESIGNED_URL*
+
+- UPLOAD
 ```json
 {
   "operationType": "GET_PRESIGNED_URL",
-  "parameters": ["example.csv","abcd1234efgh5678ijkl9012mnop3456"]
+  "parameters": {
+    "fileName": "example.csv",
+    "checksumSha256B64": "abcd1234efgh5678ijkl9012mnop3456",
+    "presignedUrlType": "UPLOAD"
+  }
+}
+```
+
+- DOWNLOAD
+```json
+{
+  "operationType": "GET_PRESIGNED_URL",
+  "parameters": {
+    "fileName": "example.csv",
+    "presignedUrlType": "DOWNLOAD"
+  }
 }
 ```
 
@@ -401,16 +418,24 @@ Un esempio di risposta è il seguente:
   ```
 
 ### Output GET_PRESIGNED_URL
-
+- UPLOAD
   ```json
   {
     "uploadUrl": "",
-    "key" :  "<filename>",
+    "key" :  "<fileName>",
     "requiredHeaders": {
       "Content-Type": "text/csv",
       "x-amz-checksum-sha256": "abcd1234efgh5678ijkl9012mnop3456"
     },
    "expiresIn": 300
+  }
+  ```
+- DOWNLOAD
+  ```json
+  {
+    "downloadUrl": "",
+    "key" :  "<fileName>",
+    "expiresIn": 300
   }
   ```
 

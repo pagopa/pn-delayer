@@ -668,18 +668,70 @@ describe("Lambda Delayer Dispatcher", () => {
    });
 
    it("GET_PRESIGNED_URL without checksum", async () => {
-     const params = ["example.csv"];
+     const params = { fileName: "example.csv" };
      const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
      assert.strictEqual(result.statusCode, 500);
-     assert.strictEqual(JSON.parse(result.body).message, "Required parameters are [fileName, checksumSha256B64]");
+     assert.strictEqual(JSON.parse(result.body).message, "checksumSha256B64 is required");
    });
 
    it("GET_PRESIGNED_URL with different file type", async () => {
-     const params = ["example.json",  "sha256checksumB64"];
+     const params = { fileName: "example.json", checksumSha256B64: "sha256checksumB64" };
      const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
      assert.strictEqual(result.statusCode, 500);
-     assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv");
+     assert.strictEqual(JSON.parse(result.body).message, "fileName must end with .csv or .zip");
    });
+
+   it("GET_PRESIGNED_URL download success", async () => {
+     const params = { fileName: "example.csv", presignedUrlType: "DOWNLOAD" };
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 200);
+     const body = JSON.parse(result.body);
+     assert.ok(body.downloadUrl);
+     assert.strictEqual(body.key, "example.csv");
+     assert.strictEqual(body.expiresIn, 300);
+   });
+
+   it("GET_PRESIGNED_URL download without fileName", async () => {
+     const params = { presignedUrlType: "DOWNLOAD" };
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 500);
+     assert.strictEqual(JSON.parse(result.body).message, "fileName is required");
+   });
+
+   it("GET_PRESIGNED_URL presignedUrlType null defaults to UPLOAD", async () => {
+     const params = { fileName: "example.csv", checksumSha256B64: "sha256checksumB64" };
+     const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+     assert.strictEqual(result.statusCode, 200);
+     const body = JSON.parse(result.body);
+     assert.ok(body.uploadUrl);
+     assert.ok(body.key);
+     assert.ok(body.key.endsWith("-example.csv"));
+     assert.strictEqual(body.expiresIn, 300);
+   });
+
+  it("GET_PRESIGNED_URL upload success", async () => {
+    const params = { fileName: "example.csv", checksumSha256B64: "sha256checksumB64" , presignedUrlType: "UPLOAD"};
+    const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+    assert.strictEqual(result.statusCode, 200);
+    const body = JSON.parse(result.body);
+    assert.ok(body.uploadUrl);
+    assert.ok(body.key);
+    assert.ok(body.key.endsWith("-example.csv"));
+    assert.strictEqual(body.expiresIn, 300);
+    assert.strictEqual(body.requiredHeaders["Content-Type"], "text/csv");
+  });
+
+    it("GET_PRESIGNED_URL upload success zip", async () => {
+      const params = { fileName: "example.zip", checksumSha256B64: "sha256checksumB64" , presignedUrlType: "UPLOAD"};
+      const result = await handler({ operationType: "GET_PRESIGNED_URL", parameters: params });
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.ok(body.uploadUrl);
+      assert.ok(body.key);
+      assert.strictEqual(body.key, "example.zip");
+      assert.strictEqual(body.expiresIn, 300);
+      assert.strictEqual(body.requiredHeaders["Content-Type"], "application/zip");
+      });
 
    it("GET_STATUS_EXECUTION returns the status of a successful execution", async () => {
        const fakeArn = "arn:aws:states:...:execution:BatchWorkflowStateMachine:exec123";
