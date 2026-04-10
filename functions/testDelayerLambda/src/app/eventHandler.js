@@ -11,7 +11,7 @@ const { getPaperDelivery } = require("./getPaperDelivery.js");
 const { getStatusExecution } = require("./getStatusExecution.js");
 const { insertMockCapacities } = require('./insertMockCapacities.js');
 const { getDeclaredCapacity } = require("./getDeclaredCapacity.js");
-const { getPrintCounter } = require("./getPrintCapacityCounter.js");
+const { getCounters } = require("./getCounters.js");
 const { getResidualPapers } = require("./getResidualPapers.js");
 
 
@@ -32,7 +32,7 @@ const OPERATIONS = {
     GET_STATUS_EXECUTION: getStatusExecution,
     INSERT_MOCK_CAPACITIES: insertMockCapacities,
     GET_DECLARED_CAPACITY: getDeclaredCapacity,
-    GET_PRINT_CAPACITY_COUNTER: getPrintCounter,
+    GET_COUNTERS: getCounters,
     GET_RESIDUAL_PAPERS: getResidualPapers
 };
 

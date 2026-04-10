@@ -825,39 +825,145 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(body.message, "Field unifiedDeliveryDriver is required and cannot be empty");
    });
 
-    it("GET_PRINT_CAPACITY_COUNTER record trovato", async () => {
+    it("GET_COUNTERS PRINT record found", async () => {
       const fakeItem = {
-                        "pk": "PRINT",
-                        "sk": "2025-11-24",
-                        "dailyExecutionCounter": 4,
-                        "dailyExecutionNumber": 4,
-                        "dailyPrintCapacity": 20,
-                        "lastEvaluatedKeyNextWeek": {},
-                        "lastEvaluatedKeyPhase2": {
-                         "pk": "2025-11-24~EVALUATE_PRINT_CAPACITY",
-                         "sk": "1~2025-07-02T00:48:00Z~tcRanking_RS_2"
-                        },
-                        "numberOfShipments": 70,
-                        "sentToNextWeek": 0,
-                        "sentToPhaseTwo": 11,
-                        "ttl": 1766571878068,
-                        "weeklyPrintCapacity": 140
-                       };
+         "pk": "PRINT",
+         "sk": "2025-11-24",
+         "dailyExecutionCounter": 4,
+         "dailyExecutionNumber": 4,
+         "dailyPrintCapacity": 20,
+         "numberOfShipments": 70,
+         "sentToNextWeek": 0,
+         "sentToPhaseTwo": 11,
+         "ttl": 1766571878068,
+         "weeklyPrintCapacity": 140
+      }
+
       ddbMock.on(GetCommand).resolves({ Item: fakeItem });
 
-      const result = await handler({ operationType: "GET_PRINT_CAPACITY_COUNTER", parameters: ["pn-paperDeliveryCountersMock", "2025-11-10"] });
+      const result = await handler({
+        operationType: "GET_COUNTERS",
+        parameters: {
+          table: "pn-PaperDeliveryCounters",
+          counterType: "PRINT",
+          deliveryDate: "2025-11-24"
+        }
+      });
+
       assert.strictEqual(result.statusCode, 200);
       const body = JSON.parse(result.body);
-      assert.strictEqual(body.dailyExecutionNumber, 4);
+      assert.strictEqual(body.items[0].dailyExecutionNumber, 4);
     });
 
-    it("GET_PRINT_CAPACITY_COUNTER no record", async () => {
-     ddbMock.on(GetCommand).resolves({});
+    it("GET_COUNTERS PRINT no record", async () => {
+      ddbMock.on(GetCommand).resolves({});
 
-     const result = await handler({ operationType: "GET_PRINT_CAPACITY_COUNTER", parameters: ["pn-paperDeliveryCountersMock", "2025-11-10"] });
-     const body = JSON.parse(result.body);
-     assert.strictEqual(result.statusCode,200);
-     assert.strictEqual(JSON.parse(result.body).message, "Item not found");
+      const result = await handler({
+        operationType: "GET_COUNTERS",
+        parameters: {
+          table: "pn-PaperDeliveryCounters",
+          counterType: "PRINT",
+          deliveryDate: "2025-11-24"
+        }
+      });
+
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.strictEqual(body.items.length, 0);
+    });
+
+    it("GET_COUNTERS SUM_ESTIMATES base", async () => {
+      ddbMock.on(QueryCommand).resolves({
+        Items: [{ sk: "SUM_ESTIMATES" }],
+        LastEvaluatedKey: { pk: "lek" }
+      });
+
+      const result = await handler({
+        operationType: "GET_COUNTERS",
+        parameters: {
+          table: "pn-PaperDeliveryCounters",
+          counterType: "SUM_ESTIMATES",
+          deliveryDate: "2025-11-24"
+        }
+      });
+
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.strictEqual(body.items.length, 1);
+      assert.deepStrictEqual(body.lastEvaluatedKey, { pk: "lek" });
+    });
+
+
+    it("GET_COUNTERS SUM_ESTIMATES error province without product", async () => {
+      const result = await handler({
+        operationType: "GET_COUNTERS",
+        parameters: {
+          table: "pn-PaperDeliveryCounters",
+          counterType: "SUM_ESTIMATES",
+          deliveryDate: "2025-11-24",
+          province: "MI"
+        }
+      });
+
+      assert.strictEqual(result.statusCode, 500);
+      const body = JSON.parse(result.body);
+      assert.match(body.message, /productType is required/);
+    });
+
+    it("GET_COUNTERS EXCLUDE base", async () => {
+      ddbMock.on(QueryCommand).resolves({
+        Items: [{ sk: "EXCLUDE" }]
+      });
+
+      const result = await handler({
+        operationType: "GET_COUNTERS",
+        parameters: {
+          table: "pn-PaperDeliveryCounters",
+          counterType: "EXCLUDE",
+          deliveryDate: "2025-11-24"
+        }
+      });
+
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.strictEqual(body.items.length, 1);
+    });
+
+    it("GET_COUNTERS EXCLUDE getCommand", async () => {
+      const fakeItem = { sk: "EXCLUDE~MI~RS" };
+
+      ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+      const result = await handler({
+        operationType: "GET_COUNTERS",
+        parameters: {
+          table: "pn-PaperDeliveryCounters",
+          counterType: "EXCLUDE",
+          deliveryDate: "2025-11-24",
+          province: "MI",
+          productType: "RS"
+        }
+      });
+
+      assert.strictEqual(result.statusCode, 200);
+      const body = JSON.parse(result.body);
+      assert.strictEqual(body.items[0].sk, "EXCLUDE~MI~RS");
+    });
+
+    it("GET_COUNTERS EXCLUDE errore product without province", async () => {
+      const result = await handler({
+        operationType: "GET_COUNTERS",
+        parameters: {
+          table: "pn-PaperDeliveryCounters",
+          counterType: "EXCLUDE",
+          deliveryDate: "2025-11-24",
+          productType: "RS"
+        }
+      });
+
+      assert.strictEqual(result.statusCode, 500);
+      const body = JSON.parse(result.body);
+      assert.match(body.message, /province is required/);
     });
 
     it("GET_RESIDUAL_PAPERS returns downloadUrl on success", async () => {
