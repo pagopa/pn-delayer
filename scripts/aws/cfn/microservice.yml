@@ -2199,34 +2199,20 @@ Resources:
           - Effect: Allow
             Action:
               - s3:GetObject
-              - s3:HeadObject
               - s3:ListBucket
               - s3:GetObjectTagging
               - s3:PutObject
               - s3:GetBucketLocation
               - s3:DeleteObject
-              - s3:CreateMultipartUpload
-              - s3:UploadPart
-              - s3:CompleteMultipartUpload
               - s3:AbortMultipartUpload
               - s3:ListMultipartUploadParts
             Resource:
               - !Sub "${TestDelayerBucketArn}"
               - !Sub "${TestDelayerBucketArn}/*"
-          - Effect: Allow
-            Action:
-              - s3:PutObject
-              - s3:GetObject
-              - s3:ListBucket
-              - s3:GetBucketLocation
-              - s3:AbortMultipartUpload
-              - s3:ListMultipartUploadParts
-              - s3:CreateMultipartUpload
-              - s3:UploadPart
-              - s3:CompleteMultipartUpload
-            Resource:
               - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
               - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
+              - !Sub "arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001"
+              - !Sub "arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*"
           - Sid: DecryptObjects
             Effect: Allow
             Action:
