@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -68,10 +69,15 @@ public class PaperDeliveryUtils {
     }
 
     private Mono<Void> sendToNextWeek(WorkflowStepEnum workflowStepEnum, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, LocalDate deliveryWeek) {
-        return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
-                .flatMap(paperDeliveryPage -> processChunkToSendToNextWeek(paperDeliveryPage.items(), deliveryWeek)
-                        .flatMap(unused -> !CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()) ?
-                                sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek) : Mono.empty()));
+        return Mono.just(lastEvaluatedKey)
+                .expand(currentKey ->
+                        retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, currentKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
+                                .flatMap(page -> processChunkToSendToNextWeek(page.items(), deliveryWeek)
+                                        .then(CollectionUtils.isEmpty(page.lastEvaluatedKey())
+                                                ? Mono.<Map<String, AttributeValue>>empty()
+                                                : Mono.just(page.lastEvaluatedKey())))
+                )
+                .then();
     }
 
 
@@ -101,9 +107,9 @@ public class PaperDeliveryUtils {
      * @param deliveryWeek     the week for which the deliveries are processed
      * @param residualCapacity the remaining capacity for processing deliveries
      * @param declaredCapacity the declared capacity for the province
-     * @return a Mono containing the number of deliveries sent to the next step
+     * @return a Mono that completes when all deliveries have been processed
      */
-    private Mono<Integer> sendToNextStep(WorkflowStepEnum workflowStepEnum,
+    private Mono<Void> sendToNextStep(WorkflowStepEnum workflowStepEnum,
                                          String sortKeyPrefix,
                                          Map<String, AttributeValue> lastEvaluatedKey,
                                          String tenderId,
@@ -119,27 +125,53 @@ public class PaperDeliveryUtils {
         String unifiedDeliveryDriver = splittedSortKeyPrefix[0];
         String province = splittedSortKeyPrefix[1];
 
-        return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, Math.min(residualCapacity, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
-                .flatMap(paperDeliveryPage -> processChunkToSendToNextStep(paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, deliveryWeek, printCounter, driverCapacityJobProcessResult)
-                        .flatMap(processResult -> {
-                            log.info("driverCapacityJobProcessResult for province={} and unifiedDeliveryDriver={} after processing chunk: sentToNextStep={}, totalIncrements={}",
-                                    province, unifiedDeliveryDriver, processResult.getSentToNextStep(), processResult.getIncrementUsedCapacityDtos().size());
-                            int residualCapacityAfterSending = declaredCapacity - (usedCapacityBase + processResult.getSentToNextStep());
-                            if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()) && residualCapacityAfterSending > 0) {
-                                log.info("Continuing to process chunk to send to next step for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending);
-                                return sendToNextStep(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), tenderId, deliveryWeek, residualCapacityAfterSending, declaredCapacity, weeklyPrintCapacity, printCounter, processResult, usedCapacityBase)
-                                        .thenReturn(residualCapacityAfterSending);
-                            } else {
-                                log.info("Finished processing chunk to send to next step for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending);
-                                processResult.getIncrementUsedCapacityDtos().add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, province, processResult.getSentToNextStep(), deliveryWeek, declaredCapacity));
-                                return flushCounters(deliveryWeek, weeklyPrintCapacity, printCounter, driverCapacityJobProcessResult.getIncrementUsedCapacityDtos())
-                                        .thenReturn(residualCapacityAfterSending);
-                            }
-                        })
-                        .filter(residualCapacityAfterSending -> residualCapacityAfterSending <= 0 && !CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey()))
-                        .doOnNext(residualCapacityAfterSending -> log.info("Process next chunk to send to next week for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending))
-                        .flatMap(unused -> sendToNextWeek(workflowStepEnum, sortKeyPrefix, paperDeliveryPage.lastEvaluatedKey(), deliveryWeek))
-                        .thenReturn(paperDeliveryPage.items().size()));
+        AtomicBoolean anyPageProcessed = new AtomicBoolean(false);
+
+        return Mono.just(new SendToNextStepIterState(lastEvaluatedKey, residualCapacity, true))
+                .expand(state -> {
+                    if (!state.hasMorePages() || state.residualCapacity() <= 0) {
+                        return Mono.empty();
+                    }
+                    return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, state.lastEvaluatedKey(), Math.min(state.residualCapacity(), pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
+                            .flatMap(paperDeliveryPage -> {
+                                anyPageProcessed.set(true);
+                                return processChunkToSendToNextStep(paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, deliveryWeek, printCounter, driverCapacityJobProcessResult)
+                                        .map(processResult -> {
+                                            int residualCapacityAfterSending = declaredCapacity - (usedCapacityBase + processResult.getSentToNextStep());
+                                            boolean hasMore = !CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey());
+                                            log.info("driverCapacityJobProcessResult for province={} and unifiedDeliveryDriver={} after processing chunk: sentToNextStep={}, totalIncrements={}",
+                                                    province, unifiedDeliveryDriver, processResult.getSentToNextStep(), processResult.getIncrementUsedCapacityDtos().size());
+                                            if (hasMore && residualCapacityAfterSending > 0) {
+                                                log.info("Continuing to process chunk to send to next step for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending);
+                                            } else {
+                                                log.info("Finished processing chunk to send to next step for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, residualCapacityAfterSending);
+                                            }
+                                            return new SendToNextStepIterState(
+                                                    hasMore ? paperDeliveryPage.lastEvaluatedKey() : null,
+                                                    residualCapacityAfterSending,
+                                                    hasMore
+                                            );
+                                        });
+                            });
+                })
+                .last()
+                .flatMap(finalState -> {
+                    if (!anyPageProcessed.get()) {
+                        return Mono.<Void>empty();
+                    }
+                    driverCapacityJobProcessResult.getIncrementUsedCapacityDtos().add(
+                            new IncrementUsedCapacityDto(unifiedDeliveryDriver, province,
+                                    driverCapacityJobProcessResult.getSentToNextStep(), deliveryWeek, declaredCapacity));
+                    return flushCounters(deliveryWeek, weeklyPrintCapacity, printCounter, driverCapacityJobProcessResult.getIncrementUsedCapacityDtos())
+                            .then(
+                                    finalState.residualCapacity() <= 0 && finalState.hasMorePages()
+                                            ? Mono.defer(() -> {
+                                                log.info("Process next chunk to send to next week for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, finalState.residualCapacity());
+                                                return sendToNextWeek(workflowStepEnum, sortKeyPrefix, finalState.lastEvaluatedKey(), deliveryWeek);
+                                            })
+                                            : Mono.<Void>empty()
+                            );
+                });
     }
 
     private Mono<Void> flushCounters(LocalDate deliveryWeek,
@@ -246,4 +278,10 @@ public class PaperDeliveryUtils {
                         .thenReturn(senderLimitJobProcessObjects.getSendToDriverCapacityStep())
                         .doOnNext(paperDeliveries -> paperDeliveries.removeIf(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1)));
     }
+
+    private record SendToNextStepIterState(
+            Map<String, AttributeValue> lastEvaluatedKey,
+            int residualCapacity,
+            boolean hasMorePages
+    ) {}
 }

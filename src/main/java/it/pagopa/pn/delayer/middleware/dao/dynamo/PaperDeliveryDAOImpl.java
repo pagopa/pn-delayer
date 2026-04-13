@@ -58,11 +58,13 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     public Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveries) {
         if(!CollectionUtils.isEmpty(paperDeliveries)) {
             return Flux.fromIterable(paperDeliveries).buffer(25)
-                    .flatMap(chunk -> insertWithRetry(chunk, 10))
+                    .flatMap(chunk -> insertWithRetry(chunk, MAX_BATCH_WRITE_RETRIES))
                     .then();
         }
         return Mono.empty();
     }
+
+    private static final int MAX_BATCH_WRITE_RETRIES = 10;
 
     private Mono<Void> insertWithRetry(List<PaperDelivery> paperDeliveriesChunk, int retriesLeft) {
         BatchWriteItemEnhancedRequest.Builder batchBuilder = BatchWriteItemEnhancedRequest.builder();
@@ -80,10 +82,10 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
                 if (unprocessed != null && !unprocessed.isEmpty()) {
                     if (retriesLeft > 1) {
                         log.info("Retrying batch write for {} unprocessed items, {} retries left", unprocessed.size(), retriesLeft - 1);
-                        return Mono.delay(Duration.ofSeconds(3)).then(insertWithRetry(unprocessed, retriesLeft - 1));
+                        return Mono.delay(Duration.ofSeconds(3)).then(Mono.defer(() -> insertWithRetry(unprocessed, retriesLeft - 1)));
                     } else {
-                        log.error("Failed to insert PaperDelivery after 3 attempts, unprocessed items remain: {}", unprocessed);
-                        return Mono.error(new PnInternalException("Error during insert PaperDelivery, Unprocessed items remain after 3 attempts", ERROR_CODE_INSERT_PAPER_DELIVERY_ENTITY));
+                        log.error("Failed to insert PaperDelivery after {} attempts, unprocessed items remain: {}", MAX_BATCH_WRITE_RETRIES, unprocessed);
+                        return Mono.error(new PnInternalException("Error during insert PaperDelivery, Unprocessed items remain after " + MAX_BATCH_WRITE_RETRIES + " attempts", ERROR_CODE_INSERT_PAPER_DELIVERY_ENTITY));
                     }
                 }
                 return Mono.empty();
