@@ -164,6 +164,11 @@ Parameters:
     Default: 1000
     Description: 'Query limit for paper delivery table'
 
+  PaperDeliveryCountersQueryLimit:
+    Type: Number
+    Default: 1000
+    Description: 'Query limit for paper delivery counters table'
+
   PaperDeliverySenderLimitTableName:
     Type: String
     Description: 'DynamoDB table name for PaperDeliverySenderLimit'
@@ -2111,6 +2116,7 @@ Resources:
           DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           PAPER_DELIVERY_QUERYLIMIT: !Ref PaperDeliveryQueryLimit
+          PAPER_DELIVERY_COUNTERS_QUERYLIMIT: !Ref PaperDeliveryCountersQueryLimit
           PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
           ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
           ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
@@ -2199,34 +2205,20 @@ Resources:
           - Effect: Allow
             Action:
               - s3:GetObject
-              - s3:HeadObject
               - s3:ListBucket
               - s3:GetObjectTagging
               - s3:PutObject
               - s3:GetBucketLocation
               - s3:DeleteObject
-              - s3:CreateMultipartUpload
-              - s3:UploadPart
-              - s3:CompleteMultipartUpload
               - s3:AbortMultipartUpload
               - s3:ListMultipartUploadParts
             Resource:
               - !Sub "${TestDelayerBucketArn}"
               - !Sub "${TestDelayerBucketArn}/*"
-          - Effect: Allow
-            Action:
-              - s3:PutObject
-              - s3:GetObject
-              - s3:ListBucket
-              - s3:GetBucketLocation
-              - s3:AbortMultipartUpload
-              - s3:ListMultipartUploadParts
-              - s3:CreateMultipartUpload
-              - s3:UploadPart
-              - s3:CompleteMultipartUpload
-            Resource:
               - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001"
               - !Sub "arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*"
+              - !Sub "arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001"
+              - !Sub "arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*"
           - Sid: DecryptObjects
             Effect: Allow
             Action:
