@@ -251,12 +251,44 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```
 
 *GET_COUNTERS*
+
+PRINT counterType
 ```json
 {
   "operationType": "GET_COUNTERS",
   "parameters": {
     "table":"pn-PaperDeliveryCounters",
-    "counterType": "one of PRINT, SUM_ESTIMATES, EXCLUDE",
+    "counterType": "PRINT",
+    "deliveryDate": "yyyy-mm-dd",
+    "province": "province",
+    "productType": "productType",
+    "lastEvaluatedKey": "LeK"
+  }
+}
+```
+
+EXCLUDE counterType
+```json
+{
+  "operationType": "GET_COUNTERS",
+  "parameters": {
+    "table":"pn-PaperDeliveryCounters",
+    "counterType": "EXCLUDE",
+    "deliveryDate": "yyyy-mm-dd",
+    "province": "province",
+    "productType": "productType",
+    "lastEvaluatedKey": "LeK"
+  }
+}
+```
+
+SUM_ESTIMATES counterType
+```json
+{
+  "operationType": "GET_COUNTERS",
+  "parameters": {
+    "table":"pn-PaperDeliveryCounters",
+    "counterType": "SUM_ESTIMATES",
     "deliveryDate": "yyyy-mm-dd",
     "province": "province",
     "productType": "productType",
@@ -462,24 +494,44 @@ Un esempio di risposta è il seguente:
 
 ### Output GET_COUNTERS
 
+PRINT CounterType
 * Items presenti →
 ```json
 {
   "pk": "PRINT",
-  "sk": "2025-11-24",
-  "dailyExecutionCounter": 4,
-  "dailyExecutionNumber": 4,
-  "dailyPrintCapacity": 20,
+  "sk": "2026-04-06",
+  "dailyExecutionCounter": 0,
+  "dailyExecutionNumber": 17,
+  "dailyPrintCapacity": 180000,
   "lastEvaluatedKeyNextWeek": {},
-  "lastEvaluatedKeyPhase2": {
-  "pk": "2025-11-24~EVALUATE_PRINT_CAPACITY",
-  "sk": "1~2025-07-02T00:48:00Z~tcRanking_RS_2"
-  },
-  "numberOfShipments": 70,
+  "lastEvaluatedKeyPhase2": {},
+  "numberOfShipments": 10,
   "sentToNextWeek": 0,
-  "sentToPhaseTwo": 11,
-  "ttl": 1766571878068,
-  "weeklyPrintCapacity": 140
+  "sentToPhaseTwo": 0,
+  "ttl": 1778309789098,
+  "weeklyPrintCapacity": 1260000,
+  "stopSendToPhaseTwo": false
+}
+ ```
+
+EXCLUDE CounterType
+* Items presenti →
+```json
+{
+  "pk": "2026-04-06",
+  "sk": "EXCLUDE~P1~890",
+  "numberOfShipments": 1,
+  "ttl": 1776926697
+}
+ ```
+
+SUM_ESTIMATES CounterType
+* Items presenti →
+```json
+{
+  "pk": "2025-09-29",
+  "sk": "SUM_ESTIMATES~890~AV~2025-09-26T16-58.04Z",
+  "numberOfShipments": 300
 }
  ```
 
