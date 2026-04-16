@@ -116,6 +116,45 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   }
 }
 ```
+
+*GET_USED_SENDER_LIMIT*
+
+- Caso standard
+
+```json
+{
+  "operationType": "GET_USED_SENDER_LIMIT",
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "province": "RM",
+    "table": "pn-PaperDeliveryUsedSenderLimit"
+  }
+}
+```
+- Con lastEvaluatedKey
+```json
+{
+  "operationType": "GET_USED_SENDER_LIMIT",
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "province": "RM",
+    "lastEvaluatedKey": "<lek>",
+    "table":  "pn-PaperDeliveryUsedSenderLimit"
+  }
+}
+```
+- Con pk
+```json
+{
+  "operationType": "GET_USED_SENDER_LIMIT",
+  "parameters": {
+    "deliveryDate": "2025-06-30",
+    "pk": "paId~productType~province",
+    "table":  "pn-PaperDeliveryUsedSenderLimit"
+  }
+}
+```
+
 *GET_BY_REQUEST_ID*
 ```json
 {
@@ -212,12 +251,44 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```
 
 *GET_COUNTERS*
+
+PRINT counterType
 ```json
 {
   "operationType": "GET_COUNTERS",
   "parameters": {
     "table":"pn-PaperDeliveryCounters",
-    "counterType": "one of PRINT, SUM_ESTIMATES, EXCLUDE",
+    "counterType": "PRINT",
+    "deliveryDate": "yyyy-mm-dd",
+    "province": "province",
+    "productType": "productType",
+    "lastEvaluatedKey": "LeK"
+  }
+}
+```
+
+EXCLUDE counterType
+```json
+{
+  "operationType": "GET_COUNTERS",
+  "parameters": {
+    "table":"pn-PaperDeliveryCounters",
+    "counterType": "EXCLUDE",
+    "deliveryDate": "yyyy-mm-dd",
+    "province": "province",
+    "productType": "productType",
+    "lastEvaluatedKey": "LeK"
+  }
+}
+```
+
+SUM_ESTIMATES counterType
+```json
+{
+  "operationType": "GET_COUNTERS",
+  "parameters": {
+    "table":"pn-PaperDeliveryCounters",
+    "counterType": "SUM_ESTIMATES",
     "deliveryDate": "yyyy-mm-dd",
     "province": "province",
     "productType": "productType",
@@ -296,6 +367,31 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
   ```
 
 * Item assente → 
+```json
+ { "items": [] }
+```
+
+### Output GET_USED_SENDER_LIMIT
+
+* Items trovati → array di oggetti, ad esempio:
+  ```json
+  {
+    "items":[
+      {
+        "pk": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95~AR~RM",
+        "deliveryDate": "2025-09-29",
+        "numberOfShipment": 396,
+        "paId": "abc14d59-1e1f-4ghi-lf3m-n46161o0pq95",
+        "productType": "AR",
+        "province": "RM",
+        "senderLimit": 2573
+      }
+    ],
+    "lastEvaluatedKey": {}
+  }
+  ```
+
+* Item assente →
 ```json
  { "items": [] }
 ```
@@ -398,24 +494,44 @@ Un esempio di risposta è il seguente:
 
 ### Output GET_COUNTERS
 
+PRINT CounterType
 * Items presenti →
 ```json
 {
   "pk": "PRINT",
-  "sk": "2025-11-24",
-  "dailyExecutionCounter": 4,
-  "dailyExecutionNumber": 4,
-  "dailyPrintCapacity": 20,
+  "sk": "2026-04-06",
+  "dailyExecutionCounter": 0,
+  "dailyExecutionNumber": 17,
+  "dailyPrintCapacity": 180000,
   "lastEvaluatedKeyNextWeek": {},
-  "lastEvaluatedKeyPhase2": {
-  "pk": "2025-11-24~EVALUATE_PRINT_CAPACITY",
-  "sk": "1~2025-07-02T00:48:00Z~tcRanking_RS_2"
-  },
-  "numberOfShipments": 70,
+  "lastEvaluatedKeyPhase2": {},
+  "numberOfShipments": 10,
   "sentToNextWeek": 0,
-  "sentToPhaseTwo": 11,
-  "ttl": 1766571878068,
-  "weeklyPrintCapacity": 140
+  "sentToPhaseTwo": 0,
+  "ttl": 1778309789098,
+  "weeklyPrintCapacity": 1260000,
+  "stopSendToPhaseTwo": false
+}
+ ```
+
+EXCLUDE CounterType
+* Items presenti →
+```json
+{
+  "pk": "2026-04-06",
+  "sk": "EXCLUDE~P1~890",
+  "numberOfShipments": 1,
+  "ttl": 1776926697
+}
+ ```
+
+SUM_ESTIMATES CounterType
+* Items presenti →
+```json
+{
+  "pk": "2025-09-29",
+  "sk": "SUM_ESTIMATES~890~AV~2025-09-26T16-58.04Z",
+  "numberOfShipments": 300
 }
  ```
 
@@ -442,6 +558,7 @@ Un esempio di risposta è il seguente:
 │       ├── getDelayerPaperDeliveriesByRequestId.js.js  # Implementazione operazione GET_BY_REQUEST_ID
 │       ├── getUsedCapacity.js                          # Implementazione operazione GET_USED_CAPACITY
 │       ├── getSenderLimit.js                           # Implementazione operazione GET_SENDER_LIMIT
+│       ├── getUsedSenderLimit.js                       # Implementazione operazione GET_USED_SENDER_LIMIT
 │       ├── importData.js                               # Implementazione operazione IMPORT_DATA
 │       ├── runAlgorithm.js                             # Implementazione operazione RUN_ALGORITHM
 │       ├── getDeclaredCapacity.js                      # Implementazione operazione GET_DECLARED_CAPACITY
