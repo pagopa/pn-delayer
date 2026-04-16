@@ -35,17 +35,18 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 ```
 
 #### CAMPI DEL CSV
-| Nome                   | Descrizione                                                                                                 |
-|------------------------|-------------------------------------------------------------------------------------------------------------|
-| **requestId**          | Identificativo spedizione nel formato PREPARE_ANALOG_DOMICILE.IUN_<iun>.RECINDEX_<index>.ATTEMPT_<attempt>. | 
-| **notificationSentAt** | Data deposito notifica in formato ISO 8601 con fuso orario UTC. Esempio 2025-01-01T00:00:00Z.               |
-| **prepareRequestDate** | Data deposito notifica in formato ISO 8601 con fuso orario UTC. Esempio 2025-01-01T00:00:00Z.               |
-| **productType**        | Prodotto postale (AR, 890, RS).                                                                             |
-| **senderPaId**         | Identificativo mittente della notifica.                                                                     |
-| **province**           | Sigla ufficiale a due cifre della provincia della spedizione. Esempio: NA.                                  |
-| **cap**                | Cap della spedizione.                                                                                       |
-| **attempt**            | Intero che indica il numero di tentativo della spedizione (0=primo, 1=secondo).                             |
-| **iun**                | Identificativo della notifica.                                                                              |
+| Nome                   | Descrizione                                                                                                                             |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| **requestId**          | Identificativo spedizione nel formato PREPARE_ANALOG_DOMICILE.IUN_<iun>.RECINDEX_<index>.ATTEMPT_<attempt>.                             | 
+| **notificationSentAt** | Data deposito notifica in formato ISO 8601 con fuso orario UTC. Esempio 2025-01-01T00:00:00Z.                                           |
+| **prepareRequestDate** | Data deposito notifica in formato ISO 8601 con fuso orario UTC. Esempio 2025-01-01T00:00:00Z.                                           |
+| **productType**        | Prodotto postale (AR, 890, RS).                                                                                                         |
+| **senderPaId**         | Identificativo mittente della notifica.                                                                                                 |
+| **province**           | Sigla ufficiale a due cifre della provincia della spedizione. Esempio: NA.                                                              |
+| **cap**                | Cap della spedizione.                                                                                                                   |
+| **attempt**            | Intero che indica il numero di tentativo della spedizione (0=primo, 1=secondo).                                                         |
+| **iun**                | Identificativo della notifica.                                                                                                          |
+| **communicationType**  | Tipologia di comunicazione: LEGAL o INFORMAL. se vuoto == LEGAL. se la colonna non è presente tutte le spedizioni saranno di tipo LEGAL |
 
 
 *DELETE_DATA*
@@ -259,10 +260,7 @@ PRINT counterType
   "parameters": {
     "table":"pn-PaperDeliveryCounters",
     "counterType": "PRINT",
-    "deliveryDate": "yyyy-mm-dd",
-    "province": "province",
-    "productType": "productType",
-    "lastEvaluatedKey": "LeK"
+    "deliveryDate": "yyyy-mm-dd"
   }
 }
 ```
