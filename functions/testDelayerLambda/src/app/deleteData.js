@@ -206,12 +206,16 @@ async function batchDeleteGeneric(tableName, keys, keyBuilder) {
                 await sleep(BATCH_DELAY);
             }
             if (chunk.length) {
-                allUnprocessed.push(
-                    ...chunk.map(item => ({
-                        tableName,
-                        key: item.DeleteRequest?.Key
-                    }))
-                );
+                    const unprocessedEntries = chunk.map(item => ({
+                    tableName,
+                    key: item.DeleteRequest?.Key
+                }));
+                allUnprocessed.push(...unprocessedEntries);
+                console.warn("batchDeleteGeneric exhausted retries with unprocessed delete requests", {
+                    tableName,
+                    unprocessedCount: unprocessedEntries.length,
+                    sampleKeys: unprocessedEntries.slice(0, 5).map(item => item.key)
+                });
             }
         });
 
