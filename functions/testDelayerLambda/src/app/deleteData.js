@@ -86,7 +86,7 @@ exports.deleteData = async (params = []) => {
             console.log(`Found ${Object.keys(entitiesByWeek).length} distinct deliveryWeek(s): ${Object.keys(entitiesByWeek).join(', ')}`);
 
             // Terza fase: delete parallele
-            await Promise.all([
+            const [paperDeliveryUnprocessed, relatedTablesUnprocessed] = await Promise.all([
                 // PAPER DELIVERY
                 batchDeleteGeneric(
                     paperDeliveryTableName,
@@ -95,6 +95,7 @@ exports.deleteData = async (params = []) => {
                 ),
 
                (async () => {
+                   const weekUnprocessed = [];
                    for (const [deliveryWeek, weekEntities] of Object.entries(entitiesByWeek)) {
 
                        const previousDeliveryWeek = LocalDate.parse(deliveryWeek)
@@ -104,7 +105,7 @@ exports.deleteData = async (params = []) => {
 
                        console.log(`Processing deliveryWeek=${deliveryWeek}, previousDeliveryWeek=${previousDeliveryWeek}, entities=${weekEntities.length}`);
 
-                       await Promise.all([
+                       const [countersUnprocessed, senderLimitUnprocessed, capacityUnprocessed] = await Promise.all([
                            // COUNTERS
                            (async () => {
                                const grouped = groupRecordsByProductAndProvince(weekEntities);
@@ -113,7 +114,7 @@ exports.deleteData = async (params = []) => {
                                    sk: `EXCLUDE~${k}`
                                }));
                                keys.push({ pk: "PRINT", sk: deliveryWeek });
-                               await batchDeleteGeneric( countersTableName, keys, k => ({ pk: k.pk, sk: k.sk }) );
+                               return batchDeleteGeneric(countersTableName, keys, k => ({ pk: k.pk, sk: k.sk }));
                            })(),
 
                            // SENDER LIMIT
@@ -124,7 +125,7 @@ exports.deleteData = async (params = []) => {
                                    sk: previousDeliveryWeek
                                }));
 
-                               await batchDeleteGeneric(senderUsedLimitTableName, keys, k => ({ pk: k.pk, deliveryDate: k.sk }) );
+                               return batchDeleteGeneric(senderUsedLimitTableName, keys, k => ({ pk: k.pk, deliveryDate: k.sk }));
                            })(),
 
                            // CAPACITY
@@ -141,13 +142,29 @@ exports.deleteData = async (params = []) => {
                                    sk: deliveryWeek
                                }));
 
-                               await batchDeleteGeneric(deliveryDriverUsedCapacitiesTableName,keys,k => ({unifiedDeliveryDriverGeokey: k.pk,deliveryDate: k.sk })
+                               return batchDeleteGeneric(deliveryDriverUsedCapacitiesTableName,keys,k => ({unifiedDeliveryDriverGeokey: k.pk,deliveryDate: k.sk })
                                );
                            })()
                        ]);
+
+                       weekUnprocessed.push(
+                           ...countersUnprocessed,
+                           ...senderLimitUnprocessed,
+                           ...capacityUnprocessed
+                       );
                    }
+                   return weekUnprocessed;
                })()
             ]);
+
+            const allUnprocessed = [
+                ...paperDeliveryUnprocessed,
+                ...relatedTablesUnprocessed
+            ];
+
+            if (allUnprocessed.length) {
+                throw new Error(`Delete completed with unprocessed items: ${allUnprocessed.length}`);
+            }
         }
         console.log("Processed deletions:", allEntities.length);
         return { message: "Delete completed", processed: allEntities.length };
@@ -163,8 +180,9 @@ exports.deleteData = async (params = []) => {
 * and retries unprocessed items up to a fixed number of attempts, waiting between retries.
 */
 async function batchDeleteGeneric(tableName, keys, keyBuilder) {
-    if (!keys?.length) return;
+    if (!keys?.length) return [];
     let pending = keys.filter(k => k?.pk && k?.sk);
+    const allUnprocessed = [];
 
     const chunks = [];
     for (let i = 0; i < pending.length; i += BATCH_SIZE) {
@@ -188,7 +206,16 @@ async function batchDeleteGeneric(tableName, keys, keyBuilder) {
                 await sleep(BATCH_DELAY);
             }
             if (chunk.length) {
-                console.warn(`Unprocessed items after retries: ${chunk.length}`);
+                    const unprocessedEntries = chunk.map(item => ({
+                    tableName,
+                    key: item.DeleteRequest?.Key
+                }));
+                allUnprocessed.push(...unprocessedEntries);
+                console.warn("batchDeleteGeneric exhausted retries with unprocessed delete requests", {
+                    tableName,
+                    unprocessedCount: unprocessedEntries.length,
+                    sampleKeys: unprocessedEntries.slice(0, 5).map(item => item.key)
+                });
             }
         });
 
@@ -198,6 +225,8 @@ async function batchDeleteGeneric(tableName, keys, keyBuilder) {
         await sleep(BATCH_DELAY);
       }
     }
+
+    return allUnprocessed;
 }
 
 /**
