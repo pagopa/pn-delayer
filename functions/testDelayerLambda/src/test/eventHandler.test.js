@@ -396,6 +396,56 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(body.message, "Delete completed");
    });
 
+   it("DELETE_DATA returns 500 when unprocessed items remain after retries", async () => {
+       const csvPath = path.join(__dirname, "sample.csv");
+       const csvData = fs.readFileSync(csvPath, "utf8");
+       s3Mock.on(GetObjectCommand).resolves({
+           Body: Readable.from([csvData])
+       });
+
+       ddbMock.on(QueryCommand).resolves({
+           Items: [{
+               pk: "2025-08-25~EVALUATE_PRINT_CAPACITY",
+               sk: "sk1",
+               province: "RM",
+               productType: "RS",
+               senderPaId: "PaId",
+               unifiedDeliveryDriver: "driver1",
+               cap: "00178"
+           }]
+       });
+
+       ddbMock.on(BatchWriteCommand).resolves({
+           UnprocessedItems: {
+               "pn-DelayerPaperDelivery": [
+                   {
+                       DeleteRequest: {
+                           Key: {
+                               pk: "2025-08-25~EVALUATE_PRINT_CAPACITY",
+                               sk: "sk1"
+                           }
+                       }
+                   }
+               ]
+           }
+       });
+
+       const result = await handler({
+           operationType: "DELETE_DATA",
+           parameters: [
+               "pn-DelayerPaperDelivery",
+               "pn-PaperDeliveryDriverUsedCapacities",
+               "pn-PaperDeliveryUsedSenderLimit",
+               "pn-PaperDeliveryCounters"
+           ]
+       });
+
+       assert.strictEqual(result.statusCode, 500);
+       const body = JSON.parse(result.body);
+       assert.strictEqual(body.message.includes("Delete completed with unprocessed items"), true);
+       assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length >= 3, true);
+   });
+
    it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
        const fakeItems = [
            {
