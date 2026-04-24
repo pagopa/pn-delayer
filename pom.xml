@@ -18,6 +18,10 @@
 	  <tag>HEAD</tag>
   </scm>
 
+	<properties>
+		<java.version>25</java.version>
+	</properties>
+
 
 	<dependencies>
 
@@ -91,6 +95,14 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<image>
+						<env>
+							<BP_JVM_VERSION>25</BP_JVM_VERSION>
+							<BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>
+						</env>
+					</image>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.jacoco</groupId>

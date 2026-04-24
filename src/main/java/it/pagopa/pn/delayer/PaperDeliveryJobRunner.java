@@ -46,6 +46,10 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     public void run(String... args) throws JsonProcessingException {
         int exitCode;
         WorkflowStepEnum workflowStep = pnDelayerConfigs.getWorkflowStep();
+        if(workflowStep == null) {
+            log.error("Unknown workflow step: {}", workflowStep);
+            return;
+        }
         switch (workflowStep) {
             case EVALUATE_SENDER_LIMIT:
                 log.info("Starting Evaluate Sender Limit step");
