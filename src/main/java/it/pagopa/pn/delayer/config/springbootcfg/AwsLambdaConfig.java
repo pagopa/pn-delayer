@@ -26,7 +26,7 @@ public class AwsLambdaConfig {
     }
 
     private LambdaClient configureBuilder(LambdaClientBuilder builder) {
-        if (this.props != null) {
+        if (this.props != null && System.getenv("AWS_REGIONCODE") == null) {
             String profileName = this.props.getProfileName();
             if (StringUtils.isNotBlank(profileName)) {
                 builder.credentialsProvider(ProfileCredentialsProvider.create(profileName));
