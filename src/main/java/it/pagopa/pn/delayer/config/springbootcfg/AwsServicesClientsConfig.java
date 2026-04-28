@@ -75,7 +75,7 @@ public class AwsServicesClientsConfig {
     }
 
     private <C> C configureBuilder(AwsClientBuilder<?, C> builder) {
-        if( props != null && System.getenv("AWS_DEFAULT_REGION") == null ) {
+        if( props != null && System.getenv("AWS_REGIONCODE") == null ) {
 
             String profileName = props.getProfileName();
             if( StringUtils.isNotBlank( profileName ) ) {
