@@ -32,7 +32,7 @@
           "Next": "WorkflowFail"
         }
       ],
-      "Next": "retrieveProvince",
+      "Next": "retrieveSenderWithPriority",
       "Parameters": {
         "FunctionName": "${TenderAPILambdaArn}",
         "Payload": {
@@ -71,6 +71,108 @@
         }
       ],
       "Type": "Task"
+    },
+    "retrieveSenderWithPriority": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName.$": "$.paperDeliveryCounterTableName",
+        "ProjectionExpression": "paId",
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :skPrefix)",
+        "ExpressionAttributeValues": {
+          ":pk": {
+            "S.$": "$.deliveryWeek"
+          },
+          ":skPrefix": {
+            "S": "SENDER_PRIORITY"
+          }
+        }
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "ResultPath": "$.senderPriorities",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2
+        }
+      ],
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "Next": "Map"
+    },
+    "Map": {
+      "Type": "Map",
+      "ItemsPath": "$.senderPriorities.Items",
+      "ItemSelector": {
+        "paId.$": "$$.Map.Item.Value.paId.S"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "submitSenderPriorityJob",
+        "States": {
+          "submitSenderPriorityJob": {
+            "Type": "Task",
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "Next": "SenderPriorityJobFail"
+              }
+            ],
+            "Resource": "arn:aws:states:::batch:submitJob.sync",
+            "Parameters": {
+              "JobDefinition": "${PnDelayerSenderPriorityJobDefinition}",
+              "JobName.$": "$.paId",
+              "JobQueue": "${PnDelayerSenderPriorityJobQueue}",
+              "ContainerOverrides": {
+                "Environment": [
+                  {
+                    "Name": "PN_DELAYER_EVALUATESENDERPRIORITYJOBINPUT_SENDERPAID",
+                    "Value.$": "$.paId"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYWEEK",
+                    "Value.$": "$.deliveryWeek"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME",
+                    "Value.$": "$.paperDeliveryCounterTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYTABLENAME",
+                    "Value.$": "$.paperDeliveryTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_WORKFLOWSTEP",
+                    "Value": "EVALUATE_SENDER_PRIORITY"
+                  }
+                ]
+              }
+            },
+            "End": true
+          },
+          "SenderPriorityJobFail": {
+            "Type": "Fail"
+          }
+        }
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "Next": "retrieveProvince"
     },
     "GetUnifiedDeliveryDriverProvinceParameter": {
       "Catch": [
