@@ -31,6 +31,8 @@ public class PaperDelivery {
     public static final String COL_DELIVERY_DATE = "deliveryDate";
     public static final String COL_WORKFLOW_STEP = "workflowStep";
     public static final String COL_COMMUNICATION_TYPE = "communicationType";
+    public static final String COL_SENDER_PRIORITY = "senderPriority";
+    public static final String COL_VIRTUAL_NOTIFICATION_SENT_AT = "virtualNotificationSentAt";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
@@ -70,6 +72,10 @@ public class PaperDelivery {
     private String workflowStep;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_COMMUNICATION_TYPE)}))
     private String communicationType;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_PRIORITY)}))
+    private Integer senderPriority;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_VIRTUAL_NOTIFICATION_SENT_AT)}))
+    private String virtualNotificationSentAt;
 
     public PaperDelivery(){}
 
