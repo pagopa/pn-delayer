@@ -6,11 +6,13 @@ describe("eventHandler.handleEvent", () => {
   let extractKinesisDataStub;
   let batchWritePaperDeliveryRecordsStub;
   let updateExcludeCounterStub;
+  let updateSenderPriorityCounterStub;
   let batchWriteKinesisEventRecordsStub;
   let batchGetKinesisEventRecordsStub;
   let buildPaperDeliveryRecordStub;
   let buildPaperDeliveryKinesisEventRecordStub;
   let groupRecordsByProductAndProvinceStub;
+  let groupRecordsBySenderPaIdStub;
   let lambda;
 
   beforeEach(() => {
@@ -24,11 +26,13 @@ describe("eventHandler.handleEvent", () => {
     extractKinesisDataStub = sinon.stub();
     batchWritePaperDeliveryRecordsStub = sinon.stub();
     updateExcludeCounterStub = sinon.stub();
+    updateSenderPriorityCounterStub = sinon.stub();
     batchWriteKinesisEventRecordsStub = sinon.stub();
     batchGetKinesisEventRecordsStub = sinon.stub();
     buildPaperDeliveryRecordStub = sinon.stub();
     buildPaperDeliveryKinesisEventRecordStub = sinon.stub();
     groupRecordsByProductAndProvinceStub = sinon.stub();
+    groupRecordsBySenderPaIdStub =  sinon.stub();
 
     lambda = proxyquire("../app/eventHandler.js", {
       "./lib/kinesis": {
@@ -37,13 +41,15 @@ describe("eventHandler.handleEvent", () => {
       "./lib/dynamo": {
         batchWritePaperDeliveryRecords: batchWritePaperDeliveryRecordsStub,
         updateExcludeCounter: updateExcludeCounterStub,
+        updateSenderPriorityCounter: updateSenderPriorityCounterStub,
         batchWriteKinesisEventRecords: batchWriteKinesisEventRecordsStub,
         batchGetKinesisEventRecords: batchGetKinesisEventRecordsStub
       },
       "./lib/utils": {
         buildPaperDeliveryRecord: buildPaperDeliveryRecordStub,
         buildPaperDeliveryKinesisEventRecord: buildPaperDeliveryKinesisEventRecordStub,
-        groupRecordsByProductAndProvince: groupRecordsByProductAndProvinceStub
+        groupRecordsByProductAndProvince: groupRecordsByProductAndProvinceStub,
+        groupRecordsBySenderPaId: groupRecordsBySenderPaIdStub
       }
     });
   });
@@ -116,7 +122,8 @@ describe("eventHandler.handleEvent", () => {
         iun: "iun1",
         notificationSentAt: "2023-10-01T00:00:00Z",
         prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
+        attempt: "0",
+        senderPriority: 30
       },
       {
         kinesisSeqNumber: "1234567891",
@@ -129,7 +136,8 @@ describe("eventHandler.handleEvent", () => {
         iun: "iun2",
         notificationSentAt: "2023-10-01T00:00:00Z",
         prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
+        attempt: "0",
+        senderPriority: 70
       }
     ];
 
@@ -143,7 +151,16 @@ describe("eventHandler.handleEvent", () => {
         { entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }
       ]
     });
+    groupRecordsBySenderPaIdStub.returns({
+      "sender1": [
+        { entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }
+      ],
+      "sender2": [
+        { entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }
+      ],
+    });
     updateExcludeCounterStub.callsFake(async (_, failures) => failures);
+    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({ UnprocessedItems: {} });
@@ -153,6 +170,7 @@ describe("eventHandler.handleEvent", () => {
     expect(result).to.deep.equal({ batchItemFailures: [] });
     expect(batchGetKinesisEventRecordsStub.calledOnce).to.equal(true);
     expect(updateExcludeCounterStub.calledOnce).to.equal(true);
+    expect(updateSenderPriorityCounterStub.calledOnce).to.equal(true);
     expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
     expect(batchWriteKinesisEventRecordsStub.calledOnce).to.equal(true);
   });
@@ -183,7 +201,8 @@ describe("eventHandler.handleEvent", () => {
         iun: "iun2",
         notificationSentAt: "2023-10-01T00:00:00Z",
         prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
+        attempt: "0",
+        senderPriority: 70
       }
     ];
 
@@ -193,7 +212,13 @@ describe("eventHandler.handleEvent", () => {
     groupRecordsByProductAndProvinceStub.returns({
       "RM~AR": [{ entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }]
     });
+    groupRecordsBySenderPaIdStub.returns({
+      "sender2": [
+        { entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }
+      ],
+    });
     updateExcludeCounterStub.callsFake(async (_, failures) => failures);
+    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({});
@@ -203,6 +228,7 @@ describe("eventHandler.handleEvent", () => {
     expect(result).to.deep.equal({ batchItemFailures: [] });
     expect(batchGetKinesisEventRecordsStub.calledOnce).to.equal(true);
     expect(batchWriteKinesisEventRecordsStub.calledOnce).to.equal(true);
+    expect(updateSenderPriorityCounterStub.calledOnce).to.equal(true);
 
     const eventRecordsArg = batchWriteKinesisEventRecordsStub.firstCall.args[0];
     expect(eventRecordsArg).to.deep.equal([{ requestId: "request2", ttl: 9999999999 }]);
@@ -279,6 +305,7 @@ describe("eventHandler.handleEvent", () => {
     const result = await lambda.handleEvent({});
 
     expect(result.batchItemFailures).to.deep.equal([{ itemIdentifier: "1234567890" }]);
+    expect(updateSenderPriorityCounterStub.calledOnce).to.equal(false);
     expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
   });
 
@@ -295,7 +322,8 @@ describe("eventHandler.handleEvent", () => {
         iun: "iun1",
         notificationSentAt: "2023-10-01T00:00:00Z",
         prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
+        attempt: "0",
+        senderPriority: 70
       }
     ];
 
@@ -305,12 +333,19 @@ describe("eventHandler.handleEvent", () => {
     groupRecordsByProductAndProvinceStub.returns({
       "RM~RS": [{ entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }]
     });
+    groupRecordsBySenderPaIdStub.returns({
+      "sender1": [
+        { entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }
+      ]
+    });
     updateExcludeCounterStub.callsFake(async (_, failures) => failures);
+    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
     batchWritePaperDeliveryRecordsStub.resolves([{ itemIdentifier: "1234567890" }]);
 
     const result = await lambda.handleEvent({});
 
     expect(result.batchItemFailures).to.deep.equal([{ itemIdentifier: "1234567890" }]);
+    expect(updateSenderPriorityCounterStub.calledOnce).to.equal(true);
     expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
   });
 
@@ -326,7 +361,8 @@ describe("eventHandler.handleEvent", () => {
       iun: "iun1",
       notificationSentAt: "2023-10-01T00:00:00Z",
       prepareRequestDate: "2024-10-01T00:00:00Z",
-      attempt: "0"
+      attempt: "0",
+      senderPriority: 40
     };
 
     extractKinesisDataStub.returns([
@@ -339,7 +375,11 @@ describe("eventHandler.handleEvent", () => {
     groupRecordsByProductAndProvinceStub.callsFake((records) => ({
       "RM~RS": records
     }));
+    groupRecordsBySenderPaIdStub.callsFake((records) => ({
+      "sender1": records
+    }));
     updateExcludeCounterStub.callsFake(async (_, failures) => failures);
+    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({});
@@ -351,6 +391,10 @@ describe("eventHandler.handleEvent", () => {
     const groupedArg = groupRecordsByProductAndProvinceStub.firstCall.args[0];
     expect(groupedArg).to.have.lengthOf(1);
     expect(groupedArg[0].entity.requestId).to.equal("request1");
+
+    const groupedArgPaId = groupRecordsBySenderPaIdStub.firstCall.args[0];
+    expect(groupedArgPaId).to.have.lengthOf(1);
+    expect(groupedArgPaId[0].entity.requestId).to.equal("request1");
   });
 
   it("should skip records without attempt instead of failing them", async () => {
@@ -366,7 +410,8 @@ describe("eventHandler.handleEvent", () => {
         iun: "iun1",
         notificationSentAt: "2023-10-01T00:00:00Z",
         prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
+        attempt: "0",
+        senderPriority: 40
       },
       {
         kinesisSeqNumber: "1234567891",
@@ -378,7 +423,8 @@ describe("eventHandler.handleEvent", () => {
         tenderId: "tender2",
         iun: "iun2",
         notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z"
+        prepareRequestDate: "2024-10-01T00:00:00Z",
+        senderPriority: 15
         // attempt missing
       }
     ];
@@ -389,7 +435,13 @@ describe("eventHandler.handleEvent", () => {
     groupRecordsByProductAndProvinceStub.returns({
       "RM~AR": [{ entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }]
     });
+    groupRecordsBySenderPaIdStub.returns({
+      "sender1": [
+        { entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }
+      ]
+    });
     updateExcludeCounterStub.callsFake(async (_, failures) => failures);
+    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({});
@@ -401,5 +453,9 @@ describe("eventHandler.handleEvent", () => {
     const groupedArg = groupRecordsByProductAndProvinceStub.firstCall.args[0];
     expect(groupedArg).to.have.lengthOf(1);
     expect(groupedArg[0].kinesisSeqNumber).to.equal("1234567890");
+
+    const groupedArgPaId = groupRecordsBySenderPaIdStub.firstCall.args[0];
+    expect(groupedArgPaId).to.have.lengthOf(1);
+    expect(groupedArgPaId[0].kinesisSeqNumber).to.equal("1234567890");
   });
 });

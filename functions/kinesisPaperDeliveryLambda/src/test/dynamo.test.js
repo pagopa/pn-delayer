@@ -244,3 +244,61 @@ describe('batchGetKinesisEventRecords - extra branches', () => {
     })
   });
 
+describe('updateSenderPriorityCounter', () => {
+    it('updates sender priority counter correctly', async () => {
+        const groupedSenderPaIdRecords = {
+            'sender1': [
+                { entity: { senderPriority: 30 }, kinesisSeqNumber: 'seq1' },
+                { entity: { senderPriority: 40 }, kinesisSeqNumber: 'seq2' }
+            ],
+            'sender2': [
+                { entity: { senderPriority: 60 }, kinesisSeqNumber: 'seq3' }
+            ]
+        };
+        const batchItemFailures = [];
+        mockSend.resolves({});
+
+        await dynamo.updateSenderPriorityCounter(groupedSenderPaIdRecords, batchItemFailures);
+
+        expect(mockSend.callCount).to.equal(2);
+        const firstCallParams = mockSend.firstCall.args[0].params;
+        const secondCallParams = mockSend.secondCall.args[0].params;
+
+        expect(firstCallParams.TableName).to.equal('TestCounterTable');
+        expect(firstCallParams.Key.sk).to.equal('SENDER_PRIORITY~sender1');
+        expect(firstCallParams.ExpressionAttributeValues[':priorities']).to.deep.equal(new Set([30, 40]));
+
+        expect(secondCallParams.Key.sk).to.equal('SENDER_PRIORITY~sender2');
+        expect(secondCallParams.ExpressionAttributeValues[':priorities']).to.deep.equal(new Set([60]));
+    });
+
+    it('skips updating when no priorities are present', async () => {
+        const groupedSenderPaIdRecords = {
+            'sender3': [
+                { entity: { senderPriority: null }, kinesisSeqNumber: 'seq4' },
+                { entity: { senderPriority: undefined }, kinesisSeqNumber: 'seq5' }
+            ]
+        };
+        const batchItemFailures = [];
+        mockSend.resolves({});
+
+        await dynamo.updateSenderPriorityCounter(groupedSenderPaIdRecords, batchItemFailures);
+
+        expect(mockSend.callCount).to.equal(0);
+    });
+
+    it('handles errors and adds failed sequence numbers to batchItemFailures', async () => {
+        const groupedSenderPaIdRecords = {
+            'sender4': [
+                { entity: { senderPriority: 80 }, kinesisSeqNumber: 'seq6' }
+            ]
+        };
+        const batchItemFailures = [];
+        mockSend.rejects(new Error('update fail'));
+
+        await dynamo.updateSenderPriorityCounter(groupedSenderPaIdRecords, batchItemFailures);
+
+        expect(mockSend.callCount).to.equal(1);
+        expect(batchItemFailures).to.deep.equal([{ itemIdentifier: 'seq6' }]);
+    });
+});
