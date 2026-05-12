@@ -74,6 +74,106 @@ ogni spedizione potrà subire i seguenti i cambi di stati durante l’esecuzione
 - Legge dalle tabelle: PaperDeliveryCounterTable, PaperDeliverySenderLimitTable, PaperDeliveryUsedSenderLimitTable, PaperDeliveryDriverCapacitiesTable, PaperDeliveryTable
 - Scrive sulle tabelle DynamoDB: PaperDeliveryUsedSenderLimitTable
 
+#### Calcolo limite garantito al mittente
+
+Il limite garantito al mittente viene calcolato in `SenderLimitUtils.retrieveCapacityAndCalculateLimit` come quota proporzionale
+della capacità disponibile del gruppo di recapitisti associato al prodotto.
+
+Per ogni tupla `paId~productType~province` presente in `PaperDeliverySenderLimit`:
+
+```text
+driver = primo DriversTotalCapacity che contiene productType
+relevantProducts = driver.products - ["RS"]
+
+se relevantProducts contiene più di un prodotto:
+    totalEstimate = somma totalEstimateCounter[prodotto] per tutti i relevantProducts
+altrimenti:
+    totalEstimate = totalEstimateCounter[productType]
+
+se totalEstimate == 0:
+    limit = 0
+altrimenti:
+    limit = floor(driver.capacity * weeklyEstimate / totalEstimate)
+```
+
+Dove:
+- `weeklyEstimate` è la stima settimanale del mittente per prodotto e provincia.
+- `totalEstimateCounter` contiene le stime totali provinciali per prodotto, recuperate dai contatori `SUM_ESTIMATES`.
+- `driver.capacity` è la capacità disponibile del gruppo di recapitisti sulla provincia. Viene calcolata sommando le capacità
+  dei recapitisti raggruppati per prodotti intersecanti e sottraendo gli eventuali contatori `EXCLUDE` relativi a RS e secondi tentativi.
+- `RS` non partecipa al denominatore del calcolo del limite garantito.
+
+Esempio con un recapitista che gestisce un solo prodotto:
+
+```text
+Fulmine su RM:
+products = [AR]
+capacity = 500
+
+totalEstimateCounter[AR] = 1000
+weeklyEstimate PA1 AR = 120
+
+limit = floor(500 * 120 / 1000) = 60
+```
+
+In questo caso PA1 ha 60 spedizioni AR garantite verso `EVALUATE_DRIVER_CAPACITY`; le spedizioni eccedenti vengono
+indirizzate verso `EVALUATE_RESIDUAL_CAPACITY`.
+
+Esempio con un recapitista che gestisce più prodotti:
+
+```text
+Poste su RM:
+products = [AR, 890]
+capacity = 600
+
+totalEstimateCounter[AR] = 700
+totalEstimateCounter[890] = 300
+totalEstimate = 700 + 300 = 1000
+
+weeklyEstimate PA1 AR = 140
+limit PA1 AR = floor(600 * 140 / 1000) = 84
+
+weeklyEstimate PA2 890 = 50
+limit PA2 890 = floor(600 * 50 / 1000) = 30
+```
+
+Quando il recapitista gestisce più prodotti, il denominatore non è la sola stima del prodotto corrente, ma la somma delle
+stime dei prodotti gestiti dal gruppo, escluso `RS`.
+
+Esempio con due recapitisti che gestiscono lo stesso prodotto:
+
+```text
+Fulmine su PA:
+products = [AR]
+capacity = 300
+
+Poste su PA:
+products = [AR, 890]
+capacity = 400
+```
+
+Poiché i prodotti si intersecano su `AR`, `DeliveryDriverUtils.groupDriversByIntersectingProducts` aggrega i due recapitisti:
+
+```text
+products = [AR, 890]
+capacity = 300 + 400 = 700
+unifiedDeliveryDrivers = [Fulmine, Poste]
+
+totalEstimateCounter[AR] = 800
+totalEstimateCounter[890] = 200
+totalEstimate = 800 + 200 = 1000
+
+weeklyEstimate PA1 AR = 160
+limit PA1 AR = floor(700 * 160 / 1000) = 112
+
+weeklyEstimate PA2 890 = 50
+limit PA2 890 = floor(700 * 50 / 1000) = 35
+```
+
+In questo scenario il limite AR non viene calcolato sulla sola capacità di Fulmine o sulla sola capacità di Poste, ma sulla
+capacità aggregata del gruppo `Fulmine + Poste`. Se invece entrambi i recapitisti gestissero solo `AR`, il gruppo avrebbe
+`products = [AR]`, `capacity = 700` e il denominatore sarebbe solo `totalEstimateCounter[AR]`.
+
 #### Configurazione
 | Variabile Ambiente                                    | Descrizione                                                                                                                                     | Default | Obbligatorio |
 |-------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------|--------------|

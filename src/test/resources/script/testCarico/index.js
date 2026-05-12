@@ -61,7 +61,7 @@ async function processJsonFiles() {
         );
 
         const results = [];
-        const startTime = Date.now();
+        const startTime = new Date().toISOString();
 
         for (let i = 0; i < jsonFiles.length; i++) {
             const fileName = jsonFiles[i];
@@ -69,7 +69,7 @@ async function processJsonFiles() {
 
             console.log(`\n[${i + 1}/${jsonFiles.length}] Processando: ${fileName}`);
 
-            const result = await safeStorageClient.processJsonFile(filePath);
+            const result = await safeStorageClient.processJsonFile(filePath, startTime);
             results.push(result);
 
             if (result.success) {
