@@ -1,13 +1,12 @@
 package it.pagopa.pn.delayer.utils;
 
+import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
-import it.pagopa.pn.delayer.model.IncrementUsedSenderLimitDto;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,14 +20,14 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,6 +74,30 @@ public class SenderLimitUtilsTest {
         assertTrue(senderLimitMaps.containsKey("key2"));
         assertEquals(62, senderLimitMaps.get("key2").getT1());
         assertEquals(0, senderLimitMaps.get("key2").getT2());
+    }
+
+    @Test
+    void retrieveAndEvaluateSenderLimitErrorInPercentage() {
+        LocalDate deliveryWeek = LocalDate.now();
+        Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId =
+                Map.of("paid1~productType1~province1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
+                        "paid2~productType2~province2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));
+        Map<String, Tuple2<Integer, Integer>> senderLimitMaps = new HashMap<>();
+        Integer capacity = 72;
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+        senderLimitJobProcessObjects.setSenderLimitMap(senderLimitMaps);
+        senderLimitJobProcessObjects.setTotalEstimateCounter(Map.of("AR", 72));
+
+        PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
+        paperDeliverySenderLimit.setPk("key2");
+        paperDeliverySenderLimit.setProductType("AR");
+        paperDeliverySenderLimit.setWeeklyEstimate(100);
+
+        when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), eq(deliveryWeek.minusWeeks(1))))
+                .thenReturn(Flux.just(paperDeliverySenderLimit));
+
+        Assertions.assertThrows(PnInternalException.class, () -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, List.of(new DriversTotalCapacity(List.of("RS", "AR"), capacity, List.of("POSTE"))), senderLimitJobProcessObjects)
+                .block(), "Sender limit percentage exceeds 100%% for productType=AR, paId=paid1, province=province1");
     }
 
     @Test
