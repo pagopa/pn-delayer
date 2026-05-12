@@ -441,6 +441,8 @@ Resources:
           AttributeType: "S"
         - AttributeName: "createdAt"
           AttributeType: "S"
+        - AttributeName: "senderPaId"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
           KeyType: "HASH"
@@ -452,6 +454,14 @@ Resources:
             - AttributeName: "requestId"
               KeyType: "HASH"
             - AttributeName: "createdAt"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "deliveryDate-paId-index"
+          KeySchema:
+            - AttributeName: "pk"
+              KeyType: "HASH"
+            - AttributeName: "senderPaId"
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
