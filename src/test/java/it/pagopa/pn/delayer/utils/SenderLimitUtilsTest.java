@@ -91,6 +91,8 @@ public class SenderLimitUtilsTest {
         PaperDeliverySenderLimit paperDeliverySenderLimit = new PaperDeliverySenderLimit();
         paperDeliverySenderLimit.setPk("key2");
         paperDeliverySenderLimit.setProductType("AR");
+        paperDeliverySenderLimit.setPaId("paid1");
+        paperDeliverySenderLimit.setProvince("province1");
         paperDeliverySenderLimit.setWeeklyEstimate(100);
 
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), eq(deliveryWeek.minusWeeks(1))))
