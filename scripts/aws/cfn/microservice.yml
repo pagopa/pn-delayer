@@ -771,6 +771,11 @@ Resources:
       JobDefinitionName: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
       RetryStrategy:
         Attempts: 3
+        EvaluateOnExit:
+          - Action: EXIT
+            OnExitCode: "10"
+          - Action: RETRY
+            OnExitCode: "*"
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
