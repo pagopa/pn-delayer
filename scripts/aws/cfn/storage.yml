@@ -441,6 +441,8 @@ Resources:
           AttributeType: "S"
         - AttributeName: "createdAt"
           AttributeType: "S"
+        - AttributeName: "senderPaIdSentAt"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
           KeyType: "HASH"
@@ -455,6 +457,14 @@ Resources:
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
+        - IndexName: "pk-senderPaId-index"
+          KeySchema:
+            - AttributeName: "pk"
+              KeyType: "HASH"
+            - AttributeName: "senderPaIdSentAt"
+              KeyType: "RANGE"
+          Projection:
+              ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
       TimeToLiveSpecification:
         AttributeName: "ttl"

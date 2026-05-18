@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -20,7 +19,6 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -71,7 +69,7 @@ public class PaperDeliveryUtils {
     private Mono<Void> sendToNextWeek(WorkflowStepEnum workflowStepEnum, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, LocalDate deliveryWeek) {
         return Mono.just(lastEvaluatedKey)
                 .expand(currentKey ->
-                        retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, currentKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
+                        retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, currentKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), null)
                                 .flatMap(page -> processChunkToSendToNextWeek(page.items(), deliveryWeek)
                                         .then(CollectionUtils.isEmpty(page.lastEvaluatedKey())
                                                 ? Mono.<Map<String, AttributeValue>>empty()
@@ -132,7 +130,7 @@ public class PaperDeliveryUtils {
                     if (!state.hasMorePages() || state.residualCapacity() <= 0) {
                         return Mono.empty();
                     }
-                    return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, state.lastEvaluatedKey(), Math.min(state.residualCapacity(), pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()))
+                    return retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, state.lastEvaluatedKey(), Math.min(state.residualCapacity(), pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit()), null)
                             .flatMap(paperDeliveryPage -> {
                                 anyPageProcessed.set(true);
                                 return processChunkToSendToNextStep(paperDeliveryPage.items(), unifiedDeliveryDriver, tenderId, deliveryWeek, printCounter, driverCapacityJobProcessResult)
@@ -212,8 +210,8 @@ public class PaperDeliveryUtils {
                 });
     }
 
-    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
-        return paperDeliveryDAO.retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, queryLimit)
+    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit, String indexName) {
+        return paperDeliveryDAO.retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, queryLimit, indexName)
                 .flatMap(paperDeliveryPage -> {
                     if (CollectionUtils.isEmpty(paperDeliveryPage.items())) {
                         log.warn("No records found for province = [{}] and deliveryWeek = [{}]", sortKeyPrefix, deliveryWeek);
@@ -277,6 +275,10 @@ public class PaperDeliveryUtils {
                 .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobProcessObjects.getSendToResidualCapacityStep(), deliveryWeek))
                         .thenReturn(senderLimitJobProcessObjects.getSendToDriverCapacityStep())
                         .doOnNext(paperDeliveries -> paperDeliveries.removeIf(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1)));
+    }
+
+    public Mono<Void> transactReorderedDeliveries(List<PaperDelivery> reorderedDeliveries) {
+        return paperDeliveryDAO.transactReorderedDeliveries(reorderedDeliveries);
     }
 
     private record SendToNextStepIterState(

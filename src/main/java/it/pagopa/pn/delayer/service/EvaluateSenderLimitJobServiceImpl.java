@@ -63,7 +63,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
 
     private Mono<SenderLimitJobProcessObjects> retrieveAndProcessPaperDeliveries(String province, String tenderId, LocalDate deliveryWeek, Map<String, AttributeValue> lastEvaluatedKey, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         var sortkeyPrefix = province + "~";
-        return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek, sortkeyPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
+        return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek, sortkeyPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), null)
                 .flatMap(paperDeliveryPage -> processItems(paperDeliveryPage.items(), tenderId, deliveryWeek, driversTotalCapacity, senderLimitJobProcessObjects)
                         .flatMap(processObjects -> {
                             if (!CollectionUtils.isEmpty(paperDeliveryPage.lastEvaluatedKey())) {

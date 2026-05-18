@@ -57,15 +57,15 @@ class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
 
         paperDeliveryDAO.insertPaperDeliveries(paperDeliveryList).block();
 
-        Page<PaperDelivery> result = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse("2025-04-07"), "RM", null, 5).block();
+        Page<PaperDelivery> result = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse("2025-04-07"), "RM", null, 5, null).block();
         log.info("result: {}", result);
         Assertions.assertNotNull(result);
         Assertions.assertEquals(5, result.items().size());
         Assertions.assertTrue(result.items().stream().allMatch(paperDelivery -> paperDelivery.getPk().equalsIgnoreCase("2025-04-07~" + WorkflowStepEnum.EVALUATE_SENDER_LIMIT)
-         && paperDelivery.getSk().startsWith("RM~") && paperDelivery.getWorkflowStep().equals(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name())));
+                && paperDelivery.getSk().startsWith("RM~") && paperDelivery.getWorkflowStep().equals(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name())));
         Assertions.assertNotNull(result.lastEvaluatedKey());
 
-        Page<PaperDelivery> resultWithLastEvaluated = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse("2025-04-07"), "RM", result.lastEvaluatedKey(), 5).block();
+        Page<PaperDelivery> resultWithLastEvaluated = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse("2025-04-07"), "RM", result.lastEvaluatedKey(), 5, null).block();
         log.info("resultWithLastEvaluated: {}", resultWithLastEvaluated);
         Assertions.assertNotNull(resultWithLastEvaluated);
         Assertions.assertEquals(4, resultWithLastEvaluated.items().size());
@@ -73,7 +73,7 @@ class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
                 && paperDelivery.getSk().startsWith("RM~")));
         Assertions.assertNull(resultWithLastEvaluated.lastEvaluatedKey());
 
-        Page<PaperDelivery> resultForDriveCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, LocalDate.parse("2025-04-07"), "RM", null, 5).block();
+        Page<PaperDelivery> resultForDriveCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, LocalDate.parse("2025-04-07"), "RM", null, 5, null).block();
         log.info("resultForDriveCapacityStep: {}", resultForDriveCapacityStep);
         Assertions.assertNotNull(resultForDriveCapacityStep);
         Assertions.assertEquals(1, resultForDriveCapacityStep.items().size());
@@ -81,12 +81,12 @@ class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
                 && paperDelivery.getSk().startsWith("RM~")));
         Assertions.assertNull(resultForDriveCapacityStep.lastEvaluatedKey());
 
-        Page<PaperDelivery> resultForPrintCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_PRINT_CAPACITY, LocalDate.parse("2025-04-07"), "RM", null, 5).block();
+        Page<PaperDelivery> resultForPrintCapacityStep = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_PRINT_CAPACITY, LocalDate.parse("2025-04-07"), "RM", null, 5, null).block();
         log.info("resultForPrintCapacityStep: {}", resultForPrintCapacityStep);
         Assertions.assertNotNull(resultForPrintCapacityStep);
         Assertions.assertEquals(0, resultForPrintCapacityStep.items().size());
 
-        Page<PaperDelivery> resultForOtherProvince = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse("2025-04-07"), "NA", null, 5).block();
+        Page<PaperDelivery> resultForOtherProvince = paperDeliveryDAO.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse("2025-04-07"), "NA", null, 5, null).block();
         log.info("resultForOtherProvince: {}", resultForOtherProvince);
         Assertions.assertNotNull(resultForOtherProvince);
         Assertions.assertEquals(1, resultForOtherProvince.items().size());
@@ -94,5 +94,60 @@ class PaperDeliveryDaoIT extends BaseTest.WithLocalStack {
                 && paperDelivery.getSk().startsWith("NA~")));
         Assertions.assertNull(resultForOtherProvince.lastEvaluatedKey());
 
+    }
+
+    @Test
+    void transactReorderedDeliveriesTest() {
+        String pk = "2025-04-08~" + WorkflowStepEnum.EVALUATE_SENDER_LIMIT;
+
+        PaperDelivery originalDelivery1 = new PaperDelivery();
+        originalDelivery1.setPk(pk);
+        originalDelivery1.setSk("RM~2025-04-09T00:00:00Z~OLD1");
+        originalDelivery1.setWorkflowStep(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name());
+
+        PaperDelivery originalDelivery2 = new PaperDelivery();
+        originalDelivery2.setPk(pk);
+        originalDelivery2.setSk("RM~2025-04-09T00:01:00Z~OLD2");
+        originalDelivery2.setWorkflowStep(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name());
+
+        paperDeliveryDAO.insertPaperDeliveries(List.of(originalDelivery1, originalDelivery2)).block();
+
+        PaperDelivery reorderedDelivery1 = new PaperDelivery();
+        reorderedDelivery1.setPk(pk);
+        reorderedDelivery1.setSk("RM~2025-04-09T01:00:00Z~NEW1");
+        reorderedDelivery1.setOldSk(originalDelivery1.getSk());
+        reorderedDelivery1.setWorkflowStep(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name());
+
+        PaperDelivery reorderedDelivery2 = new PaperDelivery();
+        reorderedDelivery2.setPk(pk);
+        reorderedDelivery2.setSk("RM~2025-04-09T01:01:00Z~NEW2");
+        reorderedDelivery2.setOldSk(originalDelivery2.getSk());
+        reorderedDelivery2.setWorkflowStep(WorkflowStepEnum.EVALUATE_SENDER_LIMIT.name());
+
+        paperDeliveryDAO.transactReorderedDeliveries(List.of(reorderedDelivery1, reorderedDelivery2)).block();
+
+        Page<PaperDelivery> result = paperDeliveryDAO.retrievePaperDeliveries(
+                WorkflowStepEnum.EVALUATE_SENDER_LIMIT,
+                LocalDate.parse("2025-04-08"),
+                "RM",
+                null,
+                10,
+                null
+        ).block();
+
+        Assertions.assertNotNull(result);
+        Assertions.assertEquals(2, result.items().size());
+
+        Assertions.assertTrue(result.items().stream()
+                .anyMatch(item -> item.getSk().equals(reorderedDelivery1.getSk())));
+
+        Assertions.assertTrue(result.items().stream()
+                .anyMatch(item -> item.getSk().equals(reorderedDelivery2.getSk())));
+
+        Assertions.assertFalse(result.items().stream()
+                .anyMatch(item -> item.getSk().equals(originalDelivery1.getSk())));
+
+        Assertions.assertFalse(result.items().stream()
+                .anyMatch(item -> item.getSk().equals(originalDelivery2.getSk())));
     }
 }

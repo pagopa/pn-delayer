@@ -103,7 +103,7 @@ class EvaluateSenderLimitJobServiceTest {
         Page<PaperDelivery> page = mock(Page.class);
         when(page.items()).thenReturn(deliveries);
         when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
-        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any()))
                 .thenReturn(Mono.just(page));
         when(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(anyList(), any(), any(), any()))
                 .thenReturn(deliveries);
@@ -139,7 +139,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(1, capturedDeliveries.getLast().size());
         verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(2)).insertPaperDeliveries(anyList());
-        verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+        verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
 
     @Test
@@ -166,7 +166,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(page2.items()).thenReturn(deliveries2);
         when(page2.lastEvaluatedKey()).thenReturn(new HashMap<>());
 
-        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any()))
                 .thenReturn(Mono.just(page))
                 .thenReturn(Mono.just(page2));
 
@@ -208,7 +208,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(2, capturedDeliveries.getLast().size());
         verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
-        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
 
     @Test
@@ -239,7 +239,7 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(deliveries)
                 .thenReturn(deliveries2);
 
-        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any()))
                 .thenReturn(Mono.just(page))
                 .thenReturn(Mono.just(page2));
 
@@ -279,7 +279,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(2, capturedDeliveries.getLast().size());
         verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
-        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
 
     @Test
@@ -299,7 +299,7 @@ class EvaluateSenderLimitJobServiceTest {
         Page<PaperDelivery> page = mock(Page.class);
         when(page.items()).thenReturn(deliveries);
         when(page.lastEvaluatedKey()).thenReturn(new HashMap<>());
-        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any()))
                 .thenReturn(Mono.just(page));
         when(deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(any(), any(), any())).thenReturn(deliveries);
 
@@ -337,7 +337,7 @@ class EvaluateSenderLimitJobServiceTest {
         verify(deliveryDriverUtils, times(1)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());
         verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(2)).insertPaperDeliveries(anyList());
-        verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+        verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
 
     @Test
@@ -361,7 +361,7 @@ class EvaluateSenderLimitJobServiceTest {
         Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
         lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_SENDER_LIMIT).build());
         lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
-        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);;
+        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);
 
         List<PaperDelivery> deliveries2 = new ArrayList<>();
         deliveries2.addAll(getPaperDeliveries(true));
@@ -370,7 +370,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(page2.items()).thenReturn(deliveries2);
         when(page2.lastEvaluatedKey()).thenReturn(new HashMap<>());
 
-        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50)))
+        when(paperDeliveryDao.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any()))
                 .thenReturn(Mono.just(page))
                 .thenReturn(Mono.just(page2));
 
@@ -419,7 +419,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(0, capturedDeliveries.getLast().size());
         verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
-        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50));
+        verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
         verify(deliveryDriverUtils, times(5)).retrieveFromCache(anyString());
         verify(deliveryDriverUtils, times(2)).insertInCache(anyList());
         verify(deliveryDriverUtils, times(2)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());

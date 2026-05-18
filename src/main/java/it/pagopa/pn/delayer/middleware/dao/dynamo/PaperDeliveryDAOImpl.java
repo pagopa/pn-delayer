@@ -8,6 +8,7 @@ import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
@@ -37,7 +38,7 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     }
 
     @Override
-    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
+    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit, String indexName) {
         QueryConditional keyCondition = QueryConditional.sortBeginsWith(Key.builder()
                 .partitionValue(String.join("~", deliveryWeek.toString(), workflowStepEnum.name()))
                 .sortValue(sortKeyPrefix)
@@ -51,6 +52,9 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
 
+        if (StringUtils.hasText(indexName)) {
+            return Mono.from(table.index(indexName).query(requestBuilder.build()));
+        }
         return Mono.from(table.query(requestBuilder.build()));
     }
 
@@ -90,5 +94,22 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
                 }
                 return Mono.empty();
             });
+    }
+
+    @Override
+    public Mono<Void> transactReorderedDeliveries(List<PaperDelivery> reorderedDeliveries) {
+        TransactWriteItemsEnhancedRequest.Builder transactWriteItemsBuilder = TransactWriteItemsEnhancedRequest.builder();
+        for (PaperDelivery newDelivery : reorderedDeliveries) {
+            transactWriteItemsBuilder.addPutItem(table, TransactPutItemEnhancedRequest.builder(PaperDelivery.class)
+                    .item(newDelivery)
+                    .build());
+            transactWriteItemsBuilder.addDeleteItem(table, TransactDeleteItemEnhancedRequest.builder()
+                    .key(Key.builder()
+                            .partitionValue(newDelivery.getPk())
+                            .sortValue(newDelivery.getOldSk())
+                            .build())
+                    .build());
+        }
+        return Mono.fromFuture(enhancedAsyncClient.transactWriteItems(transactWriteItemsBuilder.build())).then();
     }
 }

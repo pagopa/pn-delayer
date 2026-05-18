@@ -31,6 +31,10 @@ public class PaperDelivery {
     public static final String COL_DELIVERY_DATE = "deliveryDate";
     public static final String COL_WORKFLOW_STEP = "workflowStep";
     public static final String COL_COMMUNICATION_TYPE = "communicationType";
+    public static final String COL_SENDER_PRIORITY = "senderPriority";
+    public static final String COL_VIRTUAL_NOTIFICATION_SENT_AT = "virtualNotificationSentAt";
+    public static final String COL_OLD_SK = "oldSk";
+    public static final String COL_SENDERPAID_SENTAT = "senderPaIdSentAt";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
@@ -70,6 +74,14 @@ public class PaperDelivery {
     private String workflowStep;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_COMMUNICATION_TYPE)}))
     private String communicationType;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_PRIORITY)}))
+    private Integer senderPriority;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_VIRTUAL_NOTIFICATION_SENT_AT)}))
+    private String virtualNotificationSentAt;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_OLD_SK)}))
+    private String oldSk;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDERPAID_SENTAT)}))
+    private String senderPaIdSentAt;
 
     public PaperDelivery(){}
 
@@ -93,6 +105,10 @@ public class PaperDelivery {
         this.deliveryDate = paperDelivery.getDeliveryDate();
         this.workflowStep = workflowStepEnum.name();
         this.communicationType = paperDelivery.getCommunicationType();
+        this.senderPriority = paperDelivery.getSenderPriority();
+        this.virtualNotificationSentAt = paperDelivery.getVirtualNotificationSentAt();
+        this.oldSk = paperDelivery.getOldSk();
+        this.senderPaIdSentAt = paperDelivery.getSenderPaIdSentAt();
     }
 
     @DynamoDbIgnore
@@ -108,6 +124,7 @@ public class PaperDelivery {
                     String.join("~", String.valueOf(paperDelivery.getPriority()), date, paperDelivery.getRequestId());
             case SENT_TO_PREPARE_PHASE_2 ->
                     String.join("~", paperDelivery.getDeliveryDate(), paperDelivery.getRequestId());
+            default -> throw new IllegalArgumentException("Unsupported workflow step for sk builder: " + workflowStepEnum);
         };
     }
 
