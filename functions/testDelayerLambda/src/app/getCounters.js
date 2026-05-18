@@ -27,6 +27,11 @@ async function getCounters(params = {}) {
         case "EXCLUDE":
             return handleExclude(params);
 
+        case "SENDER_PRIORITY":
+            if(!params.paId)
+            	throw new Error("Required parameter [paId]")
+            return handleSenderPriority(params);
+
         default:
             throw new Error(`Unsupported counterType: ${counterType}`);
     }
@@ -88,6 +93,15 @@ async function handleExclude({ table, deliveryDate, province, productType, lastE
         pk: deliveryDate,
         skPrefix,
         lastEvaluatedKey
+    });
+}
+
+//SENDER_PRIORITY
+async function handleSenderPriority({ table, deliveryDate, paId }) {
+    return executeGet({
+        table,
+        pk: deliveryDate,
+        sk: `SENDER_PRIORITY~${paId}`
     });
 }
 
