@@ -96,7 +96,7 @@ async function updateSenderPriorityCounter(groupedSenderPaIdRecords, batchItemFa
       const priorities = new Set(
         records
           .map(r => r.entity.senderPriority)
-          .filter(p => p !== undefined && p !== null)
+          .filter(p => p !== 0)
       );
       console.log(`Updating sender priority counter for senderPaId: ${senderPaId} with priorities: ${JSON.stringify(Array.from(priorities))}`);
 

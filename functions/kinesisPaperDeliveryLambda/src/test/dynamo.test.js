@@ -275,8 +275,8 @@ describe('updateSenderPriorityCounter', () => {
     it('skips updating when no priorities are present', async () => {
         const groupedSenderPaIdRecords = {
             'sender3': [
-                { entity: { senderPriority: null }, kinesisSeqNumber: 'seq4' },
-                { entity: { senderPriority: undefined }, kinesisSeqNumber: 'seq5' }
+                { entity: { senderPriority: 0 }, kinesisSeqNumber: 'seq4' },
+                { entity: { senderPriority: 0 }, kinesisSeqNumber: 'seq5' }
             ]
         };
         const batchItemFailures = [];
