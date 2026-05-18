@@ -107,9 +107,9 @@ exports.handleEvent = async (event) => {
           type: "DAILY",
         },
       },
-      DailyEnteProvinciaProdotto: {
+      DailySpedizioniEnte: {
         query: await prepareQuery(
-          "DailyEnteProvinciaProdotto",
+          "DailySpedizioniEnte",
           specificDailyDate
         ),
         outputName: specificDailyDate,
@@ -125,7 +125,7 @@ exports.handleEvent = async (event) => {
         outputName: specificMonthlyDate,
         cron: {
           type: "MONTHLY",
-          day: 25
+          day: 25 //Max 25th of the month to avoid issues with months with less than 31 days
         },
       }
     }

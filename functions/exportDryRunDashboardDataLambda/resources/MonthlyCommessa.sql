@@ -2,7 +2,7 @@ WITH date_config AS (
     SELECT 
         -- *** SEZIONE TEST ***
         -- Per testare: decommenta la riga sotto (es. oggi è Aprile, vuoi vedere Giugno? Metti Maggio)
-        -- DATE '2026-03-15' AS execution_date 
+        --DATE '2026-04-25' AS execution_date 
         
         -- Per produzione:
         current_date AS execution_date
@@ -35,18 +35,26 @@ base AS (
     FROM pn_notification_orders_json_view o
     INNER JOIN final_params p ON o.p_year = p.anno_riferimento 
                               AND o.pk = p.pk_riferimento
-    WHERE length(o.sk) - length(replace(o.sk, '~', '')) = 3
+    WHERE (length(o.sk) - length(replace(o.sk, '~', '')) = 3) or (o.sk like '%~digitale~%')
 ),
-sk_complete AS (
+sk_extracted AS (
     SELECT
         split_part(sk, '~', 1) AS senderpaid,
-        split_part(sk, '~', 2) AS prodotto,
-        split_part(sk, '~', 4) AS regione,
+        -- Gestione dinamica del PRODOTTO
+        CASE 
+            WHEN sk LIKE '%~digitale~%' THEN split_part(sk, '~', 3)
+            ELSE split_part(sk, '~', 2)
+        END AS prodotto,
+        -- Gestione dinamica della REGIONE
+        CASE 
+            WHEN sk LIKE '%~digitale~%' THEN null
+            ELSE split_part(sk, '~', 4)
+        END AS regione,
         commessa,
         CAST(p_year || '-' || p_month || '-' || p_day AS DATE) AS data_commessa,
-        format_datetime(CAST(pk AS TIMESTAMP), 'MMMM') AS mese_validita
+        format_datetime(CAST(pk AS TIMESTAMP), 'MMMM') AS mese_validita,
+        rn
     FROM base
-    WHERE rn = 1
 )
 SELECT
     senderpaid,
@@ -55,6 +63,7 @@ SELECT
     data_commessa AS "Data commessa",
     mese_validita AS "Mese validita",
     SUM(commessa) AS totale_volumi
-FROM sk_complete
+FROM sk_extracted
+WHERE rn = 1 
 GROUP BY 1, 2, 3, 4, 5
-ORDER BY senderpaid DESC;
+ORDER BY senderpaid DESC
