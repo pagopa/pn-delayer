@@ -457,7 +457,7 @@ Resources:
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
-        - IndexName: "pk-senderPaId-index"
+        - IndexName: "pk-senderPaIdSentAt-index"
           KeySchema:
             - AttributeName: "pk"
               KeyType: "HASH"

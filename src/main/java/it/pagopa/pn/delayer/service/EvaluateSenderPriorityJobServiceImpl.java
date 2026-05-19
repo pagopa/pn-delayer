@@ -29,13 +29,14 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
         String pk = deliveryWeek + "~EVALUATE_SENDER_LIMIT";
         List<Instant> originalOrderedDates = new ArrayList<>();
         NavigableMap<Integer, List<PaperDelivery>> deliveriesByPriority = new TreeMap<>(Comparator.reverseOrder());
+        String senderPaIdSkPrefix = senderPaId + "~";
 
-        return retrievePendingDeliveriesBySenderWeek(pk, senderPaId, null)
+        return retrievePendingDeliveriesBySenderWeek(pk, senderPaIdSkPrefix, null)
                 .expand(page -> {
                     if (CollectionUtils.isEmpty(page.lastEvaluatedKey())) {
                         return Mono.empty();
                     }
-                    return retrievePendingDeliveriesBySenderWeek(pk, senderPaId, page.lastEvaluatedKey());
+                    return retrievePendingDeliveriesBySenderWeek(pk, senderPaIdSkPrefix, page.lastEvaluatedKey());
                 })
                 .doOnNext(page -> {
                     for (PaperDelivery delivery : page.items()) {
@@ -54,7 +55,7 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
     }
 
     private Mono<Page<PaperDelivery>> retrievePendingDeliveriesBySenderWeek(String pk, String skPrefix, Map<String, AttributeValue> lastEvaluatedKey) {
-        return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(pk.split("~")[0]), skPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), "index");
+        return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(pk.split("~")[0]), skPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), PaperDelivery.PK_SENDERPAID_SENTAT_INDEX);
     }
 
     private List<PaperDelivery> buildReorderedDeliveries(List<Instant> originalOrderedDates, NavigableMap<Integer, List<PaperDelivery>> deliveriesByPriority) {

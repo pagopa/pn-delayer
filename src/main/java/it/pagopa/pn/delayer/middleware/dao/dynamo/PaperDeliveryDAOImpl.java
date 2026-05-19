@@ -100,6 +100,9 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     public Mono<Void> transactReorderedDeliveries(List<PaperDelivery> reorderedDeliveries) {
         TransactWriteItemsEnhancedRequest.Builder transactWriteItemsBuilder = TransactWriteItemsEnhancedRequest.builder();
         for (PaperDelivery newDelivery : reorderedDeliveries) {
+            if (StringUtils.hasText(newDelivery.getSk()) && newDelivery.getSk().equals(newDelivery.getOldSk())) {
+                continue; // nessun cambio reale di key, evita doppia azione sullo stesso item
+            }
             transactWriteItemsBuilder.addPutItem(table, TransactPutItemEnhancedRequest.builder(PaperDelivery.class)
                     .item(newDelivery)
                     .build());

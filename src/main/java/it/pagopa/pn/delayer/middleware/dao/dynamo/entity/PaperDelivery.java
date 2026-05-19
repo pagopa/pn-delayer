@@ -36,7 +36,9 @@ public class PaperDelivery {
     public static final String COL_OLD_SK = "oldSk";
     public static final String COL_SENDERPAID_SENTAT = "senderPaIdSentAt";
 
-    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
+    public static final String PK_SENDERPAID_SENTAT_INDEX = "pk-senderPaIdSentAt-index";
+
+    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK), @DynamoDbSecondaryPartitionKey(indexNames = PK_SENDERPAID_SENTAT_INDEX)}))
     private String pk;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_SK)}))
     private String sk;
@@ -80,7 +82,7 @@ public class PaperDelivery {
     private String virtualNotificationSentAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_OLD_SK)}))
     private String oldSk;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDERPAID_SENTAT)}))
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDERPAID_SENTAT), @DynamoDbSecondarySortKey(indexNames = PK_SENDERPAID_SENTAT_INDEX)}))
     private String senderPaIdSentAt;
 
     public PaperDelivery(){}
