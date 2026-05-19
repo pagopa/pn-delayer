@@ -34,7 +34,9 @@ public class PaperDelivery {
     public static final String COL_SENDER_PRIORITY = "senderPriority";
     public static final String COL_VIRTUAL_NOTIFICATION_SENT_AT = "virtualNotificationSentAt";
 
-    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
+    public static final String DELIVERY_DATE_PA_ID_INDEX = "deliveryDate-paId-index";
+
+    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK), @DynamoDbSecondaryPartitionKey(indexNames = DELIVERY_DATE_PA_ID_INDEX)}))
     private String pk;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_SK)}))
     private String sk;
@@ -48,7 +50,7 @@ public class PaperDelivery {
     private String prepareRequestDate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PRODUCT_TYPE)}))
     private String productType;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_PA_ID)}))
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_PA_ID), @DynamoDbSecondarySortKey(indexNames = DELIVERY_DATE_PA_ID_INDEX)}))
     private String senderPaId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PROVINCE)}))
     private String province;
@@ -99,6 +101,8 @@ public class PaperDelivery {
         this.deliveryDate = paperDelivery.getDeliveryDate();
         this.workflowStep = workflowStepEnum.name();
         this.communicationType = paperDelivery.getCommunicationType();
+        this.senderPriority = paperDelivery.getSenderPriority();
+        this.virtualNotificationSentAt = paperDelivery.getVirtualNotificationSentAt();
     }
 
     @DynamoDbIgnore
