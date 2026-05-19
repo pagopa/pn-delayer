@@ -17,7 +17,8 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     tenderId: payload.tenderId,
     recipientId: payload.recipientId,
     communicationType: payload.communicationType || 'LEGAL',
-    workflowStep: 'EVALUATE_SENDER_LIMIT'
+    workflowStep: 'EVALUATE_SENDER_LIMIT',
+    senderPriority: payload.senderPriority ? payload.senderPriority : 0
   };
 };
 
@@ -56,4 +57,15 @@ const groupRecordsByProductAndProvince = (records) => {
   }, {});
 };
 
-module.exports = { buildPaperDeliveryRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince };
+const groupRecordsBySenderPaId = (records) => {
+  return records.reduce((acc, record) => {
+    const key = record.entity.senderPaId;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(record);
+    return acc;
+  }, {});
+};
+
+module.exports = { buildPaperDeliveryRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince, groupRecordsBySenderPaId };
