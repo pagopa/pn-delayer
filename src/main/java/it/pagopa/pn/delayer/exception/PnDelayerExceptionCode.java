@@ -11,5 +11,6 @@ public class PnDelayerExceptionCode extends PnExceptionsCodes {
     public static final String ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND = "PN_DELAYER_DELIVERY_DRIVER_NOT_FOUND";
     public static final String PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND = "PAPER_DELIVERY_PRIORITY_MAP_NOT_FOUND";
     public static final String PAPER_DELIVERY_PRIORITY_MAP_ERROR = "PAPER_DELIVERY_PRIORITY_MAP_ERROR";
+    public static final String ERROR_CODE_INVALID_PERCENTAGE = "PN_DELAYER_INVALID_PERCENTAGE";
 
 }

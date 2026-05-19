@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.commons.utils.MDCUtils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.exception.InvalidSenderLimitException;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.service.EvaluateDriverCapacityJobService;
 import it.pagopa.pn.delayer.service.EvaluateResidualCapacityJobService;
@@ -140,6 +141,10 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
         } catch (Exception e) {
+            if (e instanceof InvalidSenderLimitException) {
+                log.error("Invalid senderLimit percentage: job will fail without retry", e);
+                return 10;
+            }
             log.error("Error while executing batch", e);
             return 1;
         }
