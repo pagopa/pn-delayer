@@ -227,6 +227,10 @@ Parameters:
     Type: String
     Description: 'VPC Cidr default'
 
+  SenderPriorityJobLogGroup:
+    Type: String
+    Description: 'SenderPriority job log group name'
+
   SenderLimitJobLogGroup:
     Type: String
     Description: 'SenderLimit job log group name'
@@ -846,7 +850,7 @@ Resources:
           ComputeEnvironment: !Ref SenderLimitComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: pn-delayer-sender-limit-job-queue
+      JobQueueName: !Sub '${ProjectName}-delayer-sender-limit-job-queue'
 
   SenderLimitServiceRole:
     Type: AWS::IAM::Role
@@ -931,6 +935,149 @@ Resources:
 
 
   SenderLimitSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Batch Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
+
+  SenderPriorityComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !Ref SenderPriorityServiceRole
+      ComputeEnvironmentName: !Sub '${ProjectName}-delayer-sender-priority-compute-environment'
+      ComputeResources:
+        MaxvCpus: !Ref MaxvCpus
+        Type: !Ref ComputeResourceType
+        SecurityGroupIds:
+          - !Ref SenderPrioritySecurityGroup
+        Subnets: !Split [ ",", !Ref VpcEgressSubnetsIds ]
+      State: ENABLED
+
+  SenderPriorityJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      PropagateTags: true
+      JobDefinitionName: !Sub '${ProjectName}-delayer-sender-priority-job-definition'
+      RetryStrategy:
+        Attempts: 3
+      ContainerProperties:
+        Image: !Ref ContainerImageUri
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+        ResourceRequirements:
+          - Value: !Ref VCPU
+            Type: VCPU
+          - Value: !Ref Memory
+            Type: MEMORY
+        JobRoleArn: !GetAtt "SenderPriorityTaskExecutionRole.Arn"
+        ExecutionRoleArn: !GetAtt "SenderPriorityTaskExecutionRole.Arn"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref "SenderPriorityJobLogGroup"
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: !Sub '${ProjectName}-delayer-sender-priority-job-logs'
+        Environment:
+          - Name: AWS_REGIONCODE
+            Value: !Ref AWS::Region
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT
+            Value: !Ref PaperDeliveryQueryLimit
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME
+            Value: !Ref PaperDeliveryCounterTableName
+          - Name: PN_DELAYER_DAO_PAPERDELIVERYTABLENAME
+            Value: !Ref PaperDeliveryTableName
+          - Name: PN_DELAYER_WORKFLOWSTEP
+            Value: !Ref WorkflowStep
+
+
+      PlatformCapabilities:
+        - FARGATE
+      Tags:
+        Service: Batch
+        Name: JobDefinitionTag
+        Expected: MergeTag
+
+  SenderPriorityJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref SenderPriorityComputeEnvironment
+      State: ENABLED
+      Priority: 1
+      JobQueueName: !Sub '${ProjectName}-delayer-sender-priority-job-queue'
+
+  SenderPriorityServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  SenderPriorityTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-delayer-sender-priority-taskexec-role'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:BatchGetItem
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:TransactWriteItems
+                Resource:
+                  - !Sub "${PaperDeliveryCounterTableArn}"
+                  - !Sub "${PaperDeliveryCounterTableArn}/*"
+                  - !Sub "${PaperDeliveryTableArn}"
+                  - !Sub "${PaperDeliveryTableArn}/*"
+                  - !Sub "${PaperDeliveryCounterMockTableArn}"
+                  - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+                  - !Sub "${PaperDeliveryMockTableArn}"
+                  - !Sub "${PaperDeliveryMockTableArn}/*"
+
+  SenderPrioritySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Batch Security Group
@@ -1034,7 +1181,7 @@ Resources:
           ComputeEnvironment: !Ref ResidualCapacityComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: pn-delayer-residual-capacity-job-queue
+      JobQueueName: !Sub '${ProjectName}-delayer-residual-capacity-job-queue'
 
   ResidualCapacityServiceRole:
     Type: AWS::IAM::Role
@@ -1447,6 +1594,36 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 12 # 1 hour
       Period: 300 # 5 minutes
+      Statistic: Sum
+      Threshold: 1
+
+  SenderPriorityJobErrorFatalLogsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref SenderPriorityJobLogGroup
+      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${ProjectName}-delayer-sender-priority-job-ErrorFatalMetric"
+
+  SenderPriorityErrorFatalLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: SenderPriorityJobErrorFatalLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-delayer-sender-priority-job-ErrorFatalLogs-Alarm"
+      AlarmDescription: "CloudWatch alarm for when LogSaver LogGroup has ERROR or FATAL line."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-delayer-sender-priority-job-ErrorFatalMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
       Statistic: Sum
       Threshold: 1
 

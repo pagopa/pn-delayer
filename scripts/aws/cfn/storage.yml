@@ -558,6 +558,17 @@ Resources:
         DelaySeconds: 1
         VisibilityTimeout: 1800 #30 min
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  PnDelayerSenderPriorityJobLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-delayer-sender-priority-job'
+        LogGroupRetention: !Ref LogRetention
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
         
   PnDelayerSenderLimitJobLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -917,6 +928,9 @@ Outputs:
     Description: "PnDelayerInputs Kinesis stream KMS ARN"
 
   # Log groups
+  SenderPriorityJobLogGroup:
+    Value: !GetAtt PnDelayerSenderPriorityJobLogGroup.Outputs.LogGroupName
+
   SenderLimitJobLogGroup:
     Value: !GetAtt PnDelayerSenderLimitJobLogGroup.Outputs.LogGroupName
 
