@@ -48,10 +48,10 @@ class EvaluateSenderPriorityJobServiceTest {
         when(paperDeliveryUtils.retrievePaperDeliveries(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
-                eq(senderPaId),
+                eq(senderPaId+"~"),
                 isNull(),
                 eq(50),
-                eq("index")
+                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
         )).thenReturn(Mono.empty());
 
         StepVerifier.create(service.startSenderPriorityJob(senderPaId, deliveryWeek))
@@ -194,19 +194,19 @@ class EvaluateSenderPriorityJobServiceTest {
         verify(paperDeliveryUtils, times(1)).retrievePaperDeliveries(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
-                eq(senderPaId),
+                eq(senderPaId+"~"),
                 isNull(),
                 eq(50),
-                eq("index")
+                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
         );
 
         verify(paperDeliveryUtils, times(1)).retrievePaperDeliveries(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
-                eq(senderPaId),
+                eq(senderPaId+"~"),
                 eq(lastEvaluatedKey),
                 eq(50),
-                eq("index")
+                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
         );
     }
 
@@ -285,10 +285,10 @@ class EvaluateSenderPriorityJobServiceTest {
         return when(paperDeliveryUtils.retrievePaperDeliveries(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
-                eq(senderPaId),
+                eq(senderPaId+"~"),
                 lastEvaluatedKey == null ? isNull() : eq(lastEvaluatedKey),
                 eq(50),
-                eq("index")
+                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
         ));
     }
 
