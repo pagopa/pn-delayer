@@ -840,7 +840,7 @@ Resources:
           ComputeEnvironment: !Ref SenderLimitComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: pn-delayer-sender-limit-job-queue
+      JobQueueName: !Sub '${ProjectName}-delayer-sender-limit-job-queue'
 
   SenderLimitServiceRole:
     Type: AWS::IAM::Role
@@ -1003,7 +1003,7 @@ Resources:
           ComputeEnvironment: !Ref SenderPriorityComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: pn-delayer-sender-priority-job-queue
+      JobQueueName: !Sub '${ProjectName}-delayer-sender-priority-job-queue'
 
   SenderPriorityServiceRole:
     Type: AWS::IAM::Role
@@ -1171,7 +1171,7 @@ Resources:
           ComputeEnvironment: !Ref ResidualCapacityComputeEnvironment
       State: ENABLED
       Priority: 1
-      JobQueueName: pn-delayer-residual-capacity-job-queue
+      JobQueueName: !Sub '${ProjectName}-delayer-residual-capacity-job-queue'
 
   ResidualCapacityServiceRole:
     Type: AWS::IAM::Role
