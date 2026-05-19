@@ -617,6 +617,11 @@ Parameters:
     Default: 'cdc_analytics_database'
     Description: 'Name of the Athena database where delayer dry run data is stored'
 
+  AthenaWorkgroupName:
+    Type: String
+    Default: 'primary'
+    Description: 'Name of the Athena workgroup used for delayer dry run queries'
+
   MonthsToRetrieveDataQuery:
     Type: String
     Default: '4'
@@ -766,6 +771,11 @@ Resources:
       JobDefinitionName: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
       RetryStrategy:
         Attempts: 3
+        EvaluateOnExit:
+          - Action: EXIT
+            OnExitCode: "10"
+          - Action: RETRY
+            OnExitCode: "*"
       ContainerProperties:
         Image: !Ref ContainerImageUri
         FargatePlatformConfiguration:
@@ -2829,7 +2839,7 @@ Resources:
         Variables:
           MONITORING_BUCKET_NAME: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
           ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
-          ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
+          ATHENA_WORKGROUP_NAME: !Ref AthenaWorkgroupName
           QUERY_MONTHS: !Ref MonthsToRetrieveDataQuery
       TracingConfig:
         Mode: Active
@@ -2881,7 +2891,7 @@ Resources:
               - glue:GetPartition
               - glue:GetPartitions
             Resource:
-              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdc_analytics_workgroup
+              - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${AthenaWorkgroupName}
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/*
