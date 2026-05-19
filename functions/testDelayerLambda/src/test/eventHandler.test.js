@@ -70,7 +70,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "file.csv"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
-        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length == 2, true);
+        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
     });
 
     it("should batch-write items to DynamoDB with deliveryWeekInput", async () => {
@@ -85,7 +85,7 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk, "2025-08-04~EVALUATE_SENDER_LIMIT");
-        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length == 2, true);
+        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
     });
 
     it("should batch-write items to DynamoDB with custom fileName", async () => {
@@ -99,7 +99,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters", "fileName"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
-        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length == 2, true);
+        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
     });
 
     it("GET_USED_CAPACITY returns the item", async () => {
@@ -1151,7 +1151,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const fakeItem = {
             pk: "2025-11-24",
             sk: "SENDER_PRIORITY~paId1",
-            priorities: [30, 80]
+            priorities: new Set([30, 80])
         };
 
         ddbMock.on(GetCommand).resolves({ Item: fakeItem });

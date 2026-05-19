@@ -28,8 +28,9 @@ async function getCounters(params = {}) {
             return handleExclude(params);
 
         case "SENDER_PRIORITY":
-            if(!params.paId)
-            	throw new Error("Required parameter [paId]")
+            if (!params.paId) {
+                throw new Error("Required parameter [paId]");
+            }
             return handleSenderPriority(params);
 
         default:
