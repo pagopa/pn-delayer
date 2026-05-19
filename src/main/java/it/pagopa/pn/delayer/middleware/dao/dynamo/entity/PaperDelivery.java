@@ -36,9 +36,6 @@ public class PaperDelivery {
     public static final String COL_OLD_SK = "oldSk";
     public static final String COL_SENDERPAID_SENTAT = "senderPaIdSentAt";
 
-    public static final String DELIVERY_DATE_PA_ID_INDEX = "deliveryDate-paId-index";
-
-    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK), @DynamoDbSecondaryPartitionKey(indexNames = DELIVERY_DATE_PA_ID_INDEX)}))
     public static final String PK_SENDERPAID_SENTAT_INDEX = "pk-senderPaIdSentAt-index";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK), @DynamoDbSecondaryPartitionKey(indexNames = PK_SENDERPAID_SENTAT_INDEX)}))
