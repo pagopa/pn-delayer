@@ -107,13 +107,17 @@
         }
       ],
       "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
-      "Next": "Map"
+      "Next": "MapSubmitSenderPriorityJobs"
     },
-    "Map": {
+    "MapSubmitSenderPriorityJobs": {
       "Type": "Map",
+      "MaxConcurrency": 40,
       "ItemsPath": "$.senderPriorities.Items",
       "ItemSelector": {
-        "paId.$": "$$.Map.Item.Value.paId.S"
+        "paId.$": "$$.Map.Item.Value.paId.S",
+        "deliveryWeek.$": "$.deliveryWeek",
+        "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
+        "paperDeliveryTableName.$": "$.paperDeliveryTableName"
       },
       "ItemProcessor": {
         "ProcessorConfig": {
@@ -172,6 +176,7 @@
           "Next": "WorkflowFail"
         }
       ],
+      "ResultPath": null,
       "Next": "retrieveProvince"
     },
     "GetUnifiedDeliveryDriverProvinceParameter": {
