@@ -101,6 +101,8 @@ public class PaperDelivery {
         this.deliveryDate = paperDelivery.getDeliveryDate();
         this.workflowStep = workflowStepEnum.name();
         this.communicationType = paperDelivery.getCommunicationType();
+        this.senderPriority = paperDelivery.getSenderPriority();
+        this.virtualNotificationSentAt = paperDelivery.getVirtualNotificationSentAt();
     }
 
     @DynamoDbIgnore

@@ -213,7 +213,9 @@ Resources:
             unifiedDeliveryDriver:struct<S:string>,
             priority:struct<N:string>,
             deliveryDate:struct<S:string>,
-            workflowStep:struct<S:string>
+            workflowStep:struct<S:string>,
+            senderPriority:struct<N:string>,
+            virtualNotificationSentAt:struct<S:string>
           >
 
   PaperDeliveryDriverUsedCapacitiesDataQualityStack:
