@@ -59,7 +59,12 @@ exports.handleEvent = async (event = {}) => {
 
     try {
         const result = await operation(parameters || []);
-        return { statusCode: 200, body: JSON.stringify(result) };
+        return { statusCode: 200, body: JSON.stringify(result, (key, value) => {
+            if (key === 'priorities' && value instanceof Set) {
+                return Array.from(value);
+            }
+            return value;
+        }) };
     } catch (err) {
         console.error("Operation failed", err);
         return { statusCode: 500, body: JSON.stringify({ message: err.message }) };

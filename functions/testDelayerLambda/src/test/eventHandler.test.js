@@ -19,7 +19,7 @@ process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE = "2025-07-01T08:00:00
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand , CopyObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand } = require("@aws-sdk/client-athena");
-const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
 const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
 const s3Mock = mockClient(S3Client);
@@ -70,20 +70,23 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "file.csv"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
+        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
     });
 
     it("should batch-write items to DynamoDB with deliveryWeekInput", async () => {
-            const csvPath = path.join(__dirname, "sample.csv");
-            const csvData = fs.readFileSync(csvPath, "utf8");
-            s3Mock.on(GetObjectCommand).resolves({
-                Body: Readable.from([csvData])
-            });
-            ddbMock.on(BatchWriteCommand).resolves({});
+        const csvPath = path.join(__dirname, "sample.csv");
+        const csvData = fs.readFileSync(csvPath, "utf8");
+        s3Mock.on(GetObjectCommand).resolves({
+            Body: Readable.from([csvData])
+        });
+        ddbMock.on(BatchWriteCommand).resolves({});
 
-            const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "180000", "2025-08-04"] });
-            assert.strictEqual(result.statusCode, 200);
-            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
-            assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk,"2025-08-04~EVALUATE_SENDER_LIMIT");});
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "180000", "2025-08-04"] });
+        assert.strictEqual(result.statusCode, 200);
+        assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
+        assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk, "2025-08-04~EVALUATE_SENDER_LIMIT");
+        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
+    });
 
     it("should batch-write items to DynamoDB with custom fileName", async () => {
         const csvPath = path.join(__dirname, "sample.csv");
@@ -96,6 +99,7 @@ describe("Lambda Delayer Dispatcher", () => {
         const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters", "fileName"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
+        assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
     });
 
     it("GET_USED_CAPACITY returns the item", async () => {
@@ -1141,6 +1145,65 @@ describe("Lambda Delayer Dispatcher", () => {
       assert.strictEqual(result.statusCode, 500);
       const body = JSON.parse(result.body);
       assert.match(body.message, /province is required/);
+    });
+
+    it("GET_COUNTERS SENDER_PRIORITY record found", async () => {
+        const fakeItem = {
+            pk: "2025-11-24",
+            sk: "SENDER_PRIORITY~paId1",
+            priorities: new Set([30, 80])
+        };
+
+        ddbMock.on(GetCommand).resolves({ Item: fakeItem });
+
+        const result = await handler({
+            operationType: "GET_COUNTERS",
+            parameters: {
+                table: "pn-PaperDeliveryCounters",
+                counterType: "SENDER_PRIORITY",
+                paId: "paId1",
+                deliveryDate: "2025-11-24"
+            }
+        });
+
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.items.length, 1);
+        assert.deepStrictEqual(body.items[0].priorities, [30, 80]);
+        assert.strictEqual(body.items[0].sk, "SENDER_PRIORITY~paId1");
+    });
+
+    it("GET_COUNTERS SENDER_PRIORITY no record", async () => {
+        ddbMock.on(GetCommand).resolves({});
+
+        const result = await handler({
+            operationType: "GET_COUNTERS",
+            parameters: {
+                table: "pn-PaperDeliveryCounters",
+                counterType: "SENDER_PRIORITY",
+                paId: "paId1",
+                deliveryDate: "2025-11-24"
+            }
+        });
+
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.items.length, 0);
+    });
+
+    it("GET_COUNTERS SENDER_PRIORITY paId undefined", async () => {
+        const result = await handler({
+            operationType: "GET_COUNTERS",
+            parameters: {
+                table: "pn-PaperDeliveryCounters",
+                counterType: "SENDER_PRIORITY",
+                deliveryDate: "2025-11-24"
+            }
+        });
+
+        assert.strictEqual(result.statusCode, 500);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.message, "Required parameter [paId]");
     });
 
     it("GET_RESIDUAL_PAPERS returns downloadUrl on success", async () => {

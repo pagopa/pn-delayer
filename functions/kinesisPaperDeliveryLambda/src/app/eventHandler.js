@@ -2,13 +2,15 @@ const { extractKinesisData } = require("./lib/kinesis");
 const {
   batchWritePaperDeliveryRecords,
   updateExcludeCounter,
+  updateSenderPriorityCounter,
   batchWriteKinesisEventRecords,
   batchGetKinesisEventRecords
 } = require("./lib/dynamo");
 const {
   buildPaperDeliveryRecord,
   buildPaperDeliveryKinesisEventRecord,
-  groupRecordsByProductAndProvince
+  groupRecordsByProductAndProvince,
+  groupRecordsBySenderPaId
 } = require("./lib/utils");
 const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
@@ -58,9 +60,11 @@ exports.handleEvent = async (event) => {
   if (paperDeliveryRecords.length > 0) {
     try {
       const groupedProductTypeProvinceRecords = groupRecordsByProductAndProvince(paperDeliveryRecords);
+      const groupedSenderPaIdRecords = groupRecordsBySenderPaId(paperDeliveryRecords);
 
       for (const operation of [
         { func: updateExcludeCounter, data: groupedProductTypeProvinceRecords },
+        { func: updateSenderPriorityCounter, data: groupedSenderPaIdRecords },
         { func: batchWritePaperDeliveryRecords, data: paperDeliveryRecords }
       ]) {
         batchItemFailures = await operation.func(operation.data, batchItemFailures);

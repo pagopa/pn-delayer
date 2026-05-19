@@ -28,7 +28,9 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
       tenderId: item.tenderId,
       recipientId: item.recipientId,
       priority: item.priority,
-      workflowStep: `${step}`
+      workflowStep: `${step}`,
+      senderPriority: item.senderPriority,
+      virtualNotificationSentAt: item.virtualNotificationSentAt
   };
 
   return Object.fromEntries(
