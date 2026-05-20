@@ -45,13 +45,12 @@ class EvaluateSenderPriorityJobServiceTest {
 
     @Test
     void startSenderPriorityJob_withoutDeliveries_shouldCompleteWithoutWriting() {
-        when(paperDeliveryUtils.retrievePaperDeliveries(
+        when(paperDeliveryUtils.retrievePaperDeliveriesToReorder(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
                 eq(senderPaId+"~"),
                 isNull(),
-                eq(50),
-                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
+                eq(50), anyString()
         )).thenReturn(Mono.empty());
 
         StepVerifier.create(service.startSenderPriorityJob(senderPaId, deliveryWeek))
@@ -191,7 +190,7 @@ class EvaluateSenderPriorityJobServiceTest {
         assertEquals("MI~2025-01-08T10:01:00Z~req-3", reordered.getLast().getOldSk());
         assertEquals("2025-01-08T10:02:00Z", reordered.getLast().getVirtualNotificationSentAt());
 
-        verify(paperDeliveryUtils, times(1)).retrievePaperDeliveries(
+        verify(paperDeliveryUtils, times(1)).retrievePaperDeliveriesToReorder(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
                 eq(senderPaId+"~"),
@@ -200,7 +199,7 @@ class EvaluateSenderPriorityJobServiceTest {
                 eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
         );
 
-        verify(paperDeliveryUtils, times(1)).retrievePaperDeliveries(
+        verify(paperDeliveryUtils, times(1)).retrievePaperDeliveriesToReorder(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
                 eq(senderPaId+"~"),
@@ -282,7 +281,7 @@ class EvaluateSenderPriorityJobServiceTest {
     }
 
     private org.mockito.stubbing.OngoingStubbing<Mono<Page<PaperDelivery>>> whenRetrieve(Map<String, AttributeValue> lastEvaluatedKey) {
-        return when(paperDeliveryUtils.retrievePaperDeliveries(
+        return when(paperDeliveryUtils.retrievePaperDeliveriesToReorder(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
                 eq(deliveryWeek),
                 eq(senderPaId+"~"),

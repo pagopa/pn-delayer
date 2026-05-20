@@ -38,12 +38,12 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
                     }
                     return retrievePendingDeliveriesBySenderWeek(pk, senderPaIdSkPrefix, page.lastEvaluatedKey());
                 })
-                .doOnNext(page -> {
-                    for (PaperDelivery delivery : page.items()) {
-                        String sentAt = delivery.getSk().split("~")[1];
-                        originalOrderedDates.add(Instant.parse(sentAt));
-                        deliveriesByPriority.computeIfAbsent(delivery.getSenderPriority(), ignored -> new ArrayList<>()).add(delivery);
-                    }
+                .map(Page::items)
+                .flatMapIterable(items -> items)
+                .doOnNext(delivery -> {
+                    String sentAt = delivery.getSk().split("~")[1];
+                    originalOrderedDates.add(Instant.parse(sentAt));
+                    deliveriesByPriority.computeIfAbsent(delivery.getSenderPriority(), ignored -> new ArrayList<>()).add(delivery);
                 })
                 .then(Mono.defer(() -> {
                     if (originalOrderedDates.isEmpty()) {
@@ -55,7 +55,7 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
     }
 
     private Mono<Page<PaperDelivery>> retrievePendingDeliveriesBySenderWeek(String pk, String skPrefix, Map<String, AttributeValue> lastEvaluatedKey) {
-        return paperDeliveryUtils.retrievePaperDeliveries(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(pk.split("~")[0]), skPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), PaperDelivery.PK_SENDERPAID_SENTAT_INDEX);
+        return paperDeliveryUtils.retrievePaperDeliveriesToReorder(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(pk.split("~")[0]), skPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), PaperDelivery.PK_SENDERPAID_SENTAT_INDEX);
     }
 
     private List<PaperDelivery> buildReorderedDeliveries(List<Instant> originalOrderedDates, NavigableMap<Integer, List<PaperDelivery>> deliveriesByPriority) {

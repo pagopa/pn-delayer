@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 
 import static it.pagopa.pn.delayer.exception.PnDelayerExceptionCode.ERROR_CODE_DELIVERY_DRIVER_NOT_FOUND;
 import static it.pagopa.pn.delayer.model.CommunicationType.LEGAL;
+import static it.pagopa.pn.delayer.model.WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY;
 
 @Component
 @Slf4j
@@ -114,7 +115,11 @@ public class DeliveryDriverUtils {
                 .orElse(Collections.max(priorityMap.keySet()));
     }
 
-    public Mono<Tuple2<Integer, Integer>> retrieveDeclaredAndUsedCapacity(String geoKey, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {
+    public Mono<Tuple2<Integer, Integer>> retrieveDeclaredAndUsedCapacity(WorkflowStepEnum workflowStepEnum, String geoKey, String unifiedDeliveryDriver, String tenderId, LocalDate deliveryWeek) {
+        if(EVALUATE_DRIVER_CAPACITY.equals(workflowStepEnum)) {
+            return paperDeliveryDriverCapacitiesDAO.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryWeek)
+                    .map(capacity -> Tuples.of(capacity, 0));
+        }
         return paperDeliveryUsedCapacityDAO.get(unifiedDeliveryDriver, geoKey, deliveryWeek)
                 .switchIfEmpty(Mono.defer(() -> {
                     log.info("No used capacities found for unifiedDeliveryDriver={}, geoKey={}, deliveryWeek={}, retrieving declared capacity", unifiedDeliveryDriver, geoKey, deliveryWeek);

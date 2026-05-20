@@ -69,6 +69,7 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     }
 
     private static final int MAX_BATCH_WRITE_RETRIES = 10;
+    private static final int MAX_TRANSACT_WRITE_ITEMS_RETRIES = 10;
 
     private Mono<Void> insertWithRetry(List<PaperDelivery> paperDeliveriesChunk, int retriesLeft) {
         BatchWriteItemEnhancedRequest.Builder batchBuilder = BatchWriteItemEnhancedRequest.builder();
@@ -98,21 +99,30 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
 
     @Override
     public Mono<Void> transactReorderedDeliveries(List<PaperDelivery> reorderedDeliveries) {
+        return transactWithRetry(reorderedDeliveries, MAX_BATCH_WRITE_RETRIES);
+    }
+
+    public Mono<Void> transactWithRetry(List<PaperDelivery> reorderedDeliveries, int retriesLeft) {
         TransactWriteItemsEnhancedRequest.Builder transactWriteItemsBuilder = TransactWriteItemsEnhancedRequest.builder();
         for (PaperDelivery newDelivery : reorderedDeliveries) {
-            if (StringUtils.hasText(newDelivery.getSk()) && newDelivery.getSk().equals(newDelivery.getOldSk())) {
-                continue; // nessun cambio reale di key, evita doppia azione sullo stesso item
-            }
             transactWriteItemsBuilder.addPutItem(table, TransactPutItemEnhancedRequest.builder(PaperDelivery.class)
                     .item(newDelivery)
                     .build());
-            transactWriteItemsBuilder.addDeleteItem(table, TransactDeleteItemEnhancedRequest.builder()
-                    .key(Key.builder()
-                            .partitionValue(newDelivery.getPk())
-                            .sortValue(newDelivery.getOldSk())
-                            .build())
+            transactWriteItemsBuilder.addDeleteItem(table, Key.builder()
+                    .partitionValue(newDelivery.getPk())
+                    .sortValue(newDelivery.getOldSk())
                     .build());
         }
-        return Mono.fromFuture(enhancedAsyncClient.transactWriteItems(transactWriteItemsBuilder.build())).then();
+        return Mono.fromFuture(enhancedAsyncClient.transactWriteItems(transactWriteItemsBuilder.build()))
+                .onErrorResume(error -> {
+                    if (retriesLeft > 1) {
+                        log.info("Retrying transactWriteItems for {} PaperDelivery items, {} retries left", reorderedDeliveries.size(), retriesLeft - 1, error);
+                        return Mono.delay(Duration.ofSeconds(3)).then(Mono.defer(() -> transactWithRetry(reorderedDeliveries, retriesLeft - 1)));
+                    } else {
+                        log.error("Failed transactWriteItems for PaperDelivery after {} attempts. Items: {}", MAX_TRANSACT_WRITE_ITEMS_RETRIES, reorderedDeliveries, error);
+                        return Mono.error(new PnInternalException("Error during transactWriteItems PaperDelivery after " + MAX_TRANSACT_WRITE_ITEMS_RETRIES + " attempts", ERROR_CODE_INSERT_PAPER_DELIVERY_ENTITY
+                        ));  }
+                })
+                .then();
     }
 }
