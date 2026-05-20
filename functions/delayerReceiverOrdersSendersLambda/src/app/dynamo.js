@@ -50,7 +50,7 @@ async function existsSenderLimitByFileKey(fileKey) {
  * @param {Array<object>} estimates result of calculateWeeklyEstimates
  * @param fileKey fileKey of Safe Storage
  */
-async function persistWeeklyEstimates(estimates, fileKey) {
+async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
     // Separate puts vs updates
     const fulls          = estimates.filter(e => e.weekType === 'FULL');
     const partialStarts  = estimates.filter(e => e.weekType === 'PARTIAL_START');
@@ -78,6 +78,7 @@ async function persistWeeklyEstimates(estimates, fileKey) {
                       productType: item.productType,
                       province: item.province,
                       fileKey: fileKey,
+                      archiveFileKey: archiveFileKey,
                       ttl: ttlValue
                   }
               }
@@ -89,16 +90,16 @@ async function persistWeeklyEstimates(estimates, fileKey) {
 
     // === PARTIAL_START: usa secondWeekWeeklyEstimate ===
     for (const p of partialStarts) {
-      await upsertPartial(p, ttlValue, fileKey, true);
+      await upsertPartial(p, ttlValue, fileKey, archiveFileKey, true);
     }
 
     // === PARTIAL_END: usa firstWeekWeeklyEstimate ===
     for (const p of partialEnds) {
-      await upsertPartial(p, ttlValue, fileKey, false);
+      await upsertPartial(p, ttlValue, fileKey, archiveFileKey, false);
     }
 
   for (const item of estimates) {
-    await persistSumEstimateCounter(item);
+    await persistSumEstimateCounter(item, archiveFileKey);
   }
 }
 
@@ -127,7 +128,7 @@ async function persistWeeklyEstimates(estimates, fileKey) {
    * - secondWeekWeeklyEstimate = stima per 5 giorni di Luglio
    * - firstWeekWeeklyEstimate = stima per 2 giorni di Giugno
   */
-  async function upsertPartial(p, ttlValue, fileKey, isStartMonth) {
+  async function upsertPartial(p, ttlValue, fileKey, archiveFileKey, isStartMonth) {
       const pk = `${p.paId}~${p.productType}~${p.province}`;
       const portionAttr = isStartMonth ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
       const otherPortionAttr = isStartMonth ? 'firstWeekWeeklyEstimate' : 'secondWeekWeeklyEstimate';
@@ -143,6 +144,9 @@ async function persistWeeklyEstimates(estimates, fileKey) {
         isStartMonth
             ? 'fileKey = if_not_exists(fileKey, :fk),'
             : 'fileKey = :fk,',
+        isStartMonth
+            ? 'archiveFileKey = if_not_exists(archiveFileKey, :fk),'
+            : 'archiveFileKey = :afk,',
         '#ttl             = if_not_exists(#ttl, :ttl) '
       ];
 
@@ -155,7 +159,8 @@ async function persistWeeklyEstimates(estimates, fileKey) {
         ':pr': p.province,
         ':pa': p.paId,
         ':ttl': ttlValue,
-        ':fk': fileKey
+        ':fk': fileKey,
+        ':afk': archiveFileKey
       };
 
       await client.send(new UpdateCommand({
@@ -172,13 +177,13 @@ async function persistWeeklyEstimates(estimates, fileKey) {
     }
 
 
-async function persistSumEstimateCounter(item) {
+async function persistSumEstimateCounter(item, archiveFileKey) {
   if (item.weekType === 'PARTIAL_START' || item.weekType === 'PARTIAL_END') {
-    await upsertPartialSumEstimateCounter(item);
+    await upsertPartialSumEstimateCounter(item, archiveFileKey);
     return;
   }
 
-  await upsertFullSumEstimateCounter(item);
+  await upsertFullSumEstimateCounter(item, archiveFileKey);
 }
 
 /**
@@ -219,7 +224,7 @@ async function persistSumEstimateCounter(item) {
  * @param {string|number} item.archiveProcessedAt - Versione dello ZIP
  * @param {string|number} item.lastUpdate - Timestamp di aggiornamento
  */
-async function upsertFullSumEstimateCounter(item) {
+async function upsertFullSumEstimateCounter(item, archiveFileKey) {
   const key = {
     pk: item.deliveryDate,
     sk: buildSumEstimateCounterSk(item)
@@ -235,6 +240,7 @@ async function upsertFullSumEstimateCounter(item) {
           fullWeekArchiveProcessedAt = :archiveProcessedAt,
           productType = :productType,
           province = :province
+          archiveFileKey = :archiveFileKey
       `,
       ConditionExpression: `
         attribute_not_exists(fullWeekArchiveProcessedAt)
@@ -244,7 +250,8 @@ async function upsertFullSumEstimateCounter(item) {
         ':zero': 0,
         ':archiveProcessedAt': item.archiveProcessedAt,
         ':productType': item.productType,
-        ':province': item.province
+        ':province': item.province,
+        ':archiveFileKey': archiveFileKey
       }
     }));
   } catch (err) {
@@ -326,7 +333,7 @@ async function upsertFullSumEstimateCounter(item) {
  * @param {string|number} item.archiveProcessedAt - Versione dello ZIP
  * @param {string|number} item.lastUpdate - Timestamp di aggiornamento
  */
-async function upsertPartialSumEstimateCounter(item) {
+async function upsertPartialSumEstimateCounter(item, archiveFileKey) {
   const key = {
     pk: item.deliveryDate,
     sk: buildSumEstimateCounterSk(item)
@@ -361,7 +368,8 @@ async function upsertPartialSumEstimateCounter(item) {
         '#numberOfShipments = if_not_exists(#otherPortion, :zero),',
         '#portionArchive = :archiveProcessedAt,',
         'productType = :productType,',
-        'province = :province'
+        'province = :province',
+        'archiveFileKey = :archiveFileKey'
       ].join(' '),
       ConditionExpression: [
         'attribute_not_exists(#portionArchive)',
@@ -377,7 +385,8 @@ async function upsertPartialSumEstimateCounter(item) {
         ':zero': 0,
         ':archiveProcessedAt': item.archiveProcessedAt,
         ':productType': item.productType,
-        ':province': item.province
+        ':province': item.province,
+        ':archiveFileKey': archiveFileKey
       }
     }));
   } catch (err) {

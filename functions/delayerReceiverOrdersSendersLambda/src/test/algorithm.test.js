@@ -49,7 +49,8 @@ describe('calculateWeeklyEstimates', () => {
         const sampleCommessaPath = path.join(__dirname, "Modulo_Commessa_v4.json");
         const sampleCommessa = JSON.parse(fs.readFileSync(sampleCommessaPath, "utf8"));
         const fileKey = 'fileKeySafe';
-        const estimates = await calculateWeeklyEstimates(sampleCommessa, provider, fileKey);
+        const archiveFileKey = 'archiveFileKeySafe';
+        const estimates = await calculateWeeklyEstimates(sampleCommessa, provider, fileKey, archiveFileKey);
         // February 2025 starts on Saturday, so first Monday is 2025-02-03
         // expect 4 Mondays + previous partial week = 5 weeks
         const weeksInMonth = 4;
