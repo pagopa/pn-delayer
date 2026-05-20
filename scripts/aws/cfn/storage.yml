@@ -441,7 +441,7 @@ Resources:
           AttributeType: "S"
         - AttributeName: "createdAt"
           AttributeType: "S"
-        - AttributeName: "senderPaIdSentAt"
+        - AttributeName: "senderPaIdOriginalSentAt"
           AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
@@ -457,11 +457,11 @@ Resources:
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
-        - IndexName: "pk-senderPaIdSentAt-index"
+        - IndexName: "pk-senderPaIdOriginalSentAt-index"
           KeySchema:
             - AttributeName: "pk"
               KeyType: "HASH"
-            - AttributeName: "senderPaIdSentAt"
+            - AttributeName: "senderPaIdOriginalSentAt"
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"

@@ -41,7 +41,7 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
                 .map(Page::items)
                 .flatMapIterable(items -> items)
                 .doOnNext(delivery -> {
-                    String sentAt = delivery.getSk().split("~")[1];
+                    String sentAt = delivery.getSenderPaIdOriginalSentAt().split("~")[1];
                     originalOrderedDates.add(Instant.parse(sentAt));
                     deliveriesByPriority.computeIfAbsent(delivery.getSenderPriority(), ignored -> new ArrayList<>()).add(delivery);
                 })
@@ -55,7 +55,7 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
     }
 
     private Mono<Page<PaperDelivery>> retrievePendingDeliveriesBySenderWeek(String pk, String skPrefix, Map<String, AttributeValue> lastEvaluatedKey) {
-        return paperDeliveryUtils.retrievePaperDeliveriesToReorder(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(pk.split("~")[0]), skPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), PaperDelivery.PK_SENDERPAID_SENTAT_INDEX);
+        return paperDeliveryUtils.retrievePaperDeliveriesToReorder(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(pk.split("~")[0]), skPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), PaperDelivery.PK_SENDERPAID_ORIGINALSENTAT_INDEX);
     }
 
     private List<PaperDelivery> buildReorderedDeliveries(List<Instant> originalOrderedDates, NavigableMap<Integer, List<PaperDelivery>> deliveriesByPriority) {

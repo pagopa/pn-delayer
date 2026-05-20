@@ -196,7 +196,7 @@ class EvaluateSenderPriorityJobServiceTest {
                 eq(senderPaId+"~"),
                 isNull(),
                 eq(50),
-                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
+                eq(PaperDelivery.PK_SENDERPAID_ORIGINALSENTAT_INDEX)
         );
 
         verify(paperDeliveryUtils, times(1)).retrievePaperDeliveriesToReorder(
@@ -205,7 +205,7 @@ class EvaluateSenderPriorityJobServiceTest {
                 eq(senderPaId+"~"),
                 eq(lastEvaluatedKey),
                 eq(50),
-                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
+                eq(PaperDelivery.PK_SENDERPAID_ORIGINALSENTAT_INDEX)
         );
     }
 
@@ -287,7 +287,7 @@ class EvaluateSenderPriorityJobServiceTest {
                 eq(senderPaId+"~"),
                 lastEvaluatedKey == null ? isNull() : eq(lastEvaluatedKey),
                 eq(50),
-                eq(PaperDelivery.PK_SENDERPAID_SENTAT_INDEX)
+                eq(PaperDelivery.PK_SENDERPAID_ORIGINALSENTAT_INDEX)
         ));
     }
 
@@ -304,7 +304,7 @@ class EvaluateSenderPriorityJobServiceTest {
         paperDelivery.setSk(sk);
         paperDelivery.setRequestId(requestId);
         paperDelivery.setSenderPaId(senderPaId);
-        paperDelivery.setSenderPaIdSentAt(senderPaId + sentAt);
+        paperDelivery.setSenderPaIdOriginalSentAt(senderPaId + "~" + sentAt);
         paperDelivery.setSenderPriority(senderPriority);
         paperDelivery.setProvince(province);
         paperDelivery.setDeliveryDate(deliveryWeek.toString());
