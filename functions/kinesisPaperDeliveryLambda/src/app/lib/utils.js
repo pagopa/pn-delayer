@@ -61,6 +61,9 @@ const groupRecordsByProductAndProvince = (records) => {
 const groupRecordsBySenderPaId = (records) => {
   return records.reduce((acc, record) => {
     const key = record.entity.senderPaId;
+    if (!key) {
+      return acc;
+    }
     if (!acc[key]) {
       acc[key] = [];
     }

@@ -231,6 +231,14 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       expect(result['sender1']).to.deep.equal([r1, r2]);
       expect(result['sender2']).to.deep.equal([r3]);
     });
+
+    it('ignores records without a senderPaId', () => {
+        const r1 = { entity: { senderPaId: 'sender1' }, kinesisSeqNumber: 'seq1' };
+        const r2 = { entity: { }, kinesisSeqNumber: 'seq2' };
+        const result = groupRecordsBySenderPaId([r1, r2]);
+        expect(Object.keys(result)).to.have.lengthOf(1);
+        expect(result['sender1']).to.deep.equal([r1]);
+    });
   });
 
 });
