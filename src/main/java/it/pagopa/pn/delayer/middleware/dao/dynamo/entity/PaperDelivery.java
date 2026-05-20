@@ -127,6 +127,8 @@ public class PaperDelivery {
     public static String buildSortKey(WorkflowStepEnum workflowStepEnum, PaperDelivery paperDelivery, String date) {
 
         return switch (workflowStepEnum) {
+            case EVALUATE_SENDER_PRIORITY ->
+                    throw new IllegalArgumentException(String.format("Unsupported workflow step for sk builder: %s", workflowStepEnum));
             case EVALUATE_SENDER_LIMIT ->
                     String.join("~", paperDelivery.getProvince(), date, paperDelivery.getRequestId());
             case EVALUATE_DRIVER_CAPACITY, EVALUATE_RESIDUAL_CAPACITY ->
@@ -135,7 +137,6 @@ public class PaperDelivery {
                     String.join("~", String.valueOf(paperDelivery.getPriority()), date, paperDelivery.getRequestId());
             case SENT_TO_PREPARE_PHASE_2 ->
                     String.join("~", paperDelivery.getDeliveryDate(), paperDelivery.getRequestId());
-            default -> throw new IllegalArgumentException("Unsupported workflow step for sk builder: " + workflowStepEnum);
         };
     }
 

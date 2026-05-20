@@ -5,6 +5,7 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.utils.PaperDeliveryUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
@@ -18,6 +19,7 @@ import java.util.*;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPriorityJobService{
 
     private final PaperDeliveryUtils paperDeliveryUtils;
@@ -78,6 +80,9 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
         copy.setOldSk(delivery.getSk());
         copy.setSk(buildFinalSortKey(delivery.getProvince(), effectiveSortEpochMillis, delivery.getRequestId()));
         copy.setVirtualNotificationSentAt(effectiveSortEpochMillis.toString());
+
+        log.info("Reordering delivery with requestId {}: old sk was {}, new sk is {}", delivery.getRequestId(), copy.getOldSk(), copy.getSk());
+
         return copy;
     }
 

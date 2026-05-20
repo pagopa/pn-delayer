@@ -293,6 +293,12 @@ public class PaperDeliveryUtils {
         List<PaperDelivery> filteredReordered = reorderedDeliveries.stream()
                 .filter(newDelivery -> StringUtils.hasText(newDelivery.getSk()) && !newDelivery.getSk().equals(newDelivery.getOldSk()))
                 .toList();
+
+        if(CollectionUtils.isEmpty(filteredReordered)) {
+            log.debug("No deliveries to reorder after filtering, skipping transaction");
+            return Mono.empty();
+        }
+
         return paperDeliveryDAO.transactReorderedDeliveries(filteredReordered);
     }
 

@@ -280,6 +280,56 @@ class EvaluateSenderPriorityJobServiceTest {
         verify(paperDeliveryUtils, times(2)).transactReorderedDeliveries(anyList());
     }
 
+    @Test
+    void startSenderPriorityJob_alreadyReordered_shouldUseOriginalDatesFromSenderPaIdSentAt() {
+        PaperDelivery lowPriority = delivery(
+                "req-low",
+                0,
+                "RM~2025-01-06T10:01:00Z~req-low",
+                "2025-01-03T10:00:00Z",
+                "RM"
+        );
+        PaperDelivery mediumPriority = delivery(
+                "req-medium",
+                50,
+                "MI~2025-01-05T10:02:00Z~req-medium",
+                "2025-01-05T10:02:00Z",
+                "MI"
+        );
+        PaperDelivery highPriority = delivery(
+                "req-high",
+                100,
+                "MI~2025-01-03T10:00:00Z~req-high",
+                "2025-01-06T10:01:00Z",
+                "MI"
+        );
+
+        Page<PaperDelivery> page = page(
+                List.of(lowPriority, mediumPriority, highPriority),
+                Collections.emptyMap()
+        );
+
+        whenRetrieve(null).thenReturn(Mono.just(page));
+
+        ArgumentCaptor<List<PaperDelivery>> captor = ArgumentCaptor.forClass(List.class);
+        when(paperDeliveryUtils.transactReorderedDeliveries(captor.capture()))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(service.startSenderPriorityJob(senderPaId, deliveryWeek))
+                .verifyComplete();
+
+        List<PaperDelivery> reordered = captor.getValue();
+
+        assertEquals("req-high", reordered.getFirst().getRequestId());
+        assertEquals("MI~2025-01-03T10:00:00Z~req-high", reordered.getFirst().getSk());
+
+        assertEquals("req-medium", reordered.get(1).getRequestId());
+        assertEquals("MI~2025-01-05T10:02:00Z~req-medium", reordered.get(1).getSk());
+
+        assertEquals("req-low", reordered.getLast().getRequestId());
+        assertEquals("RM~2025-01-06T10:01:00Z~req-low", reordered.getLast().getSk());
+    }
+
     private org.mockito.stubbing.OngoingStubbing<Mono<Page<PaperDelivery>>> whenRetrieve(Map<String, AttributeValue> lastEvaluatedKey) {
         return when(paperDeliveryUtils.retrievePaperDeliveriesToReorder(
                 eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT),
