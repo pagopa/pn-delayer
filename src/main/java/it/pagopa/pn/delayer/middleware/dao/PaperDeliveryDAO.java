@@ -12,7 +12,9 @@ import java.util.Map;
 
 public interface PaperDeliveryDAO {
 
-    Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit);
+    Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit, String indexName);
 
     Mono<Void> insertPaperDeliveries(List<PaperDelivery> paperDeliveriesChunk);
+
+    Mono<Void> transactReorderedDeliveries(List<PaperDelivery> paperDeliveriesChunk);
 }
