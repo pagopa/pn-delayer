@@ -8,6 +8,7 @@ import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
@@ -37,7 +38,7 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     }
 
     @Override
-    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit) {
+    public Mono<Page<PaperDelivery>> retrievePaperDeliveries(WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String sortKeyPrefix, Map<String, AttributeValue> lastEvaluatedKey, Integer queryLimit, String indexName) {
         QueryConditional keyCondition = QueryConditional.sortBeginsWith(Key.builder()
                 .partitionValue(String.join("~", deliveryWeek.toString(), workflowStepEnum.name()))
                 .sortValue(sortKeyPrefix)
@@ -51,6 +52,9 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
 
+        if (StringUtils.hasText(indexName)) {
+            return Mono.from(table.index(indexName).query(requestBuilder.build()));
+        }
         return Mono.from(table.query(requestBuilder.build()));
     }
 
@@ -65,6 +69,7 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
     }
 
     private static final int MAX_BATCH_WRITE_RETRIES = 10;
+    private static final int MAX_TRANSACT_WRITE_ITEMS_RETRIES = 10;
 
     private Mono<Void> insertWithRetry(List<PaperDelivery> paperDeliveriesChunk, int retriesLeft) {
         BatchWriteItemEnhancedRequest.Builder batchBuilder = BatchWriteItemEnhancedRequest.builder();
@@ -90,5 +95,34 @@ public class PaperDeliveryDAOImpl implements PaperDeliveryDAO {
                 }
                 return Mono.empty();
             });
+    }
+
+    @Override
+    public Mono<Void> transactReorderedDeliveries(List<PaperDelivery> reorderedDeliveries) {
+        return transactWithRetry(reorderedDeliveries, MAX_BATCH_WRITE_RETRIES);
+    }
+
+    public Mono<Void> transactWithRetry(List<PaperDelivery> reorderedDeliveries, int retriesLeft) {
+        TransactWriteItemsEnhancedRequest.Builder transactWriteItemsBuilder = TransactWriteItemsEnhancedRequest.builder();
+        for (PaperDelivery newDelivery : reorderedDeliveries) {
+            transactWriteItemsBuilder.addPutItem(table, TransactPutItemEnhancedRequest.builder(PaperDelivery.class)
+                    .item(newDelivery)
+                    .build());
+            transactWriteItemsBuilder.addDeleteItem(table, Key.builder()
+                    .partitionValue(newDelivery.getPk())
+                    .sortValue(newDelivery.getOldSk())
+                    .build());
+        }
+        return Mono.fromFuture(enhancedAsyncClient.transactWriteItems(transactWriteItemsBuilder.build()))
+                .onErrorResume(error -> {
+                    if (retriesLeft > 1) {
+                        log.info("Retrying transactWriteItems for {} PaperDelivery items, {} retries left", reorderedDeliveries.size(), retriesLeft - 1, error);
+                        return Mono.delay(Duration.ofSeconds(3)).then(Mono.defer(() -> transactWithRetry(reorderedDeliveries, retriesLeft - 1)));
+                    } else {
+                        log.error("Failed transactWriteItems for PaperDelivery after {} attempts. Items: {}", MAX_TRANSACT_WRITE_ITEMS_RETRIES, reorderedDeliveries, error);
+                        return Mono.error(new PnInternalException("Error during transactWriteItems PaperDelivery after " + MAX_TRANSACT_WRITE_ITEMS_RETRIES + " attempts", ERROR_CODE_INSERT_PAPER_DELIVERY_ENTITY
+                        ));  }
+                })
+                .then();
     }
 }

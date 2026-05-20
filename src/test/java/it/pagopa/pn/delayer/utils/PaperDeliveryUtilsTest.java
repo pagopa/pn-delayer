@@ -64,10 +64,10 @@ public class PaperDeliveryUtilsTest {
         LocalDate deliveryWeek = LocalDate.now();
         String tenderId = "tender1";
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(anyString(), anyString(), anyString(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),anyString(), anyString(), anyString(), any()))
                 .thenReturn(Mono.just(provinceCapacities));
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt()))
+        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt(), any()))
                 .thenReturn(Mono.just(Page.create(List.of(createPaperDelivery("AR", "00179", province, "senderPaId1", 1),
                         createPaperDelivery("AR", "00178", province, "senderPaId2", 1)))));
 
@@ -87,10 +87,10 @@ public class PaperDeliveryUtilsTest {
         LocalDate deliveryWeek = LocalDate.now();
         String tenderId = "tender1";
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(anyString(), anyString(), anyString(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),anyString(), anyString(), anyString(), any()))
                 .thenReturn(Mono.just(provinceCapacities));
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt()))
+        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt(), any()))
                 .thenReturn(Mono.just(Page.create(List.of(createPaperDelivery("AR", "00179", province, "senderPaId1", 1),
                         createPaperDelivery("AR", "00178", province, "senderPaId2", 1)))));
 
@@ -110,7 +110,7 @@ public class PaperDeliveryUtilsTest {
         Map<String, AttributeValue> lastEvaluatedKey = Map.of();
         int queryLimit = 10;
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt()))
+        when(paperDeliveryDAO.retrievePaperDeliveries(any(), any(), anyString(), any(), anyInt(), any()))
                 .thenReturn(Mono.just(Page.create(List.of())));
 
         StepVerifier.create(paperDeliveryUtils.retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, lastEvaluatedKey, queryLimit))
@@ -145,7 +145,7 @@ public class PaperDeliveryUtilsTest {
         String tenderId = "tender1";
 
         // Province capacity = 0 → triggers sendToNextWeek path
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(10, 10)));
 
         // Build 3 pages with lastEvaluatedKey chaining
@@ -172,19 +172,19 @@ public class PaperDeliveryUtilsTest {
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                argThat(map -> map != null && map.isEmpty()), eq(10)))
+                argThat(map -> map != null && map.isEmpty()), eq(10),any()))
                 .thenReturn(Mono.just(page1));
 
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                eq(key1), eq(10)))
+                eq(key1), eq(10),any()))
                 .thenReturn(Mono.just(page2));
 
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                eq(key2), eq(10)))
+                eq(key2), eq(10),any()))
                 .thenReturn(Mono.just(page3));
 
         when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
@@ -198,7 +198,7 @@ public class PaperDeliveryUtilsTest {
         verify(paperDeliveryDAO, times(3)).retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                any(), eq(10));
+                any(), eq(10),any());
 
         // insertPaperDeliveries called 3 times (one insert per page chunk)
         verify(paperDeliveryDAO, times(3)).insertPaperDeliveries(anyList());
@@ -214,14 +214,14 @@ public class PaperDeliveryUtilsTest {
         String tenderId = "tender1";
 
         // Province: declared=3, used=0 → residual=3
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(3, 0)));
 
         // CAP capacity: enough for all items
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00184"), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(5, 0)))
                 .thenReturn(Mono.just(Tuples.of(5, 0)));
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(1, 1)));
 
         // Page 1: 2 items, has more pages
@@ -270,21 +270,21 @@ public class PaperDeliveryUtilsTest {
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                argThat(map -> map != null && map.isEmpty()), eq(3)))
+                argThat(map -> map != null && map.isEmpty()), eq(3), any()))
                 .thenReturn(Mono.just(page1));
 
         // Page 2 returned for queryLimit=min(2,10)=2 (residual shrinks after page1)
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                eq(key1), anyInt()))
+                eq(key1), anyInt(), any()))
                 .thenReturn(Mono.just(page2));
 
         // Last page for sendToNextWeek
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                eq(key2), eq(10)))
+                eq(key2), eq(10),any()))
                 .thenReturn(Mono.just(lastPage));
 
         ArgumentCaptor<List<PaperDelivery>> insertCaptor = ArgumentCaptor.forClass(List.class);
@@ -300,7 +300,7 @@ public class PaperDeliveryUtilsTest {
         verify(paperDeliveryDAO, atLeast(2)).retrievePaperDeliveries(
                 eq(EVALUATE_DRIVER_CAPACITY), any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
-                any(), anyInt());
+                any(), anyInt(), any());
 
         // insertPaperDeliveries called multiple times (chunks from nextStep + nextWeek)
         verify(paperDeliveryDAO, atLeast(2)).insertPaperDeliveries(anyList());

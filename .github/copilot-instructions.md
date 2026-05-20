@@ -37,12 +37,15 @@ The end-to-end scheduling flow is:
    - the other Lambdas in `functions/` handle surrounding orchestration, cancellation, export, and test support
 2. The Spring app starts at `DelayerApplication`, but the real entrypoint is `PaperDeliveryJobRunner`, a `CommandLineRunner` active outside the `test` profile.
 3. `PaperDeliveryJobRunner` dispatches exactly one batch step based on `pn.delayer.workflow-step` / `PN_DELAYER_WORKFLOWSTEP`:
+   - `EVALUATE_SENDER_PRIORITY`
    - `EVALUATE_SENDER_LIMIT`
    - `EVALUATE_DRIVER_CAPACITY`
    - `EVALUATE_RESIDUAL_CAPACITY`
-4. `EvaluateSenderLimitJobServiceImpl` enriches deliveries with priority and unified driver information, excludes RS and second attempts from sender-limit checks, evaluates sender quotas, and writes new `PaperDelivery` rows for the next workflow step.
-5. `EvaluateDriverCapacityJobServiceImpl` and `EvaluateResidualCapacityJobServiceImpl` are thin wrappers over `PaperDeliveryUtils`, which reads the relevant deliveries, evaluates province/CAP residual capacity, updates used-capacity and print counters, and pushes overflow back to next week's `EVALUATE_SENDER_LIMIT`.
-6. `delayerToPaperChannelLambda` is the downstream consumer of `EVALUATE_PRINT_CAPACITY`: it sends printable items toward paper channel phase 2 and postpones print-capacity overflow to the following week.
+4. `EvaluateSenderPriorityJobServiceImpl` reads all `EVALUATE_SENDER_LIMIT` deliveries for one sender and delivery week, reorders them by `senderPriority` descending while preserving the original chronological slots, then rewrites the records transactionally (put/delete).
+5. `EvaluateSenderLimitJobServiceImpl` enriches deliveries with priority and unified driver information, excludes RS and second attempts from sender-limit checks, evaluates sender quotas, and writes new `PaperDelivery` rows for the next workflow step.
+6. `EvaluateDriverCapacityJobServiceImpl` and `EvaluateResidualCapacityJobServiceImpl` are thin wrappers over `PaperDeliveryUtils`, which reads the relevant deliveries, evaluates province/CAP residual capacity, updates used-capacity and print counters, and pushes overflow back to next week's `EVALUATE_SENDER_LIMIT`.
+7. `delayerToPaperChannelLambda` is the downstream consumer of `EVALUATE_PRINT_CAPACITY`: it sends printable items toward paper channel phase 2 and postpones print-capacity overflow to the following week.
+
 
 Within the Java code, the main layering is:
 
