@@ -3,6 +3,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
   return {
     pk: buildPk(deliveryWeek),
     sk: buildSk(payload.recipientNormalizedAddress.pr, date, payload.requestId),
+    senderPaIdOriginalSentAt: `${payload.senderPaId}~${date}`,
     requestId: payload.requestId,
     createdAt: new Date().toISOString(),
     notificationSentAt: payload.notificationSentAt,

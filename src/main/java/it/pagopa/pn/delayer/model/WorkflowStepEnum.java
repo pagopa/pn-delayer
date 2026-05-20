@@ -1,6 +1,7 @@
 package it.pagopa.pn.delayer.model;
 
 public enum WorkflowStepEnum {
+    EVALUATE_SENDER_PRIORITY,
     EVALUATE_SENDER_LIMIT,
     EVALUATE_RESIDUAL_CAPACITY,
     EVALUATE_DRIVER_CAPACITY,

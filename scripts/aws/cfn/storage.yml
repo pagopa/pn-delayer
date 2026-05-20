@@ -441,7 +441,7 @@ Resources:
           AttributeType: "S"
         - AttributeName: "createdAt"
           AttributeType: "S"
-        - AttributeName: "senderPaId"
+        - AttributeName: "senderPaIdOriginalSentAt"
           AttributeType: "S"
       KeySchema:
         - AttributeName: "pk"
@@ -457,11 +457,11 @@ Resources:
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
-        - IndexName: "deliveryDate-paId-index"
+        - IndexName: "pk-senderPaIdOriginalSentAt-index"
           KeySchema:
             - AttributeName: "pk"
               KeyType: "HASH"
-            - AttributeName: "senderPaId"
+            - AttributeName: "senderPaIdOriginalSentAt"
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
@@ -569,7 +569,7 @@ Resources:
         LogGroupName: !Sub '${ProjectName}-delayer-sender-priority-job'
         LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
-        
+
   PnDelayerSenderLimitJobLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain

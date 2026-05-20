@@ -3,6 +3,7 @@ package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.Data;
 import lombok.Getter;
+import org.springframework.util.StringUtils;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
@@ -33,10 +34,12 @@ public class PaperDelivery {
     public static final String COL_COMMUNICATION_TYPE = "communicationType";
     public static final String COL_SENDER_PRIORITY = "senderPriority";
     public static final String COL_VIRTUAL_NOTIFICATION_SENT_AT = "virtualNotificationSentAt";
+    public static final String COL_OLD_SK = "oldSk";
+    public static final String COL_SENDERPAID_ORIGINALSENTAT = "senderPaIdOriginalSentAt";
 
-    public static final String DELIVERY_DATE_PA_ID_INDEX = "deliveryDate-paId-index";
+    public static final String PK_SENDERPAID_ORIGINALSENTAT_INDEX = "pk-senderPaIdOriginalSentAt-index";
 
-    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK), @DynamoDbSecondaryPartitionKey(indexNames = DELIVERY_DATE_PA_ID_INDEX)}))
+    @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK), @DynamoDbSecondaryPartitionKey(indexNames = PK_SENDERPAID_ORIGINALSENTAT_INDEX)}))
     private String pk;
     @Getter(onMethod = @__({@DynamoDbSortKey, @DynamoDbAttribute(COL_SK)}))
     private String sk;
@@ -50,7 +53,7 @@ public class PaperDelivery {
     private String prepareRequestDate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PRODUCT_TYPE)}))
     private String productType;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_PA_ID), @DynamoDbSecondarySortKey(indexNames = DELIVERY_DATE_PA_ID_INDEX)}))
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_PA_ID)}))
     private String senderPaId;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PROVINCE)}))
     private String province;
@@ -78,12 +81,19 @@ public class PaperDelivery {
     private Integer senderPriority;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_VIRTUAL_NOTIFICATION_SENT_AT)}))
     private String virtualNotificationSentAt;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_OLD_SK)}))
+    private String oldSk;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDERPAID_ORIGINALSENTAT), @DynamoDbSecondarySortKey(indexNames = PK_SENDERPAID_ORIGINALSENTAT_INDEX)}))
+    private String senderPaIdOriginalSentAt;
 
     public PaperDelivery(){}
 
     public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek){
+        String date =  paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
+                paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
+
         this.pk = buildPk(workflowStepEnum, deliveryWeek);
-        this.sk = buildSortKey(workflowStepEnum, paperDelivery);
+        this.sk = buildSortKey(workflowStepEnum, paperDelivery, date);
         this.requestId = paperDelivery.getRequestId();
         this.createdAt = String.valueOf(Instant.now());
         this.notificationSentAt = paperDelivery.getNotificationSentAt();
@@ -103,13 +113,22 @@ public class PaperDelivery {
         this.communicationType = paperDelivery.getCommunicationType();
         this.senderPriority = paperDelivery.getSenderPriority();
         this.virtualNotificationSentAt = paperDelivery.getVirtualNotificationSentAt();
+        this.oldSk = paperDelivery.getOldSk();
+        this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
+    }
+
+    private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {
+        return StringUtils.hasText(paperDelivery.getSenderPaIdOriginalSentAt()) ?
+                paperDelivery.getSenderPaIdOriginalSentAt() :
+                paperDelivery.getSenderPaId() + "~" + date;
     }
 
     @DynamoDbIgnore
-    public static String buildSortKey(WorkflowStepEnum workflowStepEnum, PaperDelivery paperDelivery) {
-        String date =  paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
-                paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
+    public static String buildSortKey(WorkflowStepEnum workflowStepEnum, PaperDelivery paperDelivery, String date) {
+
         return switch (workflowStepEnum) {
+            case EVALUATE_SENDER_PRIORITY ->
+                    throw new IllegalArgumentException(String.format("Unsupported workflow step for sk builder: %s", workflowStepEnum));
             case EVALUATE_SENDER_LIMIT ->
                     String.join("~", paperDelivery.getProvince(), date, paperDelivery.getRequestId());
             case EVALUATE_DRIVER_CAPACITY, EVALUATE_RESIDUAL_CAPACITY ->
