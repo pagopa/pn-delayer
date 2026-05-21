@@ -2677,7 +2677,8 @@ Resources:
                   "tableName": ["pn-Timelines"],
                   "dynamodb": {
                     "NewImage": {
-                      "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] }
+                      "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] },
+                      "communicationType": {"S": [{ "exists": false }]}
                     }
                   }
                 }
