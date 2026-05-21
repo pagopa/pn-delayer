@@ -10,6 +10,7 @@ timeline_events AS (
         category, 
         details_physicalAddress_zip, 
         CASE 
+            WHEN details_physicaladdress_foreignstate != 'ITALIA' and category != 'REQUEST_ACCEPTED' THEN 'RIR'
             WHEN details_serviceLevel = 'REGISTERED_LETTER_890' THEN '890'
             WHEN details_serviceLevel = 'AR_REGISTERED_LETTER' THEN 'AR'
             ELSE details_serviceLevel 
@@ -23,13 +24,13 @@ timeline_events AS (
     WHERE p_year = format_datetime((SELECT base_date FROM date_context), 'yyyy') 
       AND p_month = format_datetime((SELECT base_date FROM date_context), 'MM')
       AND p_day   = format_datetime((SELECT base_date FROM date_context), 'dd')
-      AND category IN ('PREPARE_DIGITAL_DOMICILE', 'PREPARE_ANALOG_DOMICILE', 'REQUEST_ACCEPTED')
+      AND category IN ('SEND_DIGITAL_DOMICILE', 'PREPARE_ANALOG_DOMICILE', 'REQUEST_ACCEPTED', 'NOTIFICATION_CANCELLED')
 ),
 filtered_events AS (
     SELECT *
     FROM timeline_events
-    WHERE category = 'REQUEST_ACCEPTED' 
-       OR (category != 'REQUEST_ACCEPTED' AND timelineelementid LIKE '%ATTEMPT_0%')
+    WHERE category IN ('REQUEST_ACCEPTED', 'NOTIFICATION_CANCELLED') OR
+          timelineelementid LIKE '%ATTEMPT_0%'
 )
 SELECT dynamodb_keys_iun AS iun, 
        category, 
@@ -40,4 +41,3 @@ SELECT dynamodb_keys_iun AS iun,
         paid,
         timestamp
         FROM filtered_events
-        

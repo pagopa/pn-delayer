@@ -2,7 +2,7 @@ WITH date_config AS (
     SELECT 
         -- *** SEZIONE TEST ***
         -- Per testare: decommenta la riga sotto (es. oggi è Aprile, vuoi vedere Giugno? Metti Maggio)
-        --DATE '2026-04-25' AS execution_date 
+        -- DATE '2026-03-25' AS execution_date 
         
         -- Per produzione:
         current_date AS execution_date
@@ -35,7 +35,7 @@ base AS (
     FROM pn_notification_orders_json_view o
     INNER JOIN final_params p ON o.p_year = p.anno_riferimento 
                               AND o.pk = p.pk_riferimento
-    WHERE (length(o.sk) - length(replace(o.sk, '~', '')) = 3) or (o.sk like '%~digitale~%')
+    WHERE (length(o.sk) - length(replace(o.sk, '~', '')) = 3) or (o.sk like '%~digitale~%') or (o.sk like '%~INT')
 ),
 sk_extracted AS (
     SELECT
@@ -43,11 +43,12 @@ sk_extracted AS (
         -- Gestione dinamica del PRODOTTO
         CASE 
             WHEN sk LIKE '%~digitale~%' THEN split_part(sk, '~', 3)
+            WHEN sk LIKE '%~INT' THEN 'RIR'
             ELSE split_part(sk, '~', 2)
         END AS prodotto,
         -- Gestione dinamica della REGIONE
         CASE 
-            WHEN sk LIKE '%~digitale~%' THEN null
+            WHEN sk LIKE '%~digitale~%' or sk like '%~INT' THEN null
             ELSE split_part(sk, '~', 4)
         END AS regione,
         commessa,

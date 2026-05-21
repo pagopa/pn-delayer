@@ -2,6 +2,7 @@ const fs = require('fs');
 
 function getCurrentMonday() {
   const now = new Date();
+  now.setDate(now.getDate() - 1);
   const day = now.getDay(); 
   const diff = now.getDate() - day + (day === 0 ? -6 : 1); 
   const d = new Date(now.setDate(diff))
