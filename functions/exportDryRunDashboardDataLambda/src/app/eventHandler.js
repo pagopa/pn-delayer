@@ -97,37 +97,37 @@ exports.handleEvent = async (event) => {
       cron: {
         type: "DAILY",
       },
-      SettimanaleRecapitista: {
-        query: await prepareQuery(
-          "SettimanaleRecapitista",
-          specificDate
-        ),
-        outputName: specificDate,
-        cron: {
-          type: "DAILY",
-        },
+    },
+    SettimanaleRecapitista: {
+      query: await prepareQuery(
+        "SettimanaleRecapitista",
+        specificDate
+      ),
+      outputName: specificDate,
+      cron: {
+        type: "DAILY",
       },
-      DailySpedizioniEnte: {
-        query: await prepareQuery(
-          "DailySpedizioniEnte",
-          specificDailyDate
-        ),
-        outputName: specificDailyDate,
-        cron: {
-          type: "DAILY",
-        },
+    },
+    DailySpedizioniEnte: {
+      query: await prepareQuery(
+        "DailySpedizioniEnte",
+        specificDailyDate
+      ),
+      outputName: specificDailyDate,
+      cron: {
+        type: "DAILY",
       },
-      MonthlyCommessa: {
-        query: await prepareQuery(
-          "MonthlyCommessa",
-          specificMonthlyDate
-        ),
-        outputName: specificMonthlyDate,
-        cron: {
-          type: "MONTHLY",
-          day: 25 //Max 25th of the month to avoid issues with months with less than 31 days
-        },
-      }
+    },
+    MonthlyCommessa: {
+      query: await prepareQuery(
+        "MonthlyCommessa",
+        specificMonthlyDate
+      ),
+      outputName: specificMonthlyDate,
+      cron: {
+        type: "MONTHLY",
+        day: 25 //Max 25th of the month to avoid issues with months with less than 31 days
+      },
     }
   };
   await runAllQueries(workgroupName, queries, database, monitoringBucketName, basePath);
