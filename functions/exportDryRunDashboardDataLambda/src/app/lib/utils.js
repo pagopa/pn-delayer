@@ -2,10 +2,22 @@ const fs = require('fs');
 
 function getCurrentMonday() {
   const now = new Date();
+  now.setDate(now.getDate() - 1);
   const day = now.getDay(); 
   const diff = now.getDate() - day + (day === 0 ? -6 : 1); 
   const d = new Date(now.setDate(diff))
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getCurrentDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function getNextMonthDate() {
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
 }
 
 const formatDate = (dateObj) => {
@@ -28,7 +40,7 @@ function prepareQueryCondition(queryFile, mdate) {
     const placeholder = `<${key}>`;
     query = query.replace(new RegExp(placeholder, 'g'), value);
   }
-  return query
+  return query;
 }
 
 function prepareQueryPlaceholdersMap(mDate) {
@@ -129,4 +141,4 @@ function generatePartitionConditionWithMonths(dateStr, months) {
 
 
 
-module.exports = { getCurrentMonday, prepareQueryCondition };
+module.exports = { getCurrentMonday, prepareQueryCondition, getCurrentDate, getNextMonthDate };
