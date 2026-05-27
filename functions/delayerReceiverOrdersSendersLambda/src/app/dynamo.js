@@ -239,7 +239,7 @@ async function upsertFullSumEstimateCounter(item, archiveFileKey) {
           numberOfShipments = :zero,
           fullWeekArchiveProcessedAt = :archiveProcessedAt,
           productType = :productType,
-          province = :province
+          province = :province,
           archiveFileKey = :archiveFileKey
       `,
       ConditionExpression: `
