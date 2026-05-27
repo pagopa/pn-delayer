@@ -368,7 +368,7 @@ async function upsertPartialSumEstimateCounter(item, archiveFileKey) {
         '#numberOfShipments = if_not_exists(#otherPortion, :zero),',
         '#portionArchive = :archiveProcessedAt,',
         'productType = :productType,',
-        'province = :province',
+        'province = :province,',
         'archiveFileKey = :archiveFileKey'
       ].join(' '),
       ConditionExpression: [
