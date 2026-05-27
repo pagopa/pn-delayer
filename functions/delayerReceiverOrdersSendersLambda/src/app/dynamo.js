@@ -145,7 +145,7 @@ async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
             ? 'fileKey = if_not_exists(fileKey, :fk),'
             : 'fileKey = :fk,',
         isStartMonth
-            ? 'archiveFileKey = if_not_exists(archiveFileKey, :fk),'
+            ? 'archiveFileKey = if_not_exists(archiveFileKey, :afk),'
             : 'archiveFileKey = :afk,',
         '#ttl             = if_not_exists(#ttl, :ttl) '
       ];
