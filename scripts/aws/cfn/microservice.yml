@@ -3188,6 +3188,8 @@ Resources:
         PnDelayerResidualCapacityJobQueue: !Ref ResidualCapacityJobQueue
         PnDelayerSenderLimitJobDefinition: !Sub '${ProjectName}-delayer-sender-limit-job-definition'
         PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
+        PnDelayerSenderPriorityJobDefinition: !Sub '${ProjectName}-delayer-sender-priority-job-definition'
+        PnDelayerSenderPriorityJobQueue: !Ref SenderPriorityJobQueue
       TracingConfiguration:
           Enabled: false
 
@@ -3229,6 +3231,8 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:PutItem
+                - dynamodb:Query
+                - dynamodb:DeleteItem
               Resource:
                 - !Sub "${PaperDeliveryCounterTableArn}"
                 - !Sub "${PaperDeliveryCounterTableArn}/*"
@@ -3240,12 +3244,15 @@ Resources:
                 - batch:DescribeJobs
               Resource:
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-sender-limit-job-definition:*"
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-sender-priority-job-definition:*"
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-residual-capacity-job-definition:*"
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-driver-capacity-job-definition:*"
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-sender-limit-job-definition"
+                  - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-sender-priority-job-definition"
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-residual-capacity-job-definition"
                   - !Sub "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/${ProjectName}-delayer-driver-capacity-job-definition"
                   - !Ref SenderLimitJobQueue
+                  - !Ref SenderPriorityJobQueue
                   - !Ref ResidualCapacityJobQueue
                   - !Ref DriverCapacityJobQueue
             - Effect: Allow

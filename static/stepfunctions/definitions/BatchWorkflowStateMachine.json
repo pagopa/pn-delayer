@@ -32,7 +32,7 @@
           "Next": "WorkflowFail"
         }
       ],
-      "Next": "retrieveProvince",
+      "Next": "DeletePrintItem",
       "Parameters": {
         "FunctionName": "${TenderAPILambdaArn}",
         "Payload": {
@@ -71,6 +71,218 @@
         }
       ],
       "Type": "Task"
+    },
+    "DeletePrintItem": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:deleteItem",
+      "Parameters": {
+        "TableName.$": "$.paperDeliveryCounterTableName",
+        "Key": {
+          "pk": {
+            "S": "PRINT"
+          },
+          "sk": {
+            "S.$": "$.deliveryWeek"
+          }
+        }
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "Next": "retrieveSenderWithPriorityFirstPage"
+    },
+    "retrieveSenderWithPriorityFirstPage": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName.$": "$.paperDeliveryCounterTableName",
+        "ProjectionExpression": "paId",
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :skPrefix)",
+        "Limit": 1000,
+        "ExpressionAttributeValues": {
+          ":pk": {
+            "S.$": "$.deliveryWeek"
+          },
+          ":skPrefix": {
+            "S": "SENDER_PRIORITY"
+          }
+        }
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "ResultPath": "$.senderPriorities",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2
+        }
+      ],
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "Next": "CheckSenderPrioritiesEmpty"
+    },
+    "CheckSenderPrioritiesEmpty": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.senderPriorities.Items[0]",
+          "IsPresent": true,
+          "Next": "MapSubmitSenderPriorityJobs"
+        }
+      ],
+      "Default": "retrieveProvince"
+    },
+    "retrieveSenderWithPriorityNextPage": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName.$": "$.paperDeliveryCounterTableName",
+        "ProjectionExpression": "paId",
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :skPrefix)",
+        "ExpressionAttributeValues": {
+          ":pk": {
+            "S.$": "$.deliveryWeek"
+          },
+          ":skPrefix": {
+            "S": "SENDER_PRIORITY"
+          }
+        },
+        "ExclusiveStartKey.$": "$.senderPriorities.LastEvaluatedKey"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "ResultPath": "$.senderPriorities",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2
+        }
+      ],
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "Next": "MapSubmitSenderPriorityJobs"
+    },
+    "MapSubmitSenderPriorityJobs": {
+      "Type": "Map",
+      "MaxConcurrency": 40,
+      "ItemsPath": "$.senderPriorities.Items",
+      "ItemSelector": {
+        "paId.$": "$$.Map.Item.Value.paId.S",
+        "deliveryWeek.$": "$.deliveryWeek",
+        "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
+        "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+        "printCapacity.$": "$.printCapacity"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "submitSenderPriorityJob",
+        "States": {
+          "submitSenderPriorityJob": {
+            "Type": "Task",
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "SenderPriorityJobFail"
+              }
+            ],
+            "Resource": "arn:aws:states:::batch:submitJob.sync",
+            "Parameters": {
+              "JobDefinition": "${PnDelayerSenderPriorityJobDefinition}",
+              "JobName.$": "$.paId",
+              "JobQueue": "${PnDelayerSenderPriorityJobQueue}",
+              "ContainerOverrides": {
+                "Environment": [
+                  {
+                    "Name": "PN_DELAYER_EVALUATESENDERPRIORITYJOBINPUT_SENDERPAID",
+                    "Value.$": "$.paId"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DELIVERYWEEK",
+                    "Value.$": "$.deliveryWeek"
+                  },
+                  {
+                    "Name": "PN_DELAYER_PRINTCAPACITY",
+                    "Value.$": "$.printCapacity"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME",
+                    "Value.$": "$.paperDeliveryCounterTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_DAO_PAPERDELIVERYTABLENAME",
+                    "Value.$": "$.paperDeliveryTableName"
+                  },
+                  {
+                    "Name": "PN_DELAYER_WORKFLOWSTEP",
+                    "Value": "EVALUATE_SENDER_PRIORITY"
+                  }
+                ]
+              }
+            },
+            "End": true
+          },
+          "SenderPriorityJobFail": {
+            "Type": "Fail"
+          }
+        }
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "WorkflowFail"
+        }
+      ],
+      "ResultPath": null,
+      "Next": "HasMoreSenderPriorityPages"
+    },
+    "HasMoreSenderPriorityPages": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.senderPriorities.LastEvaluatedKey",
+          "IsPresent": true,
+          "Next": "retrieveSenderWithPriorityNextPage"
+        }
+      ],
+      "Default": "retrieveProvince"
     },
     "GetUnifiedDeliveryDriverProvinceParameter": {
       "Catch": [
