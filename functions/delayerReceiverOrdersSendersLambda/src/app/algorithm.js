@@ -22,7 +22,7 @@ const { persistWeeklyEstimates } = require('./dynamo');
  * @param archiveProcessedAt                Timestamp obtained from Safe Storage tags, or Date.now() (current time) if not present.
  * @returns {Promise<Array<Object>>}        List of weekly‑granularity records.
  */
-async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey, archiveProcessedAt) {
+async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey, archiveProcessedAt, archiveFileKey) {
     const { segments, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
     const partialStart = segments.filter(s => s.weekType === 'PARTIAL_START').length;
     const partialEnd   = segments.filter(s => s.weekType === 'PARTIAL_END').length;
@@ -58,7 +58,7 @@ async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileK
                 results.push(...provinceRecords);
 
                 if (provinceRecords.length > 0) {
-                    await persistWeeklyEstimates(provinceRecords, fileKey);
+                    await persistWeeklyEstimates(provinceRecords, fileKey, archiveFileKey);
                 }
             }
         }
