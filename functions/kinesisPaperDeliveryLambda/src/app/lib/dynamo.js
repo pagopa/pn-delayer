@@ -111,12 +111,14 @@ async function updateSenderPriorityCounter(groupedSenderPaIdRecords, batchItemFa
           pk: deliveryDate,
           sk: sk
         },
-        UpdateExpression: 'ADD #priorities :priorities',
+        UpdateExpression: 'ADD #priorities :priorities SET #paId = :paId',
         ExpressionAttributeNames: {
-          '#priorities': 'priorities'
+          '#priorities': 'priorities',
+          '#paId': 'paId'
         },
         ExpressionAttributeValues: {
           ':priorities': priorities,
+          ':paId': senderPaId
         }
       };
       const command = new UpdateCommand(input);
