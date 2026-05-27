@@ -3232,6 +3232,7 @@ Resources:
               Action:
                 - dynamodb:PutItem
                 - dynamodb:Query
+                - dynamodb:DeleteItem
               Resource:
                 - !Sub "${PaperDeliveryCounterTableArn}"
                 - !Sub "${PaperDeliveryCounterTableArn}/*"
