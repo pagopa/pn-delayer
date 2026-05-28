@@ -91,6 +91,15 @@ public class PaperDeliveryUtils {
         log.info("Processing chunk of size {} to send to next week", chunk.size());
         if (!CollectionUtils.isEmpty(chunk)) {
             return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek))
+                    .thenReturn(chunk)
+                    .map(deliveries -> deliveries.stream()
+                            .filter(paperDelivery ->
+                                    (paperDelivery.getProductType().equalsIgnoreCase("RS")
+                                            || paperDelivery.getAttempt() == 1)
+                                            && !"INFORMAL".equals(paperDelivery.getCommunicationType()))
+                            .toList())
+                    .map(pnDelayerUtils::groupByProvinceProductTypeAndCount)
+                    .flatMap(grouped -> paperDeliveryCounterDAO.updateExcludeCounter(deliveryWeek, grouped))
                     .thenReturn(chunk.size());
         }
         return Mono.just(0);

@@ -5,6 +5,8 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
@@ -17,6 +19,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -81,6 +84,45 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
         return Mono.fromFuture(dynamoDbAsyncClient.updateItem(updateRequest))
                 .doOnSuccess(r -> log.info("Update print Capacity Counter successful for deliveryDate={}", deliveryDate))
                 .doOnError(e -> log.error("Error updating print Capacity Counter for deliveryDate={} --> {}", deliveryDate, e.getMessage(), e))
+                .then();
+    }
+
+    @Override
+    public Mono<Void> updateExcludeCounter(LocalDate deliveryWeek, Map<String, Long> excludeGroupedRecords) {
+        if (CollectionUtils.isEmpty(excludeGroupedRecords)) {
+            return Mono.empty();
+        }
+
+        long ttl = Instant.now().plus(pnDelayerConfigs.getPrintCounterTtlDuration()).toEpochMilli();
+
+        return Flux.fromIterable(excludeGroupedRecords.entrySet())
+                .concatMap(entry -> {
+                    String sk = "EXCLUDE~" + entry.getKey();
+
+                    Map<String, String> expressionAttributeNames = new HashMap<>();
+                    expressionAttributeNames.put("#numberOfShipments", PaperDeliveryCounter.COL_NUMBER_OF_SHIPMENTS);
+                    expressionAttributeNames.put("#ttl", PaperDeliveryCounter.COL_TTL);
+
+                    Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
+                    expressionAttributeValues.put(":inc", AttributeValue.builder().n(String.valueOf(entry.getValue())).build());
+                    expressionAttributeValues.put(":ttl", AttributeValue.builder().n(String.valueOf(ttl)).build());
+
+                    UpdateItemRequest updateRequest = UpdateItemRequest.builder()
+                            .tableName(tableCounter.tableName())
+                            .key(Map.of(
+                                    PaperDeliveryCounter.COL_PK, AttributeValue.builder().s(deliveryWeek.toString()).build(),
+                                    PaperDeliveryCounter.COL_SK, AttributeValue.builder().s(sk).build()
+                            ))
+                            .updateExpression("ADD #numberOfShipments :inc SET #ttl = :ttl")
+                            .expressionAttributeValues(expressionAttributeValues)
+                            .expressionAttributeNames(expressionAttributeNames)
+                            .build();
+
+                    return Mono.fromFuture(dynamoDbAsyncClient.updateItem(updateRequest))
+                            .doOnSuccess(r -> log.info("Update exclude counter successful for sk {}", sk))
+                            .doOnError(e -> log.error("Error updating exclude counter for sk: {}", sk, e))
+                            .then();
+                })
                 .then();
     }
 

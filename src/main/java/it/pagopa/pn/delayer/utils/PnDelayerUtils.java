@@ -60,6 +60,10 @@ public class PnDelayerUtils {
         return paperDeliveries.stream().collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getCap() + "~" + paperDelivery.getProductType()));
     }
 
+    public Map<String, Long> groupByProvinceProductTypeAndCount(List<PaperDelivery> paperDeliveries) {
+        return paperDeliveries.stream().collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getProvince() + "~" + paperDelivery.getProductType(), Collectors.counting()));
+    }
+
     public List<PaperDelivery> mapItemForResidualCapacityStep(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
         return paperDeliveries.stream()
                 .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, deliveryWeek))
