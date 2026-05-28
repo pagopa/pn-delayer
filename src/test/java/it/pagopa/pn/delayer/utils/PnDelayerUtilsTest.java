@@ -270,24 +270,24 @@ class PnDelayerUtilsTest {
     }
 
     @Test
-    void groupByProvinceProductTypeAndCount_returnsCorrectCountPerGroup() {
+    void groupingForExclude_returnsCorrectCountPerGroup() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
-        paperDeliveries.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1));
-        paperDeliveries.add(createPaperDelivery("AR", "00179", "RM", "paId2", 0, 1));
-        paperDeliveries.add(createPaperDelivery("890", "00180", "RM", "paId3", 0, 1));
-        paperDeliveries.add(createPaperDelivery("AR", "00181", "NA", "paId4", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR", "00178", "RM", "paId1", 1, 1));
+        paperDeliveries.add(createPaperDelivery("AR", "00179", "RM", "paId2", 1, 1));
+        paperDeliveries.add(createPaperDelivery("890", "00180", "RM", "paId3", 1, 1));
+        paperDeliveries.add(createPaperDelivery("RS", "00181", "NA", "paId4", 0, 1));
 
-        Map<String, Long> grouped = pnDelayerUtils.groupByProvinceProductTypeAndCount(paperDeliveries);
+        Map<String, Long> grouped = pnDelayerUtils.groupingForExclude(paperDeliveries);
 
         assertEquals(3, grouped.size());
         assertEquals(2, grouped.get("RM~AR"));
         assertEquals(1, grouped.get("RM~890"));
-        assertEquals(1, grouped.get("NA~AR"));
+        assertEquals(1, grouped.get("NA~RS"));
     }
 
     @Test
-    void groupByProvinceProductTypeAndCount_emptyList_returnsEmptyMap() {
-        Map<String, Long> grouped = pnDelayerUtils.groupByProvinceProductTypeAndCount(new ArrayList<>());
+    void groupingForExclude_emptyList_returnsEmptyMap() {
+        Map<String, Long> grouped = pnDelayerUtils.groupingForExclude(new ArrayList<>());
 
         assertTrue(grouped.isEmpty());
     }
