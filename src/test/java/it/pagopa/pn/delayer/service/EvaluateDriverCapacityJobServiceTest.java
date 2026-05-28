@@ -79,6 +79,9 @@ class EvaluateDriverCapacityJobServiceTest {
                 any(),
                 eq(5), any())).thenReturn(Mono.just(Page.create(deliveries)));
 
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
+
         StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
 
@@ -95,6 +98,7 @@ class EvaluateDriverCapacityJobServiceTest {
                 any(),
                 eq(5), any());
         verify(paperDeliveryDAO, times(1)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryCounterDAO, times(1)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
     }
 
     @Test
@@ -148,6 +152,8 @@ class EvaluateDriverCapacityJobServiceTest {
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
 
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
         StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province,  deliveryWeek, tenderId))
                 .verifyComplete();
 
@@ -167,6 +173,7 @@ class EvaluateDriverCapacityJobServiceTest {
                 eq(String.join("~", unifiedDeliveryDriver, province)),
                 any(),
                 eq(5), any());
+        verify(paperDeliveryCounterDAO, times(1)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(), eq(province), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity( any(),eq("00185"), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(), eq("00184"), any(), any(), any());
@@ -209,6 +216,8 @@ class EvaluateDriverCapacityJobServiceTest {
 
         ArgumentCaptor<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptor = ArgumentCaptor.forClass(List.class);
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
@@ -228,6 +237,7 @@ class EvaluateDriverCapacityJobServiceTest {
 
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5), any());
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4), any());
+        verify(paperDeliveryCounterDAO, times(2)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any());
         verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(any(), eq("00184"), any(), any(), any());
@@ -285,6 +295,8 @@ class EvaluateDriverCapacityJobServiceTest {
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(evaluateDr.startEvaluateDriverCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
@@ -309,6 +321,7 @@ class EvaluateDriverCapacityJobServiceTest {
 
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(3), any());
         verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(EVALUATE_DRIVER_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(2), any());
+        verify(paperDeliveryCounterDAO, times(2)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any());
         verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(any(),eq("00184"), any(), any(), any());

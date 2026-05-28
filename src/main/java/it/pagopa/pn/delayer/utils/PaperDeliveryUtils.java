@@ -91,6 +91,9 @@ public class PaperDeliveryUtils {
         log.info("Processing chunk of size {} to send to next week", chunk.size());
         if (!CollectionUtils.isEmpty(chunk)) {
             return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek))
+                    .thenReturn(chunk)
+                    .map(pnDelayerUtils::groupingForExclude)
+                    .flatMap(grouped -> paperDeliveryCounterDAO.updateExcludeCounter(deliveryWeek.plusWeeks(1), grouped))
                     .thenReturn(chunk.size());
         }
         return Mono.just(0);

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
@@ -190,6 +191,9 @@ public class PaperDeliveryUtilsTest {
         when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
                 .thenReturn(Mono.empty());
 
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
+
         StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(
                         WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
@@ -202,6 +206,29 @@ public class PaperDeliveryUtilsTest {
 
         // insertPaperDeliveries called 3 times (one insert per page chunk)
         verify(paperDeliveryDAO, times(3)).insertPaperDeliveries(anyList());
+
+        // Verify exact exclude-counter payloads in order: page1 -> page2 -> page3
+        InOrder inOrder = inOrder(paperDeliveryCounterDAO);
+
+        inOrder.verify(paperDeliveryCounterDAO).updateExcludeCounter(
+                eq(deliveryWeek.plusWeeks(1)),
+                argThat(map -> map != null
+                        && map.size() == 1
+                        && Objects.equals(map.get("RM~AR"), 2L)));
+
+        inOrder.verify(paperDeliveryCounterDAO).updateExcludeCounter(
+                eq(deliveryWeek.plusWeeks(1)),
+                argThat(map -> map != null
+                        && map.size() == 1
+                        && Objects.equals(map.get("RM~RS"), 1L)));
+
+        inOrder.verify(paperDeliveryCounterDAO).updateExcludeCounter(
+                eq(deliveryWeek.plusWeeks(1)),
+                argThat(map -> map != null
+                        && map.size() == 1
+                        && Objects.equals(map.get("RM~AR"), 1L)));
+
+        verify(paperDeliveryCounterDAO, times(3)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
     }
 
     @Test
@@ -291,6 +318,8 @@ public class PaperDeliveryUtilsTest {
         when(paperDeliveryDAO.insertPaperDeliveries(insertCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(paperDeliveryUtils.evaluateCapacitiesAndProcessDeliveries(
                         WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, unifiedDeliveryDriver, province, deliveryWeek, tenderId))
@@ -307,6 +336,21 @@ public class PaperDeliveryUtilsTest {
 
         // Counters flushed exactly once
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
+
+        // Verify exact exclude-counter payloads in order: page1 -> page2 -> page3
+        InOrder inOrder = inOrder(paperDeliveryCounterDAO);
+
+        inOrder.verify(paperDeliveryCounterDAO).updateExcludeCounter(
+                eq(deliveryWeek.plusWeeks(1)),
+                argThat(map -> map != null
+                        && map.isEmpty()));
+
+        inOrder.verify(paperDeliveryCounterDAO).updateExcludeCounter(
+                eq(deliveryWeek.plusWeeks(1)),
+                argThat(map -> map != null
+                        && map.isEmpty()));
+
+        verify(paperDeliveryCounterDAO, times(2)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
     }
 
     private PaperDelivery createPaperDelivery(String productType, String cap, String province, String senderPaId, Integer attempt) {

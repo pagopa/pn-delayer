@@ -60,6 +60,15 @@ public class PnDelayerUtils {
         return paperDeliveries.stream().collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getCap() + "~" + paperDelivery.getProductType()));
     }
 
+    public Map<String, Long> groupingForExclude(List<PaperDelivery> paperDeliveries) {
+        return paperDeliveries.stream()
+                .filter(paperDelivery ->
+                        (paperDelivery.getProductType().equalsIgnoreCase("RS")
+                                || paperDelivery.getAttempt() == 1)
+                                && !"INFORMAL".equals(paperDelivery.getCommunicationType()))
+                .collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getProvince() + "~" + paperDelivery.getProductType(), Collectors.counting()));
+    }
+
     public List<PaperDelivery> mapItemForResidualCapacityStep(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
         return paperDeliveries.stream()
                 .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, deliveryWeek))
