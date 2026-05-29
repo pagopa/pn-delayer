@@ -292,6 +292,58 @@ class PnDelayerUtilsTest {
         assertTrue(grouped.isEmpty());
     }
 
+    @Test
+    void excludeEmptyPaId_returnsOnlyDeliveriesWithSenderPaId_andMovesMissingOnesToResidualCapacityStep() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR", "00179", "RM", "", 0, 1));
+        paperDeliveries.add(createPaperDelivery("RS", "00180", "RM", "   ", 0, 1));
+        paperDeliveries.add(createPaperDelivery("AR", "00181", "RM", null, 0, 1));
+        paperDeliveries.add(createPaperDelivery("890", "00182", "RM", "paId2", 0, 1));
+
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+
+        List<PaperDelivery> result = pnDelayerUtils.excludeEmptyPaId(paperDeliveries, senderLimitJobProcessObjects);
+
+        assertEquals(2, result.size());
+        assertEquals(3, senderLimitJobProcessObjects.getSendToResidualCapacityStep().size());
+        assertEquals(1, result.stream().filter(d -> "paId1".equals(d.getSenderPaId())).count());
+        assertEquals(1, result.stream().filter(d -> "paId2".equals(d.getSenderPaId())).count());
+        assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream().filter(d -> d.getSenderPaId() == null).count());
+        assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream().filter(d -> "".equals(d.getSenderPaId())).count());
+        assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream().filter(d -> "   ".equals(d.getSenderPaId())).count());
+    }
+
+    @Test
+    void excludeEmptyPaId_whenAllSenderPaIdArePresent_returnsAllAndClearsResidualCapacityStep() {
+        List<PaperDelivery> paperDeliveries = List.of(
+                createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1),
+                createPaperDelivery("890", "00179", "RM", "paId2", 0, 1)
+        );
+
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+
+        List<PaperDelivery> result = pnDelayerUtils.excludeEmptyPaId(paperDeliveries, senderLimitJobProcessObjects);
+
+        assertEquals(2, result.size());
+        assertTrue(senderLimitJobProcessObjects.getSendToResidualCapacityStep().isEmpty());
+    }
+
+    @Test
+    void excludeEmptyPaId_whenAllSenderPaIdAreMissing_returnsEmptyAndMovesAllToResidualCapacityStep() {
+        List<PaperDelivery> paperDeliveries = new ArrayList<>();
+        paperDeliveries.add(createPaperDelivery("AR", "00178", "RM", null, 0, 1));
+        paperDeliveries.add(createPaperDelivery("890", "00179", "RM", "", 0, 1));
+        paperDeliveries.add(createPaperDelivery("RS", "00180", "RM", "   ", 0, 1));
+
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+
+        List<PaperDelivery> result = pnDelayerUtils.excludeEmptyPaId(paperDeliveries, senderLimitJobProcessObjects);
+
+        assertTrue(result.isEmpty());
+        assertEquals(3, senderLimitJobProcessObjects.getSendToResidualCapacityStep().size());
+    }
+
     private PaperChannelDeliveryDriver createPaperChannelDeliveryDriver(String geoKey, String product, String driver) {
         PaperChannelDeliveryDriver response = new PaperChannelDeliveryDriver();
         response.setGeoKey(geoKey);
@@ -299,7 +351,6 @@ class PnDelayerUtilsTest {
         response.setUnifiedDeliveryDriver(driver);
         return response;
     }
-
 
     private PaperDelivery createPaperDelivery(String productType, String cap, String province, String senderPaId, Integer attempt, Integer priority) {
         PaperDelivery delivery = new PaperDelivery();

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import org.springframework.util.StringUtils;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -170,11 +171,23 @@ public class PnDelayerUtils {
         var legalItems = partitionedByCommType.get(false);
         var byRsOrSecondAttempt = legalItems.stream().collect(Collectors.partitioningBy(this::isRsOrSecondAttempt));
         senderLimitJobProcessObjects.setSendToDriverCapacityStep(byRsOrSecondAttempt.get(true));
-        senderLimitJobProcessObjects.setSendToResidualCapacityStep(
-                new ArrayList<>(informalItems)
-        );
+        senderLimitJobProcessObjects.getSendToResidualCapacityStep().addAll(informalItems);
 
         return new ArrayList<>(byRsOrSecondAttempt.get(false));
+    }
+
+    public List<PaperDelivery> excludeEmptyPaId(List<PaperDelivery> paperDeliveries, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+        var partitioned = paperDeliveries.stream()
+                .collect(Collectors.partitioningBy(paperDelivery -> StringUtils.hasText(paperDelivery.getSenderPaId())));
+
+        var paperDeliveriesWithPaId = partitioned.get(true);
+        var paperDeliveriesWithoutPaId = partitioned.get(false);
+
+        senderLimitJobProcessObjects.setSendToResidualCapacityStep(
+                new ArrayList<>(paperDeliveriesWithoutPaId)
+        );
+
+        return new ArrayList<>(paperDeliveriesWithPaId);
     }
 
     private boolean isInformal(PaperDelivery paperDelivery) {

@@ -113,6 +113,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      */
     private Mono<SenderLimitJobProcessObjects> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         return retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(items, tenderId, driversTotalCapacity, senderLimitJobProcessObjects.getPriorityMap())
+                .map(paperDeliveries -> pnDelayerUtils.excludeEmptyPaId(paperDeliveries, senderLimitJobProcessObjects))
                 .map(paperDeliveryList -> pnDelayerUtils.excludeRsAndSecondAttempt(paperDeliveryList, senderLimitJobProcessObjects))
                 .map(pnDelayerUtils::groupByPaIdProductTypeProvince)
                 .flatMap(deliveriesGroupedByProductTypePaId -> senderLimitUtils.retrieveAndEvaluateSenderLimit(deliveryWeek, deliveriesGroupedByProductTypePaId, driversTotalCapacity, senderLimitJobProcessObjects))
