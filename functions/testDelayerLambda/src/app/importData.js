@@ -207,6 +207,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     return {
         pk: buildPk(deliveryWeek),
         sk: buildSk(payload.province, date, payload.requestId),
+        senderPaIdOriginalSentAt: `${payload.senderPaId}~${date}`,
         requestId: payload.requestId,
         createdAt: new Date().toISOString(),
         notificationSentAt: payload.notificationSentAt,
@@ -217,9 +218,13 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
         cap: payload.cap,
         attempt: parseInt(payload.attempt, 10),
         iun: payload.iun,
+        unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
+    		tenderId: payload.tenderId,
+    		recipientId: payload.recipientId,
         workflowStep: 'EVALUATE_SENDER_LIMIT',
         communicationType: payload.communicationType || 'LEGAL',
-        senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0
+        senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
+        deliveryDate: deliveryWeek
     };
 }
 
