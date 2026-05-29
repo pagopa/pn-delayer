@@ -1,5 +1,9 @@
 package it.pagopa.pn.delayer.utils;
 
+import it.pagopa.pn.commons.log.PnAuditLogBuilder;
+import it.pagopa.pn.commons.log.PnAuditLogEvent;
+import it.pagopa.pn.commons.log.PnAuditLogEventType;
+import it.pagopa.pn.commons.log.PnAuditLogType;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
@@ -33,6 +37,7 @@ public class PaperDeliveryUtils {
     private final PnDelayerUtils pnDelayerUtils;
     private final DeliveryDriverUtils deliveryDriverUtils;
     private final PaperDeliveryCounterDAO paperDeliveryCounterDAO;
+    private static final String AUDIT_LOG_DELIVERY_RESCHEDULED_NEXT_WEEK_MESSAGE = "Delivery rescheduled to next week: deliveryWeek={}";
 
 
     /**
@@ -89,11 +94,24 @@ public class PaperDeliveryUtils {
      */
     private Mono<Integer> processChunkToSendToNextWeek(List<PaperDelivery> chunk, LocalDate deliveryWeek) {
         log.info("Processing chunk of size {} to send to next week", chunk.size());
+        PnAuditLogEvent auditLogEvent = buildAuditLogEvent(deliveryWeek);
         if (!CollectionUtils.isEmpty(chunk)) {
+            auditLogEvent.generateResult(PnAuditLogType.SUCCESS, AUDIT_LOG_DELIVERY_RESCHEDULED_NEXT_WEEK_MESSAGE, deliveryWeek)
+                    .log();
             return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek))
                     .thenReturn(chunk.size());
         }
         return Mono.just(0);
+    }
+
+    private static PnAuditLogEvent buildAuditLogEvent(LocalDate deliveryWeek) {
+        PnAuditLogBuilder auditLogBuilder = new PnAuditLogBuilder();
+        return auditLogBuilder.before(
+                        PnAuditLogEventType.AUD_DELAYER_RESCHEDULED_NEXT_WEEK,
+                        AUDIT_LOG_DELIVERY_RESCHEDULED_NEXT_WEEK_MESSAGE,
+                        deliveryWeek
+                )
+                .build();
     }
 
     /**
