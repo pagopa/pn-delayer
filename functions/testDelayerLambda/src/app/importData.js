@@ -183,12 +183,14 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
             pk: deliveryWeek,
             sk: sk
           },
-          UpdateExpression: 'ADD #priorities :priorities',
+          UpdateExpression: 'ADD #priorities :priorities SET #paId = :paId',
           ExpressionAttributeNames: {
-            '#priorities': 'priorities'
+            '#priorities': 'priorities',
+            '#paId': 'paId'
           },
           ExpressionAttributeValues: {
             ':priorities': priorities,
+            ':paId': senderPaId
           }
         };
         const command = new UpdateCommand(input);
@@ -251,6 +253,9 @@ const groupRecordsByProductAndProvince = (records) => {
 const groupRecordsBySenderPaId = (records) => {
     return records.reduce((acc, record) => {
         const key = record.senderPaId;
+        if (!key) {
+          return acc;
+        }
         if (!acc[key]) {
             acc[key] = [];
         }
