@@ -3,7 +3,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
   const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
   const date = rsOrSecondAttempt ? payload.prepareRequestDate  : payload.notificationSentAt
 
-  return {
+  const record = {
     pk: buildPk(deliveryWeek),
     sk: buildSk(payload.recipientNormalizedAddress.pr, date, payload.requestId),
     senderPaIdOriginalSentAt: !rsOrSecondAttempt && payload.senderPaId ? `${payload.senderPaId}~${date}` : null,
@@ -24,6 +24,12 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     workflowStep: 'EVALUATE_SENDER_LIMIT',
     senderPriority: payload.senderPriority ? payload.senderPriority : 0
   };
+
+  if (payload.senderPaId && !rsOrSecondAttempt) {
+     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
+  }
+
+  return record;
 };
 
 function retrieveDate(payload) {

@@ -125,6 +125,9 @@ public class PaperDelivery {
 
     @DynamoDbIgnore
     public static String buildSortKey(WorkflowStepEnum workflowStepEnum, PaperDelivery paperDelivery, String date) {
+        if(StringUtils.hasText(paperDelivery.getVirtualNotificationSentAt())){
+            date = paperDelivery.getVirtualNotificationSentAt();
+        }
 
         return switch (workflowStepEnum) {
             case EVALUATE_SENDER_PRIORITY ->
