@@ -203,7 +203,9 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
   }
 
 function buildPaperDeliveryRecord(payload, deliveryWeek) {
-    let date = retrieveDate(payload);
+    const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
+    const date = rsOrSecondAttempt ? payload.prepareRequestDate  : payload.notificationSentAt
+
     return {
         pk: buildPk(deliveryWeek),
         sk: buildSk(payload.province, date, payload.requestId),
@@ -219,18 +221,15 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
         iun: payload.iun,
         workflowStep: 'EVALUATE_SENDER_LIMIT',
         communicationType: payload.communicationType || 'LEGAL',
-        senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0
+        senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
+        senderPaIdOriginalSentAt: !rsOrSecondAttempt && payload.senderPaId ? `${payload.senderPaId}~${date}` : null,
+        deliveryDate: deliveryWeek
     };
 }
 
-function retrieveDate(payload) {
-    if(payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
-        return payload.prepareRequestDate;
-    }else{
-        return payload.notificationSentAt;
-    }
+function isRsOrSecondAttempt(payload) {
+    return payload.productType === 'RS' || payload.attempt && parseInt(payload.attempt, 10) === 1;
 }
-
 function buildPk(deliveryWeek) {
     return `${deliveryWeek}~EVALUATE_SENDER_LIMIT`;
 }

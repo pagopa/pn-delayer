@@ -94,67 +94,98 @@ exports.deleteData = async (params = []) => {
                     k => ({ pk: k.pk, sk: k.sk })
                 ),
 
-               (async () => {
-                   const weekUnprocessed = [];
-                   for (const [deliveryWeek, weekEntities] of Object.entries(entitiesByWeek)) {
+                (async () => {
+                    const weekUnprocessed = [];
 
-                       const previousDeliveryWeek = LocalDate.parse(deliveryWeek)
-                           .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                           .minusWeeks(1)
-                           .toString();
+                    for (const [deliveryWeek, weekEntities] of Object.entries(entitiesByWeek)) {
+                        const previousDeliveryWeek = LocalDate.parse(deliveryWeek)
+                            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                            .minusWeeks(1)
+                            .toString();
 
-                       console.log(`Processing deliveryWeek=${deliveryWeek}, previousDeliveryWeek=${previousDeliveryWeek}, entities=${weekEntities.length}`);
+                        console.log(`Processing deliveryWeek=${deliveryWeek}, previousDeliveryWeek=${previousDeliveryWeek}, entities=${weekEntities.length}`);
 
-                       const [countersUnprocessed, senderLimitUnprocessed, capacityUnprocessed] = await Promise.all([
-                           // COUNTERS
-                           (async () => {
-                               const grouped = groupRecordsByProductAndProvince(weekEntities);
-                               const keys = Object.keys(grouped).map(k => ({
-                                   pk: deliveryWeek,
-                                   sk: `EXCLUDE~${k}`
-                               }));
-                               keys.push({ pk: "PRINT", sk: deliveryWeek });
-                               return batchDeleteGeneric(countersTableName, keys, k => ({ pk: k.pk, sk: k.sk }));
-                           })(),
+                        const [countersUnprocessed, senderLimitUnprocessed, capacityUnprocessed] = await Promise.all([
+                            // COUNTERS
+                            (async () => {
+                                const grouped = groupRecordsByProductAndProvince(weekEntities);
 
-                           // SENDER LIMIT
-                           (async () => {
-                               const grouped = groupRecordsBySenderProductProvince(weekEntities);
-                               const keys = Object.keys(grouped).map(k => ({
-                                   pk: k,
-                                   sk: previousDeliveryWeek
-                               }));
+                                const keys = Object.keys(grouped).map(k => ({
+                                    pk: deliveryWeek,
+                                    sk: `EXCLUDE~${k}`
+                                }));
 
-                               return batchDeleteGeneric(senderUsedLimitTableName, keys, k => ({ pk: k.pk, deliveryDate: k.sk }));
-                           })(),
+                                keys.push({ pk: "PRINT", sk: deliveryWeek });
 
-                           // CAPACITY
-                           (async () => {
-                               const printCapacitiesEntities = weekEntities.filter(e =>
-                                   e.pk.endsWith("EVALUATE_PRINT_CAPACITY")
-                               );
+                                const senderPriorityItems = await querySenderPriorityCounters(
+                                    countersTableName,
+                                    deliveryWeek
+                                );
 
-                               const grouped = groupRecordsByDriverIdProvinceCap(printCapacitiesEntities);
-                               const uniqueKeys = getUniqueKeysForDeletion(grouped);
+                                keys.push(
+                                    ...senderPriorityItems.map(item => ({
+                                        pk: item.pk,
+                                        sk: item.sk
+                                    }))
+                                );
 
-                               const keys = Array.from(uniqueKeys).map(pk => ({
-                                   pk,
-                                   sk: deliveryWeek
-                               }));
+                                return batchDeleteGeneric(
+                                    countersTableName,
+                                    keys,
+                                    k => ({ pk: k.pk, sk: k.sk })
+                                );
+                            })(),
 
-                               return batchDeleteGeneric(deliveryDriverUsedCapacitiesTableName,keys,k => ({unifiedDeliveryDriverGeokey: k.pk,deliveryDate: k.sk })
-                               );
-                           })()
-                       ]);
+                            // SENDER LIMIT
+                            (async () => {
+                                const grouped = groupRecordsBySenderProductProvince(weekEntities);
 
-                       weekUnprocessed.push(
-                           ...countersUnprocessed,
-                           ...senderLimitUnprocessed,
-                           ...capacityUnprocessed
-                       );
-                   }
-                   return weekUnprocessed;
-               })()
+                                const keys = Object.keys(grouped).map(k => ({
+                                    pk: k,
+                                    sk: previousDeliveryWeek
+                                }));
+
+                                return batchDeleteGeneric(
+                                    senderUsedLimitTableName,
+                                    keys,
+                                    k => ({ pk: k.pk, deliveryDate: k.sk })
+                                );
+                            })(),
+
+                            // CAPACITY
+                            (async () => {
+                                const printCapacitiesEntities = weekEntities.filter(e =>
+                                    e.pk.endsWith("EVALUATE_PRINT_CAPACITY")
+                                );
+
+                                const grouped = groupRecordsByDriverIdProvinceCap(printCapacitiesEntities);
+                                const uniqueKeys = getUniqueKeysForDeletion(grouped);
+
+                                const keys = Array.from(uniqueKeys).map(pk => ({
+                                    pk,
+                                    sk: deliveryWeek
+                                }));
+
+                                return batchDeleteGeneric(
+                                    deliveryDriverUsedCapacitiesTableName,
+                                    keys,
+                                    k => ({
+                                        unifiedDeliveryDriverGeokey: k.pk,
+                                        deliveryDate: k.sk
+                                    })
+                                );
+                            })()
+                        ]);
+
+                        weekUnprocessed.push(
+                            ...countersUnprocessed,
+                            ...senderLimitUnprocessed,
+                            ...capacityUnprocessed
+                        );
+                    }
+
+                    return weekUnprocessed;
+                })()
             ]);
 
             const allUnprocessed = [
@@ -264,9 +295,19 @@ async function queryEntitiesByRequestId(tableName, requestId) {
     }
 }
 
-/**
-* UTILS
-*/
+async function querySenderPriorityCounters(tableName, deliveryWeek) {
+    const res = await docClient.send(new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+        ExpressionAttributeValues: {
+            ":pk": deliveryWeek,
+            ":prefix": "SENDER_PRIORITY"
+        }
+    }));
+
+    return res.Items || [];
+}
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const groupRecordsByProductAndProvince = records =>

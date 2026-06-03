@@ -32,7 +32,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       notificationSentAt: '2025-01-01T00:00:00Z',
       prepareRequestDate: '2024-01-01T00:00:00Z',
       attempt: 0,
-      communicationType: 'INFORMAL'
+      communicationType: 'INFORMAL',
+      senderPaIdOriginalSentAt: 'sender1~2025-01-01T00:00:00Z'
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -48,13 +49,13 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       notificationSentAt: '2025-01-01T00:00:00Z',
       prepareRequestDate: '2024-01-01T00:00:00Z',
       unifiedDeliveryDriver: 'driver1',
-      attempt: 0,
+      attempt: 1,
       iun: 'iun1'
     };
     const result = buildPaperDeliveryRecord(payload, '2025-07-07');
     expect(result).to.include({
       pk: '2025-07-07~EVALUATE_SENDER_LIMIT',
-      sk: 'province1~2025-01-01T00:00:00Z~req1',
+      sk: 'province1~2024-01-01T00:00:00Z~req1',
       recipientId: payload.recipientId,
       province: 'province1',
       requestId: 'req1',
@@ -66,7 +67,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       iun: 'iun1',
       notificationSentAt: '2025-01-01T00:00:00Z',
       prepareRequestDate: '2024-01-01T00:00:00Z',
-      attempt: 0,
+      attempt: 1,
       communicationType: 'LEGAL'
     });
     expect(result).to.have.property('createdAt');
@@ -78,7 +79,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
     const payload = {
       recipientNormalizedAddress: { pr: 'province1', cap: '12345', region: 'region1' },
       requestId: 'req1',
-      productType: 'type1',
+      productType: 'RS',
       senderPaId: 'sender1',
       tenderId: 'tender1',
       notificationSentAt: '2025-01-01T00:00:00Z',
@@ -91,11 +92,11 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
     const result = buildPaperDeliveryRecord(payload, '2025-07-07');
     expect(result).to.include({
       pk: '2025-07-07~EVALUATE_SENDER_LIMIT',
-      sk: 'province1~2025-01-01T00:00:00Z~req1',
+      sk: 'province1~2024-01-01T00:00:00Z~req1',
       recipientId: payload.recipientId,
       province: 'province1',
       requestId: 'req1',
-      productType: 'type1',
+      productType: 'RS',
       cap: '12345',
       senderPaId: 'sender1',
       unifiedDeliveryDriver: 'driver1',
