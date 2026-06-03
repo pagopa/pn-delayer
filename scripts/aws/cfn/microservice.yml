@@ -1064,6 +1064,7 @@ Resources:
                   - dynamodb:BatchGetItem
                   - dynamodb:GetItem
                   - dynamodb:PutItem
+                  - dynamodb:DeleteItem
                   - dynamodb:UpdateItem
                   - dynamodb:BatchWriteItem
                   - dynamodb:TransactWriteItems
