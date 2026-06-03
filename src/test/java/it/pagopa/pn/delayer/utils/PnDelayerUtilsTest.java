@@ -64,14 +64,14 @@ class PnDelayerUtilsTest {
     void groupByPaIdProductTypeProvince() {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
 
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 1, 2));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 2));
+        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 0, 2));
+        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 0, 2));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 0, 2));
+        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 0, 2));
 
 
-        Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.groupByPaIdProductTypeProvince(paperDeliveries);
+        Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.classifyAndGroupForSenderLimit(paperDeliveries, new SenderLimitJobProcessObjects());
         assertEquals(4, grouped.size());
         assertEquals(2, grouped.get("paId1~AR~RM").size());
         assertEquals(1, grouped.get("paId1~890~RM").size());
@@ -79,25 +79,6 @@ class PnDelayerUtilsTest {
         assertEquals(1, grouped.get("paId1~890~NA").size());
     }
 
-
-    @Test
-    void groupByPaIdProductTypeProvinceAndCount() {
-        List<PaperDelivery> paperDeliveries = new ArrayList<>();
-
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("890","00178", "NA", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId1", 1, 2));
-        paperDeliveries.add(createPaperDelivery("890","00179", "RM", "paId2", 1, 2));
-
-
-        Map<String, Long> grouped = pnDelayerUtils.groupByPaIdProductTypeProvinceAndCount(paperDeliveries);
-        assertEquals(4, grouped.size());
-        assertEquals(2, grouped.get("paId1~AR~RM"));
-        assertEquals(1, grouped.get("paId1~890~RM"));
-        assertEquals(1, grouped.get("paId2~890~RM"));
-        assertEquals(1, grouped.get("paId1~890~NA"));
-    }
 
     @Test
     void groupByGeoKeyAndProduct() {
@@ -130,6 +111,28 @@ class PnDelayerUtilsTest {
         assertEquals(2, grouped.get("00178~AR").size());
         assertEquals(1, grouped.get("00178~890").size());
         assertEquals(2, grouped.get("00179~890").size());
+    }
+
+    @Test
+    void classifyAndGroupForSenderLimit_splitsAndGroupsDeliveriesInSinglePass() {
+        PaperDelivery missingPaId = createPaperDelivery("AR", "00178", "RM", null, 0, 1);
+        PaperDelivery informal = createPaperDelivery("RS", "00179", "RM", "paId1", 0, 1);
+        informal.setCommunicationType("INFORMAL");
+        PaperDelivery rs = createPaperDelivery("RS", "00180", "RM", "paId2", 0, 1);
+        PaperDelivery secondAttempt = createPaperDelivery("AR", "00181", "RM", "paId3", 1, 2);
+        PaperDelivery groupedAr1 = createPaperDelivery("AR", "00182", "RM", "paId4", 0, 3);
+        PaperDelivery groupedAr2 = createPaperDelivery("AR", "00183", "RM", "paId4", 0, 3);
+        PaperDelivery grouped890 = createPaperDelivery("890", "00184", "NA", "paId5", 0, 3);
+        List<PaperDelivery> items = List.of(missingPaId, informal, rs, secondAttempt, groupedAr1, groupedAr2, grouped890);
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+
+        Map<String, List<PaperDelivery>> grouped = pnDelayerUtils.classifyAndGroupForSenderLimit(items, senderLimitJobProcessObjects);
+
+        assertEquals(List.of(missingPaId, informal), senderLimitJobProcessObjects.getSendToResidualCapacityStep());
+        assertEquals(List.of(rs, secondAttempt), senderLimitJobProcessObjects.getSendToDriverCapacityStep());
+        assertEquals(2, grouped.size());
+        assertEquals(List.of(groupedAr1, groupedAr2), grouped.get("paId4~AR~RM"));
+        assertEquals(List.of(grouped890), grouped.get("paId5~890~NA"));
     }
 
     @Test
@@ -245,9 +248,8 @@ class PnDelayerUtilsTest {
         List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3, paperDelivery4);
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects);
+        pnDelayerUtils.classifyAndGroupForSenderLimit(items, senderLimitJobProcessObjects);
 
-        assertEquals(0, result.size());
         assertEquals(4, senderLimitJobProcessObjects.getSendToDriverCapacityStep().size());
     }
 
@@ -262,9 +264,8 @@ class PnDelayerUtilsTest {
         List<PaperDelivery> items = List.of(paperDelivery1, paperDelivery2, paperDelivery3, paperDelivery4);
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        List<PaperDelivery> result = pnDelayerUtils.excludeRsAndSecondAttempt(items, senderLimitJobProcessObjects);
+        pnDelayerUtils.classifyAndGroupForSenderLimit(items, senderLimitJobProcessObjects);
 
-        assertEquals(1, result.size());
         assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().size());
         assertEquals(2, senderLimitJobProcessObjects.getSendToDriverCapacityStep().size());
     }
@@ -303,12 +304,8 @@ class PnDelayerUtilsTest {
 
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        List<PaperDelivery> result = pnDelayerUtils.excludeEmptyPaId(paperDeliveries, senderLimitJobProcessObjects);
+        pnDelayerUtils.classifyAndGroupForSenderLimit(paperDeliveries, senderLimitJobProcessObjects);
 
-        assertEquals(2, result.size());
-        assertEquals(3, senderLimitJobProcessObjects.getSendToResidualCapacityStep().size());
-        assertEquals(1, result.stream().filter(d -> "paId1".equals(d.getSenderPaId())).count());
-        assertEquals(1, result.stream().filter(d -> "paId2".equals(d.getSenderPaId())).count());
         assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream().filter(d -> d.getSenderPaId() == null).count());
         assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream().filter(d -> "".equals(d.getSenderPaId())).count());
         assertEquals(1, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream().filter(d -> "   ".equals(d.getSenderPaId())).count());
@@ -323,9 +320,8 @@ class PnDelayerUtilsTest {
 
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        List<PaperDelivery> result = pnDelayerUtils.excludeEmptyPaId(paperDeliveries, senderLimitJobProcessObjects);
+        pnDelayerUtils.classifyAndGroupForSenderLimit(paperDeliveries, senderLimitJobProcessObjects);
 
-        assertEquals(2, result.size());
         assertTrue(senderLimitJobProcessObjects.getSendToResidualCapacityStep().isEmpty());
     }
 
@@ -338,9 +334,8 @@ class PnDelayerUtilsTest {
 
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        List<PaperDelivery> result = pnDelayerUtils.excludeEmptyPaId(paperDeliveries, senderLimitJobProcessObjects);
+        pnDelayerUtils.classifyAndGroupForSenderLimit(paperDeliveries, senderLimitJobProcessObjects);
 
-        assertTrue(result.isEmpty());
         assertEquals(3, senderLimitJobProcessObjects.getSendToResidualCapacityStep().size());
     }
 
