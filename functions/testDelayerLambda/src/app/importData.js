@@ -206,25 +206,30 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
     const date = rsOrSecondAttempt ? payload.prepareRequestDate  : payload.notificationSentAt
 
-    return {
-        pk: buildPk(deliveryWeek),
-        sk: buildSk(payload.province, date, payload.requestId),
-        requestId: payload.requestId,
-        createdAt: new Date().toISOString(),
-        notificationSentAt: payload.notificationSentAt,
-        prepareRequestDate: payload.prepareRequestDate,
-        productType: payload.productType,
-        senderPaId: payload.senderPaId,
-        province: payload.province,
-        cap: payload.cap,
-        attempt: parseInt(payload.attempt, 10),
-        iun: payload.iun,
-        workflowStep: 'EVALUATE_SENDER_LIMIT',
-        communicationType: payload.communicationType || 'LEGAL',
-        senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
-        senderPaIdOriginalSentAt: !rsOrSecondAttempt && payload.senderPaId ? `${payload.senderPaId}~${date}` : null,
-        deliveryDate: deliveryWeek
-    };
+    const record = {
+      pk: buildPk(deliveryWeek),
+      sk: buildSk(payload.province, date, payload.requestId),
+      requestId: payload.requestId,
+      createdAt: new Date().toISOString(),
+      notificationSentAt: payload.notificationSentAt,
+      prepareRequestDate: payload.prepareRequestDate,
+      productType: payload.productType,
+      senderPaId: payload.senderPaId,
+      province: payload.province,
+      cap: payload.cap,
+      attempt: parseInt(payload.attempt, 10),
+      iun: payload.iun,
+      workflowStep: 'EVALUATE_SENDER_LIMIT',
+      communicationType: payload.communicationType || 'LEGAL',
+      senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
+      deliveryDate: deliveryWeek
+  };
+
+  if (payload.senderPaId && !rsOrSecondAttempt) {
+      record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
+  }
+
+  return record;
 }
 
 function isRsOrSecondAttempt(payload) {
