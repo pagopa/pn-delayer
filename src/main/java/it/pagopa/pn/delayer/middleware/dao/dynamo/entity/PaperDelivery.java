@@ -108,7 +108,7 @@ public class PaperDelivery {
         this.tenderId = paperDelivery.getTenderId();
         this.priority = paperDelivery.getPriority();
         this.recipientId = paperDelivery.getRecipientId();
-        this.deliveryDate = paperDelivery.getDeliveryDate();
+        this.deliveryDate = deliveryWeek.toString();
         this.workflowStep = workflowStepEnum.name();
         this.communicationType = paperDelivery.getCommunicationType();
         this.senderPriority = paperDelivery.getSenderPriority();
