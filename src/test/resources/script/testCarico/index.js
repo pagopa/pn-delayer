@@ -66,10 +66,11 @@ async function processJsonFiles() {
         for (let i = 0; i < jsonFiles.length; i++) {
             const fileName = jsonFiles[i];
             const filePath = path.join(MODULI_COMMESSA_FOLDER, fileName);
+            const archiveFileKey = `${startTime}.bin`
 
             console.log(`\n[${i + 1}/${jsonFiles.length}] Processando: ${fileName}`);
 
-            const result = await safeStorageClient.processJsonFile(filePath, startTime);
+            const result = await safeStorageClient.processJsonFile(filePath, startTime, archiveFileKey);
             results.push(result);
 
             if (result.success) {
