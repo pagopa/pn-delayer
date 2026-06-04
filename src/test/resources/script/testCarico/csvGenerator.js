@@ -307,7 +307,7 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
 
 async function main() {
     // CSV header
-    const header = ['requestId', 'notificationSentAt', 'prepareRequestDate', 'productType', 'senderPaId', 'province', 'cap', 'attempt', 'iun'];
+    const header = ['requestId', 'notificationSentAt', 'prepareRequestDate', 'productType', 'senderPaId', 'province', 'cap', 'attempt', 'iun', 'communicationType', 'senderPriority'];
 
     const listaRegioni = Object.keys(regioni);
 
@@ -372,6 +372,8 @@ async function main() {
 
                     const requestId = `RequestId${requestIdCounter}`;
                     const iun = generaIun();
+                    const communicationType = 'LEGAL';
+                    const senderPriority = Math.floor(Math.random() * 101);
 
                     const row = [
                         requestId,
@@ -382,7 +384,9 @@ async function main() {
                         provincia,
                         cap,
                         attempt,
-                        iun
+                        iun,
+                        communicationType,
+                        senderPriority
                     ];
 
                     csvContent += row.join(';') + '\n';
