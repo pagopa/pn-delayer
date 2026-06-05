@@ -222,7 +222,7 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
     const modulo = {
         "idEnte": senderPaId,
         "contractId": "5678abcftrs43d23el4",
-        "periodo_riferimento": "6-2026",
+        "periodo_riferimento": "5-2026",
         "last_update": "2025-01-01T00:00:00Z",
         "prodotti": [
             {
@@ -281,7 +281,7 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
         "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
         "Friuli-Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
         "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana",
-        "Trentino-Alto Adige/Südtirol", "Umbria", "Valle d\\'Aosta/Vallée d\\'Aoste", "Veneto"
+        "Trentino-Alto Adige/Südtirol", "Umbria", "Valle d'Aosta/Vallée d'Aoste", "Veneto"
     ];
 
     // Add regional distribution for AR NZ - each region has a fixed value
