@@ -33,7 +33,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       prepareRequestDate: '2024-01-01T00:00:00Z',
       attempt: 0,
       communicationType: 'INFORMAL',
-      senderPaIdOriginalSentAt: 'sender1~2025-01-01T00:00:00Z'
+      senderPaIdOriginalSentAt: 'sender1~2025-01-01T00:00:00Z',
+      deliveryDate: '2025-07-07'
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -68,7 +69,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       notificationSentAt: '2025-01-01T00:00:00Z',
       prepareRequestDate: '2024-01-01T00:00:00Z',
       attempt: 1,
-      communicationType: 'LEGAL'
+      communicationType: 'LEGAL',
+      deliveryDate: '2025-07-07'
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -105,7 +107,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       notificationSentAt: '2025-01-01T00:00:00Z',
       prepareRequestDate: '2024-01-01T00:00:00Z',
       attempt: 0,
-      communicationType: 'LEGAL'
+      communicationType: 'LEGAL',
+      deliveryDate: '2025-07-07'
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');

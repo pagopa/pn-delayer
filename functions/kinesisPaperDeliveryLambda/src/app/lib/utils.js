@@ -22,7 +22,8 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     recipientId: payload.recipientId,
     communicationType: payload.communicationType || 'LEGAL',
     workflowStep: 'EVALUATE_SENDER_LIMIT',
-    senderPriority: payload.senderPriority ? payload.senderPriority : 0
+    senderPriority: payload.senderPriority ? payload.senderPriority : 0,
+    deliveryDate: deliveryWeek
   };
 
   if (payload.senderPaId && !rsOrSecondAttempt) {
