@@ -1,5 +1,9 @@
 package it.pagopa.pn.delayer.utils;
 
+import it.pagopa.pn.commons.log.PnAuditLogBuilder;
+import it.pagopa.pn.commons.log.PnAuditLogEvent;
+import it.pagopa.pn.commons.log.PnAuditLogEventType;
+import it.pagopa.pn.commons.log.PnAuditLogType;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
@@ -33,6 +37,8 @@ public class PaperDeliveryUtils {
     private final PnDelayerUtils pnDelayerUtils;
     private final DeliveryDriverUtils deliveryDriverUtils;
     private final PaperDeliveryCounterDAO paperDeliveryCounterDAO;
+    private static final String AUDIT_LOG_DELIVERIES_RESCHEDULED_NEXT_WEEK_START_CALL_MESSAGE = "Deliveries rescheduled to next week: deliveryWeek={}";
+    private static final String AUDIT_LOG_DELIVERIES_RESCHEDULED_NEXT_WEEK_MESSAGE = "Deliveries rescheduled to next week due to saturated delivery driver capacity: fromWeek={}, toWeek={}, requestIds={}";
 
 
     /**
@@ -89,7 +95,20 @@ public class PaperDeliveryUtils {
      */
     private Mono<Integer> processChunkToSendToNextWeek(List<PaperDelivery> chunk, LocalDate deliveryWeek) {
         log.info("Processing chunk of size {} to send to next week", chunk.size());
+        PnAuditLogEvent auditLogEvent = buildAuditLogEvent(deliveryWeek);
         if (!CollectionUtils.isEmpty(chunk)) {
+            LocalDate nextWeek = deliveryWeek.plusWeeks(1);
+            List<String> requestIds = chunk.stream()
+                    .map(PaperDelivery::getRequestId)
+                    .toList();
+
+            auditLogEvent.generateResult(
+                    PnAuditLogType.SUCCESS,
+                    AUDIT_LOG_DELIVERIES_RESCHEDULED_NEXT_WEEK_MESSAGE,
+                    deliveryWeek,
+                    nextWeek,
+                    requestIds
+            ).log();
             return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek))
                     .thenReturn(chunk)
                     .map(pnDelayerUtils::groupingForExclude)
@@ -97,6 +116,16 @@ public class PaperDeliveryUtils {
                     .thenReturn(chunk.size());
         }
         return Mono.just(0);
+    }
+
+    private static PnAuditLogEvent buildAuditLogEvent(LocalDate deliveryWeek) {
+        PnAuditLogBuilder auditLogBuilder = new PnAuditLogBuilder();
+        return auditLogBuilder.before(
+                        PnAuditLogEventType.AUD_DELAYER_RESCHEDULED_NEXT_WEEK,
+                        AUDIT_LOG_DELIVERIES_RESCHEDULED_NEXT_WEEK_START_CALL_MESSAGE,
+                        deliveryWeek
+                )
+                .build();
     }
 
     /**

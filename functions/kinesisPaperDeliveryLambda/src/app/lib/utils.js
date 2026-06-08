@@ -1,9 +1,12 @@
 function buildPaperDeliveryRecord(payload, deliveryWeek) {
-  let date = retrieveDate(payload);
-  return {
+
+  const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
+  const date = rsOrSecondAttempt ? payload.prepareRequestDate  : payload.notificationSentAt
+
+  const record = {
     pk: buildPk(deliveryWeek),
     sk: buildSk(payload.recipientNormalizedAddress.pr, date, payload.requestId),
-    senderPaIdOriginalSentAt: `${payload.senderPaId}~${date}`,
+    senderPaIdOriginalSentAt: !rsOrSecondAttempt && payload.senderPaId ? `${payload.senderPaId}~${date}` : null,
     requestId: payload.requestId,
     createdAt: new Date().toISOString(),
     notificationSentAt: payload.notificationSentAt,
@@ -22,6 +25,12 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     senderPriority: payload.senderPriority ? payload.senderPriority : 0,
     deliveryDate: deliveryWeek
   };
+
+  if (payload.senderPaId && !rsOrSecondAttempt) {
+     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
+  }
+
+  return record;
 };
 
 function retrieveDate(payload) {
@@ -30,6 +39,10 @@ function retrieveDate(payload) {
     }else{
       return payload.notificationSentAt;
     }
+}
+
+function isRsOrSecondAttempt(payload) {
+    return payload.productType === 'RS' || payload.attempt && parseInt(payload.attempt, 10) === 1;
 }
 
 function buildPk(deliveryWeek) {

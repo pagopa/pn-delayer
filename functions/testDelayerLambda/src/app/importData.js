@@ -203,39 +203,38 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
   }
 
 function buildPaperDeliveryRecord(payload, deliveryWeek) {
-    let date = retrieveDate(payload);
-    return {
-        pk: buildPk(deliveryWeek),
-        sk: buildSk(payload.province, date, payload.requestId),
-        senderPaIdOriginalSentAt: `${payload.senderPaId}~${date}`,
-        requestId: payload.requestId,
-        createdAt: new Date().toISOString(),
-        notificationSentAt: payload.notificationSentAt,
-        prepareRequestDate: payload.prepareRequestDate,
-        productType: payload.productType,
-        senderPaId: payload.senderPaId,
-        province: payload.province,
-        cap: payload.cap,
-        attempt: parseInt(payload.attempt, 10),
-        iun: payload.iun,
-        unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
-    		tenderId: payload.tenderId,
-    		recipientId: payload.recipientId,
-        workflowStep: 'EVALUATE_SENDER_LIMIT',
-        communicationType: payload.communicationType || 'LEGAL',
-        senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
-        deliveryDate: deliveryWeek
-    };
+    const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
+    const date = rsOrSecondAttempt ? payload.prepareRequestDate  : payload.notificationSentAt
+
+    const record = {
+      pk: buildPk(deliveryWeek),
+      sk: buildSk(payload.province, date, payload.requestId),
+      requestId: payload.requestId,
+      createdAt: new Date().toISOString(),
+      notificationSentAt: payload.notificationSentAt,
+      prepareRequestDate: payload.prepareRequestDate,
+      productType: payload.productType,
+      senderPaId: payload.senderPaId,
+      province: payload.province,
+      cap: payload.cap,
+      attempt: parseInt(payload.attempt, 10),
+      iun: payload.iun,
+      workflowStep: 'EVALUATE_SENDER_LIMIT',
+      communicationType: payload.communicationType || 'LEGAL',
+      senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
+      deliveryDate: deliveryWeek
+  };
+
+  if (payload.senderPaId && !rsOrSecondAttempt) {
+      record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
+  }
+
+  return record;
 }
 
-function retrieveDate(payload) {
-    if(payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
-        return payload.prepareRequestDate;
-    }else{
-        return payload.notificationSentAt;
-    }
+function isRsOrSecondAttempt(payload) {
+    return payload.productType === 'RS' || payload.attempt && parseInt(payload.attempt, 10) === 1;
 }
-
 function buildPk(deliveryWeek) {
     return `${deliveryWeek}~EVALUATE_SENDER_LIMIT`;
 }

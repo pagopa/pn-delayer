@@ -295,6 +295,19 @@ SUM_ESTIMATES counterType
 }
 ```
 
+SENDER_PRIORITY counterType
+```json
+{
+    "operationType": "GET_COUNTERS",
+    "parameters": {
+        "table":"pn-PaperDeliveryCounters",
+        "counterType": "SENDER_PRIORITY",
+        "deliveryDate": "yyyy-mm-dd",
+        "paId": "<senderPaId>"
+    }
+}
+```
+
 *GET_RESIDUAL_PAPERS*
 ```json
 {
@@ -527,9 +540,16 @@ SUM_ESTIMATES CounterType
 * Items presenti →
 ```json
 {
-  "pk": "2025-09-29",
-  "sk": "SUM_ESTIMATES~890~AV~2025-09-26T16-58.04Z",
-  "numberOfShipments": 300
+  "pk": "2026-02-23",
+  "sk": "SUM_ESTIMATES~890~P1",
+  "archiveFileKey": "PN_SERVICE_ORDER_ARCHIVE-afd8250812914a569466bfed7df9aada.bin",
+  "firstWeekArchiveProcessedAt": "2026-05-28T13:20:01.574183006Z",
+  "firstWeekNumberOfShipments": 7,
+  "numberOfShipments": 8,
+  "productType": "890",
+  "province": "P1",
+  "secondWeekArchiveProcessedAt": "2026-05-28T13:20:01.574183006Z",
+  "secondWeekNumberOfShipments": 1
 }
  ```
 
