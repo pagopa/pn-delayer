@@ -59,8 +59,10 @@ exports.importData = async (params = [], csvContent, profile) => {
 
 async function processBatch(docClient, paperDeliveryTableName, countersTableName, items, deliveryWeek) {
     const grouped = groupRecordsByProductAndProvince(items);
+    const groupedBySenderPaId = groupRecordsBySenderPaId(items);
     await batchWriteItems(docClient, paperDeliveryTableName, items);
     await updateExcludeCounter(docClient, countersTableName, grouped, deliveryWeek);
+    await updateSenderPriorityCounter(docClient, countersTableName, groupedBySenderPaId, deliveryWeek);
 }
 
 /**
@@ -152,9 +154,52 @@ async function updateExcludeCounter(docClient, countersTableName, excludeGrouped
     }
 }
 
+async function updateSenderPriorityCounter(docClient, countersTableName, groupedSenderPaIdRecords, deliveryWeek) {
+    for (const [senderPaId, records] of Object.entries(groupedSenderPaIdRecords)) {
+        const sk = `SENDER_PRIORITY~${senderPaId}`;
+        try {
+            const priorities = new Set(
+                records
+                    .map(r => r.senderPriority)
+                    .filter(p => p !== 0)
+            );
+            console.log(`Updating sender priority counter for senderPaId: ${senderPaId} with priorities: ${JSON.stringify(Array.from(priorities))}`);
+
+            if (!priorities || priorities.size === 0) {
+                console.log(`Skipping updating sender priority for senderPaId: ${senderPaId}`);
+                continue;
+            }
+
+            const input = {
+                TableName: countersTableName,
+                Key: {
+                    pk: deliveryWeek,
+                    sk: sk
+                },
+                UpdateExpression: 'ADD #priorities :priorities SET #paId = :paId',
+                ExpressionAttributeNames: {
+                    '#priorities': 'priorities',
+                    '#paId': 'paId'
+                },
+                ExpressionAttributeValues: {
+                    ':priorities': priorities,
+                    ':paId': senderPaId
+                }
+            };
+            const command = new UpdateCommand(input);
+            await docClient.send(command);
+            console.log(`updateSuccessfully for ${sk}`);
+        } catch (error) {
+            console.error(`Failed to update sender priority counter for sk: ${sk}`, error);
+        }
+    }
+}
+
 function buildPaperDeliveryRecord(payload, deliveryWeek) {
-    let date = retrieveDate(payload);
-    return {
+    const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
+    const date = rsOrSecondAttempt ? payload.prepareRequestDate  : payload.notificationSentAt
+
+    const record = {
         pk: buildPk(deliveryWeek),
         sk: buildSk(payload.province, date, payload.requestId),
         requestId: payload.requestId,
@@ -165,17 +210,23 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
         senderPaId: payload.senderPaId,
         province: payload.province,
         cap: payload.cap,
-        attempt: payload.attempt,
+        attempt: parseInt(payload.attempt, 10),
         iun: payload.iun,
+        workflowStep: 'EVALUATE_SENDER_LIMIT',
+        communicationType: payload.communicationType || 'LEGAL',
+        senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
+        deliveryDate: deliveryWeek
     };
+
+    if (payload.senderPaId && !rsOrSecondAttempt) {
+        record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
+    }
+
+    return record;
 }
 
-function retrieveDate(payload) {
-    if (payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
-        return payload.prepareRequestDate;
-    } else {
-        return payload.notificationSentAt;
-    }
+function isRsOrSecondAttempt(payload) {
+    return payload.productType === 'RS' || payload.attempt && parseInt(payload.attempt, 10) === 1;
 }
 
 function buildPk(deliveryWeek) {
@@ -189,6 +240,20 @@ function buildSk(province, date, requestId) {
 const groupRecordsByProductAndProvince = (records) => {
     return records.reduce((acc, record) => {
         const key = `${record.province}~${record.productType}`;
+        if (!acc[key]) {
+            acc[key] = [];
+        }
+        acc[key].push(record);
+        return acc;
+    }, {});
+};
+
+const groupRecordsBySenderPaId = (records) => {
+    return records.reduce((acc, record) => {
+        const key = record.senderPaId;
+        if (!key) {
+            return acc;
+        }
         if (!acc[key]) {
             acc[key] = [];
         }
