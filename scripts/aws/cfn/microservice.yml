@@ -248,6 +248,11 @@ Parameters:
     Default: 8
     Description: The maximum number of Amazon EC2 vCPUs that an environment can reach.
 
+  SenderPriorityJobMaxvCpus: ##TODEFINE in order to set the max number of parallel jobs of sender priority
+    Type: String
+    Default: 8
+    Description: The maximum number of Amazon EC2 vCPUs that an environment can reach.
+
   VCPU:     ##TODEFINE in order to set the max number of parallel jobs
     Type: String
     Default: 1
@@ -953,7 +958,7 @@ Resources:
       ServiceRole: !Ref SenderPriorityServiceRole
       ComputeEnvironmentName: !Sub '${ProjectName}-delayer-sender-priority-compute-environment'
       ComputeResources:
-        MaxvCpus: !Ref MaxvCpus
+        MaxvCpus: !Ref SenderPriorityJobMaxvCpus
         Type: !Ref ComputeResourceType
         SecurityGroupIds:
           - !Ref SenderPrioritySecurityGroup
