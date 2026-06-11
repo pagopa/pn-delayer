@@ -25,10 +25,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -138,18 +135,28 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
 
 
     private int executeEvaluateSenderPriorityStep() {
-        String paId = pnDelayerConfigs.getEvaluateSenderPriorityJobInput().getSenderPaId();
+        List<String> paIds = pnDelayerConfigs.getEvaluateSenderPriorityJobInput().getSenderPaIdList();
         LocalDate deliveryWeek = Objects.isNull(pnDelayerConfigs.getDeliveryWeek()) ? pnDelayerUtils.calculateDeliveryWeek(Instant.now()) : pnDelayerConfigs.getDeliveryWeek();
-        log.info("Starting batch for paId: {}", paId);
-        addMDC(paId);
-        try {
-            Mono<Void> monoExcecution = evaluateSenderPriorityJobService.startSenderPriorityJob(paId, deliveryWeek);
-            MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
-            return 0;
-        } catch (Exception e) {
-            log.error("Error while executing batch", e);
+        List<String> failedPaIds = new ArrayList<>();
+
+        for (String paId : paIds) {
+            log.info("Starting batch for paId: {}", paId);
+            addMDC(paId);
+            try {
+                Mono<Void> monoExcecution = evaluateSenderPriorityJobService.startSenderPriorityJob(paId, deliveryWeek);
+                MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
+            } catch (Exception e) {
+                failedPaIds.add(paId);
+                log.error("Error while executing batch for paId {}", paId, e);
+            }
+        }
+
+        if (!failedPaIds.isEmpty()) {
+            log.error("Sender priority step completed with failures. Failed paIds: {}", failedPaIds);
             return 1;
         }
+
+        return 0;
     }
 
     private int executeEvaluateSenderLimitStep() {
