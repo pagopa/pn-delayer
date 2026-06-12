@@ -43,7 +43,7 @@ public class PnDelayerConfigs {
 
     @Data
     public static class EvaluateSenderPriorityJobInput {
-        private List<String> senderPaIdList;
+        private String senderPaIdList;
     }
 
     @Data

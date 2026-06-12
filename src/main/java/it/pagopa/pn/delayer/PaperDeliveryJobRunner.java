@@ -134,12 +134,13 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     }
 
 
-    private int executeEvaluateSenderPriorityStep() {
-        List<String> paIds = pnDelayerConfigs.getEvaluateSenderPriorityJobInput().getSenderPaIdList();
+    private int executeEvaluateSenderPriorityStep() throws JsonProcessingException {
+        String paIds = pnDelayerConfigs.getEvaluateSenderPriorityJobInput().getSenderPaIdList();
+        List<String> paIdList = objectMapper.readValue(paIds, new TypeReference<>() {});
         LocalDate deliveryWeek = Objects.isNull(pnDelayerConfigs.getDeliveryWeek()) ? pnDelayerUtils.calculateDeliveryWeek(Instant.now()) : pnDelayerConfigs.getDeliveryWeek();
         List<String> failedPaIds = new ArrayList<>();
 
-        for (String paId : paIds) {
+        for (String paId : paIdList) {
             log.info("Starting batch for paId: {}", paId);
             addMDC(paId);
             try {
