@@ -199,7 +199,7 @@
       "MaxConcurrency": 40,
       "ItemsPath": "$.senderPriorities.Items",
       "ItemBatcher": {
-        "MaxItemsPerBatch": "${MaxItemsPerBatchParameter}",
+        "MaxItemsPerBatch": 100,
         "BatchInput": {
           "deliveryWeek.$": "$.deliveryWeek",
           "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",

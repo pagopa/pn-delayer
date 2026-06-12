@@ -248,11 +248,6 @@ Parameters:
     Default: 8
     Description: The maximum number of Amazon EC2 vCPUs that an environment can reach.
 
-  SenderPriorityJobMaxvCpus: ##TODEFINE in order to set the max number of parallel jobs of sender priority
-    Type: String
-    Default: 8
-    Description: The maximum number of Amazon EC2 vCPUs that an environment can reach.
-
   VCPU:     ##TODEFINE in order to set the max number of parallel jobs
     Type: String
     Default: 1
@@ -753,11 +748,6 @@ Parameters:
     Type: Number
     Description: 'Reserved concurrent executions for pn-delayer notification orders lambda'
 
-  MaxItemsPerBatchParameter:
-    Type: Number
-    Description: 'Max items per batch for sender priority job'
-    Default: 100
-
 Conditions:
     IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
     HasOncallRetryAlgorithmStateMachineAlarmEnabled: !Not [ !Equals [ !Ref OncallRetryAlgorithmStateMachineAlarmThreshold, '0' ] ]
@@ -963,7 +953,7 @@ Resources:
       ServiceRole: !Ref SenderPriorityServiceRole
       ComputeEnvironmentName: !Sub '${ProjectName}-delayer-sender-priority-compute-environment'
       ComputeResources:
-        MaxvCpus: !Ref SenderPriorityJobMaxvCpus
+        MaxvCpus: !Ref MaxvCpus
         Type: !Ref ComputeResourceType
         SecurityGroupIds:
           - !Ref SenderPrioritySecurityGroup
@@ -3202,7 +3192,6 @@ Resources:
         PnDelayerSenderLimitJobQueue: !Ref SenderLimitJobQueue
         PnDelayerSenderPriorityJobDefinition: !Sub '${ProjectName}-delayer-sender-priority-job-definition'
         PnDelayerSenderPriorityJobQueue: !Ref SenderPriorityJobQueue
-        MaxItemsPerBatchParameter: !Ref MaxItemsPerBatchParameter
       TracingConfiguration:
           Enabled: false
 
