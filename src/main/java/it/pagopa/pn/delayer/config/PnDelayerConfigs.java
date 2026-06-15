@@ -12,7 +12,6 @@ import org.springframework.context.annotation.Import;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 
 @Configuration
@@ -44,7 +43,7 @@ public class PnDelayerConfigs {
 
     @Data
     public static class EvaluateSenderPriorityJobInput {
-        private String senderPaId;
+        private String senderPaIdList;
     }
 
     @Data

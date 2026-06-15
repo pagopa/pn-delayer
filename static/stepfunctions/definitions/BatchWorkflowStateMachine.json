@@ -198,16 +198,22 @@
       "Type": "Map",
       "MaxConcurrency": 40,
       "ItemsPath": "$.senderPriorities.Items",
+      "ItemBatcher": {
+        "MaxItemsPerBatch": 100,
+        "BatchInput": {
+          "deliveryWeek.$": "$.deliveryWeek",
+          "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
+          "paperDeliveryTableName.$": "$.paperDeliveryTableName",
+          "printCapacity.$": "$.printCapacity"
+        }
+      },
       "ItemSelector": {
-        "paId.$": "$$.Map.Item.Value.paId.S",
-        "deliveryWeek.$": "$.deliveryWeek",
-        "paperDeliveryCounterTableName.$": "$.paperDeliveryCounterTableName",
-        "paperDeliveryTableName.$": "$.paperDeliveryTableName",
-        "printCapacity.$": "$.printCapacity"
+        "paId.$": "$$.Map.Item.Value.paId.S"
       },
       "ItemProcessor": {
         "ProcessorConfig": {
-          "Mode": "INLINE"
+          "Mode": "DISTRIBUTED",
+          "ExecutionType": "STANDARD"
         },
         "StartAt": "submitSenderPriorityJob",
         "States": {
@@ -224,29 +230,29 @@
             "Resource": "arn:aws:states:::batch:submitJob.sync",
             "Parameters": {
               "JobDefinition": "${PnDelayerSenderPriorityJobDefinition}",
-              "JobName.$": "$.paId",
+              "JobName.$": "States.Format('sender-priority-batch-{}', States.UUID())",
               "JobQueue": "${PnDelayerSenderPriorityJobQueue}",
               "ContainerOverrides": {
                 "Environment": [
                   {
-                    "Name": "PN_DELAYER_EVALUATESENDERPRIORITYJOBINPUT_SENDERPAID",
-                    "Value.$": "$.paId"
+                    "Name": "PN_DELAYER_EVALUATESENDERPRIORITYJOBINPUT_SENDERPAIDLIST",
+                    "Value.$": "States.JsonToString($.Items[*].paId)"
                   },
                   {
                     "Name": "PN_DELAYER_DELIVERYWEEK",
-                    "Value.$": "$.deliveryWeek"
+                    "Value.$": "$.BatchInput.deliveryWeek"
                   },
                   {
                     "Name": "PN_DELAYER_PRINTCAPACITY",
-                    "Value.$": "$.printCapacity"
+                    "Value.$": "$.BatchInput.printCapacity"
                   },
                   {
                     "Name": "PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME",
-                    "Value.$": "$.paperDeliveryCounterTableName"
+                    "Value.$": "$.BatchInput.paperDeliveryCounterTableName"
                   },
                   {
                     "Name": "PN_DELAYER_DAO_PAPERDELIVERYTABLENAME",
-                    "Value.$": "$.paperDeliveryTableName"
+                    "Value.$": "$.BatchInput.paperDeliveryTableName"
                   },
                   {
                     "Name": "PN_DELAYER_WORKFLOWSTEP",
