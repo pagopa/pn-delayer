@@ -253,6 +253,11 @@ Parameters:
     Default: 1
     Description: The number of vCPUs reserved for the container.
 
+  SenderPriorityVCPU: ##TODEFINE in order to set the max number of parallel jobs
+    Type: String
+    Default: 1
+    Description: The number of vCPUs reserved for the container of sender priority.
+
   ComputeResourceType:
     Type: String
     Default: FARGATE
@@ -265,6 +270,11 @@ Parameters:
     Type: String
     Default: 4096
     Description: The memory hard limit (in MiB) present to the container.
+
+  SenderPriorityMemory:
+    Type: String
+    Default: 4096
+    Description: The memory hard limit (in MiB) present to the container for sender priority.
 
   PnDelayerInputsKinesisDataStreamArn:
     Type: String
@@ -973,9 +983,9 @@ Resources:
         FargatePlatformConfiguration:
           PlatformVersion: LATEST
         ResourceRequirements:
-          - Value: !Ref VCPU
+          - Value: !Ref SenderPriorityVCPU
             Type: VCPU
-          - Value: !Ref Memory
+          - Value: !Ref SenderPriorityMemory
             Type: MEMORY
         JobRoleArn: !GetAtt "SenderPriorityTaskExecutionRole.Arn"
         ExecutionRoleArn: !GetAtt "SenderPriorityTaskExecutionRole.Arn"
