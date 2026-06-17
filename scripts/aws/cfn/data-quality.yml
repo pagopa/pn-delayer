@@ -176,7 +176,10 @@ Resources:
             deliveryDate:struct<S:string>,
             workflowStep:struct<S:string>,
             senderPriority:struct<N:string>,
-            virtualNotificationSentAt:struct<S:string>
+            virtualNotificationSentAt:struct<S:string>,
+            oldSk:struct<S:string>,
+            senderPaIdOriginalSentAt:struct<S:string>,
+            communicationType:struct<S:string>
           >
 
   PaperDeliveryMockDataQualityStack:
@@ -215,7 +218,10 @@ Resources:
             deliveryDate:struct<S:string>,
             workflowStep:struct<S:string>,
             senderPriority:struct<N:string>,
-            virtualNotificationSentAt:struct<S:string>
+            virtualNotificationSentAt:struct<S:string>,
+            oldSk:struct<S:string>,
+            senderPaIdOriginalSentAt:struct<S:string>,
+            communicationType:struct<S:string>
           >
 
   PaperDeliveryDriverUsedCapacitiesDataQualityStack:
@@ -374,6 +380,16 @@ Resources:
               dailyPrintCapacity:struct<N:string>,
               weeklyPrintCapacity:struct<N:string>,
               sentToNextWeek:struct<N:string>,
+              sentToPhaseTwo:struct<N:string>,
+              stopSendToPhaseTwo:struct<N:string>,
+              dailyExecutions:struct<N:string>,
+              dailyExecutionCounter:struct<N:string>,
+              archiveFileKey:struct<S:string>,
+              firstWeekArchiveProcessedAt:struct<S:string>,
+              firstWeekNumberOfShipments:struct<N:string>,
+              secondWeekArchiveProcessedAt:struct<S:string>,
+              secondWeekNumberOfShipments:struct<N:string>,
+              fullWeekArchiveProcessedAt:struct<S:string>,
               ttl:struct<N:string>
             >
 
@@ -400,6 +416,16 @@ Resources:
             dailyPrintCapacity:struct<N:string>,
             weeklyPrintCapacity:struct<N:string>,
             sentToNextWeek:struct<N:string>,
+            sentToPhaseTwo:struct<N:string>,
+            stopSendToPhaseTwo:struct<N:string>,
+            dailyExecutions:struct<N:string>,
+            dailyExecutionCounter:struct<N:string>,
+            archiveFileKey:struct<S:string>,
+            firstWeekArchiveProcessedAt:struct<S:string>,
+            firstWeekNumberOfShipments:struct<N:string>,
+            secondWeekArchiveProcessedAt:struct<S:string>,
+            secondWeekNumberOfShipments:struct<N:string>,
+            fullWeekArchiveProcessedAt:struct<S:string>,
             ttl:struct<N:string>
           >
 
