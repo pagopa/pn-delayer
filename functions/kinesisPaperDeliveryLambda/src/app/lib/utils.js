@@ -1,8 +1,12 @@
 function buildPaperDeliveryRecord(payload, deliveryWeek) {
-  let date = retrieveDate(payload);
-  return {
+
+  const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
+  const date = rsOrSecondAttempt ? payload.prepareRequestDate  : payload.notificationSentAt
+
+  const record = {
     pk: buildPk(deliveryWeek),
     sk: buildSk(payload.recipientNormalizedAddress.pr, date, payload.requestId),
+    senderPaIdOriginalSentAt: !rsOrSecondAttempt && payload.senderPaId ? `${payload.senderPaId}~${date}` : null,
     requestId: payload.requestId,
     createdAt: new Date().toISOString(),
     notificationSentAt: payload.notificationSentAt,
@@ -17,8 +21,16 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     tenderId: payload.tenderId,
     recipientId: payload.recipientId,
     communicationType: payload.communicationType || 'LEGAL',
-    workflowStep: 'EVALUATE_SENDER_LIMIT'
+    workflowStep: 'EVALUATE_SENDER_LIMIT',
+    senderPriority: payload.senderPriority ? payload.senderPriority : 0,
+    deliveryDate: deliveryWeek
   };
+
+  if (payload.senderPaId && !rsOrSecondAttempt) {
+     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
+  }
+
+  return record;
 };
 
 function retrieveDate(payload) {
@@ -27,6 +39,10 @@ function retrieveDate(payload) {
     }else{
       return payload.notificationSentAt;
     }
+}
+
+function isRsOrSecondAttempt(payload) {
+    return payload.productType === 'RS' || payload.attempt && parseInt(payload.attempt, 10) === 1;
 }
 
 function buildPk(deliveryWeek) {
@@ -56,4 +72,18 @@ const groupRecordsByProductAndProvince = (records) => {
   }, {});
 };
 
-module.exports = { buildPaperDeliveryRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince };
+const groupRecordsBySenderPaId = (records) => {
+  return records.reduce((acc, record) => {
+    const key = record.entity.senderPaId;
+    if (!key) {
+      return acc;
+    }
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(record);
+    return acc;
+  }, {});
+};
+
+module.exports = { buildPaperDeliveryRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince, groupRecordsBySenderPaId };

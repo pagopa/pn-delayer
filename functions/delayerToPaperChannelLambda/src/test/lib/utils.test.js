@@ -41,7 +41,9 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       unifiedDeliveryDriver: "POSTE",
       tenderId: "TENDER1",
       recipientId: "RecipientId",
-      priority: 3
+      priority: 3,
+      senderPriority: 60,
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
     };
 
     const deliveryWeek = '2025-01-01';
@@ -64,7 +66,9 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       unifiedDeliveryDriver: "POSTE",
       tenderId: "TENDER1",
       recipientId: "RecipientId",
-      priority: 3
+      priority: 3,
+      senderPriority: 60,
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
     });
 
     expect(result2).to.include({
@@ -82,7 +86,9 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       unifiedDeliveryDriver: "POSTE",
       tenderId: "TENDER1",
       recipientId: "RecipientId",
-      priority: 3
+      priority: 3,
+      senderPriority: 60,
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
     });
   });
 });

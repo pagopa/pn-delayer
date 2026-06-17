@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -105,4 +106,52 @@ public class PaperDeliveryCounterDaoIT extends BaseTest.WithLocalStack {
         Assertions.assertEquals(21, result.getFirst().getDailyExecutions());
         Assertions.assertEquals(0, result.getFirst().getDailyExecutionCounter());
     }
+
+    @Test
+    void updateExcludeCounterTest() {
+        pnDelayerConfigs.setPrintCounterTtlDuration(Duration.ofDays(7));
+
+        LocalDate deliveryWeek = LocalDate.parse("2025-04-07");
+        long before = Instant.now().toEpochMilli();
+
+        paperDeliveryCounterDAO.updateExcludeCounter(deliveryWeek, Map.of(
+                "RM~AR", 5L,
+                "NA~890", 10L
+        )).block();
+
+        List<PaperDeliveryCounter> rmResult = paperDeliveryCounterDAO
+                .getPaperDeliveryCounter("2025-04-07", "EXCLUDE~RM~AR", null)
+                .block();
+
+        Assertions.assertNotNull(rmResult);
+        Assertions.assertEquals(5, rmResult.getFirst().getNumberOfShipments());
+        Assertions.assertEquals("2025-04-07", rmResult.getFirst().getPk());
+        Assertions.assertEquals("EXCLUDE~RM~AR", rmResult.getFirst().getSk());
+        Assertions.assertTrue(rmResult.getFirst().getTtl() > before);
+
+        List<PaperDeliveryCounter> naResult = paperDeliveryCounterDAO
+                .getPaperDeliveryCounter("2025-04-07", "EXCLUDE~NA~890", null)
+                .block();
+
+        Assertions.assertNotNull(naResult);
+        Assertions.assertEquals(10, naResult.getFirst().getNumberOfShipments());
+        Assertions.assertEquals("2025-04-07", naResult.getFirst().getPk());
+        Assertions.assertEquals("EXCLUDE~NA~890", naResult.getFirst().getSk());
+        Assertions.assertTrue(naResult.getFirst().getTtl() > before);
+
+        paperDeliveryCounterDAO.updateExcludeCounter(deliveryWeek, Map.of(
+                "RM~AR", 3L
+        )).block();
+
+        List<PaperDeliveryCounter> rmResultAfterSecondUpdate = paperDeliveryCounterDAO
+                .getPaperDeliveryCounter("2025-04-07", "EXCLUDE~RM~AR", null)
+                .block();
+
+        Assertions.assertNotNull(rmResultAfterSecondUpdate);
+        Assertions.assertEquals(8, rmResultAfterSecondUpdate.getFirst().getNumberOfShipments());
+        Assertions.assertEquals("2025-04-07", rmResultAfterSecondUpdate.getFirst().getPk());
+        Assertions.assertEquals("EXCLUDE~RM~AR", rmResultAfterSecondUpdate.getFirst().getSk());
+        Assertions.assertTrue(rmResultAfterSecondUpdate.getFirst().getTtl() >= rmResult.getFirst().getTtl());
+    }
+
 }

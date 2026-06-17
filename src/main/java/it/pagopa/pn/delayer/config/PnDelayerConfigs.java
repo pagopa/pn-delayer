@@ -12,7 +12,6 @@ import org.springframework.context.annotation.Import;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 
 @Configuration
@@ -26,6 +25,7 @@ public class PnDelayerConfigs {
     private Dao dao;
     private EvaluateDriverCapacityJobInput evaluateDriverCapacityJobInput;
     private EvaluateSenderLimitJobInput evaluateSenderLimitJobInput;
+    private EvaluateSenderPriorityJobInput evaluateSenderPriorityJobInput;
     private EvaluateResidualCapacityJobInput evaluateResidualCapacityJobInput;
     private WorkflowStepEnum workflowStep;
     private Integer deliveryDateDayOfWeek; //1-7 the day-of-week to represent, from 1 (Monday) to 7 (Sunday)
@@ -40,6 +40,11 @@ public class PnDelayerConfigs {
     private String delayerToPaperChannelSecondSchedulerCron;
     private Instant delayerToPaperChannelFirstSchedulerStartDate;
     private Instant delayerToPaperChannelSecondSchedulerStartDate;
+
+    @Data
+    public static class EvaluateSenderPriorityJobInput {
+        private String senderPaIdList;
+    }
 
     @Data
     public static class EvaluateDriverCapacityJobInput {

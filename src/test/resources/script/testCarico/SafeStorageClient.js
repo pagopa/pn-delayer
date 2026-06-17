@@ -31,9 +31,11 @@ class SafeStorageClient {
     /**
      * Performs a POST to upload the file metadata to Safe Storage
      * @param {string} sha256Base64 - SHA-256 in base64
+     * @param {string} archiveProcessedAt - UTC ISO 8601 timestamp
+     * @param {string} archiveFileKey - ZIP fake name
      * @returns {Promise<any>}
      */
-    async uploadFileMetadata(sha256Base64) {
+    async uploadFileMetadata(sha256Base64, archiveProcessedAt, archiveFileKey) {
         const url = `${this._safeStorageUrl}/safe-storage/v1/files`;
         const headers = {
             "x-pagopa-safestorage-cx-id": "pn-portfat-in",
@@ -44,7 +46,11 @@ class SafeStorageClient {
         const data = {
             contentType: "application/json",
             documentType: "PN_SERVICE_ORDER",
-            status: "SAVED"
+            status: "SAVED",
+            tags: {
+                'archiveProcessedAt': [archiveProcessedAt],
+                'archiveFileKey': [archiveFileKey]
+            }
         };
 
         try {
@@ -52,7 +58,7 @@ class SafeStorageClient {
             console.log(`POST successful for checksum: ${sha256Base64}`);
             return response.data;
         } catch (error) {
-            console.error(`Error during POST for checksum ${sha256Base64}:`, error.message);
+            console.error(`Error during POST for checksum ${sha256Base64}:`, JSON.stringify(error));
             throw error;
         }
     }
@@ -104,9 +110,11 @@ class SafeStorageClient {
     /**
      * Processes a single JSON file
      * @param {string} filePath - Path of the JSON file
+     * @param {string} archiveProcessedAt - UTC ISO 8601 timestamp
+     * @param {string} archiveFileKey - ZIP fake name
      * @returns {Promise<object>}
      */
-    async processJsonFile(filePath) {
+    async processJsonFile(filePath, archiveProcessedAt, archiveFileKey) {
         try {
             console.log(`Processing file: ${filePath}`);
 
@@ -119,7 +127,7 @@ class SafeStorageClient {
             console.log(`SHA-256 calculated: ${sha256Base64}`);
 
             // POST to retrieve upload metadata
-            const uploadMetadata = await this.uploadFileMetadata(sha256Base64);
+            const uploadMetadata = await this.uploadFileMetadata(sha256Base64, archiveProcessedAt, archiveFileKey);
 
             // PUT to upload the file
             await this.uploadFileContent(

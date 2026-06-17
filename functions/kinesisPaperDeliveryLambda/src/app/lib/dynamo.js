@@ -87,6 +87,52 @@ async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
     return batchItemFailures;
 }
 
+async function updateSenderPriorityCounter(groupedSenderPaIdRecords, batchItemFailures) {
+  const deliveryDate = getDeliveryWeek();
+
+  for (const [senderPaId, records] of Object.entries(groupedSenderPaIdRecords)) {
+    const sk = `SENDER_PRIORITY~${senderPaId}`;
+    try {
+      const priorities = new Set(
+        records
+          .map(r => r.entity.senderPriority)
+          .filter(p => p !== 0)
+      );
+      console.log(`Updating sender priority counter for senderPaId: ${senderPaId} with priorities: ${JSON.stringify(Array.from(priorities))}`);
+
+      if (!priorities || priorities.size === 0) {
+        console.log(`Skipping updating sender priority for senderPaId: ${senderPaId}`);
+        continue;
+      }
+
+      const input = {
+        TableName: counterTableName,
+        Key: {
+          pk: deliveryDate,
+          sk: sk
+        },
+        UpdateExpression: 'ADD #priorities :priorities SET #paId = :paId',
+        ExpressionAttributeNames: {
+          '#priorities': 'priorities',
+          '#paId': 'paId'
+        },
+        ExpressionAttributeValues: {
+          ':priorities': priorities,
+          ':paId': senderPaId
+        }
+      };
+      const command = new UpdateCommand(input);
+      await docClient.send(command);
+      console.log(`updateSuccessfully for ${sk}`);
+    } catch (error) {
+      console.error(`Failed to update sender priority counter for sk: ${sk}`, error);
+      const failedSeqNumbers = records.map(i => ({ itemIdentifier: i.kinesisSeqNumber }));
+      batchItemFailures.push(...failedSeqNumbers);
+    }
+  }
+  return batchItemFailures;
+}
+
 async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFailures) {
   const batch_size = process.env.KINESIS_BATCHSIZE;
   console.log(`Batch size: ${batch_size}`);
@@ -168,5 +214,6 @@ async function batchGetKinesisEventRecords(keys) {
 
 module.exports = { batchWritePaperDeliveryRecords,
                    updateExcludeCounter,
+                   updateSenderPriorityCounter,
                    batchWriteKinesisEventRecords,
                    batchGetKinesisEventRecords };

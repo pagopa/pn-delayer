@@ -73,13 +73,16 @@ class EvaluateResidualCapacityJobServiceTest {
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(), any(), any(), any())).thenReturn(Mono.just(Tuples.of(10,10)));
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),any(), any(), any(), any())).thenReturn(Mono.just(Tuples.of(10,10)));
 
         when(paperDeliveryDAO.retrievePaperDeliveries(eq(EVALUATE_RESIDUAL_CAPACITY),
                 any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
                 any(),
-                eq(5))).thenReturn(Mono.just(Page.create(deliveries)));
+                eq(5), any())).thenReturn(Mono.just(Page.create(deliveries)));
+
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
@@ -95,8 +98,9 @@ class EvaluateResidualCapacityJobServiceTest {
                 any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
                 any(),
-                eq(5));
+                eq(5), any());
         verify(paperDeliveryDAO, times(1)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryCounterDAO, times(1)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
     }
 
     @Test
@@ -105,14 +109,14 @@ class EvaluateResidualCapacityJobServiceTest {
         String province = "RM";
         LocalDate deliveryWeek = LocalDate.parse("2023-10-04");
         String tenderId = "tender123";
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(), any(), any(), any())).thenReturn(Mono.just(Tuples.of(10,0)));
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),any(), any(), any(), any())).thenReturn(Mono.just(Tuples.of(10,0)));
 
         when(paperDeliveryDAO.retrievePaperDeliveries(
                 eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY),
                 any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
                 any(),
-                eq(5)))
+                eq(5), any()))
                 .thenReturn(Mono.just(Page.create(Collections.emptyList())));
 
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
@@ -123,7 +127,7 @@ class EvaluateResidualCapacityJobServiceTest {
                 any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
                 any(),
-                eq(5));
+                eq(5), any());
         verify(paperDeliveryDAO, times(0)).insertPaperDeliveries(anyList());
     }
 
@@ -137,11 +141,11 @@ class EvaluateResidualCapacityJobServiceTest {
         Tuple2<Integer, Integer> capTuple = Tuples.of(5, 5);
         Tuple2<Integer, Integer> capTuple2 = Tuples.of(5, 0);
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any())).thenReturn(Mono.just(capacityTuple));
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any())).thenReturn(Mono.just(capTuple));
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any())).thenReturn(Mono.just(capTuple2));
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any())).thenReturn(Mono.just(capacityTuple));
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any())).thenReturn(Mono.just(capTuple));
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00184"), any(), any(), any())).thenReturn(Mono.just(capTuple2));
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5)))
+        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5), any()))
                 .thenReturn(Mono.just(Page.create(deliveries)));
 
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
@@ -150,6 +154,8 @@ class EvaluateResidualCapacityJobServiceTest {
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
 
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
 
@@ -168,10 +174,11 @@ class EvaluateResidualCapacityJobServiceTest {
                 any(),
                 eq(String.join("~", unifiedDeliveryDriver, province)),
                 any(),
-                eq(5));
-        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity( eq(province), any(), any(), any());
-        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity( eq("00185"), any(), any(), any());
-        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity( eq("00184"), any(), any(), any());
+                eq(5), any());
+        verify(paperDeliveryCounterDAO, times(1)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
+        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(), eq(province), any(), any(), any());
+        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(), eq("00185"), any(), any(), any());
+        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(), eq("00184"), any(), any(), any());
         verify(deliveryDriverUtils).updateCounters(any());
         List<IncrementUsedCapacityDto> incrementUsedCapacityCaptured = incrementUsedCapacityCaptor.getValue();
         Assertions.assertEquals(2, incrementUsedCapacityCaptured.size());
@@ -185,10 +192,10 @@ class EvaluateResidualCapacityJobServiceTest {
         String tenderId = "tender123";
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
         List<PaperDelivery> deliveries2 = getPaperDeliveries(true);
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any())).thenReturn(Mono.just(Tuples.of(5, 0)));
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any())).thenReturn(Mono.just(Tuples.of(5, 0)));
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(1, 1)));
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00184"), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(3, 0)))
                 .thenReturn(Mono.just(Tuples.of(3, 1)));
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
@@ -201,16 +208,18 @@ class EvaluateResidualCapacityJobServiceTest {
         lastEvaluatedKey.put("sk", AttributeValue.builder().s("RM~2025-01-01t00:00:00Z~requestId2").build());
         when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5)))
+        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5), any()))
                 .thenReturn(Mono.just(page));
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4)))
+        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4), any()))
                 .thenReturn(Mono.just(Page.create(deliveries2)));
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(any())).thenReturn(Mono.empty());
 
         ArgumentCaptor<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptor = ArgumentCaptor.forClass(List.class);
         when(deliveryDriverUtils.updateCounters(incrementUsedCapacityCaptor.capture())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
                 .verifyComplete();
@@ -232,11 +241,12 @@ class EvaluateResidualCapacityJobServiceTest {
         Assertions.assertTrue(capturedDeliveries.getLast().getFirst().getPk().equalsIgnoreCase("2025-01-06~" + EVALUATE_PRINT_CAPACITY));
         Assertions.assertTrue(capturedDeliveries.getLast().getFirst().getSk().startsWith(String.join("3~")));
 
-        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5));
-        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4));
-        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any());
-        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any());
-        verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity( eq("00184"), any(), any(), any());
+        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5), any());
+        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(4), any());
+        verify(paperDeliveryCounterDAO, times(2)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
+        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any());
+        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any());
+        verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(any(), eq("00184"), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
         List<List<IncrementUsedCapacityDto>> incrementUsedCapacityCaptured = incrementUsedCapacityCaptor.getAllValues();
         Assertions.assertEquals(3, incrementUsedCapacityCaptured.getFirst().size());
@@ -256,10 +266,10 @@ class EvaluateResidualCapacityJobServiceTest {
         List<PaperDelivery> deliveries = getPaperDeliveries(false);
         List<PaperDelivery> deliveries2 = getPaperDeliveries(true);
         List<PaperDelivery> deliveries3 = getPaperDeliveries(false);
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any())).thenReturn(Mono.just(Tuples.of(3, 0)));
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any())).thenReturn(Mono.just(Tuples.of(3, 0)));
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(1, 1)));
-        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any()))
+        when(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(any(),eq("00184"), any(), any(), any()))
                 .thenReturn(Mono.just(Tuples.of(3, 0)))
                 .thenReturn(Mono.just(Tuples.of(3, 0)));
 
@@ -278,18 +288,20 @@ class EvaluateResidualCapacityJobServiceTest {
         when(page3.items()).thenReturn(deliveries3);
         when(page3.lastEvaluatedKey()).thenReturn(new HashMap<>());
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(3)))
+        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(3), any()))
                 .thenReturn(Mono.just(page));
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(2)))
+        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(2), any()))
                 .thenReturn(Mono.just(page2));
 
-        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5)))
+        when(paperDeliveryDAO.retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(5), any()))
                 .thenReturn(Mono.just(page3));
 
         ArgumentCaptor<List<PaperDelivery>> argumentCaptor = ArgumentCaptor.forClass(List.class);
         when(paperDeliveryDAO.insertPaperDeliveries(argumentCaptor.capture())).thenReturn(Mono.empty());
         when(paperDeliveryCounterDAO.updatePrintCapacityCounter(any(), anyInt(), anyInt())).thenReturn(Mono.empty());
+        when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
+                .thenReturn(Mono.empty());
         when(deliveryDriverUtils.updateCounters(anyList())).thenReturn(Mono.empty());
 
         StepVerifier.create(evaluateResidualCapacityJob.startEvaluateResidualCapacityJob(unifiedDeliveryDriver, province, deliveryWeek, tenderId))
@@ -313,13 +325,14 @@ class EvaluateResidualCapacityJobServiceTest {
         Assertions.assertTrue(capturedDeliveries.getLast().getLast().getPk().endsWith("2025-01-13~" + EVALUATE_SENDER_LIMIT));
         Assertions.assertTrue(capturedDeliveries.getLast().getLast().getSk().startsWith(String.join("~", province, "2025-01-01T00:00:00Z")));
 
-        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(3));
-        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(2));
-        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq(province), any(), any(), any());
-        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(eq("00185"), any(), any(), any());
-        verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(eq("00184"), any(), any(), any());
+        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(3), any());
+        verify(paperDeliveryDAO, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY), any(), eq(String.join("~", unifiedDeliveryDriver, province)), any(), eq(2), any());
+        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq(province), any(), any(), any());
+        verify(deliveryDriverUtils, times(1)).retrieveDeclaredAndUsedCapacity(any(),eq("00185"), any(), any(), any());
+        verify(deliveryDriverUtils, times(2)).retrieveDeclaredAndUsedCapacity(any(),eq("00184"), any(), any(), any());
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());
         verify(paperDeliveryDAO, times(4)).insertPaperDeliveries(anyList());
+        verify(paperDeliveryCounterDAO, times(2)).updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap());
     }
 
     private static @NotNull List<PaperDelivery> getPaperDeliveries(boolean sameCap) {

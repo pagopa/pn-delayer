@@ -5,10 +5,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.commons.utils.MDCUtils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
+import it.pagopa.pn.delayer.exception.InvalidSenderLimitException;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import it.pagopa.pn.delayer.service.EvaluateDriverCapacityJobService;
 import it.pagopa.pn.delayer.service.EvaluateResidualCapacityJobService;
 import it.pagopa.pn.delayer.service.EvaluateSenderLimitJobService;
+import it.pagopa.pn.delayer.service.EvaluateSenderPriorityJobService;
 import it.pagopa.pn.delayer.utils.PnDelayerUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,10 +25,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -37,6 +36,7 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
     private final EvaluateDriverCapacityJobService evaluateDriverCapacityJobService;
     private final EvaluateSenderLimitJobService evaluateSenderLimitJobService;
     private final EvaluateResidualCapacityJobService evaluateResidualCapacityJobService;
+    private final EvaluateSenderPriorityJobService evaluateSenderPriorityJobService;
     private final ApplicationContext applicationContext;
     private final PnDelayerConfigs pnDelayerConfigs;
     private final PnDelayerUtils pnDelayerUtils;
@@ -47,6 +47,10 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         int exitCode;
         WorkflowStepEnum workflowStep = pnDelayerConfigs.getWorkflowStep();
         switch (workflowStep) {
+            case EVALUATE_SENDER_PRIORITY:
+                log.info("Starting Evaluate Sender Priority step");
+                exitCode = executeEvaluateSenderPriorityStep();
+                break;
             case EVALUATE_SENDER_LIMIT:
                 log.info("Starting Evaluate Sender Limit step");
                 exitCode = executeEvaluateSenderLimitStep();
@@ -129,6 +133,33 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
         }
     }
 
+
+    private int executeEvaluateSenderPriorityStep() throws JsonProcessingException {
+        String paIds = pnDelayerConfigs.getEvaluateSenderPriorityJobInput().getSenderPaIdList();
+        List<String> paIdList = objectMapper.readValue(paIds, new TypeReference<>() {});
+        LocalDate deliveryWeek = Objects.isNull(pnDelayerConfigs.getDeliveryWeek()) ? pnDelayerUtils.calculateDeliveryWeek(Instant.now()) : pnDelayerConfigs.getDeliveryWeek();
+        List<String> failedPaIds = new ArrayList<>();
+
+        for (String paId : paIdList) {
+            log.info("Starting batch for paId: {}", paId);
+            addMDC(paId);
+            try {
+                Mono<Void> monoExcecution = evaluateSenderPriorityJobService.startSenderPriorityJob(paId, deliveryWeek);
+                MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
+            } catch (Exception e) {
+                failedPaIds.add(paId);
+                log.error("Error while executing batch for paId {}", paId, e);
+            }
+        }
+
+        if (!failedPaIds.isEmpty()) {
+            log.error("Sender priority step completed with failures. Failed paIds: {}", failedPaIds);
+            return 1;
+        }
+
+        return 0;
+    }
+
     private int executeEvaluateSenderLimitStep() {
         String province = pnDelayerConfigs.getEvaluateSenderLimitJobInput().getProvince();
         String tenderId = pnDelayerConfigs.getActualTenderId();
@@ -140,6 +171,10 @@ public class PaperDeliveryJobRunner implements CommandLineRunner {
             MDCUtils.addMDCToContextAndExecute(monoExcecution).block();
             return 0;
         } catch (Exception e) {
+            if (e instanceof InvalidSenderLimitException) {
+                log.error("Invalid senderLimit percentage: job will fail without retry", e);
+                return 10;
+            }
             log.error("Error while executing batch", e);
             return 1;
         }

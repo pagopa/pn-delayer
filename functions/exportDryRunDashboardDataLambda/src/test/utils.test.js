@@ -4,6 +4,8 @@ const fs = require("fs");
 
 const {
   getCurrentMonday,
+  getCurrentDate,
+  getNextMonthDate,
   prepareQueryCondition
 } = require("../app/lib/utils");
 
@@ -32,6 +34,39 @@ describe("Query Utils", () => {
       expect(monday).to.equal("2024-02-05");
 
       global.Date = realDate;
+    });
+  });
+
+  describe("getCurrentDate()", () => {
+    it("ritorna la data corrente nel formato YYYY-MM-DD", () => {
+      const clock = sinon.useFakeTimers(new Date("2024-03-15T10:00:00Z").getTime());
+
+      const result = getCurrentDate();
+      expect(result).to.match(/^\d{4}-\d{2}-\d{2}$/);
+      expect(result).to.equal("2024-03-15");
+
+      clock.restore();
+    });
+  });
+
+  describe("getNextMonthDate()", () => {
+    it("ritorna l'anno e il mese successivo nel formato YYYY-MM", () => {
+      const clock = sinon.useFakeTimers(new Date("2024-03-15T10:00:00Z").getTime());
+
+      const result = getNextMonthDate();
+      expect(result).to.match(/^\d{4}-\d{2}$/);
+      expect(result).to.equal("2024-04");
+
+      clock.restore();
+    });
+
+    it("gestisce correttamente il passaggio da dicembre a gennaio", () => {
+      const clock = sinon.useFakeTimers(new Date("2024-12-10T10:00:00Z").getTime());
+
+      const result = getNextMonthDate();
+      expect(result).to.equal("2025-01");
+
+      clock.restore();
     });
   });
 

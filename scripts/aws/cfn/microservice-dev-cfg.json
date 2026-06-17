@@ -39,6 +39,8 @@
     "DelayerReceiverOrdersSendersReservedConcurrentExecutions": "5",
     "DelayerReceiverOrdersSendersBatchSize": "10",
     "DelayerReceiverOrdersSendersMaxBatchWindowInSeconds": "60",
-    "DelayerNotificationOrdersReservedConcurrentExecutions": "5"
+    "DelayerNotificationOrdersReservedConcurrentExecutions": "5",
+    "SenderPriorityVCPU": "1",
+    "SenderPriorityMemory": "4096"
   }
 }

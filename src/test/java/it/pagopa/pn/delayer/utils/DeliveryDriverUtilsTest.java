@@ -109,7 +109,7 @@ class DeliveryDriverUtilsTest {
         when(paperDeliveryUsedCapacityDAO.get(unifiedDeliveryDriver, geoKey, deliveryWeek))
                 .thenReturn(Mono.just(Tuples.of(100, 50)));
 
-        StepVerifier.create(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(geoKey, unifiedDeliveryDriver, tenderId, deliveryWeek))
+        StepVerifier.create(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, geoKey, unifiedDeliveryDriver, tenderId, deliveryWeek))
                 .expectNext(Tuples.of(100, 50))
                 .verifyComplete();
     }
@@ -121,12 +121,10 @@ class DeliveryDriverUtilsTest {
         String tenderId = "tender1";
         LocalDate deliveryWeek = LocalDate.now();
 
-        when(paperDeliveryUsedCapacityDAO.get(unifiedDeliveryDriver, geoKey, deliveryWeek))
-                .thenReturn(Mono.empty());
         when(paperDeliveryDriverCapacitiesDAO.getPaperDeliveryDriverCapacities(tenderId, unifiedDeliveryDriver, geoKey, deliveryWeek))
                 .thenReturn(Mono.just(100));
 
-        StepVerifier.create(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(geoKey, unifiedDeliveryDriver, tenderId, deliveryWeek))
+        StepVerifier.create(deliveryDriverUtils.retrieveDeclaredAndUsedCapacity(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, geoKey, unifiedDeliveryDriver, tenderId, deliveryWeek))
                 .expectNext(Tuples.of(100, 0))
                 .verifyComplete();
     }

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import org.springframework.util.StringUtils;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,19 +40,6 @@ public class PnDelayerUtils {
         return paperDeliveries.stream().collect(Collectors.groupingBy(PaperDelivery::getCap, Collectors.toList()));
     }
 
-    public Map<String, List<PaperDelivery>> groupByPaIdProductTypeProvince(List<PaperDelivery> paperDeliveries) {
-        return paperDeliveries.stream()
-                .collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + paperDelivery.getProvince(),
-                        Collectors.toList()));
-    }
-
-    public Map<String, Long> groupByPaIdProductTypeProvinceAndCount(List<PaperDelivery> paperDeliveries) {
-        return paperDeliveries.stream()
-                .collect(Collectors.groupingBy(
-                        paperDelivery -> paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + paperDelivery.getProvince(),
-                        Collectors.counting()));
-    }
-
     public Map<String, String> groupByGeoKeyAndProduct(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriver) {
         return paperChannelDeliveryDriver.stream()
                 .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriver::getUnifiedDeliveryDriver, (x, y) -> x));
@@ -58,6 +47,70 @@ public class PnDelayerUtils {
 
     public Map<String, List<PaperDelivery>> groupByCapAndProductType(List<PaperDelivery> paperDeliveries) {
         return paperDeliveries.stream().collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getCap() + "~" + paperDelivery.getProductType()));
+    }
+
+    /**
+     * Smista e raggruppa le spedizioni in un unico passaggio sulla lista di input, popolando
+     * {@link SenderLimitJobProcessObjects} con le liste destinate agli step successivi.
+     * <p>
+     * Per ogni {@link PaperDelivery} viene applicata, nell'ordine, la prima regola che corrisponde:
+     * <ol>
+     *     <li>se {@code senderPaId} è assente o vuoto, la spedizione viene aggiunta a
+     *     {@code sendToResidualCapacityStep} (verrà processata nello step EVALUATE_RESIDUAL_CAPACITY
+     *     perché non è possibile valutare un limite mittente senza paId);</li>
+     *     <li>se la comunicazione è INFORMAL, la spedizione viene aggiunta a
+     *     {@code sendToResidualCapacityStep} (le INFORMAL bypassano la valutazione del sender limit);</li>
+     *     <li>se il prodotto è RS oppure si tratta di un secondo tentativo ({@code attempt == 1}),
+     *     la spedizione viene aggiunta a {@code sendToDriverCapacityStep} (va direttamente allo step
+     *     EVALUATE_DRIVER_CAPACITY, senza consumare il sender limit);</li>
+     *     <li>negli altri casi la spedizione viene inserita nella mappa di output, raggruppata per
+     *     chiave {@code senderPaId~productType~province}, mantenendo l'ordine di input all'interno
+     *     di ogni gruppo. Questa mappa è l'input della valutazione del sender limit.</li>
+     * </ol>
+     * Le liste {@code sendToResidualCapacityStep} e {@code sendToDriverCapacityStep} vengono
+     * sostituite (non accodate) sull'oggetto di processo: la chiamata successiva a
+     * {@link #evaluateSenderLimitAndFilterDeliveries(Map, Map, SenderLimitJobProcessObjects)}
+     * provvederà ad aggiungere ulteriori spedizioni a queste stesse liste.
+     * <p>
+     *
+     * @param paperDeliveries lista delle spedizioni arricchite con driver e priorità da smistare
+     * @param senderLimitJobProcessObjects oggetto di processo in cui scrivere le liste destinate
+     *                                     agli step EVALUATE_RESIDUAL_CAPACITY e
+     *                                     EVALUATE_DRIVER_CAPACITY
+     * @return mappa delle spedizioni candidate alla valutazione del sender limit, raggruppate
+     *         per chiave {@code senderPaId~productType~province}
+     */
+    public Map<String, List<PaperDelivery>> classifyAndGroupForSenderLimit(List<PaperDelivery> paperDeliveries, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+        List<PaperDelivery> sendToResidualCapacityStep = new ArrayList<>();
+        List<PaperDelivery> sendToDriverCapacityStep = new ArrayList<>();
+        Map<String, List<PaperDelivery>> groupedForSenderLimit = new HashMap<>();
+
+        for (PaperDelivery paperDelivery : paperDeliveries) {
+            if (!StringUtils.hasText(paperDelivery.getSenderPaId())) {
+                sendToResidualCapacityStep.add(paperDelivery);
+            } else if (isInformal(paperDelivery)) {
+                sendToResidualCapacityStep.add(paperDelivery);
+            } else if (isRsOrSecondAttempt(paperDelivery)) {
+                sendToDriverCapacityStep.add(paperDelivery);
+            } else {
+                String key = paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + paperDelivery.getProvince();
+                groupedForSenderLimit.computeIfAbsent(key, unused -> new ArrayList<>()).add(paperDelivery);
+            }
+        }
+
+        senderLimitJobProcessObjects.setSendToResidualCapacityStep(sendToResidualCapacityStep);
+        senderLimitJobProcessObjects.setSendToDriverCapacityStep(sendToDriverCapacityStep);
+
+        return groupedForSenderLimit;
+    }
+
+    public Map<String, Long> groupingForExclude(List<PaperDelivery> paperDeliveries) {
+        return paperDeliveries.stream()
+                .filter(paperDelivery ->
+                        (paperDelivery.getProductType().equalsIgnoreCase("RS")
+                                || paperDelivery.getAttempt() == 1)
+                                && !"INFORMAL".equals(paperDelivery.getCommunicationType()))
+                .collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getProvince() + "~" + paperDelivery.getProductType(), Collectors.counting()));
     }
 
     public List<PaperDelivery> mapItemForResidualCapacityStep(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
@@ -144,29 +197,6 @@ public class PnDelayerUtils {
         senderLimitJobProcessObjects.getSendToDriverCapacityStep().addAll(sendToDriverCapacityStep);
     }
 
-    /**
-     * Filtra e smista le spedizioni in base al prodotto, tentativo e tipo di comunicazione(LEGAL / INFORMAL).
-     * Il metodo esegue separa le spedizioni in INFORMAL e LEGAL.<
-     * Tra le LEGAL Le RS o i secondi tentativi vengono inviati allo step EVALUATE_DRIVER_CAPACITY.
-     * Le restanti vengono restituite come risultato del metodo
-     * Tutte le spedizioni INFORMAL vengono inviate allo step EVALUATE_RESIDUAL_CAPACITY.
-     *
-     * @param items lista delle spedizioni in input
-     * @param senderLimitJobProcessObjects oggetto popolato con le spedizioni suddivise per step di processamento
-     * @return lista delle spedizioni non-INFORMAL che non sono né RS né di secondo tentativo
-     */
-    public List<PaperDelivery> excludeRsAndSecondAttempt(List<PaperDelivery> items, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
-        var partitionedByCommType = items.stream().collect(Collectors.partitioningBy(this::isInformal));
-        var informalItems = partitionedByCommType.get(true);
-        var legalItems = partitionedByCommType.get(false);
-        var byRsOrSecondAttempt = legalItems.stream().collect(Collectors.partitioningBy(this::isRsOrSecondAttempt));
-        senderLimitJobProcessObjects.setSendToDriverCapacityStep(byRsOrSecondAttempt.get(true));
-        senderLimitJobProcessObjects.setSendToResidualCapacityStep(
-                new ArrayList<>(informalItems)
-        );
-
-        return new ArrayList<>(byRsOrSecondAttempt.get(false));
-    }
 
     private boolean isInformal(PaperDelivery paperDelivery) {
         return CommunicationType.INFORMAL.name().equalsIgnoreCase(paperDelivery.getCommunicationType());

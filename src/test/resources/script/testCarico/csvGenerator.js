@@ -130,7 +130,7 @@ const regioni = {
         ['PT', ['51100', '51010', '51011']],
         ['SI', ['53100', '53011', '53012']]
     ],
-    'Trentino-Alto Adige': [
+    'Trentino-Alto Adige/Südtirol': [
         ['BZ', ['39100', '39010', '39011']],
         ['TN', ['38122', '38121', '38123']]
     ],
@@ -138,7 +138,7 @@ const regioni = {
         ['PG', ['06122', '06121', '06131']],
         ['TR', ['05100', '05010', '05011']]
     ],
-    'Valle d\'Aosta': [
+    'Valle d\'Aosta/Vallée d\'Aoste': [
         ['AO', ['11100', '11010', '11011']]
     ],
     'Veneto': [
@@ -222,7 +222,7 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
     const modulo = {
         "idEnte": senderPaId,
         "contractId": "5678abcftrs43d23el4",
-        "periodo_riferimento": "9-2025",
+        "periodo_riferimento": "5-2026",
         "last_update": "2025-01-01T00:00:00Z",
         "prodotti": [
             {
@@ -281,7 +281,7 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
         "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
         "Friuli-Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
         "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana",
-        "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"
+        "Trentino-Alto Adige/Südtirol", "Umbria", "Valle d'Aosta/Vallée d'Aoste", "Veneto"
     ];
 
     // Add regional distribution for AR NZ - each region has a fixed value
@@ -307,7 +307,7 @@ function creaModuloCommessa(senderPaId, valorePerRegione) {
 
 async function main() {
     // CSV header
-    const header = ['requestId', 'notificationSentAt', 'prepareRequestDate', 'productType', 'senderPaId', 'province', 'cap', 'attempt', 'iun'];
+    const header = ['requestId', 'notificationSentAt', 'prepareRequestDate', 'productType', 'senderPaId', 'province', 'cap', 'attempt', 'iun', 'communicationType', 'senderPriority'];
 
     const listaRegioni = Object.keys(regioni);
 
@@ -372,6 +372,8 @@ async function main() {
 
                     const requestId = `RequestId${requestIdCounter}`;
                     const iun = generaIun();
+                    const communicationType = 'LEGAL';
+                    const senderPriority = Math.floor(Math.random() * 101);
 
                     const row = [
                         requestId,
@@ -382,7 +384,9 @@ async function main() {
                         provincia,
                         cap,
                         attempt,
-                        iun
+                        iun,
+                        communicationType,
+                        senderPriority
                     ];
 
                     csvContent += row.join(';') + '\n';

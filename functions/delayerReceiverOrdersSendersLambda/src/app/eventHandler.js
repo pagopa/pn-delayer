@@ -24,6 +24,7 @@ exports.handleEvent = async (event = {}) => {
             const body = JSON.parse(record.body);
             const fileKey = body.key;
             const archiveProcessedAt = body.tags?.archiveProcessedAt?.[0];
+            const archiveFileKey = body.tags?.archiveFileKey?.[0];
             if (!archiveProcessedAt || archiveProcessedAt.trim() === '') {
                 console.error(`[HANDLER] Errore nel record ${record.messageId}: tag archiveProcessedAt is required`);
                 batchItemFailures.push({
@@ -47,7 +48,8 @@ exports.handleEvent = async (event = {}) => {
                 estimateJson,
                 region => getProvinceDistribution(region),
                 fileKey,
-                archiveProcessedAt
+                archiveProcessedAt,
+                archiveFileKey
             );
             allEstimates.push(...estimates);
 
