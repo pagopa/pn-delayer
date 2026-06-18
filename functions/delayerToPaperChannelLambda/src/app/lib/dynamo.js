@@ -4,10 +4,59 @@ const {
   DynamoDBDocumentClient,
   QueryCommand,
   BatchWriteCommand,
+  UpdateCommand,
 } = require("@aws-sdk/lib-dynamodb");
+const { LocalDate } = require('@js-joda/core');
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
+
+async function updateSenderPriorityCounter(paperDeliveryCounterTableName, groupedSenderPaIdRecords, deliveryWeek, batchItemFailures) {
+  let deliveryWeekLocalDate = LocalDate.parse(deliveryWeek);
+  const deliveryDate = deliveryWeekLocalDate.plusDays(7).toString();
+
+  for (const [senderPaId, records] of Object.entries(groupedSenderPaIdRecords)) {
+    const sk = `SENDER_PRIORITY~${senderPaId}`;
+    try {
+      const priorities = new Set(
+        records
+          .map(r => r.senderPriority)
+          .filter(p => p !== 0)
+      );
+      console.log(`Updating sender priority counter for senderPaId: ${senderPaId} with priorities: ${JSON.stringify(Array.from(priorities))}`);
+
+      if (!priorities || priorities.size === 0) {
+        console.log(`Skipping updating sender priority for senderPaId: ${senderPaId}`);
+        continue;
+      }
+
+      const input = {
+        TableName: paperDeliveryCounterTableName,
+        Key: {
+          pk: deliveryDate,
+          sk: sk
+        },
+        UpdateExpression: 'ADD #priorities :priorities SET #paId = :paId',
+        ExpressionAttributeNames: {
+          '#priorities': 'priorities',
+          '#paId': 'paId'
+        },
+        ExpressionAttributeValues: {
+          ':priorities': priorities,
+          ':paId': senderPaId
+        }
+      };
+      const command = new UpdateCommand(input);
+      await docClient.send(command);
+      console.log(`updateSuccessfully for ${sk}`);
+    } catch (error) {
+      console.error(`Failed to update sender priority counter for sk: ${sk}`, error);
+      const failedSeqNumbers = records.map(i => ({ itemIdentifier: i.kinesisSeqNumber }));
+      batchItemFailures.push(...failedSeqNumbers);
+    }
+  }
+  return batchItemFailures;
+}
 
 async function retrieveItems(paperDeliveryTableName, deliveryWeek, LastEvaluatedKey, limit, scanIndexForward) {
 
@@ -82,4 +131,4 @@ async function insertItemsBatch(paperDeliveryTableName, putRequests, retryCount)
 }
 
 
-module.exports = { retrieveItems, insertItems };
+module.exports = { retrieveItems, insertItems, updateSenderPriorityCounter };

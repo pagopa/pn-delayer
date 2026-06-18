@@ -31,7 +31,7 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
       workflowStep: `${step}`,
       senderPriority: item.senderPriority,
       virtualNotificationSentAt: item.virtualNotificationSentAt,
-      deliveryDate: item.deliveryDate,
+      deliveryDate: deliveryWeek,
       senderPaIdOriginalSentAt: item.senderPaIdOriginalSentAt,
       communicationType: item.communicationType
   };
