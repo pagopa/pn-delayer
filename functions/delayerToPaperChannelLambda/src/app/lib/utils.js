@@ -48,7 +48,8 @@ function buildSk(workflowStepEnum, paperDelivery) {
 
   switch (workflowStepEnum) {
     case "EVALUATE_SENDER_LIMIT":
-      return [paperDelivery.province, date, paperDelivery.requestId].join("~");
+      const skDate = paperDelivery.virtualNotificationSentAt || date;
+      return [paperDelivery.province, skDate, paperDelivery.requestId].join("~");
 
     case "SENT_TO_PREPARE_PHASE_2":
       return [paperDelivery.priority, date, paperDelivery.requestId].join("~");

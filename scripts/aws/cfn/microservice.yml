@@ -2060,11 +2060,6 @@ Resources:
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
             Action:
-              - dynamodb:UpdateItem
-            Resource:
-              - !Ref PaperDeliveryCounterTableArn
-          - Effect: Allow
-            Action:
               - sqs:SendMessage
             Resource: !Ref  DelayerToPaperChannelQueueARN
 

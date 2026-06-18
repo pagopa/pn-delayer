@@ -191,7 +191,6 @@
                   "executionDate.$": "$$.Execution.StartTime",
                   "fixed.$": "$.fixed",
                   "paperDeliveryTableName.$": "$.paperDeliveryTableName",
-                  "paperDeliveryCountersTableName.$": "$.paperDeliveryCountersTableName",
                   "processType": "SEND_TO_NEXT_WEEK",
                   "variable.$": "$.variable"
                 }
@@ -271,7 +270,6 @@
                   "executionDate.$": "$$.Execution.StartTime",
                   "fixed.$": "$.fixed",
                   "paperDeliveryTableName.$": "$.paperDeliveryTableName",
-                  "paperDeliveryCountersTableName.$": "$.paperDeliveryCountersTableName",
                   "processType": "SEND_TO_PHASE_2",
                   "variable.$": "$.variable"
                 }
