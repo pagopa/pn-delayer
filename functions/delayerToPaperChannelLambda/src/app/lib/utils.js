@@ -30,7 +30,10 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
       priority: item.priority,
       workflowStep: `${step}`,
       senderPriority: item.senderPriority,
-      virtualNotificationSentAt: item.virtualNotificationSentAt
+      virtualNotificationSentAt: item.virtualNotificationSentAt,
+      deliveryDate: item.deliveryDate,
+      senderPaIdOriginalSentAt: item.senderPaIdOriginalSentAt,
+      communicationType: item.communicationType
   };
 
   return Object.fromEntries(

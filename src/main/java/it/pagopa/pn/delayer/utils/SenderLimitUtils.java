@@ -111,6 +111,7 @@ public class SenderLimitUtils {
         }
 
         if (totalEstimate == 0) {
+            log.info("Total estimate is zero for productType: {}, paId: {}, province: {}. Returning limit as 0.", paperDeliverySenderLimit.getProductType(), paperDeliverySenderLimit.getPaId(), paperDeliverySenderLimit.getProvince());
             return 0;
         }
 
