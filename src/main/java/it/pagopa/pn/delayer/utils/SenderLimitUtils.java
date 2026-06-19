@@ -52,12 +52,16 @@ public class SenderLimitUtils {
                 .thenReturn(totalEstimateCounter);
     }
 
+    // metodo che recupera la counter SUM_ESTIMATES con fallback per retro-compatibilità sulla vecchia query
+    // a causa del nuovo formato da BEGIN WITH sk = SUM_ESTIMATES~<province>~<product>~
+    // a sk EQUALS SUM_ESTIMATES~<province>~<product>
     private Mono<PaperDeliveryCounter> getSumEstimateCounterWithFallback(LocalDate deliveryWeek, String province, String product) {
         String sk = PaperDeliveryCounter.buildSk(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product, province);
         String skPrefix = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product, province);
         String shipmentDate = deliveryWeek.minusWeeks(1).toString();
         return paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, sk)
                 .switchIfEmpty(Mono.defer(() -> paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, skPrefix, 1)
+                        .doOnNext(unused -> log.info("Retrieve counters with fallback: {}", skPrefix))
                         .flatMap(paperDeliveryCounters -> CollectionUtils.isEmpty(paperDeliveryCounters) ? Mono.empty() : Mono.just(paperDeliveryCounters.getFirst()))));
     }
 
