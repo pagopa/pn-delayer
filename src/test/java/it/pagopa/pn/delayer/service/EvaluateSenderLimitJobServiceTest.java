@@ -127,7 +127,8 @@ class EvaluateSenderLimitJobServiceTest {
         paperDeliveryCounter.setNumberOfShipments(8);
 
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
-
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
+                .thenReturn(Mono.empty());
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
 
@@ -192,8 +193,8 @@ class EvaluateSenderLimitJobServiceTest {
 
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
 
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
-                .thenReturn(Mono.just(paperDeliveryCounterList));
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
+                .thenReturn(Mono.just(paperDeliveryCounterList.getFirst()));
         when(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(anyList(), any(), any(), any()))
                 .thenReturn(deliveries)
                 .thenReturn(deliveries2);
@@ -265,7 +266,8 @@ class EvaluateSenderLimitJobServiceTest {
         paperDeliveryCounter.setNumberOfShipments(10);
 
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
-
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
+                .thenReturn(Mono.empty());
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
 
@@ -321,7 +323,8 @@ class EvaluateSenderLimitJobServiceTest {
         paperDeliveryCounter.setNumberOfShipments(100);
 
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
-
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
+                .thenReturn(Mono.empty());
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
                 .thenReturn(Mono.just(paperDeliveryCounterList));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any())).thenReturn(Flux.empty());
@@ -405,8 +408,8 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.retrieveFromCache("00185~RS"))
                 .thenReturn(Optional.empty());
         when(deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(any(), any(), any())).thenReturn(deliveries2);
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
-                .thenReturn(Mono.just(List.of(paperDeliveryCounter1)));
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
+                .thenReturn(Mono.just(paperDeliveryCounter1));
 
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))

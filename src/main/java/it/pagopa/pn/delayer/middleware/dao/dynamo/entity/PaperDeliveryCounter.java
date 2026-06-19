@@ -89,6 +89,13 @@ public class PaperDeliveryCounter {
         return String.join("~", attribute);
     }
 
+    public static String buildSk(SkPrefix skPrefix, String... attribute) {
+        if(Objects.nonNull(skPrefix)) {
+            return skPrefix.value + String.join("~", attribute);
+        }
+        return String.join("~", attribute);
+    }
+
     public enum SkPrefix {
         SUM_ESTIMATES("SUM_ESTIMATES~"),
         EXCLUDE("EXCLUDE~");
