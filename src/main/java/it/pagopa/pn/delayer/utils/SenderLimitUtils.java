@@ -40,21 +40,25 @@ public class SenderLimitUtils {
                 .thenReturn(senderLimitJobProcessObjects);
     }
 
-    public Mono<Map<String,Integer>> retrieveTotalEstimateCounter(LocalDate deliveryWeek, String province){
-        Map<String,Integer> totalEstimateCounter = new HashMap<>();
+    public Mono<Map<String, Integer>> retrieveTotalEstimateCounter(LocalDate deliveryWeek, String province) {
+        Map<String, Integer> totalEstimateCounter = new HashMap<>();
         return Flux.fromStream(Arrays.stream(ProductType.values()))
-                .flatMap(product -> {
-                    String sk = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product.getValue(), province);
-                    String shipmentDate = deliveryWeek.minusWeeks(1).toString();
-                    return paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, sk, 1)
-                            .flatMapMany(Flux::fromIterable)
-                            .map(counter -> Tuples.of(product, counter));
-                })
+                .flatMap(product -> getSumEstimateCounterWithFallback(deliveryWeek, province, product.getValue())
+                        .map(paperDeliveryCounter -> Tuples.of(product, paperDeliveryCounter)))
                 .collectList()
                 .filter(paperDeliveryCountersTuple -> !CollectionUtils.isEmpty(paperDeliveryCountersTuple))
                 .doOnNext(paperDeliveryCountersTuple -> paperDeliveryCountersTuple
                         .forEach(tuple -> totalEstimateCounter.put(tuple.getT1().getValue(), tuple.getT2().getNumberOfShipments())))
                 .thenReturn(totalEstimateCounter);
+    }
+
+    private Mono<PaperDeliveryCounter> getSumEstimateCounterWithFallback(LocalDate deliveryWeek, String province, String product) {
+        String sk = PaperDeliveryCounter.buildSk(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product, province);
+        String skPrefix = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product, province);
+        String shipmentDate = deliveryWeek.minusWeeks(1).toString();
+        return paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, sk)
+                .switchIfEmpty(Mono.defer(() -> paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, skPrefix, 1)
+                        .flatMap(paperDeliveryCounters -> CollectionUtils.isEmpty(paperDeliveryCounters) ? Mono.empty() : Mono.just(paperDeliveryCounters.getFirst()))));
     }
 
     /**

@@ -54,6 +54,12 @@ public class PaperDeliveryCounterDAOImpl implements PaperDeliveryCounterDAO {
                 .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", pk, sk, error));
     }
 
+    @Override
+    public Mono<PaperDeliveryCounter> getPaperDeliveryCounter(String pk, String sk) {
+        return Mono.fromFuture(tableCounter.getItem(Key.builder().partitionValue(pk).sortValue(sk).build()))
+                .doOnError(error -> log.error("Error retrieving paper delivery counter for deliveryDate: {} and key: {}", pk, sk, error));
+    }
+
     public Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer weeklyPrintCapacity) {
         log.info("update print capacity counter for deliveryDate={} with weeklyPrintCapacity={} and field counter to increment of={}",
                 deliveryDate, weeklyPrintCapacity, counter);
