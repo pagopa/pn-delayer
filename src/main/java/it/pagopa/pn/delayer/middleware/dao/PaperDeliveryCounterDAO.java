@@ -11,6 +11,8 @@ public interface PaperDeliveryCounterDAO {
 
     Mono<List<PaperDeliveryCounter>> getPaperDeliveryCounter(String pk, String sk, Integer limit);
 
+    Mono<PaperDeliveryCounter> getPaperDeliveryCounter(String pk, String sk);
+
     Mono<Void> updatePrintCapacityCounter(LocalDate deliveryDate, Integer counter, Integer weeklyPrintCapacity);
 
     Mono<Void> updateExcludeCounter(LocalDate deliveryWeek, Map<String, Long> excludeGroupedRecords);
