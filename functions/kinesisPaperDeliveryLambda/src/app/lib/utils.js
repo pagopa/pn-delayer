@@ -6,7 +6,6 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
   const record = {
     pk: buildPk(deliveryWeek),
     sk: buildSk(payload.recipientNormalizedAddress.pr, date, payload.requestId),
-    senderPaIdOriginalSentAt: !rsOrSecondAttempt && payload.senderPaId ? `${payload.senderPaId}~${date}` : null,
     requestId: payload.requestId,
     createdAt: new Date().toISOString(),
     notificationSentAt: payload.notificationSentAt,

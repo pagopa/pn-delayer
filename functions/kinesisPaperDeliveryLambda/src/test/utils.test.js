@@ -74,6 +74,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
+    expect(result).to.not.have.property('senderPaIdOriginalSentAt');
   });
 
 
@@ -112,6 +113,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
+    expect(result).to.not.have.property('senderPaIdOriginalSentAt');
   });
 
 
