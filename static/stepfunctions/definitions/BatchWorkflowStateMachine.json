@@ -6,7 +6,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "FunctionName": "${PreRunAlgorithmLambda}",
+        "FunctionName": "${PreRunAlgorithmLambdaArn}",
         "Payload": {
           "deliveryWeek.$": "$$.Execution.Input.PN_DELAYER_DELIVERYWEEK"
         }

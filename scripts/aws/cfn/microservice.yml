@@ -3193,7 +3193,7 @@ Resources:
         Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/BatchWorkflowStateMachine.json"
       DefinitionSubstitutions:
         TenderAPILambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
-        PreRunAlgorithmLambdaName: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
+        PreRunAlgorithmLambdaArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PreRunAlgorithmLambdaName}
         UnifiedDeliveryDriverProvinceParameter: !Ref UnifiedDeliveryDriverProvinceParameter
         PnDelayerDriverCapacityJobDefinition: !Sub '${ProjectName}-delayer-driver-capacity-job-definition'
         PnDelayerDriverCapacityJobQueue: !Ref DriverCapacityJobQueue
