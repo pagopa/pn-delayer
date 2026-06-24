@@ -26,7 +26,7 @@ public class AwsLambdaConfig {
     }
 
     private LambdaClient configureBuilder(LambdaClientBuilder builder) {
-        if (this.props != null && System.getenv("AWS_REGIONCODE") == null) {
+        if (this.props != null && isLocal()) {
             String profileName = this.props.getProfileName();
             if (StringUtils.isNotBlank(profileName)) {
                 builder.credentialsProvider(ProfileCredentialsProvider.create(profileName));
@@ -44,5 +44,9 @@ public class AwsLambdaConfig {
         }
 
         return builder.build();
+    }
+
+    private boolean isLocal() {
+        return System.getenv("AWS_REGIONCODE") == null;
     }
 }
