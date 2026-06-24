@@ -40,21 +40,29 @@ public class SenderLimitUtils {
                 .thenReturn(senderLimitJobProcessObjects);
     }
 
-    public Mono<Map<String,Integer>> retrieveTotalEstimateCounter(LocalDate deliveryWeek, String province){
-        Map<String,Integer> totalEstimateCounter = new HashMap<>();
+    public Mono<Map<String, Integer>> retrieveTotalEstimateCounter(LocalDate deliveryWeek, String province) {
+        Map<String, Integer> totalEstimateCounter = new HashMap<>();
         return Flux.fromStream(Arrays.stream(ProductType.values()))
-                .flatMap(product -> {
-                    String sk = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product.getValue(), province);
-                    String shipmentDate = deliveryWeek.minusWeeks(1).toString();
-                    return paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, sk, 1)
-                            .flatMapMany(Flux::fromIterable)
-                            .map(counter -> Tuples.of(product, counter));
-                })
+                .flatMap(product -> getSumEstimateCounterWithFallback(deliveryWeek, province, product.getValue())
+                        .map(paperDeliveryCounter -> Tuples.of(product, paperDeliveryCounter)))
                 .collectList()
                 .filter(paperDeliveryCountersTuple -> !CollectionUtils.isEmpty(paperDeliveryCountersTuple))
                 .doOnNext(paperDeliveryCountersTuple -> paperDeliveryCountersTuple
                         .forEach(tuple -> totalEstimateCounter.put(tuple.getT1().getValue(), tuple.getT2().getNumberOfShipments())))
                 .thenReturn(totalEstimateCounter);
+    }
+
+    // metodo che recupera la counter SUM_ESTIMATES con fallback per retro-compatibilità sulla vecchia query
+    // a causa del nuovo formato da BEGIN WITH sk = SUM_ESTIMATES~<province>~<product>~
+    // a sk EQUALS SUM_ESTIMATES~<province>~<product>
+    private Mono<PaperDeliveryCounter> getSumEstimateCounterWithFallback(LocalDate deliveryWeek, String province, String product) {
+        String sk = PaperDeliveryCounter.buildSk(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product, province);
+        String skPrefix = PaperDeliveryCounter.buildSkPrefix(PaperDeliveryCounter.SkPrefix.SUM_ESTIMATES, product, province);
+        String shipmentDate = deliveryWeek.minusWeeks(1).toString();
+        return paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, sk)
+                .switchIfEmpty(Mono.defer(() -> paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, skPrefix, 1)
+                        .doOnNext(unused -> log.info("Retrieve counters with fallback: {}", skPrefix))
+                        .flatMap(paperDeliveryCounters -> CollectionUtils.isEmpty(paperDeliveryCounters) ? Mono.empty() : Mono.just(paperDeliveryCounters.getFirst()))));
     }
 
     /**
@@ -111,6 +119,7 @@ public class SenderLimitUtils {
         }
 
         if (totalEstimate == 0) {
+            log.info("Total estimate is zero for productType: {}, paId: {}, province: {}. Returning limit as 0.", paperDeliverySenderLimit.getProductType(), paperDeliverySenderLimit.getPaId(), paperDeliverySenderLimit.getProvince());
             return 0;
         }
 
