@@ -534,6 +534,18 @@ Parameters:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
+
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to delayer receiver orders senders Mock lambda '
+
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN:
+    Type: String
+    Description: 'queue arn for safeStorage to delayer receiver orders senders Mock lambda'
+
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueURL:
+    Type: String
+    Description: 'Events from safe storage to pn-delayer queue URL'
   
   SafeStorageToNotificationOrdersQueueName:
     Type: String
