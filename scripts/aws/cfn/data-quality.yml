@@ -390,6 +390,8 @@ Resources:
               secondWeekArchiveProcessedAt:struct<S:string>,
               secondWeekNumberOfShipments:struct<N:string>,
               fullWeekArchiveProcessedAt:struct<S:string>,
+              notificationSentAtWeek:struct<S:string>,
+              weeklyEstimate:struct<N:string>,
               ttl:struct<N:string>
             >
 
@@ -426,6 +428,8 @@ Resources:
             secondWeekArchiveProcessedAt:struct<S:string>,
             secondWeekNumberOfShipments:struct<N:string>,
             fullWeekArchiveProcessedAt:struct<S:string>,
+            notificationSentAtWeek:struct<S:string>,
+            weeklyEstimate:struct<N:string>,
             ttl:struct<N:string>
           >
 

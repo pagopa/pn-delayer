@@ -28,6 +28,8 @@ public class PaperDeliveryCounter {
     public static final String COL_STOP_SEND_TO_PHASE_TWO = "stopSendToPhaseTwo";
     public static final String COL_DAILY_EXECUTION_NUMBER = "dailyExecutionNumber";
     public static final String COL_DAILY_EXECUTION_COUNTER = "dailyExecutionCounter";
+    public static final String COL_NOTIFICATION_SENT_AT_WEEK = "notificationSentAtWeek";
+    public static final String COL_WEEKLY_ESTIMATE = "weeklyEstimate";
 
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
@@ -50,6 +52,10 @@ public class PaperDeliveryCounter {
     private Integer sentToPhaseTwo;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_STOP_SEND_TO_PHASE_TWO)}))
     private Boolean stopSendToPhaseTwo;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_NOTIFICATION_SENT_AT_WEEK)}))
+    private String notificationSentAtWeek;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_WEEKLY_ESTIMATE)}))
+    private Integer weeklyEstimate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TTL)}))
     private long ttl;
 
