@@ -179,7 +179,10 @@ Resources:
             virtualNotificationSentAt:struct<S:string>,
             oldSk:struct<S:string>,
             senderPaIdOriginalSentAt:struct<S:string>,
-            communicationType:struct<S:string>
+            communicationType:struct<S:string>,
+            delayed:struct<N:string>,
+            previousStep:struct<S:string>,
+            skipSenderLimit:struct<N:string>
           >
 
   PaperDeliveryMockDataQualityStack:
@@ -221,7 +224,10 @@ Resources:
             virtualNotificationSentAt:struct<S:string>,
             oldSk:struct<S:string>,
             senderPaIdOriginalSentAt:struct<S:string>,
-            communicationType:struct<S:string>
+            communicationType:struct<S:string>,
+            delayed:struct<N:string>,
+            previousStep:struct<S:string>,
+            skipSenderLimit:struct<N:string>
           >
 
   PaperDeliveryDriverUsedCapacitiesDataQualityStack:
