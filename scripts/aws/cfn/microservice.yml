@@ -177,6 +177,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
 
+  PaperDeliverySenderLimitMockTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit mock'
+
+  PaperDeliverySenderLimitMockTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit mock'
+
   PaperDeliveryUsedSenderLimitTableName:
     Type: String
     Description: 'DynamoDB table name for PaperDeliveryUsedSenderLimit'
