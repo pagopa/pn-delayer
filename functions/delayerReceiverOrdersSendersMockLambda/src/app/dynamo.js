@@ -1,0 +1,467 @@
+'use strict';
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+
+const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+
+const PROVINCE_TABLE = process.env.PROVINCE_TABLE || 'pn-PaperChannelProvince';
+const LIMIT_TABLE = process.env.LIMIT_TABLE || 'pn-PaperDeliverySenderLimitMock';
+const COUNTERS_TABLE = process.env.COUNTERS_TABLE || 'pn-PaperDeliveryCountersMock';
+const FILEKEY_GSI = "fileKey-index";
+/**
+ * Query pn-PaperChannelProvince to get provinces and their percentage distribution for a region.
+ * @param {string} region
+ * @returns {Promise<Array<{province:string, percentageDistribution:number}>>}
+ */
+async function getProvinceDistribution(region) {
+    const params = {
+        TableName: PROVINCE_TABLE,
+        KeyConditionExpression: '#pk = :region',
+        ExpressionAttributeNames: { '#pk': 'region' },
+        ExpressionAttributeValues: { ':region': region }
+    };
+    const resp = await client.send(new QueryCommand(params));
+    return resp.Items || [];
+}
+
+/**
+ * Query pn-PaperDeliverySenderLimitMock to verify if items with same fileKey exists.
+ * @param {string} fileKey
+ * @returns {Promise<{Count: number}>} Count of items with the given fileKey
+ */
+async function existsSenderLimitByFileKey(fileKey) {
+    const params = {
+     TableName: LIMIT_TABLE,
+     IndexName: FILEKEY_GSI,
+     KeyConditionExpression: "#fk = :fk",
+     ExpressionAttributeNames: { "#fk": "fileKey" },
+     ExpressionAttributeValues: { ":fk": fileKey },
+     Limit: 1,
+     Select: "COUNT",
+    };
+
+    return await client.send(new QueryCommand(params));
+}
+
+/**
+ * Insert or update weekly estimates (pn-PaperDeliverySenderLimitMock).
+ * Uses BatchWrite for new items and UpdateCommand for partial‑week adjustments.
+ *
+ * @param {Array<object>} estimates result of calculateWeeklyEstimates
+ * @param fileKey fileKey of Safe Storage
+ */
+async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
+    // Separate puts vs updates
+    const fulls          = estimates.filter(e => e.weekType === 'FULL');
+    const partialStarts  = estimates.filter(e => e.weekType === 'PARTIAL_START');
+    const partialEnds    = estimates.filter(e => e.weekType === 'PARTIAL_END');
+
+    const ttlValue = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365; // 1y
+    // Batch write 25 items at a time
+    if (fulls.length) {
+        const batches = [];
+        for (let i = 0; i < fulls.length; i += 25) {
+          batches.push(fulls.slice(i, i + 25));
+        }
+
+        for (const batch of batches) {
+          const RequestItems = {
+            [LIMIT_TABLE]: batch.map(item => ({
+              PutRequest: {
+                  Item: {
+                      pk: `${item.paId}~${item.productType}~${item.province}`,
+                      deliveryDate: item.deliveryDate,
+                      weeklyEstimate: item.weeklyEstimate,
+                      monthlyEstimate: item.monthlyEstimate,
+                      originalEstimate: item.originalEstimate,
+                      paId: item.paId,
+                      productType: item.productType,
+                      province: item.province,
+                      fileKey: fileKey,
+                      archiveFileKey: archiveFileKey,
+                      ttl: ttlValue
+                  }
+              }
+            }))
+          };
+          await batchWriteWithRetry(RequestItems);
+        }
+    }
+
+    // === PARTIAL_START: usa secondWeekWeeklyEstimate ===
+    for (const p of partialStarts) {
+      await upsertPartial(p, ttlValue, fileKey, archiveFileKey, true);
+    }
+
+    // === PARTIAL_END: usa firstWeekWeeklyEstimate ===
+    for (const p of partialEnds) {
+      await upsertPartial(p, ttlValue, fileKey, archiveFileKey, false);
+    }
+
+  for (const item of estimates) {
+    await persistSumEstimateCounter(item, archiveFileKey);
+  }
+}
+
+  // Helper per gestire PARTIAL_START / PARTIAL_END
+  /**
+   * Esegue l'upsert parziale della stima settimanale su DynamoDB per le settimane
+   * di confine tra due mesi.
+   *
+   * Se la prima settimana calcolata non inizia il giorno 1 del mese, il metodo
+   * aggiorna o crea il record relativo alla settimana precedente, valorizzando
+   * solo la porzione di competenza del mese corrente.
+   *
+   * Se il record esiste, la stima settimanale viene ricalcolata sommando la
+   * quota della settimana corrente alla quota eventualmente già presente
+   * dell'altra porzione settimanale. Se il record non esiste, viene creato con
+   * la sola quota calcolata per i giorni del mese corrente.
+   *
+   * L'attributo fileKey rappresenta la chiave del file associato alla delivery date.
+   * Nel caso di settimana parziale di inizio mese (isStartMonth = true), se il record
+   * esiste già la fileKey preesistente (tipicamente quella del mese precedente) viene
+   * mantenuto; se il record non esiste, la fileKey viene inizializzata con la chiave
+   * del file corrente.
+   * es. Commesse Giugno/Luglio 2026 --> settimana parziale deliveryDate = 2026-06-29 (2d Giugno - 5d Luglio)
+   * - fileKey = commessa giugno
+   * - weeklyEstimate = stima per 2 giorni di Giugno + stima per 5 giorni di Luglio
+   * - secondWeekWeeklyEstimate = stima per 5 giorni di Luglio
+   * - firstWeekWeeklyEstimate = stima per 2 giorni di Giugno
+  */
+  async function upsertPartial(p, ttlValue, fileKey, archiveFileKey, isStartMonth) {
+      const pk = `${p.paId}~${p.productType}~${p.province}`;
+      const portionAttr = isStartMonth ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
+      const otherPortionAttr = isStartMonth ? 'firstWeekWeeklyEstimate' : 'secondWeekWeeklyEstimate';
+
+      const updateParts = [
+        'SET weeklyEstimate = if_not_exists(#otherWeekPortion, :zero) + :portion,',
+        '#portion = :portion,',
+        'monthlyEstimate  = if_not_exists(monthlyEstimate, :me),',
+        'originalEstimate = if_not_exists(originalEstimate, :oe),',
+        'productType      = if_not_exists(productType, :pt),',
+        'province         = if_not_exists(province, :pr),',
+        'paId             = if_not_exists(paId, :pa),',
+        isStartMonth
+            ? 'fileKey = if_not_exists(fileKey, :fk),'
+            : 'fileKey = :fk,',
+        isStartMonth
+            ? 'archiveFileKey = if_not_exists(archiveFileKey, :afk),'
+            : 'archiveFileKey = :afk,',
+        '#ttl             = if_not_exists(#ttl, :ttl) '
+      ];
+
+      const expressionValues = {
+        ':zero': 0,
+        ':portion': p.weeklyEstimate,
+        ':me': p.monthlyEstimate,
+        ':oe': p.originalEstimate,
+        ':pt': p.productType,
+        ':pr': p.province,
+        ':pa': p.paId,
+        ':ttl': ttlValue,
+        ':fk': fileKey,
+        ':afk': archiveFileKey
+      };
+
+      await client.send(new UpdateCommand({
+        TableName: LIMIT_TABLE,
+        Key: { pk, deliveryDate: p.deliveryDate },
+        UpdateExpression: updateParts.join(' '),
+        ExpressionAttributeNames: {
+          '#portion': portionAttr,
+          '#otherWeekPortion': otherPortionAttr,
+          '#ttl': 'ttl'
+        },
+        ExpressionAttributeValues: expressionValues
+      }));
+    }
+
+
+async function persistSumEstimateCounter(item, archiveFileKey) {
+  if (item.weekType === 'PARTIAL_START' || item.weekType === 'PARTIAL_END') {
+    await upsertPartialSumEstimateCounter(item, archiveFileKey);
+    return;
+  }
+
+  await upsertFullSumEstimateCounter(item, archiveFileKey);
+}
+
+/**
+ * Esegue l'upsert del contatore SUM_ESTIMATES per settimane complete (FULL).
+ *
+ * Il contatore è identificato da:
+ *  - pk = deliveryDate (inizio settimana)
+ *  - sk = SUM_ESTIMATES~productType~province
+ *
+ * Per ogni settimana completa, tutti i JSON appartenenti allo stesso ZIP
+ * (identificato da archiveProcessedAt) contribuiscono alla somma tramite
+ * operazioni incrementali (ADD).
+ *
+ * Il metodo garantisce:
+ *
+ * 1. Idempotenza a livello di ZIP:
+ *    - Se arriva un nuovo ZIP (archiveProcessedAt maggiore), il contatore viene
+ *      resettato e ricalcolato da zero.
+ *    - Se arrivano JSON appartenenti allo stesso ZIP, vengono sommati tra loro.
+ *
+ * 2. Protezione da ZIP obsoleti:
+ *    - Se arriva un JSON con archiveProcessedAt più vecchio rispetto a quello
+ *      già presente, l'aggiornamento viene ignorato.
+ *
+ * 3. Gestione consistente della versione:
+ *    - La versione del contatore per settimane FULL è tracciata tramite
+ *      l'attributo fullWeekArchiveProcessedAt.
+ *
+ * Flusso:
+ *  - Step 1: se la versione è nuova, resetta numberOfShipments a 0 e aggiorna versione
+ *  - Step 2: incrementa numberOfShipments solo se il JSON appartiene alla versione corrente
+ *
+ * @param {Object} item
+ * @param {string} item.deliveryDate - Data di inizio settimana (pk)
+ * @param {string} item.productType
+ * @param {string} item.province
+ * @param {number} item.weeklyEstimate - Valore da sommare
+ * @param {string|number} item.archiveProcessedAt - Versione dello ZIP
+ * @param {string|number} item.lastUpdate - Timestamp di aggiornamento
+ */
+async function upsertFullSumEstimateCounter(item, archiveFileKey) {
+  const key = {
+    pk: item.deliveryDate,
+    sk: buildSumEstimateCounterSk(item)
+  };
+
+  try {
+    await client.send(new UpdateCommand({
+      TableName: COUNTERS_TABLE,
+      Key: key,
+      UpdateExpression: `
+        SET
+          numberOfShipments = :zero,
+          fullWeekArchiveProcessedAt = :archiveProcessedAt,
+          productType = :productType,
+          province = :province,
+          archiveFileKey = :archiveFileKey
+      `,
+      ConditionExpression: `
+        attribute_not_exists(fullWeekArchiveProcessedAt)
+        OR fullWeekArchiveProcessedAt < :archiveProcessedAt
+      `,
+      ExpressionAttributeValues: {
+        ':zero': 0,
+        ':archiveProcessedAt': item.archiveProcessedAt,
+        ':productType': item.productType,
+        ':province': item.province,
+        ':archiveFileKey': archiveFileKey
+      }
+    }));
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') {
+      throw err;
+    }
+  }
+
+  try {
+    await client.send(new UpdateCommand({
+      TableName: COUNTERS_TABLE,
+      Key: key,
+      UpdateExpression: 'ADD numberOfShipments :inc',
+      ConditionExpression: 'fullWeekArchiveProcessedAt = :archiveProcessedAt',
+      ExpressionAttributeValues: {
+        ':inc': item.weeklyEstimate,
+        ':archiveProcessedAt': item.archiveProcessedAt
+      }
+    }));
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') {
+      throw err;
+    }
+  }
+}
+
+/**
+ * Esegue l'upsert del contatore SUM_ESTIMATES per settimane a cavallo tra due mesi
+ * (PARTIAL_START e PARTIAL_END).
+ *
+ * Il contatore è identificato da:
+ *  - pk = deliveryDate (inizio settimana)
+ *  - sk = SUM_ESTIMATES~productType~province
+ *
+ * La settimana è suddivisa in due porzioni:
+ *  - firstWeek: giorni appartenenti al mese precedente (PARTIAL_END)
+ *  - secondWeek: giorni appartenenti al mese corrente (PARTIAL_START)
+ *
+ * Ogni porzione è gestita in modo indipendente tramite:
+ *  - firstWeekNumberOfShipments / secondWeekNumberOfShipments
+ *  - firstWeekArchiveProcessedAt / secondWeekArchiveProcessedAt
+ *
+ * Il totale è sempre ricalcolato come:
+ *  numberOfShipments = firstWeekNumberOfShipments + secondWeekNumberOfShipments
+ *
+ * Il metodo garantisce:
+ *
+ * 1. Idempotenza a livello di ZIP per singola porzione:
+ *    - Se arriva un nuovo ZIP (archiveProcessedAt maggiore) per una porzione,
+ *      solo quella porzione viene resettata e ricalcolata.
+ *
+ * 2. Isolamento tra le due porzioni:
+ *    - Aggiornamenti su firstWeek non impattano secondWeek e viceversa.
+ *
+ * 3. Protezione da ZIP obsoleti:
+ *    - Se arriva un JSON con archiveProcessedAt più vecchio rispetto a quello
+ *      già presente per quella porzione, l'aggiornamento viene ignorato.
+ *
+ * 4. Accumulo corretto dei JSON:
+ *    - Tutti i JSON appartenenti allo stesso ZIP contribuiscono tramite ADD
+ *      alla rispettiva porzione.
+ *
+ * Flusso:
+ *  - Step 1: se la versione della porzione è nuova, resetta la porzione a 0
+ *  - Step 2: incrementa la porzione solo se il JSON appartiene alla versione corrente
+ *  - Step 3: ricalcola numberOfShipments come somma delle due porzioni
+ *
+ * Supporta correttamente scenari:
+ *  - arrivo fuori ordine (prima maggio poi aprile)
+ *  - reinvio completo di un mese (nuovo ZIP)
+ *  - aggiornamento indipendente delle due metà settimana
+ *
+ * @param {Object} item
+ * @param {string} item.deliveryDate - Data di inizio settimana (pk)
+ * @param {string} item.productType
+ * @param {string} item.province
+ * @param {number} item.weeklyEstimate - Valore da sommare alla porzione
+ * @param {'PARTIAL_START'|'PARTIAL_END'} item.weekType
+ * @param {string|number} item.archiveProcessedAt - Versione dello ZIP
+ * @param {string|number} item.lastUpdate - Timestamp di aggiornamento
+ */
+async function upsertPartialSumEstimateCounter(item, archiveFileKey) {
+  const key = {
+    pk: item.deliveryDate,
+    sk: buildSumEstimateCounterSk(item)
+  };
+
+  const isPartialStart = item.weekType === 'PARTIAL_START';
+
+  const portionAttr = isPartialStart
+    ? 'secondWeekNumberOfShipments'
+    : 'firstWeekNumberOfShipments';
+
+  const portionArchiveAttr = isPartialStart
+    ? 'secondWeekArchiveProcessedAt'
+    : 'firstWeekArchiveProcessedAt';
+
+  const otherPortionAttr = isPartialStart
+    ? 'firstWeekNumberOfShipments'
+    : 'secondWeekNumberOfShipments';
+
+  /*
+   * Step 1:
+   * se la porzione non esiste oppure arriva una versione più nuova dello ZIP,
+   * resetta solo quella porzione.
+   */
+  try {
+    await client.send(new UpdateCommand({
+      TableName: COUNTERS_TABLE,
+      Key: key,
+      UpdateExpression: [
+        'SET',
+        '#portion = :zero,',
+        '#numberOfShipments = if_not_exists(#otherPortion, :zero),',
+        '#portionArchive = :archiveProcessedAt,',
+        'productType = :productType,',
+        'province = :province,',
+        'archiveFileKey = :archiveFileKey'
+      ].join(' '),
+      ConditionExpression: [
+        'attribute_not_exists(#portionArchive)',
+        'OR #portionArchive < :archiveProcessedAt'
+      ].join(' '),
+      ExpressionAttributeNames: {
+        '#portion': portionAttr,
+        '#otherPortion': otherPortionAttr,
+        '#portionArchive': portionArchiveAttr,
+        '#numberOfShipments': 'numberOfShipments'
+      },
+      ExpressionAttributeValues: {
+        ':zero': 0,
+        ':archiveProcessedAt': item.archiveProcessedAt,
+        ':productType': item.productType,
+        ':province': item.province,
+        ':archiveFileKey': archiveFileKey
+      }
+    }));
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') {
+      throw err;
+    }
+  }
+
+  /*
+   * Step 2:
+   * incrementa solo se il JSON appartiene alla versione corrente della porzione.
+   * Questo consente a tutti i JSON dello stesso ZIP di concorrere alla somma,
+   * ma impedisce a ZIP vecchi di sporcare il contatore.
+   */
+  try {
+    await client.send(new UpdateCommand({
+      TableName: COUNTERS_TABLE,
+      Key: key,
+      UpdateExpression: 'ADD #portion :inc, #numberOfShipments :inc',
+      ConditionExpression: '#portionArchive = :archiveProcessedAt',
+      ExpressionAttributeNames: {
+        '#portion': portionAttr,
+        '#portionArchive': portionArchiveAttr,
+        '#numberOfShipments': 'numberOfShipments'
+      },
+      ExpressionAttributeValues: {
+        ':inc': item.weeklyEstimate,
+        ':archiveProcessedAt': item.archiveProcessedAt
+      }
+    }));
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') {
+      throw err;
+    }
+  }
+}
+
+function buildSumEstimateCounterSk(item) {
+  return `SUM_ESTIMATES~${item.productType}~${item.province}`;
+}
+
+/**
+ * Helper that executes BatchWriteCommand and transparently retries
+ * UnprocessedItems with exponential back‑off + jitter as recommended by AWS.
+ *
+ * @param {Record<string, Array<Object>>} requestItems
+ * @param {number} maxRetries
+ */
+async function batchWriteWithRetry(requestItems, maxRetries = 5) {
+    let unprocessed = requestItems;
+    let attempt = 0;
+
+    while (unprocessed && Object.keys(unprocessed).length > 0) {
+        const resp = await client.send(new BatchWriteCommand({ RequestItems: unprocessed }));
+        unprocessed = resp.UnprocessedItems;
+
+        if (!unprocessed || Object.keys(unprocessed).length === 0) {
+            break; // done
+        }
+
+        if (attempt >= maxRetries) {
+            // You may prefer just logging and letting the caller decide
+            const err = new Error('Exceeded maxRetries while writing to DynamoDB');
+            err.unprocessedItems = unprocessed;
+            throw err;
+        }
+
+        // Exponential back‑off with full‑jitter (AWS-recommended)
+        const delay = Math.floor(Math.pow(2, attempt) * 100 + Math.random() * 100);
+        await new Promise(r => setTimeout(r, delay));
+        attempt++;
+    }
+}
+
+
+
+
+module.exports = { getProvinceDistribution, persistWeeklyEstimates, existsSenderLimitByFileKey };

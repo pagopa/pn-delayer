@@ -691,6 +691,17 @@ Resources:
         LogGroupName: !Sub ${ProjectName}-delayer-receiverOrdersSendersLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
+
+  DelayerReceiverOrdersSendersMockLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-receiverOrdersSendersMockLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
   
   DelayerNotificationOrdersLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -958,6 +969,9 @@ Outputs:
 
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
+
+  DelayerReceiverOrdersSendersMockLambdaName:
+    Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersMockLambda"
   
   DelayerNotificationOrdersLambdaName:
     Value: !Sub "${ProjectName}-delayer-notificationOrdersLambda"
