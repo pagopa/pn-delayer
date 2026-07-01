@@ -1791,6 +1791,37 @@ Resources:
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
+  # Send Safe Storage Response to delayerReceiverOrdersSendersMockLambda
+  PnCoreEventBusToDelayerOrdersSendersMockSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Route SafeStorage Events to pn-delayerReceiverOrdersSendersMockLambda
+      RoleArn: !GetAtt "DelayerOrdersSendersEventBusEnqueueRole.Arn"
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_SERVICE_ORDER_MOCK' ]
+      Targets:
+        - Arn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:PnCoreEventBusMatchedEventLogger
+          Id: !Sub ${ProjectName}-Logger-SafeStore2DelayerOrdersSendersMock
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }
+        - Id: !Sub '${ProjectName}-SafeStore2DelayerSendersOrdersMock'
+          Arn: !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
+          InputPath: $.detail
+          DeadLetterConfig:
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+
   DelayerOrdersSendersEventBusEnqueueRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1817,6 +1848,7 @@ Resources:
                 Effect: Allow
                 Resource:
                   - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+                  - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
 
   DelayerInputsRole:
     Type: AWS::IAM::Role
@@ -3700,6 +3732,23 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+
+  DelayerOrdersSendersMockQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueURL
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "SQS:SendMessage"
+            Resource:
+              - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
 
   DelayerNotificationOrdersQueuePolicy:
     Type: AWS::SQS::QueuePolicy
