@@ -4,15 +4,19 @@ const {
   updateExcludeCounter,
   updateSenderPriorityCounter,
   batchWriteKinesisEventRecords,
-  batchGetKinesisEventRecords
+  batchGetKinesisEventRecords,
+  getSenderLimit,
+  createDelayedCounter
 } = require("./lib/dynamo");
 const {
   buildPaperDeliveryRecord,
   buildPaperDeliveryKinesisEventRecord,
   groupRecordsByProductAndProvince,
-  groupRecordsBySenderPaId
+  groupRecordsBySenderPaId,
+  groupDelayedRecords,
+  isCurrentWeek,
+  getDeliveryWeek
 } = require("./lib/utils");
-const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
 
 exports.handleEvent = async (event) => {
   console.log("Event received:", JSON.stringify(event));
@@ -32,29 +36,95 @@ exports.handleEvent = async (event) => {
 
   let batchItemFailures = [];
   let paperDeliveryRecords = [];
+  const delayedPaperDeliveryList = [];
   const requestIds = new Set();
-  const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
-  const deliveryWeek = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
+  const deliveryWeek = getDeliveryWeek();
 
+  // Separazione record per settimana corrente vs precedenti
   for (const eventItem of filteredData) {
-    const record = {
-      entity: { ...buildPaperDeliveryRecord(eventItem, deliveryWeek) },
-      kinesisSeqNumber: eventItem.kinesisSeqNumber
-    };
-    if (!requestIds.has(record.entity.requestId)) {
-      requestIds.add(record.entity.requestId);
-      paperDeliveryRecords.push(record);
+    const inCurrentWeek = isCurrentWeek(eventItem.notificationSentAt);
+
+    if (inCurrentWeek) {
+      console.log("Current week");
+      addPaperDeliveryRecordIfNew({
+        eventItem,
+        deliveryWeek,
+        delayed: false,
+        requestIds,
+        paperDeliveryRecords
+      });
+    } else {
+      console.log("Previous week");
+      delayedPaperDeliveryList.push(eventItem);
     }
   }
 
-  const alreadyEvaluatedEvents = await batchGetKinesisEventRecords(
-    paperDeliveryRecords.map(record => record.entity.requestId)
-  );
-  if (alreadyEvaluatedEvents.length > 0) {
-    console.log("Skipping already evaluated events");
-    paperDeliveryRecords = paperDeliveryRecords.filter(
-      record => !alreadyEvaluatedEvents.includes(record.entity.requestId)
+  // Elaborazione record delayed
+  if (delayedPaperDeliveryList.length > 0) {
+    console.log(`Processing ${delayedPaperDeliveryList.length} delayed records`);
+    const groupedDelayedRecords = groupDelayedRecords(delayedPaperDeliveryList);
+
+    for (const [groupKey, groupRecords] of Object.entries(groupedDelayedRecords)) {
+      const [notificationSentAtWeek, senderPaId, productType, province] = groupKey.split("~");
+
+      console.log(`Processing delayed group: ${groupKey}`);
+
+      const senderLimitItem = await getSenderLimit(
+        senderPaId,
+        productType,
+        province,
+        notificationSentAtWeek
+      );
+
+      let hasSenderLimit = senderLimitItem && senderLimitItem.weeklyEstimate > 0;
+
+      if (hasSenderLimit) {
+        console.log(`Found sender limit for ${groupKey}: ${senderLimitItem.weeklyEstimate}`);
+        try {
+          await createDelayedCounter(
+            deliveryWeek,
+            notificationSentAtWeek,
+            senderPaId,
+            productType,
+            province,
+            groupRecords.length,
+            senderLimitItem.weeklyEstimate
+          );
+        } catch (error) {
+          console.error(`Failed to create delayed counter for group ${groupKey}`, error);
+          batchItemFailures.push(
+            ...groupRecords.map(item => ({ itemIdentifier: item.kinesisSeqNumber }))
+          );
+          hasSenderLimit = false;
+          continue;
+        }
+      } else {
+        console.log(`No sender limit found for ${groupKey}`);
+      }
+
+      for (const eventItem of groupRecords) {
+        addPaperDeliveryRecordIfNew({
+          eventItem,
+          deliveryWeek,
+          delayed: !!hasSenderLimit,
+          requestIds,
+          paperDeliveryRecords
+        });
+      }
+    }
+  }
+
+  // Verifica record già elaborati
+  if (paperDeliveryRecords.length > 0) {
+    const alreadyEvaluatedEvents = await batchGetKinesisEventRecords(
+      paperDeliveryRecords.map(record => record.entity.requestId)
     );
+    if (alreadyEvaluatedEvents.length > 0) {
+      console.log("Skipping already evaluated events");
+      paperDeliveryRecords = paperDeliveryRecords.filter(
+        record => !alreadyEvaluatedEvents.includes(record.entity.requestId)
+      );
+    }
   }
 
   if (paperDeliveryRecords.length > 0) {
@@ -77,10 +147,10 @@ exports.handleEvent = async (event) => {
   }
 
   if (paperDeliveryRecords.length > 0) {
-    const requestIds = paperDeliveryRecords.map(record =>
+    const kinesisEventRecords = paperDeliveryRecords.map(record =>
       buildPaperDeliveryKinesisEventRecord(record.entity.requestId)
     );
-    await batchWriteKinesisEventRecords(requestIds);
+    await batchWriteKinesisEventRecords(kinesisEventRecords);
     console.log(`Processed ${paperDeliveryRecords.length} records successfully`);
   } else {
     console.log("No new records to write to Kinesis sequence number table");
@@ -89,22 +159,43 @@ exports.handleEvent = async (event) => {
   return { batchItemFailures };
 };
 
+function addPaperDeliveryRecordIfNew({
+  eventItem,
+  deliveryWeek,
+  delayed,
+  requestIds,
+  paperDeliveryRecords
+}) {
+  const record = {
+    entity: { ...buildPaperDeliveryRecord(eventItem, deliveryWeek, delayed) },
+    kinesisSeqNumber: eventItem.kinesisSeqNumber
+  };
+
+  if (!requestIds.has(record.entity.requestId)) {
+    requestIds.add(record.entity.requestId);
+    paperDeliveryRecords.push(record);
+  }
+}
+
 function filterFailedRecords(records, failures) {
-  return records.filter(record =>
-    !failures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber)
+  return records.filter(
+    record => !failures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber)
   );
 }
 
 function filterInvalidRecords(records) {
-    const filteredData = [];
-    for (const item of records) {
-        if (item.attempt !== undefined && item.attempt !== null
-            && item.prepareRequestDate
-            && item.notificationSentAt) {
-            filteredData.push(item);
-        } else {
-            console.warn(`Skipping invalid event: ${item.requestId}`);
-        }
+  const filteredData = [];
+  for (const item of records) {
+    if (
+      item.attempt !== undefined &&
+      item.attempt !== null &&
+      item.prepareRequestDate &&
+      item.notificationSentAt
+    ) {
+      filteredData.push(item);
+    } else {
+      console.warn(`Skipping invalid event: ${item.requestId}`);
     }
-    return filteredData;
+  }
+  return filteredData;
 }
