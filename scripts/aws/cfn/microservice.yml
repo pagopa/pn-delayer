@@ -2356,7 +2356,7 @@ Resources:
       Handler: "index.handler"
       Code:
         S3Bucket: !Ref MicroserviceBucketName
-        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerReceiverOrdersSendersMockLambda.zip"
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerReceiverOrdersSendersLambda.zip"
       Role: !GetAtt DelayerReceiverOrdersSendersMockLambdaRole.Arn
       Environment:
         Variables:
