@@ -782,6 +782,17 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
+  SentPaperDeliveryToPreparePhaseTwoLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-SentPaperDeliveryToPreparePhaseTwoLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   PreRunRetryLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -1054,6 +1065,9 @@ Outputs:
 
   SwitchOffAlgorithmLambdaName:
     Value: !Sub "${ProjectName}-delayer-switchOffAlgorithmLambda"
+
+  SentPaperDeliveryToPreparePhaseTwoLambdaName:
+    Value: !Sub "${ProjectName}-delayer-sentPaperDeliveryToPreparePhaseTwoLambda"
 
   ExportDelayerDataLambdaName:
     Value: !Sub "${ProjectName}-exportDelayerDataLambda"
