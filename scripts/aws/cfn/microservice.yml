@@ -3557,6 +3557,70 @@ Resources:
               Resource:
                 - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:BatchWorkflowStateMachine
 
+  SentPaperDeliveryToPreparePhaseTwoStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - SentPaperDeliveryToPreparePhaseTwoStateMachinePolicy
+    Properties:
+      StateMachineName: sentPaperDeliveryToPreparePhaseTwoStateMachine
+      RoleArn: !GetAtt SentPaperDeliveryToPreparePhaseTwoStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/sentPaperDeliveryToPreparePhaseTwoStateMachine.json"
+      DefinitionSubstitutions:
+        testDelayerBucketName: !Ref TestDelayerBucketName
+        sentPaperDeliveryToPreparePhaseTwoLambda: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SentPaperDeliveryToPreparePhaseTwoLambdaName}
+      TracingConfiguration:
+        Enabled: false
+
+  SentPaperDeliveryToPreparePhaseTwoStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-sentPaperDeliveryToPreparePhaseTwoStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  SentPaperDeliveryToPreparePhaseTwoStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-sentPaperDeliveryToPreparePhaseTwoStateMachinePolicy
+      Roles:
+        - !Ref SentPaperDeliveryToPreparePhaseTwoStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub arn:aws:s3:::${TestDelayerBucketName}/*
+
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SentPaperDeliveryToPreparePhaseTwoLambdaName}
+          # Required for Distributed Map
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:sentPaperDeliveryToPreparePhaseTwoStateMachine
+
+          - Effect: Allow
+            Action:
+              - states:DescribeExecution
+              - states:StopExecution
+            Resource:
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:sentPaperDeliveryToPreparePhaseTwoStateMachine:*
+
   RetryAlgorithmStateMachine:
     Type: AWS::StepFunctions::StateMachine
     DependsOn:
