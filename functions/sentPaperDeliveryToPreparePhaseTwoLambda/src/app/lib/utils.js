@@ -1,5 +1,5 @@
-function buildPaperDeliveryRecord(payload, deliveryWeek) {
-  let date = retrieveDate(payload);
+function buildPaperDeliveryRecord(payload) {
+  const date = retrieveDate(payload);
   return {
     pk: buildPk(payload.deliveryDate),
     sk: buildSk(date, payload.requestId),
@@ -7,7 +7,6 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     createdAt: new Date().toISOString(),
     notificationSentAt: payload.notificationSentAt,
     prepareRequestDate: payload.prepareRequestDate,
-    priority: priority,
     productType: payload.productType,
     senderPaId: payload.senderPaId,
     province: payload.province,
@@ -16,35 +15,45 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     iun: payload.iun,
     unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
     tenderId: payload.tenderId,
+    priority: payload.priority,
     recipientId: payload.recipientId,
-    workflowStep: 'SENT_TO_PREPARE_PHASE_2',
     deliveryDate: payload.deliveryDate,
+    workflowStep: 'SENT_TO_PREPARE_PHASE_2',
     communicationType: payload.communicationType,
     senderPriority: payload.senderPriority,
     virtualNotificationSentAt: payload.virtualNotificationSentAt,
     oldSk: payload.oldSk
   };
-};
-
-function retrieveDate(payload) {
-    if (payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
-      return payload.prepareRequestDate;
-    } else {
-      return payload.notificationSentAt;
-    }
 }
 
-function buildPk(deliveryWeek) {
-    return `${deliveryWeek}~SENT_TO_PREPARE_PHASE_2`;
+function retrieveDate(payload) {
+  const isFirstAttempt = payload.attempt && Number.parseInt(payload.attempt, 10) === 1;
+
+  return payload.productType === 'RS' || isFirstAttempt
+    ? payload.prepareRequestDate
+    : payload.notificationSentAt;
+}
+
+function buildPk(deliveryDate) {
+  return `${deliveryDate}~SENT_TO_PREPARE_PHASE_2`;
 }
 
 function buildSk(date, requestId) {
-    return `${date}~${requestId}`;
+  return `${date}~${requestId}`;
 }
 
-function chunkArray(messages, size) {
-    return Array.from({ length: Math.ceil(messages.length / size) },
-    (_, i) => messages.slice(i * size, i * size + size));
+function chunkArray(items, size) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return [];
+  }
+
+  return Array.from(
+    { length: Math.ceil(items.length / size) },
+    (_, index) => items.slice(index * size, index * size + size)
+  );
 }
 
-module.exports = { buildPaperDeliveryRecord, chunkArray };
+module.exports = {
+  buildPaperDeliveryRecord,
+  chunkArray
+};

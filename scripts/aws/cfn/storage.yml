@@ -255,6 +255,50 @@ Resources:
       KinesisStreamSpecification:
         StreamArn: !Ref CdcKinesisSourceStreamArn
 
+  PaperDeliverySenderLimitMockTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub '${ProjectName}-PaperDeliverySenderLimitMock'
+      AttributeDefinitions:
+        - AttributeName: "pk"
+          AttributeType: "S"
+        - AttributeName: "deliveryDate"
+          AttributeType: "S"
+        - AttributeName: "province"
+          AttributeType: "S"
+        - AttributeName: "fileKey"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "pk"
+          KeyType: "HASH"
+        - AttributeName: "deliveryDate"
+          KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "deliveryDateProvince-index"
+          KeySchema:
+            - AttributeName: "deliveryDate"
+              KeyType: "HASH"
+            - AttributeName: "province"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "fileKey-index"
+          KeySchema:
+            - AttributeName: "fileKey"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+      BillingMode: "PAY_PER_REQUEST"
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      KinesisStreamSpecification:
+        StreamArn: !Ref CdcKinesisSourceStreamArn
+
   PaperDeliveryUsedSenderLimitTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
@@ -545,6 +589,19 @@ Resources:
         DelaySeconds: 1
         VisibilityTimeout: 1800 #30 min
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM SafeStorage TO delayerReceiverOrdersSendersMockLambda ###
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_delayer_orders_senders_mock'
+        DelaySeconds: 1
+        VisibilityTimeout: 1800 #30 min
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
   ### Communication FROM SafeStorage TO NotificationOrdersQueue ###
   SafeStorageToNotificationOrdersQueueName:
@@ -691,6 +748,17 @@ Resources:
         LogGroupName: !Sub ${ProjectName}-delayer-receiverOrdersSendersLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
+
+  DelayerReceiverOrdersSendersMockLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-receiverOrdersSendersMockLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
   
   DelayerNotificationOrdersLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -711,6 +779,17 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Sub ${ProjectName}-delayer-switchOffAlgorithmLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  SentPaperDeliveryToPreparePhaseTwoLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-delayer-SentPaperDeliveryToPreparePhaseTwoLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
@@ -873,6 +952,13 @@ Outputs:
     Description: ARN of dynamodb table containing PaperDeliverySenderLimit
     Value: !Sub '${PaperDeliverySenderLimitTable.Arn}'
 
+  PaperDeliverySenderLimitMockTableName:
+    Description: Name of dynamodb table containing PaperDeliverySenderLimit mock
+    Value: !Ref PaperDeliverySenderLimitMockTable
+  PaperDeliverySenderLimitMockTableArn:
+    Description: ARN of dynamodb table containing PaperDeliverySenderLimit mock
+    Value: !Sub '${PaperDeliverySenderLimitMockTable.Arn}'
+
   PaperDeliveryUsedSenderLimitTableName:
     Description: Name of dynamodb table containing PaperDeliveryUsedSenderLimit
     Value: !Ref PaperDeliveryUsedSenderLimitTable
@@ -904,6 +990,15 @@ Outputs:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN:
     Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueARN
     Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue ARN
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueQueueName:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueue.Outputs.QueueName
+    Description: SafeStorage-to-delayerReceiverOrdersSendersMockLambda queue name
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueURL:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueue.Outputs.QueueURL
+    Description: SafeStorage-to-delayerReceiverOrdersSendersMockLambda queue URL
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueue.Outputs.QueueARN
+    Description: SafeStorage-to-delayerReceiverOrdersSendersMockLambda queue ARN
   SafeStorageToNotificationOrdersQueueName:
     Value: !GetAtt SafeStorageToNotificationOrdersQueueName.Outputs.QueueName
     Description: SafeStorage-to-NotificationOrders queue name
@@ -958,6 +1053,9 @@ Outputs:
 
   DelayerReceiverOrdersSendersLambdaName:
     Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersLambda"
+
+  DelayerReceiverOrdersSendersMockLambdaName:
+    Value: !Sub "${ProjectName}-delayer-receiverOrdersSendersMockLambda"
   
   DelayerNotificationOrdersLambdaName:
     Value: !Sub "${ProjectName}-delayer-notificationOrdersLambda"
@@ -967,6 +1065,9 @@ Outputs:
 
   SwitchOffAlgorithmLambdaName:
     Value: !Sub "${ProjectName}-delayer-switchOffAlgorithmLambda"
+
+  SentPaperDeliveryToPreparePhaseTwoLambdaName:
+    Value: !Sub "${ProjectName}-delayer-sentPaperDeliveryToPreparePhaseTwoLambda"
 
   ExportDelayerDataLambdaName:
     Value: !Sub "${ProjectName}-exportDelayerDataLambda"
