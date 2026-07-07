@@ -519,6 +519,10 @@ Parameters:
     Type: String
     Description: 'ReceiverOrdersSendersLambda function name'
 
+  DelayerReceiverOrdersSendersMockLambdaName:
+    Type: String
+    Description: 'ReceiverOrdersSendersLambdaMock function name'
+
   DelayerNotificationOrdersLambdaName:
     Type: String
     Description: 'NotificationOrdersLambda function name'
@@ -553,8 +557,8 @@ Parameters:
 
   SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueURL:
     Type: String
-    Description: 'Events from safe storage to pn-delayer queue URL'
-  
+    Description: 'Events from safe storage to pn-delayer Mock queue URL'
+
   SafeStorageToNotificationOrdersQueueName:
     Type: String
     Description: 'queue name for safeStorage to notification orders queue'
@@ -2331,6 +2335,117 @@ Resources:
       MaximumBatchingWindowInSeconds: !Ref DelayerReceiverOrdersSendersMaxBatchWindowInSeconds
       FunctionResponseTypes:
         - ReportBatchItemFailures
+
+  #########################################################
+  ###         DelayerReceiverOrdersSendersMockLambda          ###
+  #########################################################
+
+  DelayerReceiverOrdersSendersMockLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${DelayerReceiverOrdersSendersMockLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  DelayerReceiverOrdersSendersMockLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref DelayerReceiverOrdersSendersMockLambdaName
+      ReservedConcurrentExecutions: !Ref DelayerReceiverOrdersSendersReservedConcurrentExecutions
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerReceiverOrdersSendersLambda.zip"
+      Role: !GetAtt DelayerReceiverOrdersSendersMockLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PN_SAFESTORAGE_URL: !Ref SandboxSafeStorageBaseUrl
+          PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
+          PAPER_CHANNEL_PROVINCE_TABLENAME: !Ref ProvinceTableName
+          PAPER_DELIVERY_SENDER_LIMIT_TABLENAME: !Ref PaperDeliverySenderLimitMockTableName
+          PAPER_DELIVERY_COUNTERS_TABLENAME: !Ref PaperDeliveryCounterMockTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 300 #5 min
+      VpcConfig:
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
+        SecurityGroupIds:
+          - !GetAtt DelayerReceiverOrdersSendersMockLambdaSecGroup.GroupId
+
+  # Lambda function role
+  DelayerReceiverOrdersSendersMockLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-DelayerReceiverOrdersSendersMockLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+
+  # Lambda function IAM policy
+  DelayerReceiverOrdersSendersMockLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DelayerReceiverOrdersSendersMockLambdaPolicy
+      Roles:
+        - !Ref DelayerReceiverOrdersSendersMockLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:BatchWriteItem
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub "${ProvinceTableArn}"
+              - !Sub "${ProvinceTableArn}/*"
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}"
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}/*"
+              - !Sub "${PaperDeliveryCounterMockTableArn}"
+              - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ReceiveMessage
+            Resource:
+              - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
+              - !Ref SafeStorageToNotificationOrdersQueueARN
+
+  DelayerReceiverOrdersSendersMockLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DelayerReceiverOrdersSendersMockLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  DelayerReceiverOrdersSendersMockLambdaSQSSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: !Ref DelayerReceiverOrdersSendersBatchSize
+      EventSourceArn: !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
+      FunctionName: !Ref DelayerReceiverOrdersSendersMockLambda
+      Enabled: true
+      MaximumBatchingWindowInSeconds: !Ref DelayerReceiverOrdersSendersMaxBatchWindowInSeconds
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+
 
   #########################################################
   ###         TestDelayerLambda                ###
