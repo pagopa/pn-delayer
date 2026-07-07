@@ -789,7 +789,7 @@ Resources:
     Properties:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
-        LogGroupName: !Sub ${ProjectName}-delayer-SentPaperDeliveryToPreparePhaseTwoLambda
+        LogGroupName: !Sub ${ProjectName}-delayer-sentPaperDeliveryToPreparePhaseTwoLambda
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
