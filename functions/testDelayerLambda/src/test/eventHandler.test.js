@@ -971,6 +971,34 @@ describe("Lambda Delayer Dispatcher", () => {
         assert.deepStrictEqual(driver2Item.capacity, 200);
     });
 
+  it("INSERT_MOCK_SENDER_LIMIT invokes file-ready lambda with presigned download url", async () => {
+    process.env.EVENTFILEREADY_LAMBDA_ARN =
+      "arn:aws:lambda:eu-south-1:123456789012:function:eventFileReady";
+
+    const result = await handler({
+      operationType: "INSERT_MOCK_SENDER_LIMITS",
+      parameters: ["sender-limit.zip"],
+    });
+
+    assert.strictEqual(result.statusCode, 200);
+
+    const body = JSON.parse(result.body);
+    assert.strictEqual(body.message, "Import senderLimit process started");
+
+    const calls = lambdaMock.commandCalls(InvokeCommand);
+    assert.strictEqual(calls.length, 1);
+
+    const input = calls[0].args[0].input;
+    assert.strictEqual(input.FunctionName, process.env.EVENTFILEREADY_LAMBDA_ARN);
+    assert.strictEqual(input.InvocationType, "RequestResponse");
+
+    const payload = JSON.parse(input.Payload);
+    assert.strictEqual(payload.httpMethod, "POST");
+    assert.strictEqual(payload.resource, "/file-ready-event");
+    assert.strictEqual(payload.mock, true);
+    assert.ok(payload.downloadUrl);
+  });
+
    it("INSERT_MOCK_CAPACITIES should batch-write items to DynamoDB", async () => {
       const csvPath = path.join(__dirname, "capacitySample.csv");
       const csvData = fs.readFileSync(csvPath, "utf8");
