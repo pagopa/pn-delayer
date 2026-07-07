@@ -1,0 +1,51 @@
+{
+  "Comment": "Sent Paper Delivery To Prepare phase two",
+  "StartAt": "ProcessCsv",
+  "States": {
+    "ProcessCsv": {
+      "Type": "Map",
+      "Label": "ProcessCsv",
+      "MaxConcurrency": 10,
+      "ItemReader": {
+        "Resource": "arn:aws:states:::s3:getObject",
+        "ReaderConfig": {
+          "InputType": "CSV",
+          "CSVHeaderLocation": "FIRST_ROW"
+        },
+        "Parameters": {
+          "Bucket.$": "${testDelayerBucketName}",
+          "Key.$": "$$.Execution.Input.fileName"
+        }
+      },
+      "ItemBatcher": {
+        "MaxItemsPerBatch": 100
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "DISTRIBUTED",
+          "ExecutionType": "STANDARD"
+        },
+        "StartAt": "InvokeLambdaForBatch",
+        "States": {
+          "InvokeLambdaForBatch": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "Payload": {
+                "rows.$": "$.Items"
+              },
+              "FunctionName": "${sentPaperDeliveryToPreparePhaseTwoLambda}"
+            },
+            "OutputPath": "$.Payload",
+            "End": true
+          }
+        }
+      },
+      "ResultSelector": {
+        "notProcessedRows.$": "$[*][*]"
+      },
+      "OutputPath": "$.notProcessedRows",
+      "End": true
+    }
+  }
+}
