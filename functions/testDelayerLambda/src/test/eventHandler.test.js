@@ -995,8 +995,9 @@ describe("Lambda Delayer Dispatcher", () => {
     const payload = JSON.parse(input.Payload);
     assert.strictEqual(payload.httpMethod, "POST");
     assert.strictEqual(payload.resource, "/file-ready-event");
-    assert.strictEqual(payload.mock, true);
-    assert.ok(payload.downloadUrl);
+    const payloadBody = JSON.parse(payload.body);
+    assert.strictEqual(payloadBody.mock, true);
+    assert.ok(payloadBody.downloadUrl);
   });
 
    it("INSERT_MOCK_CAPACITIES should batch-write items to DynamoDB", async () => {

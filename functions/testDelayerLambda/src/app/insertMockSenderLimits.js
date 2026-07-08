@@ -61,8 +61,11 @@ async function invokeFileReadyLambda(downloadUrl, functionName) {
     Payload: JSON.stringify({
       httpMethod: "POST",
       resource: "/file-ready-event",
-      mock: true,
-      downloadUrl,
+      body: JSON.stringify({
+        mock: true,
+        downloadUrl: downloadUrl,
+        fileVersion: "1.0.0"
+      })
     }),
   });
 

@@ -513,12 +513,12 @@ Parameters:
   PaperChannelTenderApiLambdaName:
     Type: String
     Description: 'PaperChannelTenderApiLambda function name'
-    Default: 'pn-portfat-eventFileReady-lambda'
+    Default: 'pn-paper-channel-TenderAPI'
 
   EventFileReadyLambdaName:
     Type: String
     Description: 'EventFileReadyLambda function name'
-    Default: 'pn-paper-channel-EventFileReady'
+    Default: 'pn-portfat-eventFileReady-lambda'
 
   DelayerReceiverOrdersSendersLambdaName:
     Type: String
