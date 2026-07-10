@@ -68,7 +68,8 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       recipientId: "RecipientId",
       priority: 3,
       senderPriority: 60,
-      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z",
+      previousStep: 'EVALUATE_PRINT_CAPACITY'
     });
 
     expect(result2).to.include({
@@ -88,7 +89,8 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       recipientId: "RecipientId",
       priority: 3,
       senderPriority: 60,
-      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z",
+      previousStep: 'EVALUATE_PRINT_CAPACITY'
     });
   });
 });
