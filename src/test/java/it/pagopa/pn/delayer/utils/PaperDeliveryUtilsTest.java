@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 import static it.pagopa.pn.delayer.model.WorkflowStepEnum.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -188,7 +189,8 @@ public class PaperDeliveryUtilsTest {
                 eq(key2), eq(10),any()))
                 .thenReturn(Mono.just(page3));
 
-        when(paperDeliveryDAO.insertPaperDeliveries(anyList()))
+        ArgumentCaptor<List<PaperDelivery>> insertCaptor = ArgumentCaptor.forClass(List.class);
+        when(paperDeliveryDAO.insertPaperDeliveries(insertCaptor.capture()))
                 .thenReturn(Mono.empty());
 
         when(paperDeliveryCounterDAO.updateExcludeCounter(eq(deliveryWeek.plusWeeks(1)), anyMap()))
@@ -206,6 +208,16 @@ public class PaperDeliveryUtilsTest {
 
         // insertPaperDeliveries called 3 times (one insert per page chunk)
         verify(paperDeliveryDAO, times(3)).insertPaperDeliveries(anyList());
+
+        List<List<PaperDelivery>> insertedBatches = insertCaptor.getAllValues();
+        assertEquals(3, insertedBatches.size());
+
+        insertedBatches.stream()
+                .flatMap(List::stream)
+                .forEach(delivery -> {
+                    assertEquals(EVALUATE_SENDER_LIMIT.name(), delivery.getWorkflowStep());
+                    assertEquals(EVALUATE_DRIVER_CAPACITY.name(), delivery.getPreviousStep());
+                });
 
         // Verify exact exclude-counter payloads in order: page1 -> page2 -> page3
         InOrder inOrder = inOrder(paperDeliveryCounterDAO);
@@ -333,6 +345,15 @@ public class PaperDeliveryUtilsTest {
 
         // insertPaperDeliveries called multiple times (chunks from nextStep + nextWeek)
         verify(paperDeliveryDAO, atLeast(2)).insertPaperDeliveries(anyList());
+
+        List<List<PaperDelivery>> insertedBatches = insertCaptor.getAllValues();
+        assertEquals(4, insertedBatches.size());
+
+        insertedBatches.getLast()
+                .forEach(delivery -> {
+                    assertEquals(EVALUATE_SENDER_LIMIT.name(), delivery.getWorkflowStep());
+                    assertEquals(EVALUATE_DRIVER_CAPACITY.name(), delivery.getPreviousStep());
+                });
 
         // Counters flushed exactly once
         verify(deliveryDriverUtils, times(1)).updateCounters(anyList());

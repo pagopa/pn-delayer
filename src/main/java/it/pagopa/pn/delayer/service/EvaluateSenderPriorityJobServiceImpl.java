@@ -76,7 +76,7 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
     }
 
     private PaperDelivery copyWithEffectiveSort(PaperDelivery delivery, Instant effectiveSortEpochMillis) {
-        PaperDelivery copy = new PaperDelivery(delivery, WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(delivery.getDeliveryDate()));
+        PaperDelivery copy = new PaperDelivery(delivery, WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(delivery.getDeliveryDate()), delivery.getPreviousStep());
         copy.setOldSk(delivery.getSk());
         copy.setSk(buildFinalSortKey(delivery.getProvince(), effectiveSortEpochMillis, delivery.getRequestId()));
         copy.setVirtualNotificationSentAt(effectiveSortEpochMillis.toString());

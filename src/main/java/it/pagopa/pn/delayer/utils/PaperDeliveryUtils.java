@@ -77,7 +77,7 @@ public class PaperDeliveryUtils {
         return Mono.just(lastEvaluatedKey)
                 .expand(currentKey ->
                         retrievePaperDeliveries(workflowStepEnum, deliveryWeek, sortKeyPrefix, currentKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit())
-                                .flatMap(page -> processChunkToSendToNextWeek(page.items(), deliveryWeek)
+                                .flatMap(page -> processChunkToSendToNextWeek(page.items(), deliveryWeek, workflowStepEnum)
                                         .then(CollectionUtils.isEmpty(page.lastEvaluatedKey())
                                                 ? Mono.<Map<String, AttributeValue>>empty()
                                                 : Mono.just(page.lastEvaluatedKey())))
@@ -93,7 +93,7 @@ public class PaperDeliveryUtils {
      * @param deliveryWeek the delivery week for which the deliveries are processed
      * @return a Mono containing the number of processed deliveries
      */
-    private Mono<Integer> processChunkToSendToNextWeek(List<PaperDelivery> chunk, LocalDate deliveryWeek) {
+    private Mono<Integer> processChunkToSendToNextWeek(List<PaperDelivery> chunk, LocalDate deliveryWeek, WorkflowStepEnum workflowStepEnum) {
         log.info("Processing chunk of size {} to send to next week", chunk.size());
         PnAuditLogEvent auditLogEvent = buildAuditLogEvent(deliveryWeek);
         if (!CollectionUtils.isEmpty(chunk)) {
@@ -109,7 +109,7 @@ public class PaperDeliveryUtils {
                     nextWeek,
                     requestIds
             ).log();
-            return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek))
+            return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek, workflowStepEnum))
                     .thenReturn(chunk)
                     .map(pnDelayerUtils::groupingForExclude)
                     .flatMap(grouped -> paperDeliveryCounterDAO.updateExcludeCounter(deliveryWeek.plusWeeks(1), grouped))
@@ -274,7 +274,7 @@ public class PaperDeliveryUtils {
                                 driverCapacityJobProcessObject.getToNextStep().size(),
                                 driverCapacityJobProcessObject.getToNextWeek().size(),
                                 driverCapacityJobProcessObject.getIncrementUsedCapacityDtosForCap().size())))
-                .flatMap(driverCapacityJobProcessObject -> processChunkToSendToNextWeek(driverCapacityJobProcessObject.getToNextWeek(), deliveryWeek)
+                .flatMap(driverCapacityJobProcessObject -> processChunkToSendToNextWeek(driverCapacityJobProcessObject.getToNextWeek(), deliveryWeek, workflowStepEnum)
                         .thenReturn(driverCapacityJobProcessObject));
     }
 
@@ -304,7 +304,7 @@ public class PaperDeliveryUtils {
                 .map(db -> Tuples.of(db.getT1(), db.getT2() + incrementsSoFar))
                 .doOnNext(t -> log.info("Capacities [{}~{}] -> declared={}, used(base+inc)={} (inc={})", unifiedDeliveryDriver, cap, t.getT1(), t.getT2(), incrementsSoFar))
                 .flatMap(t -> {
-                    int processed = pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, t, obj.getToNextStep(), obj.getToNextWeek(), deliveryWeek);
+                    int processed = pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, t, obj.getToNextStep(), obj.getToNextWeek(), deliveryWeek, workflowStepEnum);
                     return Mono.just(processed)
                             .filter(c -> c > 0)
                             .doOnDiscard(Integer.class, u -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))

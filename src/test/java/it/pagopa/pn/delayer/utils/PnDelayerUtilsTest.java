@@ -170,11 +170,12 @@ class PnDelayerUtilsTest {
         paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 1, 2));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluatePrintCapacityStep(paperDeliveries, deliveryWeek);
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluatePrintCapacityStep(paperDeliveries, deliveryWeek, WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY);
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_PRINT_CAPACITY.name())
-                && delivery.getSk().equalsIgnoreCase(String.join("~", String.valueOf(delivery.getPriority()), "2023-10-01T12:00:00Z", delivery.getRequestId()))));
+                && delivery.getSk().equalsIgnoreCase(String.join("~", String.valueOf(delivery.getPriority()), "2023-10-01T12:00:00Z", delivery.getRequestId()))
+                && delivery.getPreviousStep().equalsIgnoreCase(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY.name())));
     }
 
     @Test
@@ -184,11 +185,12 @@ class PnDelayerUtilsTest {
         paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0, 3));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(paperDeliveries, deliveryWeek);
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(paperDeliveries, deliveryWeek, WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY);
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-09~" + EVALUATE_SENDER_LIMIT.name())
-                && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getProvince(), "2023-10-01T12:00:00Z", delivery.getRequestId()))));
+                && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getProvince(), "2023-10-01T12:00:00Z", delivery.getRequestId()))
+                && delivery.getPreviousStep().equalsIgnoreCase(WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY.name())));
     }
 
     @Test
@@ -198,7 +200,7 @@ class PnDelayerUtilsTest {
         paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 0, 3));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-        Integer result = pnDelayerUtils.filterOnResidualDriverCapacity(paperDeliveries, Tuples.of(10,5), new ArrayList<>(), new ArrayList<>(), deliveryWeek);
+        Integer result = pnDelayerUtils.filterOnResidualDriverCapacity(paperDeliveries, Tuples.of(10,5), new ArrayList<>(), new ArrayList<>(), deliveryWeek, WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY);
 
         assertEquals(2, result);
     }

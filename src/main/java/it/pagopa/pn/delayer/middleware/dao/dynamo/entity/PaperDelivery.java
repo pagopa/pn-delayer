@@ -36,6 +36,9 @@ public class PaperDelivery {
     public static final String COL_VIRTUAL_NOTIFICATION_SENT_AT = "virtualNotificationSentAt";
     public static final String COL_OLD_SK = "oldSk";
     public static final String COL_SENDERPAID_ORIGINALSENTAT = "senderPaIdOriginalSentAt";
+    public static final String COL_DELAYED = "delayed";
+    public static final String COL_PREVIOUS_STEP = "previousStep";
+    public static final String COL_SKIP_SENDER_LIMIT = "skipSenderLimit";
 
     public static final String PK_SENDERPAID_ORIGINALSENTAT_INDEX = "pk-senderPaIdOriginalSentAt-index";
 
@@ -85,10 +88,16 @@ public class PaperDelivery {
     private String oldSk;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDERPAID_ORIGINALSENTAT), @DynamoDbSecondarySortKey(indexNames = PK_SENDERPAID_ORIGINALSENTAT_INDEX)}))
     private String senderPaIdOriginalSentAt;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELAYED)}))
+    private Boolean delayed;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_PREVIOUS_STEP)}))
+    private String previousStep;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SKIP_SENDER_LIMIT)}))
+    private Boolean skipSenderLimit;
 
     public PaperDelivery(){}
 
-    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek){
+    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, String previousStep){
         String date =  paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
                 paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
 
@@ -115,6 +124,9 @@ public class PaperDelivery {
         this.virtualNotificationSentAt = paperDelivery.getVirtualNotificationSentAt();
         this.oldSk = paperDelivery.getOldSk();
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
+        this.delayed = paperDelivery.getDelayed();
+        this.previousStep = previousStep;
+        this.skipSenderLimit = paperDelivery.getSkipSenderLimit();
     }
 
     private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {
