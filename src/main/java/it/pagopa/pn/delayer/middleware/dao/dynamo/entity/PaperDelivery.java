@@ -125,7 +125,7 @@ public class PaperDelivery {
         this.oldSk = paperDelivery.getOldSk();
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
         this.delayed = paperDelivery.getDelayed();
-        this.previousStep = paperDelivery.getPreviousStep();
+        this.previousStep = paperDelivery.getWorkflowStep();
         this.skipSenderLimit = paperDelivery.getSkipSenderLimit();
     }
 
