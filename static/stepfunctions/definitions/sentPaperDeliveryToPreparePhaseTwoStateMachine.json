@@ -13,7 +13,7 @@
           "CSVHeaderLocation": "FIRST_ROW"
         },
         "Parameters": {
-          "Bucket.$": "${testDelayerBucketName}",
+          "Bucket": "${testDelayerBucketName}",
           "Key.$": "$$.Execution.Input.fileName"
         }
       },
@@ -32,7 +32,7 @@
             "Resource": "arn:aws:states:::lambda:invoke",
             "Parameters": {
               "Payload": {
-                "rows.$": "$.Items"
+                "requestIds.$": "$.Items[*].requestId"
               },
               "FunctionName": "${sentPaperDeliveryToPreparePhaseTwoLambda}"
             },

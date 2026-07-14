@@ -3604,6 +3604,13 @@ Resources:
 
           - Effect: Allow
             Action:
+              - kms:Decrypt
+            Resource:
+              - !Sub "${TestDelayerKmsBucketArn}"
+              - !Sub "${LogsBucketKmsKeyArn}"
+
+          - Effect: Allow
+            Action:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SentPaperDeliveryToPreparePhaseTwoLambdaName}
