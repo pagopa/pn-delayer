@@ -177,6 +177,14 @@ Parameters:
     Type: String
     Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit'
 
+  PaperDeliverySenderLimitMockTableName:
+    Type: String
+    Description: 'DynamoDB table name for PaperDeliverySenderLimit mock'
+
+  PaperDeliverySenderLimitMockTableArn:
+    Type: String
+    Description: 'ARN of dynamodb table containing PaperDeliverySenderLimit mock'
+
   PaperDeliveryUsedSenderLimitTableName:
     Type: String
     Description: 'DynamoDB table name for PaperDeliveryUsedSenderLimit'
@@ -507,9 +515,18 @@ Parameters:
     Description: 'PaperChannelTenderApiLambda function name'
     Default: 'pn-paper-channel-TenderAPI'
 
+  EventFileReadyLambdaName:
+    Type: String
+    Description: 'EventFileReadyLambda function name'
+    Default: 'pn-portfat-eventFileReady-lambda'
+
   DelayerReceiverOrdersSendersLambdaName:
     Type: String
     Description: 'ReceiverOrdersSendersLambda function name'
+
+  DelayerReceiverOrdersSendersMockLambdaName:
+    Type: String
+    Description: 'ReceiverOrdersSendersLambdaMock function name'
 
   DelayerNotificationOrdersLambdaName:
     Type: String
@@ -534,7 +551,19 @@ Parameters:
   SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
     Type: String
     Description: 'Events from safe storage to pn-delayer queue URL'
-  
+
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueQueueName:
+    Type: String
+    Description: 'queue name for safeStorage to delayer receiver orders senders Mock lambda '
+
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN:
+    Type: String
+    Description: 'queue arn for safeStorage to delayer receiver orders senders Mock lambda'
+
+  SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueURL:
+    Type: String
+    Description: 'Events from safe storage to pn-delayer Mock queue URL'
+
   SafeStorageToNotificationOrdersQueueName:
     Type: String
     Description: 'queue name for safeStorage to notification orders queue'
@@ -645,6 +674,10 @@ Parameters:
     Type: Number
     Description: 'Max paper deliveries for execution'
     Default: 5000
+
+  SentPaperDeliveryToPreparePhaseTwoLambdaName:
+    Type: String
+    Description: 'SentPaperDeliveryToPreparePhaseTwo function name'
 
   SwitchOffAlgorithmLambdaName:
     Type: String
@@ -1779,6 +1812,37 @@ Resources:
           DeadLetterConfig:
             Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
 
+  # Send Safe Storage Response to delayerReceiverOrdersSendersMockLambda
+  PnCoreEventBusToDelayerOrdersSendersMockSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Route SafeStorage Events to pn-delayerReceiverOrdersSendersMockLambda
+      RoleArn: !GetAtt "DelayerOrdersSendersEventBusEnqueueRole.Arn"
+      EventBusName: !Sub '${ProjectName}-CoreEventBus'
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_SERVICE_ORDER_MOCK' ]
+      Targets:
+        - Arn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:PnCoreEventBusMatchedEventLogger
+          Id: !Sub ${ProjectName}-Logger-SafeStore2DelayerOrdersSendersMock
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }
+        - Id: !Sub '${ProjectName}-SafeStore2DelayerSendersOrdersMock'
+          Arn: !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
+          InputPath: $.detail
+          DeadLetterConfig:
+            Arn: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-CoreEventBus-DLQ
+
   DelayerOrdersSendersEventBusEnqueueRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1805,6 +1869,7 @@ Resources:
                 Effect: Allow
                 Resource:
                   - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+                  - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
 
   DelayerInputsRole:
     Type: AWS::IAM::Role
@@ -2287,6 +2352,117 @@ Resources:
         - ReportBatchItemFailures
 
   #########################################################
+  ###         DelayerReceiverOrdersSendersMockLambda          ###
+  #########################################################
+
+  DelayerReceiverOrdersSendersMockLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${DelayerReceiverOrdersSendersMockLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  DelayerReceiverOrdersSendersMockLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref DelayerReceiverOrdersSendersMockLambdaName
+      ReservedConcurrentExecutions: !Ref DelayerReceiverOrdersSendersReservedConcurrentExecutions
+      Runtime: !Ref LambdaRuntime
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/delayerReceiverOrdersSendersLambda.zip"
+      Role: !GetAtt DelayerReceiverOrdersSendersMockLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          PN_SAFESTORAGE_URL: !Ref SandboxSafeStorageBaseUrl
+          PN_SAFESTORAGE_CXID: !Ref SafeStorageCxId
+          PAPER_CHANNEL_PROVINCE_TABLENAME: !Ref ProvinceTableName
+          PAPER_DELIVERY_SENDER_LIMIT_TABLENAME: !Ref PaperDeliverySenderLimitMockTableName
+          PAPER_DELIVERY_COUNTERS_TABLENAME: !Ref PaperDeliveryCounterMockTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 300 #5 min
+      VpcConfig:
+        SubnetIds: !Split [ ",", !Ref SubnetsIds ]
+        SecurityGroupIds:
+          - !GetAtt DelayerReceiverOrdersSendersMockLambdaSecGroup.GroupId
+
+  # Lambda function role
+  DelayerReceiverOrdersSendersMockLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-DelayerReceiverOrdersSendersMockLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+
+  # Lambda function IAM policy
+  DelayerReceiverOrdersSendersMockLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DelayerReceiverOrdersSendersMockLambdaPolicy
+      Roles:
+        - !Ref DelayerReceiverOrdersSendersMockLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:BatchWriteItem
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub "${ProvinceTableArn}"
+              - !Sub "${ProvinceTableArn}/*"
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}"
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}/*"
+              - !Sub "${PaperDeliveryCounterMockTableArn}"
+              - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ReceiveMessage
+            Resource:
+              - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
+              - !Ref SafeStorageToNotificationOrdersQueueARN
+
+  DelayerReceiverOrdersSendersMockLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DelayerReceiverOrdersSendersMockLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  DelayerReceiverOrdersSendersMockLambdaSQSSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: !Ref DelayerReceiverOrdersSendersBatchSize
+      EventSourceArn: !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
+      FunctionName: !Ref DelayerReceiverOrdersSendersMockLambda
+      Enabled: true
+      MaximumBatchingWindowInSeconds: !Ref DelayerReceiverOrdersSendersMaxBatchWindowInSeconds
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+
+
+  #########################################################
   ###         TestDelayerLambda                ###
   #########################################################
 
@@ -2324,6 +2500,7 @@ Resources:
           PAPERCHANNELTENDERAPI_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
           ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
           ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
+          EVENTFILEREADY_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EventFileReadyLambdaName}
       TracingConfig:
         Mode: Active
       Layers:
@@ -2450,6 +2627,7 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${PaperChannelTenderApiLambdaName}
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EventFileReadyLambdaName}
           - Effect: Allow
             Action:
               - athena:StartQueryExecution
@@ -2746,6 +2924,83 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
         FunctionName: !Ref SwitchOffAlgorithmLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  #########################################################
+  ###     sentPaperDeliveryToPreparePhaseTwoLambda      ###
+  #########################################################
+
+  SentPaperDeliveryToPreparePhaseTwoLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${SentPaperDeliveryToPreparePhaseTwoLambdaName}-sec-group'
+      VpcId: !Ref VpcId
+
+  # Lambda function
+  SentPaperDeliveryToPreparePhaseTwoLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref SentPaperDeliveryToPreparePhaseTwoLambdaName
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref MicroserviceBucketName
+        S3Key: !Sub "${MicroserviceBucketBaseKey}/functions_zip/sentPaperDeliveryToPreparePhaseTwoLambda.zip"
+      Role: !GetAtt SentPaperDeliveryToPreparePhaseTwoLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          DELAYER_PAPER_DELIVERY_TABLE_NAME: !Ref PaperDeliveryTableName
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout: 900 #15 min
+
+  # Lambda function role
+  SentPaperDeliveryToPreparePhaseTwoLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-SentPaperDeliveryToPreparePhaseTwoLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function IAM policy
+  SentPaperDeliveryToPreparePhaseTwoLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-SentPaperDeliveryToPreparePhaseTwoLambdaPolicy
+      Roles:
+        - !Ref SentPaperDeliveryToPreparePhaseTwoLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:PutItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:TransactWriteItems
+              - dynamodb:DeleteItem
+            Resource:
+              - !Sub "${PaperDeliveryTableArn}"
+              - !Sub "${PaperDeliveryTableArn}/*"
+
+  SentPaperDeliveryToPreparePhaseTwoLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SentPaperDeliveryToPreparePhaseTwoLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   #########################################################
@@ -3308,6 +3563,77 @@ Resources:
               Resource:
                 - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:BatchWorkflowStateMachine
 
+  SentPaperDeliveryToPreparePhaseTwoStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - SentPaperDeliveryToPreparePhaseTwoStateMachinePolicy
+    Properties:
+      StateMachineName: sentPaperDeliveryToPreparePhaseTwoStateMachine
+      RoleArn: !GetAtt SentPaperDeliveryToPreparePhaseTwoStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref MicroserviceBucketName
+        Key: !Sub "${MicroserviceBucketBaseKey}/static/stepfunctions/definitions/sentPaperDeliveryToPreparePhaseTwoStateMachine.json"
+      DefinitionSubstitutions:
+        testDelayerBucketName: !Ref TestDelayerBucketName
+        sentPaperDeliveryToPreparePhaseTwoLambda: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SentPaperDeliveryToPreparePhaseTwoLambdaName}
+      TracingConfiguration:
+        Enabled: false
+
+  SentPaperDeliveryToPreparePhaseTwoStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-sentPaperDeliveryToPreparePhaseTwoStateMachineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  SentPaperDeliveryToPreparePhaseTwoStateMachinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-sentPaperDeliveryToPreparePhaseTwoStateMachinePolicy
+      Roles:
+        - !Ref SentPaperDeliveryToPreparePhaseTwoStateMachineRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub arn:aws:s3:::${TestDelayerBucketName}/*
+
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource:
+              - !Sub "${TestDelayerKmsBucketArn}"
+              - !Sub "${LogsBucketKmsKeyArn}"
+
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SentPaperDeliveryToPreparePhaseTwoLambdaName}
+          # Required for Distributed Map
+          - Effect: Allow
+            Action:
+              - states:StartExecution
+            Resource:
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:sentPaperDeliveryToPreparePhaseTwoStateMachine
+
+          - Effect: Allow
+            Action:
+              - states:DescribeExecution
+              - states:StopExecution
+            Resource:
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:sentPaperDeliveryToPreparePhaseTwoStateMachine:*
+
   RetryAlgorithmStateMachine:
     Type: AWS::StepFunctions::StateMachine
     DependsOn:
@@ -3694,6 +4020,23 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !Ref SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN
+
+  DelayerOrdersSendersMockQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueURL
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "SQS:SendMessage"
+            Resource:
+              - !Ref SafeStorageToDelayerReceiverOrdersSendersMockLambdaQueueARN
 
   DelayerNotificationOrdersQueuePolicy:
     Type: AWS::SQS::QueuePolicy
