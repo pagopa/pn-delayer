@@ -7,6 +7,7 @@
     "PaperDeliveryUsedSenderLimitGlueTableName": "pn_paper_delivery_used_sender_limit",
     "PaperDeliveryUsedSenderLimitMockGlueTableName": "pn_paper_delivery_used_sender_limit_mock",
     "PaperDeliverySenderLimitGlueTableName": "pn_paper_delivery_sender_limit",
+    "PaperDeliverySenderLimitMockGlueTableName": "pn_paper_delivery_sender_limit_mock",
     "PaperDeliveryCounterGlueTableName": "pn_paper_delivery_counters",
     "PaperDeliveryCounterMockGlueTableName": "pn_paper_delivery_counters_mock",
     "NotificationOrdersGlueTableName": "pn_notification_orders",

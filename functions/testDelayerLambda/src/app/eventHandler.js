@@ -14,6 +14,7 @@ const { insertMockCapacities } = require('./insertMockCapacities.js');
 const { getDeclaredCapacity } = require("./getDeclaredCapacity.js");
 const { getCounters } = require("./getCounters.js");
 const { getResidualPapers } = require("./getResidualPapers.js");
+const { insertMockSenderLimits } = require("./insertMockSenderLimits.js");
 
 
 /***************************************
@@ -35,7 +36,8 @@ const OPERATIONS = {
     INSERT_MOCK_CAPACITIES: insertMockCapacities,
     GET_DECLARED_CAPACITY: getDeclaredCapacity,
     GET_COUNTERS: getCounters,
-    GET_RESIDUAL_PAPERS: getResidualPapers
+    GET_RESIDUAL_PAPERS: getResidualPapers,
+    INSERT_MOCK_SENDER_LIMITS: insertMockSenderLimits
 };
 
 /**
