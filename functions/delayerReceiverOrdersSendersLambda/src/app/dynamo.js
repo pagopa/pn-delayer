@@ -4,9 +4,9 @@ const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand, QueryCommand }
 
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-const PROVINCE_TABLE = process.env.PROVINCE_TABLE || 'pn-PaperChannelProvince';
-const LIMIT_TABLE = process.env.LIMIT_TABLE || 'pn-PaperDeliverySenderLimit';
-const COUNTERS_TABLE = process.env.COUNTERS_TABLE || 'pn-PaperDeliveryCounters';
+const PROVINCE_TABLE = process.env.PAPER_CHANNEL_PROVINCE_TABLENAME || 'pn-PaperChannelProvince';
+const LIMIT_TABLE = process.env.PAPER_DELIVERY_SENDER_LIMIT_TABLENAME || 'pn-PaperDeliverySenderLimit';
+const COUNTERS_TABLE = process.env.PAPER_DELIVERY_COUNTERS_TABLENAME || 'pn-PaperDeliveryCounters';
 const FILEKEY_GSI = "fileKey-index";
 /**
  * Query pn-PaperChannelProvince to get provinces and their percentage distribution for a region.
