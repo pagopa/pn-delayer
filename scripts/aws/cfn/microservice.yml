@@ -2557,6 +2557,8 @@ Resources:
               - !Sub "${PaperDeliveryUsedSenderLimitTableArn}/*"
               - !Sub "${PaperDeliverySenderLimitTableArn}"
               - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}"
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}/*"
               - !Sub "${PaperDeliveryDriverCapacitiesTableArn}"
               - !Sub "${PaperDeliveryDriverCapacitiesTableArn}/*"
               - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}"
