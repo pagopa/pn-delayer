@@ -6,7 +6,7 @@ const {
   batchWriteKinesisEventRecords,
   batchGetKinesisEventRecords,
   getSenderLimit,
-  createDelayedCounter
+  updateDelayedCounter
 } = require("./lib/dynamo");
 const {
   buildPaperDeliveryRecord,
@@ -30,7 +30,7 @@ exports.handleEvent = async (event) => {
   const filteredData = filterInvalidRecords(kinesisData);
 
   if (filteredData.length === 0) {
-    console.log("No valid event to process");
+    console.log("No valid events to process");
     return { batchItemFailures: [] };
   }
 
@@ -40,12 +40,14 @@ exports.handleEvent = async (event) => {
   const requestIds = new Set();
   const deliveryWeek = getDeliveryWeek();
 
-  // Separazione record per settimana corrente vs precedenti
+  /*
+   * Separazione dei record appartenenti alla settimana corrente
+   * da quelli appartenenti alle settimane precedenti.
+   */
   for (const eventItem of filteredData) {
     const inCurrentWeek = isCurrentWeek(eventItem.notificationSentAt);
 
     if (inCurrentWeek) {
-      console.log("Current week");
       addPaperDeliveryRecordIfNew({
         eventItem,
         deliveryWeek,
@@ -54,12 +56,21 @@ exports.handleEvent = async (event) => {
         paperDeliveryRecords
       });
     } else {
-      console.log("Previous week");
+      console.log(`PaperDelivery ${eventItem.requestId} belongs to a previous notification week`);
       delayedPaperDeliveryList.push(eventItem);
     }
   }
 
-  // Elaborazione record delayed
+  /*
+   * Gli eventi delayed vengono raggruppati per:
+   *
+   * notificationSentAtWeek
+   * + senderPaId
+   * + productType
+   * + province
+   *
+   * Per ogni gruppo viene cercato il relativo sender limit.
+   */
   if (delayedPaperDeliveryList.length > 0) {
     console.log(`Processing ${delayedPaperDeliveryList.length} delayed records`);
     const groupedDelayedRecords = groupDelayedRecords(delayedPaperDeliveryList);
@@ -69,6 +80,7 @@ exports.handleEvent = async (event) => {
 
       console.log(`Processing delayed group: ${groupKey}`);
 
+    try {
       const senderLimitItem = await getSenderLimit(
         senderPaId,
         productType,
@@ -78,10 +90,13 @@ exports.handleEvent = async (event) => {
 
       let hasSenderLimit = senderLimitItem && senderLimitItem.weeklyEstimate > 0;
 
+     /*
+     * Il contatore DELAYED viene incrementato solamente
+     * quando esiste un sender limit con weeklyEstimate > 0.
+     */
       if (hasSenderLimit) {
         console.log(`Found sender limit for ${groupKey}: ${senderLimitItem.weeklyEstimate}`);
-        try {
-          await createDelayedCounter(
+          await updateDelayedCounter(
             deliveryWeek,
             notificationSentAtWeek,
             senderPaId,
@@ -90,18 +105,18 @@ exports.handleEvent = async (event) => {
             groupRecords.length,
             senderLimitItem.weeklyEstimate
           );
-        } catch (error) {
-          console.error(`Failed to create delayed counter for group ${groupKey}`, error);
-          batchItemFailures.push(
-            ...groupRecords.map(item => ({ itemIdentifier: item.kinesisSeqNumber }))
-          );
-          hasSenderLimit = false;
-          continue;
+          console.log(`Updated DELAYED counter for ${groupKey} with ${groupRecords.length} shipments`);
+        } else {
+          console.log(`No valid sender limit found for delayed group ${groupKey}`);
         }
-      } else {
-        console.log(`No sender limit found for ${groupKey}`);
-      }
 
+     /*
+     * Tutte le spedizioni conformi proseguono nel flusso comune.
+     *
+     * delayed è true solamente quando:
+     * - la spedizione appartiene a una settimana precedente;
+     * - esiste un weeklyEstimate valido.
+     */
       for (const eventItem of groupRecords) {
         addPaperDeliveryRecordIfNew({
           eventItem,
@@ -111,11 +126,29 @@ exports.handleEvent = async (event) => {
           paperDeliveryRecords
         });
       }
-    }
+    } catch (error) {
+    console.error(error);
+             console.error(
+               `Failed to process delayed group ${groupKey}`,
+               error
+             );
+
+             batchItemFailures.push(
+               ...groupRecords.map(item => ({
+                 itemIdentifier: item.kinesisSeqNumber
+               }))
+             );
+
+             batchItemFailures = uniqueFailures(
+               batchItemFailures
+             );
+           }
+         }
   }
 
   // Verifica record già elaborati
   if (paperDeliveryRecords.length > 0) {
+    try {
     const alreadyEvaluatedEvents = await batchGetKinesisEventRecords(
       paperDeliveryRecords.map(record => record.entity.requestId)
     );
@@ -125,38 +158,126 @@ exports.handleEvent = async (event) => {
         record => !alreadyEvaluatedEvents.includes(record.entity.requestId)
       );
     }
-  }
-
-  if (paperDeliveryRecords.length > 0) {
-    try {
-      const groupedProductTypeProvinceRecords = groupRecordsByProductAndProvince(paperDeliveryRecords);
-      const groupedSenderPaIdRecords = groupRecordsBySenderPaId(paperDeliveryRecords);
-
-      for (const operation of [
-        { func: updateExcludeCounter, data: groupedProductTypeProvinceRecords },
-        { func: updateSenderPriorityCounter, data: groupedSenderPaIdRecords },
-        { func: batchWritePaperDeliveryRecords, data: paperDeliveryRecords }
-      ]) {
-        batchItemFailures = await operation.func(operation.data, batchItemFailures);
-        paperDeliveryRecords = filterFailedRecords(paperDeliveryRecords, batchItemFailures);
-        if (paperDeliveryRecords.length === 0) break;
-      }
     } catch (error) {
-      console.error("Error processing event", error);
+      console.error(
+        "Failed to check already evaluated events",
+        error
+      );
+
+      batchItemFailures.push(
+        ...paperDeliveryRecords.map(record => ({
+          itemIdentifier: record.kinesisSeqNumber
+        }))
+      );
+
+      batchItemFailures = uniqueFailures(
+        batchItemFailures
+      );
+
+      paperDeliveryRecords = [];
     }
   }
 
+  /*
+   * Aggiornamento contatori e scrittura PaperDelivery.
+   *
+   * Tutte le spedizioni conformi, delayed e non delayed,
+   * entrano nello stesso flusso:
+   *
+   * 1. aggiornamento contatori EXCLUDE;
+   * 2. aggiornamento contatori SENDER_PRIORITY;
+   * 3. scrittura dei PaperDeliveryRecord.
+   *
+   * Dopo ogni operazione vengono rimossi i record falliti.
+   * I dati dell'operazione successiva vengono calcolati
+   * utilizzando solamente i record ancora validi.
+   */
+  if (paperDeliveryRecords.length > 0) {
+    const operations = [
+      {
+        func: updateExcludeCounter,
+        getData: records =>
+          groupRecordsByProductAndProvince(records)
+      },
+      {
+        func: updateSenderPriorityCounter,
+        getData: records =>
+          groupRecordsBySenderPaId(records)
+      },
+      {
+        func: batchWritePaperDeliveryRecords,
+        getData: records => records
+      }
+    ];
+
+    for (const operation of operations) {
+      try {
+        batchItemFailures = await operation.func(
+          operation.getData(paperDeliveryRecords),
+          batchItemFailures
+        );
+      } catch (error) {
+        console.error(
+          "Error processing DynamoDB operation",
+          error
+        );
+
+        batchItemFailures.push(
+          ...paperDeliveryRecords.map(record => ({
+            itemIdentifier: record.kinesisSeqNumber
+          }))
+        );
+      }
+
+      batchItemFailures = uniqueFailures(
+        batchItemFailures
+      );
+
+      paperDeliveryRecords = filterFailedRecords(
+        paperDeliveryRecords,
+        batchItemFailures
+      );
+
+      if (paperDeliveryRecords.length === 0) {
+        break;
+      }
+    }
+  }
+
+  /*
+   * Vengono marcati come elaborati solamente i record
+   * che hanno completato tutte le operazioni precedenti.
+   */
   if (paperDeliveryRecords.length > 0) {
     const kinesisEventRecords = paperDeliveryRecords.map(record =>
       buildPaperDeliveryKinesisEventRecord(record.entity.requestId)
     );
+
+    try {
     await batchWriteKinesisEventRecords(kinesisEventRecords);
     console.log(`Processed ${paperDeliveryRecords.length} records successfully`);
+
+    } catch (error) {
+      console.error(
+        "Failed to write processed Kinesis event records",
+        error
+      );
+
+      batchItemFailures.push(
+        ...paperDeliveryRecords.map(record => ({
+          itemIdentifier: record.kinesisSeqNumber
+        }))
+      );
+    }
   } else {
     console.log("No new records to write to Kinesis sequence number table");
   }
 
-  return { batchItemFailures };
+  return {
+    batchItemFailures: uniqueFailures(
+      batchItemFailures
+    )
+  };
 };
 
 function addPaperDeliveryRecordIfNew({
@@ -181,6 +302,17 @@ function filterFailedRecords(records, failures) {
   return records.filter(
     record => !failures.some(failure => failure.itemIdentifier === record.kinesisSeqNumber)
   );
+}
+
+function uniqueFailures(failures) {
+  return [
+    ...new Map(
+      failures.map(failure => [
+        failure.itemIdentifier,
+        failure
+      ])
+    ).values()
+  ];
 }
 
 function filterInvalidRecords(records) {

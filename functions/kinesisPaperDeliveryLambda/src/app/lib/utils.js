@@ -1,8 +1,9 @@
-const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
+const { LocalDate, DayOfWeek, TemporalAdjusters, Clock, Instant, ZoneOffset} = require("@js-joda/core");
+const dayOfWeekEnv = process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK;
 
 function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false) {
-  const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
-  const date = rsOrSecondAttempt ? payload.prepareRequestDate : payload.notificationSentAt;
+  const skipSenderLimit = isRsOrSecondAttempt(payload);
+  const date = skipSenderLimit   ? payload.prepareRequestDate : payload.notificationSentAt;
 
   const record = {
     pk: buildPk(deliveryWeek),
@@ -24,11 +25,11 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false) {
     workflowStep: 'EVALUATE_SENDER_LIMIT',
     senderPriority: payload.senderPriority ? payload.senderPriority : 0,
     deliveryDate: deliveryWeek,
-    delayed: delayed,
-    skipSenderLimit: rsOrSecondAttempt
+    delayed: Boolean(delayed),
+    skipSenderLimit
   };
 
-  if (payload.senderPaId && !rsOrSecondAttempt) {
+  if (payload.senderPaId && !skipSenderLimit) {
     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
   }
 
@@ -36,33 +37,30 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false) {
 }
 
 function getDeliveryWeek() {
-  const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
+  const dayOfWeek = parseInt(dayOfWeekEnv, 10) || 1;
   return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
 }
 
 function calculateNotificationSentAtWeek(notificationSentAt) {
-  const datePart = notificationSentAt.includes("T")
-    ? notificationSentAt.split("T")[0]
-    : notificationSentAt;
-
-  const date = LocalDate.parse(datePart);
-  return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).toString();
+  const dayOfWeek = parseInt(dayOfWeekEnv, 10) || 1;
+  return Instant.parse(notificationSentAt)
+    .atOffset(ZoneOffset.UTC)
+    .toLocalDate()
+    .with(
+      TemporalAdjusters.previousOrSame(
+        DayOfWeek.of(dayOfWeek)
+      )
+    )
+    .toString();
 }
 
 function getCurrentWeek() {
-  return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(1))).toString();
+  const dayOfWeek = parseInt(dayOfWeekEnv, 10) || 1;
+  return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
 }
 
 function isCurrentWeek(notificationSentAt) {
   return (calculateNotificationSentAtWeek(notificationSentAt) === getCurrentWeek());
-}
-
-function retrieveDate(payload) {
-  if (payload.productType === "RS" || (payload.attempt && parseInt(payload.attempt, 10) === 1)) {
-    return payload.prepareRequestDate;
-  } else {
-    return payload.notificationSentAt;
-  }
 }
 
 function isRsOrSecondAttempt(payload) {
@@ -85,7 +83,7 @@ function buildPaperDeliveryKinesisEventRecord(requestId) {
   };
 }
 
-const groupRecordsByProductAndProvince = (records) => {
+function groupRecordsByProductAndProvince(records) {
   return records.reduce((acc, record) => {
     const key = `${record.entity.province}~${record.entity.productType}`;
     if (!acc[key]) {
@@ -96,7 +94,7 @@ const groupRecordsByProductAndProvince = (records) => {
   }, {});
 };
 
-const groupRecordsBySenderPaId = (records) => {
+function groupRecordsBySenderPaId(records) {
   return records.reduce((acc, record) => {
     const key = record.entity.senderPaId;
     if (!key) {
@@ -110,7 +108,7 @@ const groupRecordsBySenderPaId = (records) => {
   }, {});
 };
 
-const groupDelayedRecords = (records) => {
+function groupDelayedRecords(records) {
   return records.reduce((acc, record) => {
     const notificationSentAtWeek = calculateNotificationSentAtWeek(record.notificationSentAt);
     const key = `${notificationSentAtWeek}~${record.senderPaId}~${record.productType}~${record.province}`;

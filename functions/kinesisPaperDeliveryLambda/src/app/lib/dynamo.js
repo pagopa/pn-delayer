@@ -231,8 +231,8 @@ async function getSenderLimit(senderPaId, productType, province, notificationSen
   }
 }
 
-async function createDelayedCounter(deliveryWeek, notificationSentAtWeek, senderPaId, productType, province, numberOfShipments, weeklyEstimate) {
-  const sk = `DELAYED~${notificationSentAtWeek}~${senderPaId}~${productType}~${province}`;
+async function updateDelayedCounter(deliveryWeek, notificationSentAtWeek, senderPaId, productType, province, numberOfShipments, weeklyEstimate) {
+  const sk = `DELAYED~${province}~${productType}~${senderPaId}~${notificationSentAtWeek}`;
 
   const input = {
     TableName: counterTableName,
@@ -270,5 +270,5 @@ module.exports = {
   batchWriteKinesisEventRecords,
   batchGetKinesisEventRecords,
   getSenderLimit,
-  createDelayedCounter
+  updateDelayedCounter
 };

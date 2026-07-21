@@ -1995,6 +1995,7 @@ Resources:
               - dynamodb:GetItem
             Resource:
               - !Ref PaperDeliverySenderLimitTableArn
+              - !Sub "${PaperDeliverySenderLimitTableArn}/*"
           - Effect: Allow
             Action:
               - dynamodb:BatchGetItem

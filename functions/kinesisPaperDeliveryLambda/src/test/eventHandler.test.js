@@ -17,7 +17,7 @@ describe("eventHandler.handleEvent", () => {
   let isCurrentWeekStub;
   let groupDelayedRecordsStub;
   let getSenderLimitStub;
-  let createDelayedCounterStub;
+  let updateDelayedCounter;
   let lambda;
 
   beforeEach(() => {
@@ -42,7 +42,7 @@ describe("eventHandler.handleEvent", () => {
     isCurrentWeekStub = sinon.stub();
     groupDelayedRecordsStub = sinon.stub();
     getSenderLimitStub = sinon.stub();
-    createDelayedCounterStub = sinon.stub();
+    updateDelayedCounter = sinon.stub();
 
     lambda = proxyquire("../app/eventHandler.js", {
       "./lib/kinesis": {
@@ -55,7 +55,7 @@ describe("eventHandler.handleEvent", () => {
         batchWriteKinesisEventRecords: batchWriteKinesisEventRecordsStub,
         batchGetKinesisEventRecords: batchGetKinesisEventRecordsStub,
         getSenderLimit: getSenderLimitStub,
-        createDelayedCounter: createDelayedCounterStub
+        updateDelayedCounter: updateDelayedCounter
       },
       "./lib/utils": {
         buildPaperDeliveryRecord: buildPaperDeliveryRecordStub,
@@ -504,7 +504,7 @@ describe("eventHandler.handleEvent", () => {
         "2025-05-19~sender1~AR~RM": [delayedEvent]
       });
       getSenderLimitStub.resolves({ weeklyEstimate: 15 });
-      createDelayedCounterStub.resolves();
+      updateDelayedCounter.resolves();
       buildPaperDeliveryRecordStub.callsFake((item, deliveryWeek, delayed, skipSenderLimit) =>
         mockBuiltRecord(item, { deliveryDate: deliveryWeek, delayed, skipSenderLimit })
       );
@@ -521,7 +521,7 @@ describe("eventHandler.handleEvent", () => {
 
       expect(result).to.deep.equal({ batchItemFailures: [] });
       expect(getSenderLimitStub.calledOnceWithExactly("sender1", "AR", "RM", "2025-05-19")).to.equal(true);
-      expect(createDelayedCounterStub.calledOnceWithExactly("2025-05-26", "2025-05-19", "sender1", "AR", "RM", 1, 15)).to.equal(true);
+      expect(updateDelayedCounter.calledOnceWithExactly("2025-05-26", "2025-05-19", "sender1", "AR", "RM", 1, 15)).to.equal(true);
       expect(buildPaperDeliveryRecordStub.firstCall.args[2]).to.equal(true);
       expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
       expect(batchWriteKinesisEventRecordsStub.calledOnce).to.equal(true);
@@ -566,7 +566,7 @@ describe("eventHandler.handleEvent", () => {
 
       expect(result).to.deep.equal({ batchItemFailures: [] });
       expect(getSenderLimitStub.calledOnceWithExactly("sender2", "AR", "MI", "2025-05-19")).to.equal(true);
-      expect(createDelayedCounterStub.called).to.equal(false);
+      expect(updateDelayedCounter.called).to.equal(false);
       expect(buildPaperDeliveryRecordStub.firstCall.args[2]).to.equal(false);
       expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
     });
@@ -594,7 +594,7 @@ describe("eventHandler.handleEvent", () => {
         "2025-05-19~sender3~AR~TO": [delayedEvent]
       });
       getSenderLimitStub.resolves({ weeklyEstimate: 8 });
-      createDelayedCounterStub.rejects(new Error("counter error"));
+      updateDelayedCounter.rejects(new Error("counter error"));
 
       const result = await lambda.handleEvent({});
 

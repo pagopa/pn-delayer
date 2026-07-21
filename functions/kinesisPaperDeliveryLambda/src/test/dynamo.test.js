@@ -345,28 +345,28 @@ describe('getSenderLimit', () => {
   });
 });
 
-describe('createDelayedCounter', () => {
+describe('updateDelayedCounter', () => {
   it('sends an UpdateCommand with correct pk, sk and expression attribute values', async () => {
     mockSend.resolves({});
 
-    await dynamo.createDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 5, 100);
+    await dynamo.updateDelayedCounter('2025-05-26', '2025-05-19T00:00:00Z', 'sender1', 'RS', 'MI', 5, 100);
 
     expect(mockSend.callCount).to.equal(1);
     const cmd = mockSend.firstCall.args[0];
     expect(cmd).to.be.instanceOf(UpdateCommand);
     expect(cmd.params.TableName).to.equal('TestCounterTable');
     expect(cmd.params.Key.pk).to.equal('2025-05-26');
-    expect(cmd.params.Key.sk).to.equal('DELAYED~2025-05-19~sender1~RS~MI');
+    expect(cmd.params.Key.sk).to.equal('DELAYED~MI~RS~sender1~2025-05-19T00:00:00Z');
     expect(cmd.params.ExpressionAttributeValues[':numberOfShipments']).to.equal(5);
-    expect(cmd.params.ExpressionAttributeValues[':notificationSentAtWeek']).to.equal('2025-05-19');
+    expect(cmd.params.ExpressionAttributeValues[':notificationSentAtWeek']).to.equal('2025-05-19T00:00:00Z');
     expect(cmd.params.ExpressionAttributeValues[':weeklyEstimate']).to.equal(100);
   });
 
   it('uses ADD expression so subsequent calls increment the same counter', async () => {
     mockSend.resolves({});
 
-    await dynamo.createDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 3, 100);
-    await dynamo.createDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 2, 100);
+    await dynamo.updateDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 3, 100);
+    await dynamo.updateDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 2, 100);
 
     expect(mockSend.callCount).to.equal(2);
     expect(mockSend.firstCall.args[0].params.UpdateExpression).to.include('ADD');
@@ -375,13 +375,13 @@ describe('createDelayedCounter', () => {
   it('builds a distinct sk for each unique senderPaId, productType and province combination', async () => {
     mockSend.resolves({});
 
-    await dynamo.createDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 1, 50);
-    await dynamo.createDelayedCounter('2025-05-26', '2025-05-19', 'sender2', '890', 'RM', 1, 50);
+    await dynamo.updateDelayedCounter('2025-05-26', '2025-05-19T00:00:00Z', 'sender1', 'RS', 'MI', 1, 50);
+    await dynamo.updateDelayedCounter('2025-05-26', '2025-05-19T00:00:00Z', 'sender2', '890', 'RM', 1, 50);
 
     const sk1 = mockSend.firstCall.args[0].params.Key.sk;
     const sk2 = mockSend.secondCall.args[0].params.Key.sk;
-    expect(sk1).to.equal('DELAYED~2025-05-19~sender1~RS~MI');
-    expect(sk2).to.equal('DELAYED~2025-05-19~sender2~890~RM');
+    expect(sk1).to.equal('DELAYED~MI~RS~sender1~2025-05-19T00:00:00Z');
+    expect(sk2).to.equal('DELAYED~RM~890~sender2~2025-05-19T00:00:00Z');
   });
 
   it('throws when DynamoDB rejects the update', async () => {
@@ -389,7 +389,7 @@ describe('createDelayedCounter', () => {
 
     let thrown;
     try {
-      await dynamo.createDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 5, 100);
+      await dynamo.updateDelayedCounter('2025-05-26', '2025-05-19', 'sender1', 'RS', 'MI', 5, 100);
     } catch (e) {
       thrown = e;
     }

@@ -274,7 +274,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
 
     it('groups records with date-only and ISO datetime notificationSentAt values in the same week together', () => {
       const r1 = {
-        notificationSentAt: '2025-05-19',
+        notificationSentAt: '2025-05-19T00:00:00Z',
         senderPaId: 'sender1',
         productType: '890',
         province: 'RM'
@@ -368,7 +368,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
     });
 
     it('returns true when notificationSentAt is the first day of the current week', () => {
-      expect(isCurrentWeek('2026-06-29')).to.equal(true);
+      expect(isCurrentWeek('2026-06-29T00:00:00Z')).to.equal(true);
     });
 
     it('returns false when notificationSentAt belongs to the previous week', () => {
