@@ -16,7 +16,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **DELAYER_TO_PAPER_CHANNEL**  | Avvia la Step Function DelayerToPaperChannelStateMachine passandole i parametri statici per i nomi delle tabelle.                                                    | `["delayerPaperDeliveryTableName","paperDeliveryCountersTableName"]`                                                                                                                                                             |
 | **GET_STATUS_EXECUTION**      | Restituisce lo stato di una specifica esecuzione di una Step Function                                                                                                | `["executionArn"]`                                                                                                                                                                                                               |
 | **GET_PAPER_DELIVERY**        | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                      | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
-| **GET_SENDER_LIMIT**          | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? }`                                                                                                                                                      |
+| **GET_SENDER_LIMIT**          | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "table": "pn-PaperDeliverySenderLimit", "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? }`                                                                                                              |
 | **GET_PRESIGNED_URL**         | Restituisce un URL presigned per l'upload o il download dei CSV delle spedizioni o delle capacità dichiarate dai recapitisti                                         | `{ "fileName", "checksumSha256B64"?, "presignedUrlType"? }`                                                                                                                                                                      |
 | **GET_DECLARED_CAPACITY**     | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                 | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
 | **INSERT_MOCK_CAPACITIES**    | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                           | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
@@ -92,6 +92,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 {
   "operationType": "GET_SENDER_LIMIT",
   "parameters": {
+    "table": "pn-PaperDeliverySenderLimit",
     "deliveryDate": "2025-06-30",
     "province": "RM"
   }
@@ -102,6 +103,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 {
   "operationType": "GET_SENDER_LIMIT",
   "parameters": {
+    "table": "pn-PaperDeliverySenderLimit",
     "deliveryDate": "2025-06-30",
     "province": "RM",
     "lastEvaluatedKey": "<lek>"
@@ -113,6 +115,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 {
   "operationType": "GET_SENDER_LIMIT",
   "parameters": {
+    "table": "pn-PaperDeliverySenderLimit",
     "deliveryDate": "2025-06-30",
     "pk": "paId~productType~province"
   }

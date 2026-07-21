@@ -2,7 +2,6 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, QueryCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
 
-const TABLE_NAME = "pn-PaperDeliverySenderLimit";
 const GSI_NAME = "deliveryDateProvince-index";
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
@@ -10,20 +9,20 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 /**
  * GET_SENDER_LIMIT operation
  * Supporta:
- *  - Object: { deliveryDate, province, lastEvaluatedKey?, pk? }
+ *  - Object: { table, deliveryDate, province, lastEvaluatedKey?, pk? }
  */
 async function getSenderLimit(params = {}) {
 
-    let deliveryDate, province, lastEvaluatedKey, pk;
-    ({ deliveryDate, province, lastEvaluatedKey, pk } = params);
+    let table, deliveryDate, province, lastEvaluatedKey, pk;
+    ({ table, deliveryDate, province, lastEvaluatedKey, pk } = params);
 
-    if (!deliveryDate || (!province && !pk)) {
-        throw new Error("Parameters must include deliveryDate and (province or pk)");
+    if (!table || !deliveryDate || (!province && !pk)) {
+        throw new Error("Parameters must include table, deliveryDate and (province or pk)");
     }
 
     if (pk) {
         const getParams = {
-            TableName: TABLE_NAME,
+            TableName: table,
             Key: {
                 pk: pk,
                 deliveryDate: deliveryDate,
@@ -39,7 +38,7 @@ async function getSenderLimit(params = {}) {
 
     const limit = parseInt(process.env.PAPER_DELIVERY_QUERYLIMIT || '1000', 10);
     const queryParams = {
-      TableName: TABLE_NAME,
+      TableName: table,
       IndexName: GSI_NAME,
       KeyConditionExpression: "deliveryDate = :deliveryDate AND province = :province",
       ExpressionAttributeValues: {
