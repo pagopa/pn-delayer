@@ -241,10 +241,10 @@ describe('dynamo.js', () => {
           Put: {
             TableName: 'test-table',
             Item: {
-              pk: 'DELETED#pk1',
+              pk: 'DELETED~pk1',
               sk: 'sk1',
               requestId: 'request-id-1',
-              workflowStep: 'EVALUATE_SENDER_LIMIT'
+              workflowStep: 'DELETED'
             }
           }
         }
