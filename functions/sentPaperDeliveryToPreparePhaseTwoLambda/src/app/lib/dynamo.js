@@ -126,7 +126,8 @@ function buildMoveToDeletedTransaction(item, tableName) {
         Item: marshall(
           {
             ...item,
-            pk: `DELETED#${item.pk}`
+            pk: `DELETED~${item.pk}`,
+            workflowStep: `DELETED`
           },
           {
             removeUndefinedValues: true
