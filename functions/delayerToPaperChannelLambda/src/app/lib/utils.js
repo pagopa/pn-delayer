@@ -6,10 +6,10 @@ function chunkArray(messages, size) {
 }
 
 function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
-  if (step === 'EVALUATE_SENDER_LIMIT') {
-    let deliveryWeekLocalDate = LocalDate.parse(deliveryWeek);
-    deliveryWeek = deliveryWeekLocalDate.plusDays(7).toString();
-  }
+   if(step === 'EVALUATE_SENDER_LIMIT'){
+      let deliveryWeekLocalDate = LocalDate.parse(deliveryWeek);
+      deliveryWeek = deliveryWeekLocalDate.plusDays(7).toString();
+    }
 
   const paperDelivery = {
     pk: `${deliveryWeek}~${step}`,
@@ -40,7 +40,7 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
   };
 
   return Object.fromEntries(
-    Object.entries(paperDelivery).filter(([_, value]) => value !== null && value !== undefined)
+      Object.entries(paperDelivery).filter(([_, value]) => value !== null && value !== undefined)
   );
 }
 
