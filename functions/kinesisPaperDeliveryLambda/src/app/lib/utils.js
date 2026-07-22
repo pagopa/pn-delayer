@@ -59,10 +59,6 @@ function getCurrentWeek() {
   return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
 }
 
-function isCurrentWeek(notificationSentAt) {
-  return (calculateNotificationSentAtWeek(notificationSentAt) === getCurrentWeek());
-}
-
 function isRsOrSecondAttempt(payload) {
   return payload.productType === 'RS' || (payload.attempt && parseInt(payload.attempt, 10) === 1);
 }
@@ -126,6 +122,7 @@ module.exports = {
   groupRecordsByProductAndProvince,
   groupRecordsBySenderPaId,
   groupDelayedRecords,
-  isCurrentWeek,
+  calculateNotificationSentAtWeek,
+  getCurrentWeek,
   getDeliveryWeek
 };

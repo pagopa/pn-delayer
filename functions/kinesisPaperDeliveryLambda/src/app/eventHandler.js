@@ -14,7 +14,8 @@ const {
   groupRecordsByProductAndProvince,
   groupRecordsBySenderPaId,
   groupDelayedRecords,
-  isCurrentWeek,
+  calculateNotificationSentAtWeek,
+  getCurrentWeek,
   getDeliveryWeek
 } = require("./lib/utils");
 
@@ -39,13 +40,15 @@ exports.handleEvent = async (event) => {
   const delayedPaperDeliveryList = [];
   const requestIds = new Set();
   const deliveryWeek = getDeliveryWeek();
+  const currentWeek = getCurrentWeek();
 
   /*
    * Separazione dei record appartenenti alla settimana corrente
    * da quelli appartenenti alle settimane precedenti.
    */
   for (const eventItem of filteredData) {
-    const inCurrentWeek = isCurrentWeek(eventItem.notificationSentAt);
+    const notificationSentAtWeek = calculateNotificationSentAtWeek(eventItem.notificationSentAt);
+    const inCurrentWeek = notificationSentAtWeek === currentWeek;
 
     if (inCurrentWeek) {
       addPaperDeliveryRecordIfNew({

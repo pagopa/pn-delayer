@@ -14,7 +14,8 @@ describe("eventHandler.handleEvent", () => {
   let groupRecordsByProductAndProvinceStub;
   let groupRecordsBySenderPaIdStub;
   let getDeliveryWeekStub;
-  let isCurrentWeekStub;
+  let getCurrentWeekStub;
+  let calculateNotificationSentAtWeekStub;
   let groupDelayedRecordsStub;
   let getSenderLimitStub;
   let updateDelayedCounter;
@@ -39,7 +40,8 @@ describe("eventHandler.handleEvent", () => {
     groupRecordsByProductAndProvinceStub = sinon.stub();
     groupRecordsBySenderPaIdStub =  sinon.stub();
     getDeliveryWeekStub = sinon.stub();
-    isCurrentWeekStub = sinon.stub();
+    getCurrentWeekStub = sinon.stub();
+    calculateNotificationSentAtWeekStub = sinon.stub();
     groupDelayedRecordsStub = sinon.stub();
     getSenderLimitStub = sinon.stub();
     updateDelayedCounter = sinon.stub();
@@ -63,7 +65,8 @@ describe("eventHandler.handleEvent", () => {
         groupRecordsByProductAndProvince: groupRecordsByProductAndProvinceStub,
         groupRecordsBySenderPaId: groupRecordsBySenderPaIdStub,
         getDeliveryWeek: getDeliveryWeekStub,
-        isCurrentWeek: isCurrentWeekStub,
+        getCurrentWeek: getCurrentWeekStub,
+        calculateNotificationSentAtWeek: calculateNotificationSentAtWeekStub,
         groupDelayedRecords: groupDelayedRecordsStub
       }
     });
@@ -179,7 +182,8 @@ describe("eventHandler.handleEvent", () => {
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({ UnprocessedItems: {} });
-    isCurrentWeekStub.returns(true);
+    getCurrentWeekStub.returns('2026-07-20');
+    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -238,7 +242,8 @@ describe("eventHandler.handleEvent", () => {
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({});
-    isCurrentWeekStub.returns(true);
+    getCurrentWeekStub.returns('2026-07-20');
+    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -284,7 +289,8 @@ describe("eventHandler.handleEvent", () => {
     extractKinesisDataStub.returns(eventData);
     buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
     batchGetKinesisEventRecordsStub.resolves(["1234567890", "1234567891"]);
-    isCurrentWeekStub.returns(true);
+    getCurrentWeekStub.returns('2026-07-20');
+    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -319,7 +325,8 @@ describe("eventHandler.handleEvent", () => {
     });
     updateExcludeCounterStub.resolves([{ itemIdentifier: "1234567890" }]);
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-    isCurrentWeekStub.returns(true);
+    getCurrentWeekStub.returns('2026-07-20');
+    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -360,7 +367,8 @@ describe("eventHandler.handleEvent", () => {
     updateExcludeCounterStub.callsFake(async (_, failures) => failures);
     updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
     batchWritePaperDeliveryRecordsStub.resolves([{ itemIdentifier: "1234567890" }]);
-    isCurrentWeekStub.returns(true);
+    getCurrentWeekStub.returns('2026-07-20');
+    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -403,7 +411,8 @@ describe("eventHandler.handleEvent", () => {
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({});
-    isCurrentWeekStub.returns(true);
+    getCurrentWeekStub.returns('2026-07-20');
+    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -466,7 +475,8 @@ describe("eventHandler.handleEvent", () => {
     batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
     buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
     batchWriteKinesisEventRecordsStub.resolves({});
-    isCurrentWeekStub.returns(true);
+    getCurrentWeekStub.returns('2026-07-20');
+    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -499,7 +509,8 @@ describe("eventHandler.handleEvent", () => {
 
       extractKinesisDataStub.returns([delayedEvent]);
       getDeliveryWeekStub.returns("2025-05-26");
-      isCurrentWeekStub.returns(false);
+      getCurrentWeekStub.returns('2026-07-20');
+      calculateNotificationSentAtWeekStub.returns('2026-07-13');
       groupDelayedRecordsStub.returns({
         "2025-05-19~sender1~AR~RM": [delayedEvent]
       });
@@ -545,7 +556,8 @@ describe("eventHandler.handleEvent", () => {
 
       extractKinesisDataStub.returns([delayedEvent]);
       getDeliveryWeekStub.returns("2025-05-26");
-      isCurrentWeekStub.returns(false);
+      getCurrentWeekStub.returns('2026-07-20');
+      calculateNotificationSentAtWeekStub.returns('2026-07-13');
       groupDelayedRecordsStub.returns({
         "2025-05-19~sender2~AR~MI": [delayedEvent]
       });
@@ -589,7 +601,8 @@ describe("eventHandler.handleEvent", () => {
 
       extractKinesisDataStub.returns([delayedEvent]);
       getDeliveryWeekStub.returns("2025-05-26");
-      isCurrentWeekStub.returns(false);
+      getCurrentWeekStub.returns('2026-07-20');
+      calculateNotificationSentAtWeekStub.returns('2026-07-13');
       groupDelayedRecordsStub.returns({
         "2025-05-19~sender3~AR~TO": [delayedEvent]
       });

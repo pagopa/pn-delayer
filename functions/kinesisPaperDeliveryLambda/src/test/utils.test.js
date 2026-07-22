@@ -351,29 +351,5 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       });
     });
   });
-  
-  describe('isCurrentWeek', () => {
-    let clock;
-
-    beforeEach(() => {
-      clock = sinon.useFakeTimers(new Date('2026-07-03T12:00:00Z').getTime());
-    });
-
-    afterEach(() => {
-      clock.restore();
-    });
-
-    it('returns true when notificationSentAt is inside the current week', () => {
-      expect(isCurrentWeek('2026-07-03T11:00:00Z')).to.equal(true);
-    });
-
-    it('returns true when notificationSentAt is the first day of the current week', () => {
-      expect(isCurrentWeek('2026-06-29T00:00:00Z')).to.equal(true);
-    });
-
-    it('returns false when notificationSentAt belongs to the previous week', () => {
-      expect(isCurrentWeek('2026-06-28T12:00:00Z')).to.equal(false);
-    });
-  });
 
 });
