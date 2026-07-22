@@ -3122,7 +3122,12 @@ Resources:
                   "tableName": ["pn-Timelines"],
                   "dynamodb": {
                     "NewImage": {
-                      "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] },
+                      "category": {
+                        "S": [
+                          "NOTIFICATION_CANCELLATION_REQUEST",
+                          "NOTIFICATION_VIEWED_CREATION_REQUEST"
+                        ]
+                      },
                       "communicationType": {"S": [{ "exists": false }]}
                     }
                   }
