@@ -78,7 +78,7 @@ public class PaperDelivery {
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_COMMUNICATION_TYPE)}))
     private String communicationType;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_PRIORITY)}))
-    private Integer senderPriority;
+    private int senderPriority;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_VIRTUAL_NOTIFICATION_SENT_AT)}))
     private String virtualNotificationSentAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_OLD_SK)}))
