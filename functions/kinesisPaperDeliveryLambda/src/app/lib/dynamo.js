@@ -2,13 +2,18 @@ const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   BatchWriteCommand,
   BatchGetCommand,
+  GetCommand,
   UpdateCommand,
   DynamoDBDocumentClient
 } = require("@aws-sdk/lib-dynamodb");
+const {
+  getDeliveryWeek
+} = require("./utils");
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 const counterTableName = process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE;
-const { LocalDate, DayOfWeek, TemporalAdjusters } = require('@js-joda/core');
+const senderLimitTableName = process.env.KINESIS_PAPERDELIVERY_SENDERLIMITTABLE;
+const paperDeliveryTableName = process.env.KINESIS_PAPERDELIVERY_TABLE;
 
 function calculateTtl(){
   const ttlDays = parseInt(process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS, 10) || 14;
@@ -40,11 +45,6 @@ function retrieveCounterMap(excludeGroupedRecords) {
     }
   }
   return result;
-}
-
-function getDeliveryWeek() {
-  const dayOfWeek = parseInt(process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK, 10) || 1;
-  return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
 }
 
 async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
@@ -136,7 +136,7 @@ async function updateSenderPriorityCounter(groupedSenderPaIdRecords, batchItemFa
 async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFailures) {
   const batch_size = process.env.KINESIS_BATCHSIZE;
   console.log(`Batch size: ${batch_size}`);
-  const tableName = process.env.KINESIS_PAPERDELIVERY_TABLE;
+  const tableName = paperDeliveryTableName;
 
   const params = {
         RequestItems: {
@@ -212,8 +212,63 @@ async function batchGetKinesisEventRecords(keys) {
   });
 }
 
-module.exports = { batchWritePaperDeliveryRecords,
-                   updateExcludeCounter,
-                   updateSenderPriorityCounter,
-                   batchWriteKinesisEventRecords,
-                   batchGetKinesisEventRecords };
+async function getSenderLimit(senderPaId, productType, province, notificationSentAtWeek) {
+  const key = {
+    pk: `${senderPaId}~${productType}~${province}`,
+    deliveryDate: notificationSentAtWeek
+  };
+
+  try {
+    const command = new GetCommand({
+      TableName: senderLimitTableName,
+      Key: key
+    });
+    const response = await docClient.send(command);
+    return response.Item || null;
+  } catch (error) {
+    console.error(`Failed to get sender limit for key: ${JSON.stringify(key)}`, error);
+    return null;
+  }
+}
+
+async function updateDelayedCounter(deliveryWeek, notificationSentAtWeek, senderPaId, productType, province, numberOfShipments, weeklyEstimate) {
+  const sk = `DELAYED~${province}~${productType}~${senderPaId}~${notificationSentAtWeek}`;
+
+  const input = {
+    TableName: counterTableName,
+    Key: {
+      pk: deliveryWeek,
+      sk: sk
+    },
+    UpdateExpression: 'ADD #numberOfShipments :numberOfShipments SET #notificationSentAtWeek = :notificationSentAtWeek, #weeklyEstimate = :weeklyEstimate',
+    ExpressionAttributeNames: {
+      '#numberOfShipments': 'numberOfShipments',
+      '#notificationSentAtWeek': 'notificationSentAtWeek',
+      '#weeklyEstimate': 'weeklyEstimate'
+    },
+    ExpressionAttributeValues: {
+      ':numberOfShipments': numberOfShipments,
+      ':notificationSentAtWeek': notificationSentAtWeek,
+      ':weeklyEstimate': weeklyEstimate
+    }
+  };
+
+  try {
+    const command = new UpdateCommand(input);
+    await docClient.send(command);
+    console.log(`Created/updated DELAYED counter for sk: ${sk}`);
+  } catch (error) {
+    console.error(`Failed to create DELAYED counter for sk: ${sk}`, error);
+    throw error;
+  }
+}
+
+module.exports = {
+  batchWritePaperDeliveryRecords,
+  updateExcludeCounter,
+  updateSenderPriorityCounter,
+  batchWriteKinesisEventRecords,
+  batchGetKinesisEventRecords,
+  getSenderLimit,
+  updateDelayedCounter
+};

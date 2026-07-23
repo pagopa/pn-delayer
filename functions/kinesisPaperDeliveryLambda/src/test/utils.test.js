@@ -1,5 +1,6 @@
-const { buildPaperDeliveryRecord } = require('../app/lib/utils');
+const { buildPaperDeliveryRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince, groupRecordsBySenderPaId, groupDelayedRecords, isCurrentWeek } = require('../app/lib/utils');
 const { expect } = require("chai");
+const sinon = require("sinon");
 
 describe('buildPaperDeliveryHighPriorityRecord', () => {
   it('builds a record with all required fields from payload', () => {
@@ -116,13 +117,10 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
     expect(result).to.not.have.property('senderPaIdOriginalSentAt');
   });
 
-
   it('throws an error when payload is missing required fields', () => {
     const payload = { unifiedDeliveryDriver: 'driver1' };
     expect(() => buildPaperDeliveryRecord(payload)).throw();
   });
-
-  const { buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince, groupRecordsBySenderPaId } = require('../app/lib/utils');
 
   describe('buildPaperDeliveryKinesisEventRecord', () => {
     beforeEach(() => {
@@ -244,6 +242,123 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         const result = groupRecordsBySenderPaId([r1, r2]);
         expect(Object.keys(result)).to.have.lengthOf(1);
         expect(result['sender1']).to.deep.equal([r1]);
+    });
+  });
+
+  describe('groupDelayedRecords', () => {
+    it('returns an empty object for an empty records array', () => {
+      const result = groupDelayedRecords([]);
+      expect(result).to.deep.equal({});
+    });
+
+    it('groups records under the same delivery week key', () => {
+      const r1 = {
+        notificationSentAt: '2025-05-21T12:34:25Z',
+        senderPaId: 'sender1',
+        productType: 'RS',
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
+      };
+      const r2 = {
+        notificationSentAt: '2025-05-23T08:15:00Z',
+        senderPaId: 'sender1',
+        productType: 'RS',
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
+      };
+
+      const result = groupDelayedRecords([r1, r2]);
+
+      expect(result).to.deep.equal({
+        '2025-05-19~sender1~RS~MI': [r1, r2]
+      });
+    });
+
+    it('groups records with date-only and ISO datetime notificationSentAt values in the same week together', () => {
+      const r1 = {
+        notificationSentAt: '2025-05-19T00:00:00Z',
+        senderPaId: 'sender1',
+        productType: '890',
+        province: 'RM',
+        notificationSentAtWeek: '2025-05-19'
+      };
+      const r2 = {
+        notificationSentAt: '2025-05-21T12:34:25Z',
+        senderPaId: 'sender1',
+        productType: '890',
+        province: 'RM',
+        notificationSentAtWeek: '2025-05-19'
+      };
+
+      const result = groupDelayedRecords([r1, r2]);
+
+      expect(result).to.deep.equal({
+        '2025-05-19~sender1~890~RM': [r1, r2]
+      });
+    });
+
+    it('creates separate groups when records belong to different delivery weeks', () => {
+      const r1 = {
+        notificationSentAt: '2025-05-25T23:59:59Z',
+        senderPaId: 'sender1',
+        productType: 'RS',
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
+      };
+      const r2 = {
+        notificationSentAt: '2025-05-26T00:00:00Z',
+        senderPaId: 'sender1',
+        productType: 'RS',
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-26'
+      };
+
+      const result = groupDelayedRecords([r1, r2]);
+
+      expect(result).to.deep.equal({
+        '2025-05-19~sender1~RS~MI': [r1],
+        '2025-05-26~sender1~RS~MI': [r2]
+      });
+    });
+
+    it('creates separate groups when sender, product type or province differ within the same week', () => {
+      const r1 = {
+        notificationSentAt: '2025-05-21T12:34:25Z',
+        senderPaId: 'sender1',
+        productType: 'RS',
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
+      };
+      const r2 = {
+        notificationSentAt: '2025-05-22T10:00:00Z',
+        senderPaId: 'sender2',
+        productType: 'RS',
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
+      };
+      const r3 = {
+        notificationSentAt: '2025-05-23T10:00:00Z',
+        senderPaId: 'sender1',
+        productType: '890',
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
+      };
+      const r4 = {
+        notificationSentAt: '2025-05-24T10:00:00Z',
+        senderPaId: 'sender1',
+        productType: 'RS',
+        province: 'RM',
+        notificationSentAtWeek: '2025-05-19'
+      };
+
+      const result = groupDelayedRecords([r1, r2, r3, r4]);
+
+      expect(result).to.deep.equal({
+        '2025-05-19~sender1~RS~MI': [r1],
+        '2025-05-19~sender2~RS~MI': [r2],
+        '2025-05-19~sender1~890~MI': [r3],
+        '2025-05-19~sender1~RS~RM': [r4]
+      });
     });
   });
 
