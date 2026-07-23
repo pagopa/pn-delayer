@@ -97,7 +97,7 @@ public class PaperDelivery {
 
     public PaperDelivery(){}
 
-    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek){
+    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, boolean skipSenderLimit){
         String date =  paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
                 paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
 
@@ -126,7 +126,7 @@ public class PaperDelivery {
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
         this.delayed = paperDelivery.getDelayed();
         this.previousStep = paperDelivery.getWorkflowStep();
-        this.skipSenderLimit = paperDelivery.getSkipSenderLimit();
+        this.skipSenderLimit = skipSenderLimit;
     }
 
     private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {
