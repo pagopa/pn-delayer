@@ -106,8 +106,7 @@ function groupRecordsBySenderPaId(records) {
 
 function groupDelayedRecords(records) {
   return records.reduce((acc, record) => {
-    const notificationSentAtWeek = calculateNotificationSentAtWeek(record.notificationSentAt);
-    const key = `${notificationSentAtWeek}~${record.senderPaId}~${record.productType}~${record.province}`;
+    const key = `${record.notificationSentAtWeek}~${record.senderPaId}~${record.productType}~${record.province}`;
     if (!acc[key]) {
       acc[key] = [];
     }

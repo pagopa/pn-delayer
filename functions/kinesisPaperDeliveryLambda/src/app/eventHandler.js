@@ -60,7 +60,10 @@ exports.handleEvent = async (event) => {
       });
     } else {
       console.log(`PaperDelivery ${eventItem.requestId} belongs to a previous notification week`);
-      delayedPaperDeliveryList.push(eventItem);
+      delayedPaperDeliveryList.push({
+        ...eventItem,
+        notificationSentAtWeek
+      });
     }
   }
 

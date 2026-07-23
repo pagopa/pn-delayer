@@ -256,13 +256,15 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         notificationSentAt: '2025-05-21T12:34:25Z',
         senderPaId: 'sender1',
         productType: 'RS',
-        province: 'MI'
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
       };
       const r2 = {
         notificationSentAt: '2025-05-23T08:15:00Z',
         senderPaId: 'sender1',
         productType: 'RS',
-        province: 'MI'
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
       };
 
       const result = groupDelayedRecords([r1, r2]);
@@ -277,13 +279,15 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         notificationSentAt: '2025-05-19T00:00:00Z',
         senderPaId: 'sender1',
         productType: '890',
-        province: 'RM'
+        province: 'RM',
+        notificationSentAtWeek: '2025-05-19'
       };
       const r2 = {
         notificationSentAt: '2025-05-21T12:34:25Z',
         senderPaId: 'sender1',
         productType: '890',
-        province: 'RM'
+        province: 'RM',
+        notificationSentAtWeek: '2025-05-19'
       };
 
       const result = groupDelayedRecords([r1, r2]);
@@ -298,13 +302,15 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         notificationSentAt: '2025-05-25T23:59:59Z',
         senderPaId: 'sender1',
         productType: 'RS',
-        province: 'MI'
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
       };
       const r2 = {
         notificationSentAt: '2025-05-26T00:00:00Z',
         senderPaId: 'sender1',
         productType: 'RS',
-        province: 'MI'
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-26'
       };
 
       const result = groupDelayedRecords([r1, r2]);
@@ -320,25 +326,29 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         notificationSentAt: '2025-05-21T12:34:25Z',
         senderPaId: 'sender1',
         productType: 'RS',
-        province: 'MI'
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
       };
       const r2 = {
         notificationSentAt: '2025-05-22T10:00:00Z',
         senderPaId: 'sender2',
         productType: 'RS',
-        province: 'MI'
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
       };
       const r3 = {
         notificationSentAt: '2025-05-23T10:00:00Z',
         senderPaId: 'sender1',
         productType: '890',
-        province: 'MI'
+        province: 'MI',
+        notificationSentAtWeek: '2025-05-19'
       };
       const r4 = {
         notificationSentAt: '2025-05-24T10:00:00Z',
         senderPaId: 'sender1',
         productType: 'RS',
-        province: 'RM'
+        province: 'RM',
+        notificationSentAtWeek: '2025-05-19'
       };
 
       const result = groupDelayedRecords([r1, r2, r3, r4]);
