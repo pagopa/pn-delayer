@@ -1,5 +1,6 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
+import it.pagopa.pn.delayer.model.ProductType;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.Data;
 import lombok.Getter;
@@ -92,12 +93,11 @@ public class PaperDelivery {
     private Boolean delayed;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PREVIOUS_STEP)}))
     private String previousStep;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_SKIP_SENDER_LIMIT)}))
     private Boolean skipSenderLimit;
 
     public PaperDelivery(){}
 
-    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, boolean skipSenderLimit){
+    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek){
         String date =  paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
                 paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
 
@@ -126,7 +126,15 @@ public class PaperDelivery {
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
         this.delayed = paperDelivery.getDelayed();
         this.previousStep = paperDelivery.getWorkflowStep();
-        this.skipSenderLimit = skipSenderLimit;
+        this.skipSenderLimit = paperDelivery.getSkipSenderLimit();
+    }
+
+    @DynamoDbAttribute(COL_SKIP_SENDER_LIMIT)
+    public Boolean getSkipSenderLimit() {
+        if (Boolean.TRUE.equals(skipSenderLimit)) {
+            return true;
+        }
+        return ProductType.RS.getValue().equalsIgnoreCase(productType) || attempt == 1;
     }
 
     private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {
