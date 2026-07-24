@@ -3,6 +3,7 @@ const { Readable } = require("stream");
 const fs = require("fs");
 const path = require("path");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+const { LocalDate } = require("@js-joda/core");
 
 process.env.AWS_REGION = "eu-south-1";
 process.env.BUCKET_NAME = "test-bucket";
@@ -67,7 +68,7 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "file.csv"] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "pn-PaperDeliverySenderLimit", "file.csv"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
         assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
@@ -81,7 +82,7 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "180000", "2025-08-04"] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "pn-PaperDeliverySenderLimit", "180000", "2025-08-04"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand)[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"][0].PutRequest.Item.pk, "2025-08-04~EVALUATE_SENDER_LIMIT");
@@ -96,10 +97,227 @@ describe("Lambda Delayer Dispatcher", () => {
         });
         ddbMock.on(BatchWriteCommand).resolves({});
 
-        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery","pn-PaperDeliveryCounters", "fileName"] });
+        const result = await handler({ operationType: "IMPORT_DATA", parameters: ["pn-DelayerPaperDelivery", "pn-PaperDeliveryCounters", "pn-PaperDeliverySenderLimit", "fileName"] });
         assert.strictEqual(result.statusCode, 200);
         assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length > 0, true);
         assert.strictEqual(ddbMock.commandCalls(UpdateCommand).length, 2);
+    });
+
+    function buildImportCsv(rowsCount) {
+        const header = "requestId;notificationSentAt;prepareRequestDate;productType;senderPaId;province;cap;attempt;iun;senderPriority";
+        const rows = Array.from({ length: rowsCount }, (_, i) =>
+            `RID-${i};1970-01-05T00:00:00Z;1970-01-05T00:00:00Z;AR;sender-${i % 3};RM;00100;0;IUN-${i};10`
+        );
+        return [header, ...rows].join("\n");
+    }
+
+    it("IMPORT_DATA batchWriteItems must split payload in chunks of max 25", async () => {
+        const csvData = buildImportCsv(60);
+
+        s3Mock.on(GetObjectCommand).resolves({
+            Body: Readable.from([csvData])
+        });
+
+        // Nessun sender limit valido -> i record delayed passano comunque nel flusso comune
+        ddbMock.on(GetCommand).resolves({});
+        ddbMock.on(BatchWriteCommand).resolves({});
+
+        const result = await handler({
+            operationType: "IMPORT_DATA",
+            parameters: [
+                "pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryCounters",
+                "pn-PaperDeliverySenderLimit",
+                "large.csv"
+            ]
+        });
+
+        assert.strictEqual(result.statusCode, 200);
+
+        const calls = ddbMock.commandCalls(BatchWriteCommand);
+        assert.strictEqual(calls.length, 3);
+
+        const chunkSizes = calls.map(
+            (c) => c.args[0].input.RequestItems["pn-DelayerPaperDelivery"].length
+        );
+
+        assert.deepStrictEqual(chunkSizes, [25, 25, 10]);
+        assert.strictEqual(chunkSizes.every((n) => n <= 25), true);
+    });
+
+    it("IMPORT_DATA batchWriteItems must retry UnprocessedItems and continue with remaining records", async () => {
+        const csvData = buildImportCsv(30);
+
+        s3Mock.on(GetObjectCommand).resolves({
+            Body: Readable.from([csvData])
+        });
+
+        ddbMock.on(GetCommand).resolves({});
+
+        let invocation = 0;
+        ddbMock.on(BatchWriteCommand).callsFake(async (input) => {
+            invocation += 1;
+
+            const req = input.RequestItems["pn-DelayerPaperDelivery"];
+
+            // Prima chiamata: simula 3 record non processati
+            if (invocation === 1) {
+                return {
+                    UnprocessedItems: {
+                        "pn-DelayerPaperDelivery": req.slice(0, 3)
+                    }
+                };
+            }
+
+            // Chiamate successive: tutto ok
+            return {};
+        });
+
+        const result = await handler({
+            operationType: "IMPORT_DATA",
+            parameters: [
+                "pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryCounters",
+                "pn-PaperDeliverySenderLimit",
+                "retry.csv"
+            ]
+        });
+
+        assert.strictEqual(result.statusCode, 200);
+
+        const calls = ddbMock.commandCalls(BatchWriteCommand);
+        assert.strictEqual(calls.length, 2);
+
+        const firstCallItems = calls[0].args[0].input.RequestItems["pn-DelayerPaperDelivery"];
+        const secondCallItems = calls[1].args[0].input.RequestItems["pn-DelayerPaperDelivery"];
+
+        assert.strictEqual(firstCallItems.length, 25);
+        assert.strictEqual(secondCallItems.length, 8); // 5 rimanenti + 3 retry
+        assert.strictEqual(firstCallItems.length <= 25, true);
+        assert.strictEqual(secondCallItems.length <= 25, true);
+
+        const retriedIds = firstCallItems.slice(0, 3).map((x) => x.PutRequest.Item.requestId);
+        const secondCallIds = secondCallItems.map((x) => x.PutRequest.Item.requestId);
+
+        retriedIds.forEach((id) => {
+            assert.strictEqual(secondCallIds.includes(id), true);
+        });
+
+        const uniqueIds = new Set(
+            calls.flatMap((c) =>
+                c.args[0].input.RequestItems["pn-DelayerPaperDelivery"].map(
+                    (x) => x.PutRequest.Item.requestId
+                )
+            )
+        );
+
+        assert.strictEqual(uniqueIds.size, 30);
+    });
+
+    it("IMPORT_DATA should handle mixed current and delayed records with valid sender limit", async () => {
+    	LocalDate.now = () => LocalDate.parse("1970-01-07"); // mercoledi', currentWeek = 1970-01-05 (lunedi')
+        // CSV con date miste: alcuni record current week (1970-01-05), altri delayed (1970-01-01)
+        const csvData = [
+            "requestId;notificationSentAt;prepareRequestDate;productType;senderPaId;province;cap;attempt;iun;senderPriority",
+            "RID-CURRENT-1;1970-01-05T00:00:00Z;1970-01-05T00:00:00Z;AR;sender1;RM;00100;0;IUN-1;10",
+            "RID-CURRENT-2;1970-01-05T00:00:00Z;1970-01-05T00:00:00Z;AR;sender1;RM;00100;0;IUN-2;20",
+            "RID-DELAYED-1;1970-01-01T00:00:00Z;1970-01-01T00:00:00Z;AR;sender1;RM;00100;0;IUN-3;15",
+            "RID-DELAYED-2;1970-01-01T00:00:00Z;1970-01-01T00:00:00Z;RS;sender2;NA;80124;0;IUN-4;30",
+            "RID-CURRENT-3;1970-01-05T00:00:00Z;1970-01-05T00:00:00Z;890;sender3;MI;20100;0;IUN-5;25"
+        ].join("\n");
+
+        s3Mock.on(GetObjectCommand).resolves({
+            Body: Readable.from([csvData])
+        });
+
+        // Mock getSenderLimit: ritorna weeklyEstimate > 0 per delayed records
+        ddbMock.on(GetCommand).resolves({
+            Item: {
+                weeklyEstimate: 100
+            }
+        });
+
+        // Mock batchWriteCommand e updateCommand
+        ddbMock.on(BatchWriteCommand).resolves({});
+        ddbMock.on(UpdateCommand).resolves({});
+
+        const result = await handler({
+            operationType: "IMPORT_DATA",
+            parameters: [
+                "pn-DelayerPaperDelivery",
+                "pn-PaperDeliveryCounters",
+                "pn-PaperDeliverySenderLimit",
+                "mixed.csv"
+            ]
+        });
+
+        assert.strictEqual(result.statusCode, 200);
+        const body = JSON.parse(result.body);
+        assert.strictEqual(body.processed, 5);
+
+        // Verifica che BatchWriteCommand sia stato chiamato
+        const batchCalls = ddbMock.commandCalls(BatchWriteCommand);
+        assert.strictEqual(batchCalls.length, 1);
+
+        // Raccogli tutti gli item scritti in DynamoDB
+        const allWrittenItems = batchCalls.flatMap((call) =>
+            call.args[0].input.RequestItems["pn-DelayerPaperDelivery"].map(
+                (req) => req.PutRequest.Item
+            )
+        );
+
+        // Verifica che tutti i 5 record siano stati elaborati
+        assert.strictEqual(allWrittenItems.length, 5);
+
+        // Verifica record current week (delayed = false)
+        const currentRecords = allWrittenItems.filter((r) =>
+            r.requestId.includes("CURRENT")
+        );
+        assert.strictEqual(currentRecords.length, 3);
+        currentRecords.forEach((r) => {
+            assert.strictEqual(r.delayed, false);
+            assert.strictEqual(r.workflowStep, "EVALUATE_SENDER_LIMIT");
+        });
+
+        // Verifica record delayed che hanno sender limit valido (delayed = true)
+        const delayedWithSenderLimit = allWrittenItems.filter((r) =>
+            r.requestId === "RID-DELAYED-1"
+        );
+        assert.strictEqual(delayedWithSenderLimit.length, 1);
+        assert.strictEqual(delayedWithSenderLimit[0].delayed, true);
+        assert.strictEqual(delayedWithSenderLimit[0].skipSenderLimit, false);
+        assert.strictEqual(delayedWithSenderLimit[0].senderPaId, "sender1");
+        assert.strictEqual(delayedWithSenderLimit[0].province, "RM");
+
+        // Verifica record delayed RS
+        const delayedRS = allWrittenItems.filter((r) =>
+            r.requestId === "RID-DELAYED-2"
+        );
+        assert.strictEqual(delayedRS.length, 1);
+        assert.strictEqual(delayedRS[0].productType, "RS");
+        assert.strictEqual(delayedRS[0].senderPaId, "sender2");
+        assert.strictEqual(delayedRS[0].delayed, true);
+        assert.strictEqual(delayedRS[0].skipSenderLimit, true);
+
+        const updateCalls = ddbMock.commandCalls(UpdateCommand);
+        assert.strictEqual(updateCalls.length, 6);
+
+        const delayedCounterUpdates = updateCalls.filter((call) => {
+            const sk = call.args[0].input.Key.sk;
+            return sk && sk.startsWith("DELAYED~");
+        });
+
+        assert.strictEqual(delayedCounterUpdates.length, 2);
+
+        // Verifica i parametri di updateDelayedCounter
+        delayedCounterUpdates.forEach((call) => {
+            const input = call.args[0].input;
+            const sk = input.Key.sk;
+
+            assert.strictEqual(sk.includes("DELAYED~"), true);
+            assert.strictEqual(input.ExpressionAttributeValues[":numberOfShipments"], 1);
+            assert.strictEqual(input.ExpressionAttributeValues[":weeklyEstimate"], 100);
+        });
     });
 
     it("GET_USED_CAPACITY returns the item", async () => {
