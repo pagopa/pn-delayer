@@ -72,7 +72,7 @@ public class SenderLimitUtilsTest {
         assertEquals(1, senderLimitMaps.size());
         assertTrue(senderLimitMaps.containsKey("2026-07-20~key2"));
         assertEquals(62, senderLimitMaps.get("2026-07-20~key2").availableLimit());
-        assertEquals(0, senderLimitMaps.get("2026-07-20~key2").usedLimit());
+        assertEquals(0, senderLimitMaps.get("2026-07-20~key2").incrementUsedLimit());
     }
 
     @Test
@@ -103,7 +103,7 @@ public class SenderLimitUtilsTest {
 
     @Test
     void createIncrementUsedSenderLimitDtos() {
-        Map<String, SenderLimitData> senderLimitMaps = Map.of("2026-07-07~paId~AR~RM", new SenderLimitData(100,100,50, LocalDate.now()));
+        Map<String, SenderLimitData> senderLimitMaps = Map.of("2026-07-07~paId~AR~RM", new SenderLimitData(100,100,0, 50, LocalDate.now()));
 
         StepVerifier.create(senderLimitUtils.createIncrementUsedSenderLimitDtos(senderLimitMaps))
                 .expectNextMatches(incrementUsedSenderLimitDto -> {

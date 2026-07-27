@@ -55,20 +55,17 @@ public class SenderLimitUtils {
                 .defaultIfEmpty(List.of());
     }
 
-    public Mono<Map<String, Integer>> getResidualCapacity(SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+    public Mono<SenderLimitJobProcessObjects> getResidualCapacity(SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         List<PaperDeliveryCounter> counters = senderLimitJobProcessObjects.getDelayedCounters();
         if (CollectionUtils.isEmpty(counters)) {
-            return Mono.just(Map.of());
+            return Mono.just(senderLimitJobProcessObjects);
         }
 
         return Flux.fromIterable(counters)
                 .collectMultimap(PaperDeliveryCounter::getNotificationSentAtWeek)
                 .flatMapMany(groupedCounters -> Flux.fromIterable(groupedCounters.entrySet()))
-                .flatMap(entry -> buildResidualCapacity(entry.getKey(), List.copyOf(entry.getValue()), senderLimitJobProcessObjects))
-                .reduce(new HashMap<>(), (result, partialResult) -> {
-                    result.putAll(partialResult);
-                    return result;
-                });
+                .concatMap(entry -> buildResidualCapacity(entry.getKey(), List.copyOf(entry.getValue()), senderLimitJobProcessObjects))
+                .then(Mono.just(senderLimitJobProcessObjects));
     }
 
 
@@ -87,7 +84,7 @@ public class SenderLimitUtils {
 
     /**
      * Retrieves the sender limits for the specified shipment date for the
-     * {@code paId~productType} entries that are not already present in the sender limit map.
+     * {@code paId~productType~province} entries that are not already present in the sender limit map.
      *
      * <p>Entries in the map use the following key format:</p>
      *
@@ -106,10 +103,10 @@ public class SenderLimitUtils {
      *   <li>the shipment date associated with the limit.</li>
      * </ul>
      *
-     * @param shipmentDate the shipment date for which the sender limits are retrieved
-     * @param driversTotalCapacity the calculated capacities for each product or product group
-     *                             and the related unified delivery drivers
-     * @param paIdProductTypeTuples the set of keys in {@code paId~productType} format
+     * @param shipmentDate                 the shipment date for which the sender limits are retrieved
+     * @param driversTotalCapacity         the calculated capacities for each product or product group
+     *                                     and the related unified delivery drivers
+     * @param paIdProductTypeTuples        the set of keys in {@code paId~productType} format
      * @param senderLimitJobProcessObjects the object containing the sender limit map
      *                                     and the total estimate counter
      * @return a {@link Mono} emitting the updated sender limit map
@@ -187,17 +184,17 @@ public class SenderLimitUtils {
 
     public Flux<IncrementUsedSenderLimitDto> createIncrementUsedSenderLimitDtos(Map<String, SenderLimitData> senderLimitMap) {
         return Flux.fromIterable(senderLimitMap.entrySet())
-                .filter(entry -> entry.getValue().usedLimit() > 0)
+                .filter(entry -> entry.getValue().incrementUsedLimit() > 0)
                 .map(entry -> {
                     String[] keyParts = entry.getKey().split("~", 2);
                     String pk = keyParts[1];
-                    return new IncrementUsedSenderLimitDto(pk, entry.getValue().usedLimit(), entry.getValue().calculatedLimit(), entry.getValue().date());
+                    return new IncrementUsedSenderLimitDto(pk, entry.getValue().incrementUsedLimit(), entry.getValue().calculatedLimit(), entry.getValue().date());
                 });
     }
 
-    private Mono<Map<String, Integer>> buildResidualCapacity(String notificationSentAtWeek, List<PaperDeliveryCounter> counters, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+    private Mono<Void> buildResidualCapacity(String notificationSentAtWeek, List<PaperDeliveryCounter> counters, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         if (CollectionUtils.isEmpty(counters)) {
-            return Mono.just(Map.of());
+            return Mono.empty();
         }
         LocalDate sentAtWeek = LocalDate.parse(notificationSentAtWeek);
         List<String> senderLimitKeys = counters.stream()
@@ -208,18 +205,22 @@ public class SenderLimitUtils {
 
         return paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(senderLimitKeys, sentAtWeek)
                 .collectMap(PaperDeliveryUsedSenderLimit::getPk, item -> Optional.ofNullable(item.getNumberOfShipment()).orElse(0))
-                .map(usedCapacityBySender -> {
-                    Map<String, Integer> residualCapacityBySender = new HashMap<>();
+                .doOnNext(usedCapacityBySender -> {
                     for (PaperDeliveryCounter counter : counters) {
                         String senderLimitKey = extractSk(counter.getSk());
-                        int weeklyEstimate = Optional.ofNullable(counter.getWeeklyEstimate()).orElse(0);
-                        int usedCapacity = usedCapacityBySender.getOrDefault(senderLimitKey, 0);
+                        int weeklyEstimate = Objects.requireNonNullElse(counter.getWeeklyEstimate(), 0);
+                        int baselineUsedLimit = usedCapacityBySender.getOrDefault(senderLimitKey, 0);
                         String resultKey = String.join("~", notificationSentAtWeek, senderLimitKey);
-                        senderLimitJobProcessObjects.getSenderLimitMap().put(resultKey, new SenderLimitData(weeklyEstimate, null, usedCapacity, sentAtWeek));
+                        senderLimitJobProcessObjects.getSenderLimitMap().put(resultKey,
+                                SenderLimitData.initialWithBaseline(
+                                        weeklyEstimate,
+                                        null,
+                                        baselineUsedLimit,
+                                        sentAtWeek
+                                ));
                     }
-                    return residualCapacityBySender;
                 })
-                .defaultIfEmpty(new HashMap<>());
+                .then();
     }
 
     private String extractSk(String sk) {

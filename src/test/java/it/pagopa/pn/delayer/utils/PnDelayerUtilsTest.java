@@ -244,8 +244,8 @@ class PnDelayerUtilsTest {
     }
 
     private static Map<String, SenderLimitData> getStringSenderLimitDataMap() {
-        SenderLimitData senderLimitData1 = new SenderLimitData(3,3,1, LocalDate.parse("2023-09-25"));
-        SenderLimitData senderLimitData2 = new SenderLimitData(2,2,0, LocalDate.parse("2023-09-25"));
+        SenderLimitData senderLimitData1 = new SenderLimitData(3,3,1, 0, LocalDate.parse("2023-09-25"));
+        SenderLimitData senderLimitData2 = new SenderLimitData(2,2,0, 0, LocalDate.parse("2023-09-25"));
 
         return new HashMap<>(Map.of("2023-09-25~paId1~AR~RM", senderLimitData1,
                 "2023-09-25~paId2~890~RM", senderLimitData2));

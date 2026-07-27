@@ -141,11 +141,11 @@ public class PnDelayerUtils {
     }
 
     private void applyWeeklySenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, String shipmentDate) {
-        String key = String.join("~", shipmentDate, paperDelivery.getSenderPaId(), paperDelivery.getProductType());
+        String key = String.join("~", shipmentDate, paperDelivery.getSenderPaId(), paperDelivery.getProductType(), paperDelivery.getProvince());
         Map<String, SenderLimitData> senderLimitMap = processObjects.getSenderLimitMap();
         SenderLimitData limitData = senderLimitMap.get(key);
         if (Objects.nonNull(limitData) && limitData.weeklyEstimate() > 0) {
-            int availableLimit = limitData.weeklyEstimate() - limitData.usedLimit();
+            int availableLimit = limitData.weeklyEstimate() - limitData.totalUsedLimit();
             boolean hasAvailableLimit = availableLimit > 0;
             paperDelivery.setSkipSenderLimit(hasAvailableLimit);
             if (hasAvailableLimit) {
