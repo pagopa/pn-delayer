@@ -24,10 +24,8 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -316,10 +314,9 @@ public class PaperDeliveryUtils {
     }
 
     public Mono<List<PaperDelivery>> insertPaperDeliveries(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
-        return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(senderLimitJobProcessObjects.getSendToDriverCapacityStep(), deliveryWeek))
+        return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(senderLimitJobProcessObjects, deliveryWeek))
                 .thenReturn(senderLimitJobProcessObjects)
-                .doOnNext(this::assignSkipSenderLimitToResidualDeliveries)
-                .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobProcessObjects.getSendToResidualCapacityStep(), deliveryWeek))
+                .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobProcessObjects, deliveryWeek))
                         .thenReturn(senderLimitJobProcessObjects.getSendToDriverCapacityStep())
                         .doOnNext(paperDeliveries -> paperDeliveries.removeIf(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1)));
     }
@@ -341,27 +338,5 @@ public class PaperDeliveryUtils {
             Map<String, AttributeValue> lastEvaluatedKey,
             int residualCapacity,
             boolean hasMorePages
-    ) {
-    }
-
-    private void assignSkipSenderLimitToResidualDeliveries(SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
-        Map<String, SenderLimitJobProcessObjects.SenderLimitData> senderLimitMap = senderLimitJobProcessObjects.getSenderLimitMap();
-        senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
-                .filter(delivery -> !pnDelayerUtils.isInformal(delivery) && StringUtils.hasText(delivery.getSenderPaId()))
-                .collect(Collectors.groupingBy(delivery -> String.join("~", delivery.getSenderPaId(), delivery.getProductType())))
-                .forEach((key, deliveries) -> {
-
-                    int availableWeeklyLimit = Optional.ofNullable(senderLimitMap.get(key))
-                            .map(SenderLimitJobProcessObjects.SenderLimitData::availableWeeklyLimit)
-                            .orElse(0);
-
-                    deliveries.stream().limit(availableWeeklyLimit).forEach(delivery -> delivery.setSkipSenderLimit(true));
-                    deliveries.stream().skip(availableWeeklyLimit).forEach(delivery -> delivery.setSkipSenderLimit(false));
-
-                    if (availableWeeklyLimit > 0) {
-                        senderLimitMap.computeIfPresent(key, (k, current) -> current.incrementUsedLimit(
-                                Math.min(availableWeeklyLimit, deliveries.size())));
-                    }
-                });
-    }
+    ) {}
 }

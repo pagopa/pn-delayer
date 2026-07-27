@@ -102,6 +102,7 @@ public class PaperDeliveryCounter {
         return String.join("~", attribute);
     }
 
+    @Getter
     public enum SkPrefix {
         SUM_ESTIMATES("SUM_ESTIMATES~"),
         EXCLUDE("EXCLUDE~"),

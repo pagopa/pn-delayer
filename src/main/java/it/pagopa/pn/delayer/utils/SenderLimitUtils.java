@@ -8,17 +8,13 @@ import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
-import it.pagopa.pn.delayer.model.DriversTotalCapacity;
-import it.pagopa.pn.delayer.model.IncrementUsedSenderLimitDto;
-import it.pagopa.pn.delayer.model.ProductType;
-import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
+import it.pagopa.pn.delayer.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 import java.time.LocalDate;
@@ -38,7 +34,7 @@ public class SenderLimitUtils {
     public Mono<SenderLimitJobProcessObjects> retrieveAndEvaluateSenderLimit(LocalDate deliveryWeek, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         LocalDate shipmentDate = deliveryWeek.minusWeeks(1);
         return retrieveAndCalculateSenderLimit(shipmentDate, driversTotalCapacity, deliveriesGroupedByProductTypePaId.keySet(), senderLimitJobProcessObjects)
-                .doOnNext(unused -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitJobProcessObjects.getSenderLimitMap(), deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects))
+                .doOnNext(unused -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitJobProcessObjects.getSenderLimitMap(), deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects, deliveryWeek))
                 .thenReturn(senderLimitJobProcessObjects);
     }
 
@@ -55,11 +51,12 @@ public class SenderLimitUtils {
     }
 
     public Mono<List<PaperDeliveryCounter>> retrieveDelayedCounters(LocalDate deliveryWeek, String province) {
-        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryWeek.toString(), PaperDeliveryCounter.SkPrefix.DELAYED.name() + province, null)
+        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryWeek.toString(), PaperDeliveryCounter.SkPrefix.DELAYED.getValue() + province, null)
                 .defaultIfEmpty(List.of());
     }
 
-    public Mono<Map<String, Integer>> getResidualCapacity(List<PaperDeliveryCounter> counters) {
+    public Mono<Map<String, Integer>> getResidualCapacity(SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+        List<PaperDeliveryCounter> counters = senderLimitJobProcessObjects.getDelayedCounters();
         if (CollectionUtils.isEmpty(counters)) {
             return Mono.just(Map.of());
         }
@@ -67,14 +64,11 @@ public class SenderLimitUtils {
         return Flux.fromIterable(counters)
                 .collectMultimap(PaperDeliveryCounter::getNotificationSentAtWeek)
                 .flatMapMany(groupedCounters -> Flux.fromIterable(groupedCounters.entrySet()))
-                .flatMap(entry ->
-                        buildResidualCapacity(entry.getKey(), List.copyOf(entry.getValue()))
-                )
-                .reduce(new HashMap<String, Integer>(), (result, partialResult) -> {
+                .flatMap(entry -> buildResidualCapacity(entry.getKey(), List.copyOf(entry.getValue()), senderLimitJobProcessObjects))
+                .reduce(new HashMap<>(), (result, partialResult) -> {
                     result.putAll(partialResult);
                     return result;
-                })
-                .map(Map::copyOf);
+                });
     }
 
 
@@ -92,42 +86,53 @@ public class SenderLimitUtils {
     }
 
     /**
-     * Retrieves the sender limits for the specified shipment date only for the
-     * paId~productType entries that are not already present in the senderLimitMap.
-     * For each retrieved sender limit, calculates the guaranteed limit based on the
-     * corresponding drivers' total capacity and stores the following information
-     * in the senderLimitMap:
+     * Retrieves the sender limits for the specified shipment date for the
+     * {@code paId~productType} entries that are not already present in the sender limit map.
+     *
+     * <p>Entries in the map use the following key format:</p>
+     *
+     * <pre>
+     * shipmentDate~paId~productType
+     * </pre>
+     *
+     * <p>For each retrieved sender limit, the method calculates the guaranteed limit
+     * based on the corresponding drivers' total capacity and stores a
+     * {@link SenderLimitData} containing:</p>
+     *
      * <ul>
      *   <li>the configured weekly estimate;</li>
      *   <li>the calculated guaranteed limit;</li>
-     *   <li>the used limit, initialized to {@code 0}.</li>
+     *   <li>the used limit, initialized to {@code 0};</li>
+     *   <li>the shipment date associated with the limit.</li>
      * </ul>
      *
-     * @param shipmentDate the shipment date for which sender limits are retrieved
+     * @param shipmentDate the shipment date for which the sender limits are retrieved
      * @param driversTotalCapacity the calculated capacities for each product or product group
      *                             and the related unified delivery drivers
-     * @param paIdProductTypeTuples the set of {@code paId~productType} keys
+     * @param paIdProductTypeTuples the set of keys in {@code paId~productType} format
      * @param senderLimitJobProcessObjects the object containing the sender limit map
      *                                     and the total estimate counter
-     * @return a {@link Mono} containing the updated sender limit map
+     * @return a {@link Mono} emitting the updated sender limit map
      */
-    private Mono<Map<String, SenderLimitJobProcessObjects.SenderLimitData>> retrieveAndCalculateSenderLimit(LocalDate shipmentDate, List<DriversTotalCapacity> driversTotalCapacity, Set<String> paIdProductTypeTuples, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+    private Mono<Map<String, SenderLimitData>> retrieveAndCalculateSenderLimit(LocalDate shipmentDate, List<DriversTotalCapacity> driversTotalCapacity, Set<String> paIdProductTypeTuples, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+        List<String> paIdProductTypeTuplesCopy = new ArrayList<>(paIdProductTypeTuples);
+        paIdProductTypeTuplesCopy.removeIf(paIdProductTypeTuple -> {
+            String senderLimitMapKey = String.join("~", shipmentDate.toString(), paIdProductTypeTuple);
+            return senderLimitJobProcessObjects.getSenderLimitMap().containsKey(senderLimitMapKey);
+        });
 
-        List<String> missingSenderLimits = paIdProductTypeTuples.stream()
-                .filter(pk -> !senderLimitJobProcessObjects.getSenderLimitMap().containsKey(pk))
-                .toList();
-
-        return Flux.fromIterable(missingSenderLimits)
-                .buffer(25)
-                .flatMap(senderLimitPkSubList -> paperDeliverySenderLimitDAO
-                        .retrieveSendersLimit(senderLimitPkSubList, shipmentDate))
-                .map(paperDeliverySenderLimit -> {
-                    Integer calculatedLimit = calculateLimit(driversTotalCapacity, senderLimitJobProcessObjects, paperDeliverySenderLimit);
-                    SenderLimitJobProcessObjects.SenderLimitData senderLimitData = SenderLimitJobProcessObjects.SenderLimitData.initial(paperDeliverySenderLimit.getWeeklyEstimate(), calculatedLimit);
-                    return Tuples.of(paperDeliverySenderLimit.getPk(), senderLimitData);
-                })
-                .collectMap(Tuple2::getT1, Tuple2::getT2)
-                .doOnNext(senderLimits -> senderLimitJobProcessObjects.getSenderLimitMap().putAll(senderLimits))
+        return Flux.fromIterable(paIdProductTypeTuplesCopy).buffer(25)
+                .flatMap(senderLimitPkSubList -> paperDeliverySenderLimitDAO.retrieveSendersLimit(senderLimitPkSubList, shipmentDate)
+                        .map(paperDeliverySenderLimit -> {
+                            int calculatedLimit = calculateLimit(driversTotalCapacity, senderLimitJobProcessObjects, paperDeliverySenderLimit);
+                            return Tuples.of(paperDeliverySenderLimit.getPk(), SenderLimitData.initial(paperDeliverySenderLimit.getWeeklyEstimate(),
+                                    calculatedLimit, shipmentDate));
+                        }))
+                .collectList()
+                .doOnNext(pkLimitTuples -> pkLimitTuples.forEach(tuple -> {
+                    String senderLimitMapKey = String.join("~", shipmentDate.toString(), tuple.getT1());
+                    senderLimitJobProcessObjects.getSenderLimitMap().put(senderLimitMapKey, tuple.getT2());
+                }))
                 .thenReturn(senderLimitJobProcessObjects.getSenderLimitMap());
     }
 
@@ -180,19 +185,21 @@ public class SenderLimitUtils {
         return limit;
     }
 
-    public Flux<IncrementUsedSenderLimitDto> createIncrementUsedSenderLimitDtos(Map<String, SenderLimitJobProcessObjects.SenderLimitData> senderLimitMap) {
+    public Flux<IncrementUsedSenderLimitDto> createIncrementUsedSenderLimitDtos(Map<String, SenderLimitData> senderLimitMap) {
         return Flux.fromIterable(senderLimitMap.entrySet())
                 .filter(entry -> entry.getValue().usedLimit() > 0)
-                .map(entry -> new IncrementUsedSenderLimitDto(entry.getKey(), entry.getValue().usedLimit(), entry.getValue().calculatedLimit()));
+                .map(entry -> {
+                    String[] keyParts = entry.getKey().split("~", 2);
+                    String pk = keyParts[1];
+                    return new IncrementUsedSenderLimitDto(pk, entry.getValue().usedLimit(), entry.getValue().calculatedLimit(), entry.getValue().date());
+                });
     }
 
-    private Mono<Map<String, Integer>> buildResidualCapacity(String notificationSentAtWeek, List<PaperDeliveryCounter> counters) {
+    private Mono<Map<String, Integer>> buildResidualCapacity(String notificationSentAtWeek, List<PaperDeliveryCounter> counters, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         if (CollectionUtils.isEmpty(counters)) {
             return Mono.just(Map.of());
         }
-
         LocalDate sentAtWeek = LocalDate.parse(notificationSentAtWeek);
-
         List<String> senderLimitKeys = counters.stream()
                 .map(PaperDeliveryCounter::getSk)
                 .map(this::extractSk)
@@ -207,9 +214,8 @@ public class SenderLimitUtils {
                         String senderLimitKey = extractSk(counter.getSk());
                         int weeklyEstimate = Optional.ofNullable(counter.getWeeklyEstimate()).orElse(0);
                         int usedCapacity = usedCapacityBySender.getOrDefault(senderLimitKey, 0);
-                        int residualCapacity = Math.max(weeklyEstimate - usedCapacity, 0);
-                        String resultKey = notificationSentAtWeek + "~" + senderLimitKey;
-                        residualCapacityBySender.put(resultKey, residualCapacity);
+                        String resultKey = String.join("~", notificationSentAtWeek, senderLimitKey);
+                        senderLimitJobProcessObjects.getSenderLimitMap().put(resultKey, new SenderLimitData(weeklyEstimate, null, usedCapacity, sentAtWeek));
                     }
                     return residualCapacityBySender;
                 })
@@ -225,8 +231,5 @@ public class SenderLimitUtils {
         String productType = parts[2];
         String senderPaId = parts[3];
         return String.join("~", senderPaId, productType, province);
-    }
-
-    public void adjustDriverCapacitiesForSkipSenderLimitDeliveries(Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
     }
 }

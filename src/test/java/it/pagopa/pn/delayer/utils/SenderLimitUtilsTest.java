@@ -5,10 +5,9 @@ import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
+import it.pagopa.pn.delayer.model.SenderLimitData;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,8 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -55,7 +52,7 @@ public class SenderLimitUtilsTest {
         Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId =
                 Map.of("paid1~productType1~province1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
                         "paid2~productType2~province2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));
-        Map<String, Tuple2<Integer, Integer>> senderLimitMaps = new HashMap<>();
+        Map<String, SenderLimitData> senderLimitMaps = new HashMap<>();
         Integer capacity = 72;
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setSenderLimitMap(senderLimitMaps);
@@ -73,9 +70,9 @@ public class SenderLimitUtilsTest {
                 .block();
 
         assertEquals(1, senderLimitMaps.size());
-        assertTrue(senderLimitMaps.containsKey("key2"));
-        assertEquals(62, senderLimitMaps.get("key2").getT1());
-        assertEquals(0, senderLimitMaps.get("key2").getT2());
+        assertTrue(senderLimitMaps.containsKey("2026-07-20~key2"));
+        assertEquals(62, senderLimitMaps.get("2026-07-20~key2").availableLimit());
+        assertEquals(0, senderLimitMaps.get("2026-07-20~key2").usedLimit());
     }
 
     @Test
@@ -84,7 +81,7 @@ public class SenderLimitUtilsTest {
         Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId =
                 Map.of("paid1~productType1~province1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
                         "paid2~productType2~province2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));
-        Map<String, Tuple2<Integer, Integer>> senderLimitMaps = new HashMap<>();
+        Map<String, SenderLimitData> senderLimitMaps = new HashMap<>();
         Integer capacity = 72;
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setSenderLimitMap(senderLimitMaps);
@@ -106,7 +103,7 @@ public class SenderLimitUtilsTest {
 
     @Test
     void createIncrementUsedSenderLimitDtos() {
-        Map<String, Tuple2<Integer, Integer>> senderLimitMaps = Map.of("paId~AR~RM", Tuples.of(100, 50));
+        Map<String, SenderLimitData> senderLimitMaps = Map.of("2026-07-07~paId~AR~RM", new SenderLimitData(100,100,50, LocalDate.now()));
 
         StepVerifier.create(senderLimitUtils.createIncrementUsedSenderLimitDtos(senderLimitMaps))
                 .expectNextMatches(incrementUsedSenderLimitDto -> {
@@ -116,83 +113,6 @@ public class SenderLimitUtilsTest {
                     return true;
                 })
                 .verifyComplete();
-    }
-
-    @Test
-    void getResidualCapacityReturnsEmptyMapWhenCountersAreEmpty() {
-        StepVerifier.create(senderLimitUtils.getResidualCapacity(List.of()))
-                .assertNext(residualCapacity -> assertTrue(residualCapacity.isEmpty()))
-                .verifyComplete();
-    }
-
-    @Test
-    void getResidualCapacityCalculatesResidualForSingleCounter() {
-        String notificationWeek = "2025-01-06";
-        PaperDeliveryCounter counter = createCounter(notificationWeek, "DELAYED~RM~AR~PA1~2025-01-06", 10);
-        String pk = "PA1~AR~RM";
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(eq(List.of(pk)), eq(LocalDate.parse(notificationWeek))))
-                .thenReturn(Flux.just(createUsedSenderLimit(pk, 4)));
-
-        StepVerifier.create(senderLimitUtils.getResidualCapacity(List.of(counter)))
-                .assertNext(residualCapacity -> {
-                    assertEquals(1, residualCapacity.size());
-                    assertEquals(6, residualCapacity.get("2025-01-06~PA1~AR~RM"));
-                })
-                .verifyComplete();
-    }
-
-    @Test
-    void getResidualCapacityAggregatesCountersFromDifferentNotificationWeeks() {
-        PaperDeliveryCounter weekOneCounter = createCounter("2025-01-06", "DELAYED~RM~AR~PA1~2025-01-06", 12);
-        PaperDeliveryCounter weekTwoCounter = createCounter("2025-01-13", "DELAYED~MI~890~PA2~2025-01-13", 8);
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(LocalDate.parse("2025-01-06"))))
-                .thenReturn(Flux.just(createUsedSenderLimit("PA1~AR~RM", 5)));
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(LocalDate.parse("2025-01-13"))))
-                .thenReturn(Flux.just(createUsedSenderLimit("PA2~890~MI", 3)));
-
-        StepVerifier.create(senderLimitUtils.getResidualCapacity(List.of(weekOneCounter, weekTwoCounter)))
-                .assertNext(residualCapacity -> {
-                    assertEquals(2, residualCapacity.size());
-                    assertEquals(7, residualCapacity.get("2025-01-06~PA1~AR~RM"));
-                    assertEquals(5, residualCapacity.get("2025-01-13~PA2~890~MI"));
-                })
-                .verifyComplete();
-    }
-
-    @Test
-    void getResidualCapacityUsesZeroWhenWeeklyEstimateOrUsedShipmentsAreMissing() {
-        String notificationWeek = "2025-01-20";
-        PaperDeliveryCounter counterWithNullWeeklyEstimate = createCounter(notificationWeek, "DELAYED~RM~AR~PA1~2025-01-20", null);
-        PaperDeliveryCounter counterWithUsedShipmentNull = createCounter(notificationWeek, "DELAYED~RM~AR~PA2~2025-01-20", 5);
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), eq(LocalDate.parse(notificationWeek))))
-                .thenReturn(Flux.just(createUsedSenderLimit("PA2~AR~RM", null)));
-
-        StepVerifier.create(senderLimitUtils.getResidualCapacity(List.of(counterWithNullWeeklyEstimate, counterWithUsedShipmentNull)))
-                .assertNext(residualCapacity -> {
-                    assertEquals(2, residualCapacity.size());
-                    assertEquals(0, residualCapacity.get("2025-01-20~PA1~AR~RM"));
-                    assertEquals(5, residualCapacity.get("2025-01-20~PA2~AR~RM"));
-                })
-                .verifyComplete();
-    }
-
-    private PaperDeliveryCounter createCounter(String notificationSentAtWeek, String sk, Integer weeklyEstimate) {
-        PaperDeliveryCounter counter = new PaperDeliveryCounter();
-        counter.setNotificationSentAtWeek(notificationSentAtWeek);
-        counter.setSk(sk);
-        counter.setWeeklyEstimate(weeklyEstimate);
-        return counter;
-    }
-
-    private PaperDeliveryUsedSenderLimit createUsedSenderLimit(String pk, Integer numberOfShipment) {
-        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
-        usedSenderLimit.setPk(pk);
-        usedSenderLimit.setNumberOfShipment(numberOfShipment);
-        return usedSenderLimit;
     }
 
     private PaperDelivery createPaperDelivery(String productType, String cap, String province, String senderPaId, Integer attempt) {

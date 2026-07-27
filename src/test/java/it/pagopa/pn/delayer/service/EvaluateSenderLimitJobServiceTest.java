@@ -129,8 +129,24 @@ class EvaluateSenderLimitJobServiceTest {
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
                 .thenReturn(Mono.empty());
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
-                .thenReturn(Mono.just(paperDeliveryCounterList));
+        PaperDeliveryCounter delayedCounter = new PaperDeliveryCounter();
+        delayedCounter.setSk("DELAYED~RM~AR~sender1~2025-01-01");
+        delayedCounter.setNumberOfShipments(5);
+        delayedCounter.setNotificationSentAtWeek("2025-01-01");
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
+                anyString(),
+                anyString(),
+                any()
+        )).thenReturn(Mono.just(paperDeliveryCounterList));
+
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
+                eq("2026-07-27"),
+                eq("DELAYED~RM"),
+                isNull()
+        )).thenReturn(Mono.just(List.of(delayedCounter)));
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.empty());
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
@@ -198,6 +214,8 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(anyList(), any(), any(), any()))
                 .thenReturn(deliveries)
                 .thenReturn(deliveries2);
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), any()))
+                .thenReturn(Mono.just(List.of()));
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
@@ -268,8 +286,24 @@ class EvaluateSenderLimitJobServiceTest {
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
                 .thenReturn(Mono.empty());
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
-                .thenReturn(Mono.just(paperDeliveryCounterList));
+        PaperDeliveryCounter delayedCounter = new PaperDeliveryCounter();
+        delayedCounter.setSk("DELAYED~RM~AR~sender1~2025-01-01");
+        delayedCounter.setNumberOfShipments(5);
+        delayedCounter.setNotificationSentAtWeek("2025-01-01");
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
+                anyString(),
+                anyString(),
+                any()
+        )).thenReturn(Mono.just(paperDeliveryCounterList));
+
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
+                eq("2026-07-27"),
+                eq("DELAYED~RM"),
+                isNull()
+        )).thenReturn(Mono.just(List.of(delayedCounter)));
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(usedSenderLimit));
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
@@ -325,8 +359,24 @@ class EvaluateSenderLimitJobServiceTest {
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
                 .thenReturn(Mono.empty());
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), anyInt()))
-                .thenReturn(Mono.just(paperDeliveryCounterList));
+        PaperDeliveryCounter delayedCounter = new PaperDeliveryCounter();
+        delayedCounter.setSk("DELAYED~RM~AR~sender1~2025-01-01");
+        delayedCounter.setNumberOfShipments(5);
+        delayedCounter.setNotificationSentAtWeek("2025-01-01");
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
+                anyString(),
+                anyString(),
+                any()
+        )).thenReturn(Mono.just(paperDeliveryCounterList));
+
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
+                eq("2026-07-27"),
+                eq("DELAYED~RM"),
+                isNull()
+        )).thenReturn(Mono.just(List.of(delayedCounter)));
+
+        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
+                .thenReturn(Flux.just(usedSenderLimit));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any())).thenReturn(Flux.empty());
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
@@ -410,6 +460,8 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(any(), any(), any())).thenReturn(deliveries2);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
                 .thenReturn(Mono.just(paperDeliveryCounter1));
+        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), any()))
+                .thenReturn(Mono.just(List.of()));
 
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))

@@ -9,6 +9,7 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
 
 @DynamoDbBean
 @Data
@@ -90,10 +91,10 @@ public class PaperDelivery {
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDERPAID_ORIGINALSENTAT), @DynamoDbSecondarySortKey(indexNames = PK_SENDERPAID_ORIGINALSENTAT_INDEX)}))
     private String senderPaIdOriginalSentAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELAYED)}))
-    private Boolean delayed;
+    private boolean delayed;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_PREVIOUS_STEP)}))
     private String previousStep;
-    private Boolean skipSenderLimit;
+    private boolean skipSenderLimit;
 
     public PaperDelivery(){}
 
@@ -124,17 +125,17 @@ public class PaperDelivery {
         this.virtualNotificationSentAt = paperDelivery.getVirtualNotificationSentAt();
         this.oldSk = paperDelivery.getOldSk();
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
-        this.delayed = paperDelivery.getDelayed();
+        this.delayed = paperDelivery.isDelayed();
         this.previousStep = paperDelivery.getWorkflowStep();
-        this.skipSenderLimit = paperDelivery.getSkipSenderLimit();
+        this.skipSenderLimit = paperDelivery.isSkipSenderLimit();
     }
 
     @DynamoDbAttribute(COL_SKIP_SENDER_LIMIT)
-    public Boolean getSkipSenderLimit() {
-        if (Boolean.TRUE.equals(skipSenderLimit)) {
+    public boolean isSkipSenderLimit() {
+        if (skipSenderLimit) {
             return true;
         }
-        return ProductType.RS.getValue().equalsIgnoreCase(productType) || attempt == 1;
+        return ProductType.RS.getValue().equalsIgnoreCase(productType) || (Objects.nonNull(attempt) && attempt == 1);
     }
 
     private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {
