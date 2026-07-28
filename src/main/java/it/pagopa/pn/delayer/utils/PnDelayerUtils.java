@@ -6,7 +6,6 @@ import it.pagopa.pn.delayer.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 import org.springframework.util.StringUtils;
 
 import java.time.DayOfWeek;
@@ -14,11 +13,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
@@ -31,9 +26,9 @@ public class PnDelayerUtils {
     /**
      * This method calculates the start day of the delivery week based on the execution batch start date.
      */
-    public LocalDate calculateDeliveryWeek(Instant startExcutionBatch) {
-        LocalDate startDate = startExcutionBatch.atZone(ZoneOffset.UTC).toLocalDate();
-        return startDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(pnDelayerConfig.getDeliveryDateDayOfWeek())));
+    public LocalDate calculateDeliveryWeek(Instant date) {
+        LocalDate localDate = date.atZone(ZoneOffset.UTC).toLocalDate();
+        return localDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(pnDelayerConfig.getDeliveryDateDayOfWeek())));
     }
 
     public Map<String, List<PaperDelivery>> groupByCap(List<PaperDelivery> paperDeliveries) {
@@ -42,7 +37,7 @@ public class PnDelayerUtils {
 
     public Map<String, String> groupByGeoKeyAndProduct(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriver) {
         return paperChannelDeliveryDriver.stream()
-                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriver::getUnifiedDeliveryDriver, (x, y) -> x));
+                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriver::getUnifiedDeliveryDriver, (x, _) -> x));
     }
 
     public Map<String, List<PaperDelivery>> groupByCapAndProductType(List<PaperDelivery> paperDeliveries) {
@@ -69,7 +64,7 @@ public class PnDelayerUtils {
      * </ol>
      * Le liste {@code sendToResidualCapacityStep} e {@code sendToDriverCapacityStep} vengono
      * sostituite (non accodate) sull'oggetto di processo: la chiamata successiva a
-     * {@link #evaluateSenderLimitAndFilterDeliveries(Map, Map, SenderLimitJobProcessObjects)}
+     * {@link #evaluateSenderLimitAndFilterDeliveries(Map, Map, SenderLimitJobProcessObjects, LocalDate)}
      * provvederà ad aggiungere ulteriori spedizioni a queste stesse liste.
      * <p>
      *
@@ -90,11 +85,11 @@ public class PnDelayerUtils {
                 sendToResidualCapacityStep.add(paperDelivery);
             } else if (isInformal(paperDelivery)) {
                 sendToResidualCapacityStep.add(paperDelivery);
-            } else if (isRsOrSecondAttempt(paperDelivery)) {
+            } else if (paperDelivery.isSkipSenderLimit()) {
                 sendToDriverCapacityStep.add(paperDelivery);
             } else {
                 String key = paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + paperDelivery.getProvince();
-                groupedForSenderLimit.computeIfAbsent(key, unused -> new ArrayList<>()).add(paperDelivery);
+                groupedForSenderLimit.computeIfAbsent(key, _ -> new ArrayList<>()).add(paperDelivery);
             }
         }
 
@@ -106,24 +101,59 @@ public class PnDelayerUtils {
 
     public Map<String, Long> groupingForExclude(List<PaperDelivery> paperDeliveries) {
         return paperDeliveries.stream()
-                .filter(paperDelivery ->
-                        (paperDelivery.getProductType().equalsIgnoreCase("RS")
-                                || paperDelivery.getAttempt() == 1)
-                                && !"INFORMAL".equals(paperDelivery.getCommunicationType()))
-                .collect(Collectors.groupingBy(paperDelivery -> paperDelivery.getProvince() + "~" + paperDelivery.getProductType(), Collectors.counting()));
+                .filter(paperDelivery -> paperDelivery.isSkipSenderLimit() && !CommunicationType.INFORMAL.name().equals(paperDelivery.getCommunicationType()))
+                .collect(Collectors.groupingBy(paperDelivery -> String.join("~", paperDelivery.getProvince(), paperDelivery.getProductType()), Collectors.counting()));
     }
 
-    public List<PaperDelivery> mapItemForResidualCapacityStep(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
-        return paperDeliveries.stream()
+    public List<PaperDelivery> mapItemForResidualCapacityStep(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
+        return senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
+                .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek))
                 .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, deliveryWeek))
                 .toList();
     }
 
-    public List<PaperDelivery> mapItemForEvaluateDriverCapacityStep(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
-        return paperDeliveries.stream()
+
+    public List<PaperDelivery> mapItemForEvaluateDriverCapacityStep(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
+        return senderLimitJobProcessObjects.getSendToDriverCapacityStep().stream()
+                .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek))
                 .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, deliveryWeek))
                 .toList();
     }
+
+    private PaperDelivery evaluateAndSetSkipSenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, LocalDate deliveryWeek) {
+        if (paperDelivery.isSkipSenderLimit()) {
+            return paperDelivery;
+        }
+        if (!StringUtils.hasText(paperDelivery.getSenderPaId())) {
+            paperDelivery.setSkipSenderLimit(false);
+            return paperDelivery;
+        }
+        if (isInformal(paperDelivery)) {
+            paperDelivery.setSkipSenderLimit(false);
+            return paperDelivery;
+        }
+        if (paperDelivery.isDelayed() && paperDelivery.getPreviousStep() == null) {
+            applyWeeklySenderLimit(paperDelivery, processObjects, calculateDeliveryWeek(Instant.parse(paperDelivery.getNotificationSentAt())).toString());
+            return paperDelivery;
+        }
+        applyWeeklySenderLimit(paperDelivery, processObjects, deliveryWeek.minusWeeks(1).toString());
+        return paperDelivery;
+    }
+
+    private void applyWeeklySenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, String shipmentDate) {
+        String key = String.join("~", shipmentDate, paperDelivery.getSenderPaId(), paperDelivery.getProductType(), paperDelivery.getProvince());
+        Map<String, SenderLimitData> senderLimitMap = processObjects.getSenderLimitMap();
+        SenderLimitData limitData = senderLimitMap.get(key);
+        if (Objects.nonNull(limitData) && limitData.weeklyEstimate() > 0) {
+            int availableLimit = limitData.weeklyEstimate() - limitData.totalUsedLimit();
+            boolean hasAvailableLimit = availableLimit > 0;
+            paperDelivery.setSkipSenderLimit(hasAvailableLimit);
+            if (hasAvailableLimit) {
+                senderLimitMap.put(key, limitData.incrementUsedLimit(1));
+            }
+        }
+    }
+
 
     public List<PaperDelivery> mapItemForEvaluatePrintCapacityStep(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
         return paperDeliveries.stream()
@@ -170,12 +200,14 @@ public class PnDelayerUtils {
      * @param deliveriesGroupedByProductTypePaId Map containing the deliveries grouped by product type and Pa
      * @param senderLimitJobProcessObjects Object containing the lists to which the deliveries will be
      */
-    public void evaluateSenderLimitAndFilterDeliveries(Map<String, Tuple2<Integer, Integer>> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+    public void evaluateSenderLimitAndFilterDeliveries(Map<String, SenderLimitData> senderLimitMap, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
+        String shipmentDate = deliveryWeek.minusWeeks(1).toString();
         List<PaperDelivery> sendToDriverCapacityStep = new ArrayList<>();
         List<PaperDelivery> sendToResidualCapacityStep = new ArrayList<>();
         deliveriesGroupedByProductTypePaId.forEach((key, deliveries) -> {
-            int limit = Optional.ofNullable(senderLimitMap.get(key))
-                    .map(senderLimits -> senderLimits.getT1() - senderLimits.getT2())
+            SenderLimitData senderLimitData = senderLimitMap.get(String.join("~", shipmentDate, key));
+            int limit = Optional.ofNullable(senderLimitData)
+                    .map(SenderLimitData::availableLimit)
                     .orElse(0);
 
             int actualLimit = Math.min(limit, deliveries.size());
@@ -184,9 +216,8 @@ public class PnDelayerUtils {
             List<PaperDelivery> residualStep = (actualLimit >= deliveries.size()) ? List.of() : new ArrayList<>(deliveries.subList(actualLimit, deliveries.size()));
 
             if (!driverStep.isEmpty()) {
-                senderLimitMap.put(key, Tuples.of(
-                        Optional.ofNullable(senderLimitMap.get(key)).map(Tuple2::getT1).orElse(0),
-                        Optional.ofNullable(senderLimitMap.get(key)).map(Tuple2::getT2).orElse(0) + driverStep.size()));
+                senderLimitMap.computeIfPresent(String.join("~", shipmentDate, key), (ignoredKey, currentSenderLimit) ->
+                        currentSenderLimit.incrementUsedLimit(driverStep.size()));
             }
 
             sendToDriverCapacityStep.addAll(driverStep);
@@ -200,10 +231,6 @@ public class PnDelayerUtils {
 
     private boolean isInformal(PaperDelivery paperDelivery) {
         return CommunicationType.INFORMAL.name().equalsIgnoreCase(paperDelivery.getCommunicationType());
-    }
-
-    private boolean isRsOrSecondAttempt(PaperDelivery paperDelivery) {
-        return ProductType.RS.getValue().equalsIgnoreCase(paperDelivery.getProductType()) || paperDelivery.getAttempt() == 1;
     }
 
     public Integer retrieveActualPrintCapacity(LocalDate deliveryWeek) {
