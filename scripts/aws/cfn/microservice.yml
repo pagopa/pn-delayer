@@ -773,7 +773,12 @@ Parameters:
     Description: 'Maximum record age in seconds for notification cancellation lambda'
     Default: 604800 # 7 days in seconds
 
-
+  EnablePriorityResidualFlow:
+    Type: String
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Enable priority residual flow'
 
   DelayerReceiverOrdersSendersReservedConcurrentExecutions:
     Type: Number
@@ -877,6 +882,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+          - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
+            Value: !Ref EnablePriorityResidualFlow
 
       PlatformCapabilities:
         - FARGATE

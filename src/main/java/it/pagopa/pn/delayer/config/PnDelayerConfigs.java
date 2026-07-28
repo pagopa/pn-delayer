@@ -40,6 +40,7 @@ public class PnDelayerConfigs {
     private String delayerToPaperChannelSecondSchedulerCron;
     private Instant delayerToPaperChannelFirstSchedulerStartDate;
     private Instant delayerToPaperChannelSecondSchedulerStartDate;
+    private boolean enablePriorityResidualFlow;
 
     @Data
     public static class EvaluateSenderPriorityJobInput {
