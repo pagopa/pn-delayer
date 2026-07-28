@@ -121,7 +121,7 @@ public class PaperDeliveryUtils {
     private static PnAuditLogEvent buildAuditLogEvent(LocalDate deliveryWeek) {
         PnAuditLogBuilder auditLogBuilder = new PnAuditLogBuilder();
         return auditLogBuilder.before(
-                        PnAuditLogEventType.AUD_AB_DA_DEL,
+                        PnAuditLogEventType.AUD_DELAYER_RESCHEDULED_NEXT_WEEK,
                         AUDIT_LOG_DELIVERIES_RESCHEDULED_NEXT_WEEK_START_CALL_MESSAGE,
                         deliveryWeek
                 )
@@ -188,7 +188,7 @@ public class PaperDeliveryUtils {
                 .last()
                 .flatMap(finalState -> {
                     if (!anyPageProcessed.get()) {
-                        return Mono.<Void>empty();
+                        return Mono.empty();
                     }
                     driverCapacityJobProcessResult.getIncrementUsedCapacityDtos().add(
                             new IncrementUsedCapacityDto(unifiedDeliveryDriver, province,
@@ -200,7 +200,7 @@ public class PaperDeliveryUtils {
                                                 log.info("Process next chunk to send to next week for province={} and unifiedDeliveryDriver={}, residualCapacityAfterSending={}", province, unifiedDeliveryDriver, finalState.residualCapacity());
                                                 return sendToNextWeek(workflowStepEnum, sortKeyPrefix, finalState.lastEvaluatedKey(), deliveryWeek);
                                             })
-                                            : Mono.<Void>empty()
+                                            : Mono.empty()
                             );
                 });
     }
@@ -239,7 +239,7 @@ public class PaperDeliveryUtils {
 
                     return paperDeliveryDAO.insertPaperDeliveries(deliveriesToSend)
                             .thenReturn(driverCapacityJobProcessResult)
-                            .doOnNext(driverCapacityJobProcessRes -> printCounter.addAndGet(deliveriesToSend.size()));
+                            .doOnNext(_ -> printCounter.addAndGet(deliveriesToSend.size()));
                 });
     }
 
@@ -307,7 +307,7 @@ public class PaperDeliveryUtils {
                     int processed = pnDelayerUtils.filterOnResidualDriverCapacity(deliveries, t, obj.getToNextStep(), obj.getToNextWeek(), deliveryWeek);
                     return Mono.just(processed)
                             .filter(c -> c > 0)
-                            .doOnDiscard(Integer.class, u -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
+                            .doOnDiscard(Integer.class, _ -> log.warn("No capacity for cap={} and unifiedDeliveryDriver={}, no records will be processed", cap, unifiedDeliveryDriver))
                             .doOnNext(c -> obj.getIncrementUsedCapacityDtosForCap().add(new IncrementUsedCapacityDto(unifiedDeliveryDriver, cap, c, deliveryWeek, t.getT1())))
                             .thenReturn(obj);
                 });
@@ -316,7 +316,7 @@ public class PaperDeliveryUtils {
     public Mono<List<PaperDelivery>> insertPaperDeliveries(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
         return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(senderLimitJobProcessObjects, deliveryWeek))
                 .thenReturn(senderLimitJobProcessObjects)
-                .flatMap(unused -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobProcessObjects, deliveryWeek))
+                .flatMap(_ -> paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobProcessObjects, deliveryWeek))
                         .thenReturn(senderLimitJobProcessObjects.getSendToDriverCapacityStep())
                         .doOnNext(paperDeliveries -> paperDeliveries.removeIf(paperDelivery -> paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1)));
     }

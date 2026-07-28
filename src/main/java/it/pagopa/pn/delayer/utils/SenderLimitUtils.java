@@ -34,7 +34,7 @@ public class SenderLimitUtils {
     public Mono<SenderLimitJobProcessObjects> retrieveAndEvaluateSenderLimit(LocalDate deliveryWeek, Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         LocalDate shipmentDate = deliveryWeek.minusWeeks(1);
         return retrieveAndCalculateSenderLimit(shipmentDate, driversTotalCapacity, deliveriesGroupedByProductTypePaId.keySet(), senderLimitJobProcessObjects)
-                .doOnNext(unused -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitJobProcessObjects.getSenderLimitMap(), deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects, deliveryWeek))
+                .doOnNext(_ -> pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitJobProcessObjects.getSenderLimitMap(), deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects, deliveryWeek))
                 .thenReturn(senderLimitJobProcessObjects);
     }
 
@@ -55,7 +55,21 @@ public class SenderLimitUtils {
                 .defaultIfEmpty(List.of());
     }
 
-    public Mono<SenderLimitJobProcessObjects> getResidualCapacity(SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
+    /**
+     * Popola la mappa dei SenderLimitData per le spedizioni ritardate dal sistema,
+     * a partire dai contatori di tali spedizioni.
+     * <p>
+     * Le spedizioni vengono raggruppate in base alla settimana di spedizione
+     * originaria e, per ciascun gruppo, viene recuperata dal datastore la quota
+     * di sender limit già utilizzata. Tale valore costituisce la baseline dalla
+     * quale prosegue la valutazione del sender limit durante l'elaborazione
+     * corrente.
+     *
+     * @param senderLimitJobProcessObjects oggetti condivisi utilizzati durante il job
+     * @return oggetti di processo aggiornati con la capacità residua delle
+     * spedizioni ritardate
+     */
+    public Mono<SenderLimitJobProcessObjects> getResidualCapacityForDelayed(SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         List<PaperDeliveryCounter> counters = senderLimitJobProcessObjects.getDelayedCounters();
         if (CollectionUtils.isEmpty(counters)) {
             return Mono.just(senderLimitJobProcessObjects);
@@ -78,38 +92,28 @@ public class SenderLimitUtils {
         String shipmentDate = deliveryWeek.minusWeeks(1).toString();
         return paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, sk)
                 .switchIfEmpty(Mono.defer(() -> paperDeliveryCounterDAO.getPaperDeliveryCounter(shipmentDate, skPrefix, 1)
-                        .doOnNext(unused -> log.info("Retrieve counters with fallback: {}", skPrefix))
+                        .doOnNext(_ -> log.info("Retrieve counters with fallback: {}", skPrefix))
                         .flatMap(paperDeliveryCounters -> CollectionUtils.isEmpty(paperDeliveryCounters) ? Mono.empty() : Mono.just(paperDeliveryCounters.getFirst()))));
     }
 
     /**
-     * Retrieves the sender limits for the specified shipment date for the
-     * {@code paId~productType~province} entries that are not already present in the sender limit map.
+     * Recupera e calcola il sender limit per tutti i mittenti non ancora presenti
+     * nella mappa condivisa del job.
+     * <p>
+     * Per ciascun mittente viene recuperata la configurazione persistita, viene
+     * calcolato il limite garantito in funzione della capacità disponibile dei
+     * driver e viene creata una nuova istanza di {@link SenderLimitData}.
+     * <p>
+     * I sender già presenti nella mappa vengono ignorati. Questo comportamento è
+     * necessario per evitare di ricalcolare il sender limit dei mittenti già
+     * inizializzati durante la gestione delle spedizioni ritardate.
      *
-     * <p>Entries in the map use the following key format:</p>
-     *
-     * <pre>
-     * shipmentDate~paId~productType
-     * </pre>
-     *
-     * <p>For each retrieved sender limit, the method calculates the guaranteed limit
-     * based on the corresponding drivers' total capacity and stores a
-     * {@link SenderLimitData} containing:</p>
-     *
-     * <ul>
-     *   <li>the configured weekly estimate;</li>
-     *   <li>the calculated guaranteed limit;</li>
-     *   <li>the used limit, initialized to {@code 0};</li>
-     *   <li>the shipment date associated with the limit.</li>
-     * </ul>
-     *
-     * @param shipmentDate                 the shipment date for which the sender limits are retrieved
-     * @param driversTotalCapacity         the calculated capacities for each product or product group
-     *                                     and the related unified delivery drivers
-     * @param paIdProductTypeTuples        the set of keys in {@code paId~productType} format
-     * @param senderLimitJobProcessObjects the object containing the sender limit map
-     *                                     and the total estimate counter
-     * @return a {@link Mono} emitting the updated sender limit map
+     * @param shipmentDate settimana di spedizione di riferimento
+     * @param driversTotalCapacity capacità dichiarata dei driver
+     * @param paIdProductTypeTuples insieme delle chiavi nel formato
+     *                              {@code paId~productType~province}
+     * @param senderLimitJobProcessObjects oggetti condivisi utilizzati durante il job
+     * @return mappa aggiornata contenente il sender limit di tutti i mittenti coinvolti
      */
     private Mono<Map<String, SenderLimitData>> retrieveAndCalculateSenderLimit(LocalDate shipmentDate, List<DriversTotalCapacity> driversTotalCapacity, Set<String> paIdProductTypeTuples, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         List<String> paIdProductTypeTuplesCopy = new ArrayList<>(paIdProductTypeTuples);
@@ -198,6 +202,28 @@ public class SenderLimitUtils {
                 });
     }
 
+    /**
+     * Inizializza le informazioni relative al modulo commessa e alla quota mittente già utilizzata
+     * per le notifiche ritardate dal sistema per una specifica settimana di riferimento.
+     * <p>
+     * Per ciascun mittente vengono recuperate:
+     * <ul>
+     *     <li>la stima settimanale dal contatore delle spedizioni ritardate;</li>
+     *     <li>la quota mittente già utilizzata nella settimana di riferimento,
+     *     recuperata dal datastore.</li>
+     * </ul>
+     * La quota già utilizzata costituisce la baseline da cui ripartire durante la
+     * valutazione corrente, evitando di riconsiderare come disponibili quote di
+     * sender limit già consumate in precedenti esecuzioni dell'algoritmo.
+     * <p>
+     * Se per un mittente non è presente alcun record persistito, la baseline viene
+     * inizializzata a {@code 0}.
+     *
+     * @param notificationSentAtWeek settimana di spedizione originaria
+     * @param counters contatori delle spedizioni ritardate appartenenti alla settimana
+     * @param senderLimitJobProcessObjects oggetti condivisi utilizzati durante il job
+     * @return completamento dell'inizializzazione delle informazioni di sender limit
+     */
     private Mono<Void> buildResidualCapacity(String notificationSentAtWeek, List<PaperDeliveryCounter> counters, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         if (CollectionUtils.isEmpty(counters)) {
             return Mono.empty();
@@ -220,7 +246,6 @@ public class SenderLimitUtils {
                         senderLimitJobProcessObjects.getSenderLimitMap().put(resultKey,
                                 SenderLimitData.initialWithBaseline(
                                         weeklyEstimate,
-                                        null,
                                         baselineUsedLimit,
                                         sentAtWeek
                                 ));

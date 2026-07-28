@@ -37,7 +37,7 @@ public class PnDelayerUtils {
 
     public Map<String, String> groupByGeoKeyAndProduct(List<PaperChannelDeliveryDriver> paperChannelDeliveryDriver) {
         return paperChannelDeliveryDriver.stream()
-                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriver::getUnifiedDeliveryDriver, (x, y) -> x));
+                .collect(Collectors.toMap(item -> item.getGeoKey() + "~" + item.getProduct(), PaperChannelDeliveryDriver::getUnifiedDeliveryDriver, (x, _) -> x));
     }
 
     public Map<String, List<PaperDelivery>> groupByCapAndProductType(List<PaperDelivery> paperDeliveries) {
@@ -64,7 +64,7 @@ public class PnDelayerUtils {
      * </ol>
      * Le liste {@code sendToResidualCapacityStep} e {@code sendToDriverCapacityStep} vengono
      * sostituite (non accodate) sull'oggetto di processo: la chiamata successiva a
-     * {@link #evaluateSenderLimitAndFilterDeliveries(Map, Map, SenderLimitJobProcessObjects)}
+     * {@link #evaluateSenderLimitAndFilterDeliveries(Map, Map, SenderLimitJobProcessObjects, LocalDate)}
      * provvederà ad aggiungere ulteriori spedizioni a queste stesse liste.
      * <p>
      *
@@ -89,7 +89,7 @@ public class PnDelayerUtils {
                 sendToDriverCapacityStep.add(paperDelivery);
             } else {
                 String key = paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + paperDelivery.getProvince();
-                groupedForSenderLimit.computeIfAbsent(key, unused -> new ArrayList<>()).add(paperDelivery);
+                groupedForSenderLimit.computeIfAbsent(key, _ -> new ArrayList<>()).add(paperDelivery);
             }
         }
 
