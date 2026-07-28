@@ -3,13 +3,13 @@ package it.pagopa.pn.delayer.utils;
 import it.pagopa.pn.delayer.config.PnDelayerConfigs;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
+import it.pagopa.pn.delayer.model.SenderLimitData;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 import java.time.Instant;
@@ -140,9 +140,11 @@ class PnDelayerUtilsTest {
         List<PaperDelivery> paperDeliveries = new ArrayList<>();
         paperDeliveries.add(createPaperDelivery("AR","00178", "RM", "paId1", 1, 2));
         paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 1, 2));
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+        senderLimitJobProcessObjects.setSendToResidualCapacityStep(paperDeliveries);
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForResidualCapacityStep(paperDeliveries, deliveryWeek);
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForResidualCapacityStep(senderLimitJobProcessObjects, deliveryWeek);
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY.name())
@@ -156,7 +158,10 @@ class PnDelayerUtilsTest {
         paperDeliveries.add(createPaperDelivery("AR","00179", "RM", "paId2", 1, 2));
 
         LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
-        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(paperDeliveries, deliveryWeek);
+        SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
+        senderLimitJobProcessObjects.setSendToDriverCapacityStep(paperDeliveries);
+
+        List<PaperDelivery> result = pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(senderLimitJobProcessObjects, deliveryWeek);
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY.name())
@@ -206,9 +211,8 @@ class PnDelayerUtilsTest {
 
     @Test
     void evaluateSenderLimitAndFilterDeliveries(){
-        Map<String, Tuple2<Integer, Integer>> senderLimitMap = new HashMap<>();
-        senderLimitMap.putAll( Map.of("paId1~AR~RM", Tuples.of(3, 1),
-                "paId2~890~RM", Tuples.of(2, 0)));
+        Map<String, SenderLimitData> senderLimitMap = getStringSenderLimitDataMap();
+
 
         List<PaperDelivery> deliveries1 = new ArrayList<>();
         deliveries1.add(createPaperDelivery("AR", "00178", "RM", "paId1", 0, 3));
@@ -226,7 +230,7 @@ class PnDelayerUtilsTest {
 
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
 
-        pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitMap, deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects);
+        pnDelayerUtils.evaluateSenderLimitAndFilterDeliveries(senderLimitMap, deliveriesGroupedByProductTypePaId, senderLimitJobProcessObjects, LocalDate.parse("2023-10-02"));
 
         assertEquals(2, senderLimitJobProcessObjects.getSendToDriverCapacityStep().stream()
                 .filter(d -> d.getSenderPaId().equals("paId1")).count());
@@ -237,6 +241,14 @@ class PnDelayerUtilsTest {
                 .filter(d -> d.getSenderPaId().equals("paId2")).count());
         assertEquals(0, senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
                 .filter(d -> d.getSenderPaId().equals("paId2")).count());
+    }
+
+    private static Map<String, SenderLimitData> getStringSenderLimitDataMap() {
+        SenderLimitData senderLimitData1 = new SenderLimitData(3,3,1, 0, LocalDate.parse("2023-09-25"));
+        SenderLimitData senderLimitData2 = new SenderLimitData(2,2,0, 0, LocalDate.parse("2023-09-25"));
+
+        return new HashMap<>(Map.of("2023-09-25~paId1~AR~RM", senderLimitData1,
+                "2023-09-25~paId2~890~RM", senderLimitData2));
     }
 
     @Test

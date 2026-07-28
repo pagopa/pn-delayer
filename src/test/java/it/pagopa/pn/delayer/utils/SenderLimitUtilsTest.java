@@ -7,6 +7,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
 import it.pagopa.pn.delayer.model.DriversTotalCapacity;
+import it.pagopa.pn.delayer.model.SenderLimitData;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,8 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -49,11 +48,11 @@ public class SenderLimitUtilsTest {
 
     @Test
     void retrieveAndEvaluateSenderLimit() {
-        LocalDate deliveryWeek = LocalDate.now();
+        LocalDate deliveryWeek = LocalDate.parse("2026-07-27");
         Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId =
                 Map.of("paid1~productType1~province1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
                         "paid2~productType2~province2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));
-        Map<String, Tuple2<Integer, Integer>> senderLimitMaps = new HashMap<>();
+        Map<String, SenderLimitData> senderLimitMaps = new HashMap<>();
         Integer capacity = 72;
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setSenderLimitMap(senderLimitMaps);
@@ -71,9 +70,9 @@ public class SenderLimitUtilsTest {
                 .block();
 
         assertEquals(1, senderLimitMaps.size());
-        assertTrue(senderLimitMaps.containsKey("key2"));
-        assertEquals(62, senderLimitMaps.get("key2").getT1());
-        assertEquals(0, senderLimitMaps.get("key2").getT2());
+        assertTrue(senderLimitMaps.containsKey("2026-07-20~key2"));
+        assertEquals(62, senderLimitMaps.get("2026-07-20~key2").availableLimit());
+        assertEquals(0, senderLimitMaps.get("2026-07-20~key2").incrementUsedLimit());
     }
 
     @Test
@@ -82,7 +81,7 @@ public class SenderLimitUtilsTest {
         Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId =
                 Map.of("paid1~productType1~province1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
                         "paid2~productType2~province2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));
-        Map<String, Tuple2<Integer, Integer>> senderLimitMaps = new HashMap<>();
+        Map<String, SenderLimitData> senderLimitMaps = new HashMap<>();
         Integer capacity = 72;
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setSenderLimitMap(senderLimitMaps);
@@ -104,7 +103,7 @@ public class SenderLimitUtilsTest {
 
     @Test
     void createIncrementUsedSenderLimitDtos() {
-        Map<String, Tuple2<Integer, Integer>> senderLimitMaps = Map.of("paId~AR~RM", Tuples.of(100, 50));
+        Map<String, SenderLimitData> senderLimitMaps = Map.of("2026-07-07~paId~AR~RM", new SenderLimitData(100,100,0, 50, LocalDate.now()));
 
         StepVerifier.create(senderLimitUtils.createIncrementUsedSenderLimitDtos(senderLimitMaps))
                 .expectNextMatches(incrementUsedSenderLimitDto -> {
