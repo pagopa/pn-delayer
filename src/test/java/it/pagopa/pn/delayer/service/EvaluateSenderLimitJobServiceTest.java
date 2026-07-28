@@ -148,7 +148,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
                 .thenReturn(Flux.empty());
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.parse("2026-07-27")))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -305,7 +305,7 @@ class EvaluateSenderLimitJobServiceTest {
         when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(usedSenderLimit));
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.parse("2026-07-27")))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
@@ -379,7 +379,7 @@ class EvaluateSenderLimitJobServiceTest {
                 .thenReturn(Flux.just(usedSenderLimit));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any())).thenReturn(Flux.empty());
 
-        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
+        StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.parse("2026-07-27")))
                 .verifyComplete();
 
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();

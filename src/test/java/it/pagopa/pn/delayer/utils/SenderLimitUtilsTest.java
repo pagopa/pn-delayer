@@ -48,7 +48,7 @@ public class SenderLimitUtilsTest {
 
     @Test
     void retrieveAndEvaluateSenderLimit() {
-        LocalDate deliveryWeek = LocalDate.now();
+        LocalDate deliveryWeek = LocalDate.parse("2026-07-27");
         Map<String, List<PaperDelivery>> deliveriesGroupedByProductTypePaId =
                 Map.of("paid1~productType1~province1", List.of(createPaperDelivery("product1", "cap1", "province1", "senderPaId1", 1)),
                         "paid2~productType2~province2", List.of(createPaperDelivery("product2", "cap2", "province2", "senderPaId2", 1)));

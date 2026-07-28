@@ -51,7 +51,7 @@ public class SenderLimitUtils {
     }
 
     public Mono<List<PaperDeliveryCounter>> retrieveDelayedCounters(LocalDate deliveryWeek, String province) {
-        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryWeek.toString(), PaperDeliveryCounter.SkPrefix.DELAYED.getValue() + province, null)
+        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryWeek.toString(), PaperDeliveryCounter.buildSk(PaperDeliveryCounter.SkPrefix.DELAYED,province), null)
                 .defaultIfEmpty(List.of());
     }
 
@@ -187,8 +187,14 @@ public class SenderLimitUtils {
                 .filter(entry -> entry.getValue().incrementUsedLimit() > 0)
                 .map(entry -> {
                     String[] keyParts = entry.getKey().split("~", 2);
-                    String pk = keyParts[1];
-                    return new IncrementUsedSenderLimitDto(pk, entry.getValue().incrementUsedLimit(), entry.getValue().calculatedLimit(), entry.getValue().date());
+                    SenderLimitData data = entry.getValue();
+
+                    return new IncrementUsedSenderLimitDto(
+                            keyParts[1],
+                            data.incrementUsedLimit(),
+                            data.calculatedLimit(),
+                            data.date()
+                    );
                 });
     }
 
@@ -226,7 +232,7 @@ public class SenderLimitUtils {
     private String extractSk(String sk) {
         String[] parts = sk.split("~", -1);
         if (parts.length < 4) {
-            throw new PnInternalException("INVALID USEDSENDERLIMIT_SK", "Invalid PaperDeliveryCounter sk: " + sk);
+            throw new PnInternalException("Invalid PaperDeliveryCounter sk: " + sk,"INVALID USEDSENDERLIMIT_SK");
         }
         String province = parts[1];
         String productType = parts[2];
