@@ -66,25 +66,50 @@ class EvaluateSenderPriorityJobServiceTest {
                 0,
                 "RM~2025-01-03T10:00:00Z~req-low",
                 "2025-01-03T10:00:00Z",
-                "RM"
+                "RM",
+                false,
+                null
+        );
+        lowPriority.setSkipSenderLimit(true);
+        PaperDelivery lowPriorityDelayed = delivery(
+                "req-low-2",
+                0,
+                "RM~2025-01-03T09:00:00Z~req-low-2",
+                "2025-01-03T09:00:00Z",
+                "RM",
+                true,
+                null
+        );
+        PaperDelivery lowPriorityDelayedWithPrevious = delivery(
+                "req-low-3",
+                0,
+                "RM~2025-01-03T10:00:01Z~req-low-3",
+                "2025-01-03T10:00:01Z",
+                "RM",
+                true,
+                "EVALUATE_PRINT_CAPACITY"
         );
         PaperDelivery mediumPriority = delivery(
                 "req-medium",
                 50,
                 "MI~2025-01-05T10:02:00Z~req-medium",
                 "2025-01-05T10:02:00Z",
-                "MI"
+                "MI",
+                false,
+                null
         );
         PaperDelivery highPriority = delivery(
                 "req-high",
                 100,
                 "MI~2025-01-06T10:01:00Z~req-high",
                 "2025-01-06T10:01:00Z",
-                "MI"
+                "MI",
+                false,
+                null
         );
 
         Page<PaperDelivery> page = page(
-                List.of(lowPriority, mediumPriority, highPriority),
+                List.of(lowPriorityDelayed, lowPriority, lowPriorityDelayedWithPrevious, mediumPriority, highPriority),
                 Collections.emptyMap()
         );
 
@@ -99,22 +124,31 @@ class EvaluateSenderPriorityJobServiceTest {
 
         List<PaperDelivery> reordered = captor.getValue();
 
-        assertEquals(3, reordered.size());
+        assertEquals(4, reordered.size());
 
         assertEquals("req-high", reordered.getFirst().getRequestId());
         assertEquals("MI~2025-01-03T10:00:00Z~req-high", reordered.getFirst().getSk());
         assertEquals("MI~2025-01-06T10:01:00Z~req-high", reordered.getFirst().getOldSk());
         assertEquals("2025-01-03T10:00:00Z", reordered.getFirst().getVirtualNotificationSentAt());
+        assertTrue(reordered.getFirst().isSkipSenderLimit());
 
         assertEquals("req-medium", reordered.get(1).getRequestId());
-        assertEquals("MI~2025-01-05T10:02:00Z~req-medium", reordered.get(1).getSk());
+        assertEquals("MI~2025-01-03T10:00:01Z~req-medium", reordered.get(1).getSk());
         assertEquals("MI~2025-01-05T10:02:00Z~req-medium", reordered.get(1).getOldSk());
-        assertEquals("2025-01-05T10:02:00Z", reordered.get(1).getVirtualNotificationSentAt());
+        assertEquals("2025-01-03T10:00:01Z", reordered.get(1).getVirtualNotificationSentAt());
+        assertFalse(reordered.get(1).isSkipSenderLimit());
 
-        assertEquals("req-low", reordered.getLast().getRequestId());
-        assertEquals("RM~2025-01-06T10:01:00Z~req-low", reordered.getLast().getSk());
-        assertEquals("RM~2025-01-03T10:00:00Z~req-low", reordered.getLast().getOldSk());
+        assertEquals("req-low", reordered.get(2).getRequestId());
+        assertEquals("RM~2025-01-05T10:02:00Z~req-low", reordered.get(2).getSk());
+        assertEquals("RM~2025-01-03T10:00:00Z~req-low", reordered.get(2).getOldSk());
+        assertEquals("2025-01-05T10:02:00Z", reordered.get(2).getVirtualNotificationSentAt());
+        assertFalse(reordered.get(2).isSkipSenderLimit());
+
+        assertEquals("req-low-3", reordered.getLast().getRequestId());
+        assertEquals("RM~2025-01-06T10:01:00Z~req-low-3", reordered.getLast().getSk());
+        assertEquals("RM~2025-01-03T10:00:01Z~req-low-3", reordered.getLast().getOldSk());
         assertEquals("2025-01-06T10:01:00Z", reordered.getLast().getVirtualNotificationSentAt());
+        assertFalse(reordered.getLast().isSkipSenderLimit());
 
         verify(paperDeliveryUtils, times(1)).transactReorderedDeliveries(anyList());
     }
@@ -132,12 +166,16 @@ class EvaluateSenderPriorityJobServiceTest {
                                 90,
                                 "MI~2025-01-06T10:01:00Z~req-1",
                                 "2025-01-06T10:01:00Z",
-                                "MI"),
+                                "MI",
+                                false,
+                                null),
                         delivery(   "req-2",
                                 30,
                                 "MI~2025-01-07T10:01:00Z~req-2",
                                 "2025-01-07T10:01:00Z",
-                                "MI")
+                                "MI",
+                                false,
+                                null)
                 ),
                 lastEvaluatedKey
         );
@@ -148,12 +186,16 @@ class EvaluateSenderPriorityJobServiceTest {
                                 25,
                                 "MI~2025-01-08T10:01:00Z~req-3",
                                 "2025-01-08T10:01:00Z",
-                                "MI"),
+                                "MI",
+                                false,
+                                null),
                         delivery("req-4",
                                 100,
                                 "MI~2025-01-08T10:02:00Z~req-4",
                                 "2025-01-08T10:02:00Z",
-                                "MI")
+                                "MI",
+                                false,
+                                null)
                 ),
                 Collections.emptyMap()
         );
@@ -215,17 +257,23 @@ class EvaluateSenderPriorityJobServiceTest {
                 25,
                 "MI~2025-01-08T10:01:00Z~req-1",
                 "2025-01-08T10:01:00Z",
-                "MI");
+                "MI",
+                false,
+                null);
         PaperDelivery second = delivery("req-2",
                 25,
                 "MI~2025-01-08T10:02:00Z~req-2",
                 "2025-01-08T10:02:00Z",
-                "MI");
+                "MI",
+                false,
+                null);
         PaperDelivery third = delivery("req-3",
                 25,
                 "MI~2025-01-08T10:03:00Z~req-3",
                 "2025-01-08T10:03:00Z",
-                "MI");
+                "MI",
+                false,
+                null);
 
        Page<PaperDelivery> page = page(List.of(first, second, third),
                Collections.emptyMap()
@@ -256,7 +304,9 @@ class EvaluateSenderPriorityJobServiceTest {
                     i % 5,
                     String.format("RM~2025-01-06T10:%02d:00Z~req-%02d", i, i),
                     "2025-01-06T10:%02d:00Z".formatted(i),
-                    "RM"
+                    "RM",
+                    false,
+                    null
             ));
         }
 
@@ -287,21 +337,27 @@ class EvaluateSenderPriorityJobServiceTest {
                 0,
                 "RM~2025-01-06T10:01:00Z~req-low",
                 "2025-01-03T10:00:00Z",
-                "RM"
+                "RM",
+                false,
+                null
         );
         PaperDelivery mediumPriority = delivery(
                 "req-medium",
                 50,
                 "MI~2025-01-05T10:02:00Z~req-medium",
                 "2025-01-05T10:02:00Z",
-                "MI"
+                "MI",
+                false,
+                null
         );
         PaperDelivery highPriority = delivery(
                 "req-high",
                 100,
                 "MI~2025-01-03T10:00:00Z~req-high",
                 "2025-01-06T10:01:00Z",
-                "MI"
+                "MI",
+                false,
+                null
         );
 
         Page<PaperDelivery> page = page(
@@ -348,7 +404,7 @@ class EvaluateSenderPriorityJobServiceTest {
         return page;
     }
 
-    private PaperDelivery delivery(String requestId, Integer senderPriority, String sk, String sentAt, String province) {
+    private PaperDelivery delivery(String requestId, Integer senderPriority, String sk, String sentAt, String province, boolean delayed, String previousStep) {
         PaperDelivery paperDelivery = new PaperDelivery();
         paperDelivery.setPk(deliveryWeek + "~EVALUATE_SENDER_LIMIT");
         paperDelivery.setSk(sk);
@@ -360,6 +416,8 @@ class EvaluateSenderPriorityJobServiceTest {
         paperDelivery.setDeliveryDate(deliveryWeek.toString());
         paperDelivery.setProductType("AR");
         paperDelivery.setAttempt(0);
+        paperDelivery.setDelayed(delayed);
+        paperDelivery.setPreviousStep(previousStep);
         return paperDelivery;
     }
 }
