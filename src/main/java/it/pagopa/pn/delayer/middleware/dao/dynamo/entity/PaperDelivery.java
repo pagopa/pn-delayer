@@ -9,7 +9,6 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Objects;
 
 @DynamoDbBean
 @Data
@@ -132,10 +131,12 @@ public class PaperDelivery {
 
     @DynamoDbAttribute(COL_SKIP_SENDER_LIMIT)
     public boolean isSkipSenderLimit() {
-        if (skipSenderLimit) {
-            return true;
-        }
-        return ProductType.RS.getValue().equalsIgnoreCase(productType) || (Objects.nonNull(attempt) && attempt == 1);
+        return skipSenderLimit || isLegacySkipSenderLimit();
+    }
+
+    @DynamoDbIgnore
+    public boolean isLegacySkipSenderLimit() {
+        return ProductType.RS.getValue().equalsIgnoreCase(productType) || (attempt != null && attempt == 1);
     }
 
     private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {

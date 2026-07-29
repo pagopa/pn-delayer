@@ -85,7 +85,7 @@ public class PnDelayerUtils {
                 sendToResidualCapacityStep.add(paperDelivery);
             } else if (isInformal(paperDelivery)) {
                 sendToResidualCapacityStep.add(paperDelivery);
-            } else if (paperDelivery.isSkipSenderLimit()) {
+            } else if (needToSkipSenderLimit(paperDelivery)) {
                 sendToDriverCapacityStep.add(paperDelivery);
             } else {
                 String key = paperDelivery.getSenderPaId() + "~" + paperDelivery.getProductType() + "~" + paperDelivery.getProvince();
@@ -99,6 +99,10 @@ public class PnDelayerUtils {
         return groupedForSenderLimit;
     }
 
+    private boolean needToSkipSenderLimit(PaperDelivery paperDelivery) {
+        return pnDelayerConfig.isEnablePriorityResidualFlow() ? paperDelivery.isSkipSenderLimit() : paperDelivery.isLegacySkipSenderLimit();
+    }
+
     public Map<String, Long> groupingForExclude(List<PaperDelivery> paperDeliveries) {
         return paperDeliveries.stream()
                 .filter(paperDelivery -> paperDelivery.isSkipSenderLimit() && !CommunicationType.INFORMAL.name().equals(paperDelivery.getCommunicationType()))
@@ -107,7 +111,7 @@ public class PnDelayerUtils {
 
     public List<PaperDelivery> mapItemForResidualCapacityStep(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
         return senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
-                .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek))
+                .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek, true))
                 .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, deliveryWeek))
                 .toList();
     }
@@ -115,12 +119,12 @@ public class PnDelayerUtils {
 
     public List<PaperDelivery> mapItemForEvaluateDriverCapacityStep(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
         return senderLimitJobProcessObjects.getSendToDriverCapacityStep().stream()
-                .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek))
+                .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek, false))
                 .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, deliveryWeek))
                 .toList();
     }
 
-    private PaperDelivery evaluateAndSetSkipSenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, LocalDate deliveryWeek) {
+    private PaperDelivery evaluateAndSetSkipSenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, LocalDate deliveryWeek, boolean isResidual) {
         if (paperDelivery.isSkipSenderLimit()) {
             return paperDelivery;
         }
@@ -133,14 +137,14 @@ public class PnDelayerUtils {
             return paperDelivery;
         }
         if (paperDelivery.isDelayed() && paperDelivery.getPreviousStep() == null) {
-            applyWeeklySenderLimit(paperDelivery, processObjects, calculateDeliveryWeek(Instant.parse(paperDelivery.getNotificationSentAt())).toString());
+            applyWeeklySenderLimit(paperDelivery, processObjects, calculateDeliveryWeek(Instant.parse(paperDelivery.getNotificationSentAt())).toString(), isResidual);
             return paperDelivery;
         }
-        applyWeeklySenderLimit(paperDelivery, processObjects, deliveryWeek.minusWeeks(1).toString());
+        applyWeeklySenderLimit(paperDelivery, processObjects, deliveryWeek.minusWeeks(1).toString(), isResidual);
         return paperDelivery;
     }
 
-    private void applyWeeklySenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, String shipmentDate) {
+    private void applyWeeklySenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, String shipmentDate, boolean isResidual) {
         String key = String.join("~", shipmentDate, paperDelivery.getSenderPaId(), paperDelivery.getProductType(), paperDelivery.getProvince());
         Map<String, SenderLimitData> senderLimitMap = processObjects.getSenderLimitMap();
         SenderLimitData limitData = senderLimitMap.get(key);
@@ -148,7 +152,7 @@ public class PnDelayerUtils {
             int availableLimit = limitData.weeklyEstimate() - limitData.totalUsedLimit();
             boolean hasAvailableLimit = availableLimit > 0;
             paperDelivery.setSkipSenderLimit(hasAvailableLimit);
-            if (hasAvailableLimit) {
+            if (hasAvailableLimit && isResidual) {
                 senderLimitMap.put(key, limitData.incrementUsedLimit(1));
             }
         }

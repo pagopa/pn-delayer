@@ -432,10 +432,6 @@ class EvaluateSenderLimitJobServiceTest {
         paperDeliverySenderLimit.setProductType("AR");
         paperDeliverySenderLimit.setWeeklyEstimate(5);
 
-        PaperDeliveryUsedSenderLimit usedSenderLimit = new PaperDeliveryUsedSenderLimit();
-        usedSenderLimit.setPk("paId2~AR~RM");
-        usedSenderLimit.setSenderLimit(5);
-        usedSenderLimit.setNumberOfShipment(4);
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
         when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
