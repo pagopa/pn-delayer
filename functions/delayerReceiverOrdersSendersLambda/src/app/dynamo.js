@@ -53,8 +53,8 @@ async function existsSenderLimitByFileKey(fileKey) {
 async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
     // Separate puts vs updates
     const fulls          = estimates.filter(e => e.weekType === 'FULL');
-    const partialStarts  = estimates.filter(e => e.weekType === 'PARTIAL_START');
-    const partialEnds    = estimates.filter(e => e.weekType === 'PARTIAL_END');
+    const partialFirstWeeks = estimates.filter(e => e.weekType === 'PARTIAL_FIRST_WEEK');
+    const partialLastWeeks  = estimates.filter(e => e.weekType === 'PARTIAL_LAST_WEEK');
 
     const ttlValue = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365; // 1y
     // Batch write 25 items at a time
@@ -88,13 +88,13 @@ async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
         }
     }
 
-    // === PARTIAL_START: usa secondWeekWeeklyEstimate ===
-    for (const p of partialStarts) {
+    // === PARTIAL_FIRST_WEEK: usa secondWeekWeeklyEstimate ===
+    for (const p of partialFirstWeeks) {
       await upsertPartial(p, ttlValue, fileKey, archiveFileKey, true);
     }
 
-    // === PARTIAL_END: usa firstWeekWeeklyEstimate ===
-    for (const p of partialEnds) {
+    // === PARTIAL_LAST_WEEK: usa firstWeekWeeklyEstimate ===
+    for (const p of partialLastWeeks) {
       await upsertPartial(p, ttlValue, fileKey, archiveFileKey, false);
     }
 
@@ -103,7 +103,7 @@ async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
   }
 }
 
-  // Helper per gestire PARTIAL_START / PARTIAL_END
+  // Helper per gestire PARTIAL_FIRST_WEEK / PARTIAL_LAST_WEEK
   /**
    * Esegue l'upsert parziale della stima settimanale su DynamoDB per le settimane
    * di confine tra due mesi.
@@ -118,7 +118,7 @@ async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
    * la sola quota calcolata per i giorni del mese corrente.
    *
    * L'attributo fileKey rappresenta la chiave del file associato alla delivery date.
-   * Nel caso di settimana parziale di inizio mese (isStartMonth = true), se il record
+   * Nel caso di settimana parziale di inizio mese (isStartMonthWeek = true), se il record
    * esiste già la fileKey preesistente (tipicamente quella del mese precedente) viene
    * mantenuto; se il record non esiste, la fileKey viene inizializzata con la chiave
    * del file corrente.
@@ -128,25 +128,29 @@ async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
    * - secondWeekWeeklyEstimate = stima per 5 giorni di Luglio
    * - firstWeekWeeklyEstimate = stima per 2 giorni di Giugno
   */
-  async function upsertPartial(p, ttlValue, fileKey, archiveFileKey, isStartMonth) {
+  async function upsertPartial(p, ttlValue, fileKey, archiveFileKey, isStartMonthWeek ) {
       const pk = `${p.paId}~${p.productType}~${p.province}`;
-      const portionAttr = isStartMonth ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
-      const otherPortionAttr = isStartMonth ? 'firstWeekWeeklyEstimate' : 'secondWeekWeeklyEstimate';
+      const portionAttr = isStartMonthWeek ? 'secondWeekWeeklyEstimate' : 'firstWeekWeeklyEstimate';
+      const otherPortionAttr = isStartMonthWeek ? 'firstWeekWeeklyEstimate' : 'secondWeekWeeklyEstimate';
 
       const updateParts = [
         'SET weeklyEstimate = if_not_exists(#otherWeekPortion, :zero) + :portion,',
         '#portion = :portion,',
-        'monthlyEstimate  = if_not_exists(monthlyEstimate, :me),',
-        'originalEstimate = if_not_exists(originalEstimate, :oe),',
         'productType      = if_not_exists(productType, :pt),',
         'province         = if_not_exists(province, :pr),',
         'paId             = if_not_exists(paId, :pa),',
-        isStartMonth
+        isStartMonthWeek
             ? 'fileKey = if_not_exists(fileKey, :fk),'
             : 'fileKey = :fk,',
-        isStartMonth
+        isStartMonthWeek
             ? 'archiveFileKey = if_not_exists(archiveFileKey, :afk),'
             : 'archiveFileKey = :afk,',
+        isStartMonthWeek
+             ? 'monthlyEstimate = if_not_exists(monthlyEstimate, :me),'
+             : 'monthlyEstimate = :me,',
+        isStartMonthWeek
+             ? 'originalEstimate = if_not_exists(originalEstimate, :oe),'
+             : 'originalEstimate = :oe,',
         '#ttl             = if_not_exists(#ttl, :ttl) '
       ];
 
@@ -178,7 +182,7 @@ async function persistWeeklyEstimates(estimates, fileKey, archiveFileKey) {
 
 
 async function persistSumEstimateCounter(item, archiveFileKey) {
-  if (item.weekType === 'PARTIAL_START' || item.weekType === 'PARTIAL_END') {
+  if (item.weekType === 'PARTIAL_FIRST_WEEK' || item.weekType === 'PARTIAL_LAST_WEEK') {
     await upsertPartialSumEstimateCounter(item, archiveFileKey);
     return;
   }
@@ -280,15 +284,15 @@ async function upsertFullSumEstimateCounter(item, archiveFileKey) {
 
 /**
  * Esegue l'upsert del contatore SUM_ESTIMATES per settimane a cavallo tra due mesi
- * (PARTIAL_START e PARTIAL_END).
+ * (PARTIAL_FIRST_WEEK e PARTIAL_LAST_WEEK).
  *
  * Il contatore è identificato da:
  *  - pk = deliveryDate (inizio settimana)
  *  - sk = SUM_ESTIMATES~productType~province
  *
  * La settimana è suddivisa in due porzioni:
- *  - firstWeek: giorni appartenenti al mese precedente (PARTIAL_END)
- *  - secondWeek: giorni appartenenti al mese corrente (PARTIAL_START)
+ *  - firstWeek: giorni appartenenti al mese precedente (PARTIAL_LAST_WEEK)
+ *  - secondWeek: giorni appartenenti al mese corrente (PARTIAL_FIRST_WEEK)
  *
  * Ogni porzione è gestita in modo indipendente tramite:
  *  - firstWeekNumberOfShipments / secondWeekNumberOfShipments
@@ -329,7 +333,7 @@ async function upsertFullSumEstimateCounter(item, archiveFileKey) {
  * @param {string} item.productType
  * @param {string} item.province
  * @param {number} item.weeklyEstimate - Valore da sommare alla porzione
- * @param {'PARTIAL_START'|'PARTIAL_END'} item.weekType
+ * @param {'PARTIAL_FIRST_WEEK'|'PARTIAL_LAST_WEEK'} item.weekType
  * @param {string|number} item.archiveProcessedAt - Versione dello ZIP
  * @param {string|number} item.lastUpdate - Timestamp di aggiornamento
  */
@@ -339,7 +343,7 @@ async function upsertPartialSumEstimateCounter(item, archiveFileKey) {
     sk: buildSumEstimateCounterSk(item)
   };
 
-  const isPartialStart = item.weekType === 'PARTIAL_START';
+  const isPartialStart = item.weekType === 'PARTIAL_FIRST_WEEK';
 
   const portionAttr = isPartialStart
     ? 'secondWeekNumberOfShipments'
