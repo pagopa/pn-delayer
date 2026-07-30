@@ -1,6 +1,6 @@
 'use strict';
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, BatchWriteCommand, UpdateCommand, QueryCommand, TransactWriteCommand} = require('@aws-sdk/lib-dynamodb');
 
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -464,4 +464,6 @@ async function batchWriteWithRetry(requestItems, maxRetries = 5) {
 
 
 
-module.exports = { getProvinceDistribution, persistWeeklyEstimates, existsSenderLimitByFileKey };
+
+
+module.exports = { getProvinceDistribution, persistWeeklyEstimates, existsSenderLimitByFileKey, updateUsedSenderLimitAndInsertPaperDeliveriesWithFallback };

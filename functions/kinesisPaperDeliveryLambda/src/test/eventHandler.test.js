@@ -9,16 +9,16 @@ describe("eventHandler.handleEvent", () => {
   let updateSenderPriorityCounterStub;
   let batchWriteKinesisEventRecordsStub;
   let batchGetKinesisEventRecordsStub;
-  let buildPaperDeliveryRecordStub;
+  let getSenderLimitStub;
+  let updateUsedSenderLimitAndInsertPaperDeliveriesStub;
   let buildPaperDeliveryKinesisEventRecordStub;
   let groupRecordsByProductAndProvinceStub;
   let groupRecordsBySenderPaIdStub;
+  let groupDelayedRecordsStub;
+  let calculateNotificationSentAtWeekStub;
   let getDeliveryWeekStub;
   let getCurrentWeekStub;
-  let calculateNotificationSentAtWeekStub;
-  let groupDelayedRecordsStub;
-  let getSenderLimitStub;
-  let updateDelayedCounter;
+  let addPaperDeliveryRecordStub;
   let lambda;
 
   beforeEach(() => {
@@ -35,16 +35,89 @@ describe("eventHandler.handleEvent", () => {
     updateSenderPriorityCounterStub = sinon.stub();
     batchWriteKinesisEventRecordsStub = sinon.stub();
     batchGetKinesisEventRecordsStub = sinon.stub();
-    buildPaperDeliveryRecordStub = sinon.stub();
+    getSenderLimitStub = sinon.stub();
+    updateUsedSenderLimitAndInsertPaperDeliveriesStub = sinon.stub();
     buildPaperDeliveryKinesisEventRecordStub = sinon.stub();
     groupRecordsByProductAndProvinceStub = sinon.stub();
-    groupRecordsBySenderPaIdStub =  sinon.stub();
+    groupRecordsBySenderPaIdStub = sinon.stub();
+    groupDelayedRecordsStub = sinon.stub();
+    calculateNotificationSentAtWeekStub = sinon.stub();
     getDeliveryWeekStub = sinon.stub();
     getCurrentWeekStub = sinon.stub();
-    calculateNotificationSentAtWeekStub = sinon.stub();
-    groupDelayedRecordsStub = sinon.stub();
-    getSenderLimitStub = sinon.stub();
-    updateDelayedCounter = sinon.stub();
+    addPaperDeliveryRecordStub = sinon.stub();
+
+    getDeliveryWeekStub.returns("2026-07-27");
+    getCurrentWeekStub.returns("2026-07-20");
+    calculateNotificationSentAtWeekStub.returns("2026-07-20");
+
+    addPaperDeliveryRecordStub.callsFake(({
+      eventItem,
+      deliveryWeek,
+      delayed,
+      skipSenderLimit,
+      requestIds,
+      paperDeliveryRecords
+    }) => {
+      if (requestIds.has(eventItem.requestId)) {
+        return;
+      }
+
+      requestIds.add(eventItem.requestId);
+      paperDeliveryRecords.push({
+        entity: mockBuiltRecord(eventItem, {
+          deliveryDate: deliveryWeek,
+          delayed,
+          skipSenderLimit
+        }),
+        kinesisSeqNumber: eventItem.kinesisSeqNumber
+      });
+    });
+
+    groupDelayedRecordsStub.callsFake(records =>
+      records.reduce((acc, record) => {
+        const key = `${record.notificationSentAtWeek}~${record.senderPaId}~${record.productType}~${record.recipientNormalizedAddress.pr}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(record);
+        return acc;
+      }, {})
+    );
+
+    groupRecordsByProductAndProvinceStub.callsFake(records =>
+      records.reduce((acc, record) => {
+        const key = `${record.entity.province}~${record.entity.productType}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(record);
+        return acc;
+      }, {})
+    );
+
+    groupRecordsBySenderPaIdStub.callsFake(records =>
+      records.reduce((acc, record) => {
+        const key = record.entity.senderPaId;
+        if (!key) {
+          return acc;
+        }
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(record);
+        return acc;
+      }, {})
+    );
+
+    updateExcludeCounterStub.callsFake(async (_, failures) => failures);
+    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
+    batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
+    batchGetKinesisEventRecordsStub.resolves([]);
+    buildPaperDeliveryKinesisEventRecordStub.callsFake(requestId => ({
+      requestId,
+      ttl: 9999999999
+    }));
+    batchWriteKinesisEventRecordsStub.resolves({});
 
     lambda = proxyquire("../app/eventHandler.js", {
       "./lib/kinesis": {
@@ -57,17 +130,17 @@ describe("eventHandler.handleEvent", () => {
         batchWriteKinesisEventRecords: batchWriteKinesisEventRecordsStub,
         batchGetKinesisEventRecords: batchGetKinesisEventRecordsStub,
         getSenderLimit: getSenderLimitStub,
-        updateDelayedCounter: updateDelayedCounter
+        updateUsedSenderLimitAndInsertPaperDeliveries: updateUsedSenderLimitAndInsertPaperDeliveriesStub
       },
       "./lib/utils": {
-        buildPaperDeliveryRecord: buildPaperDeliveryRecordStub,
         buildPaperDeliveryKinesisEventRecord: buildPaperDeliveryKinesisEventRecordStub,
         groupRecordsByProductAndProvince: groupRecordsByProductAndProvinceStub,
         groupRecordsBySenderPaId: groupRecordsBySenderPaIdStub,
+        groupDelayedRecords: groupDelayedRecordsStub,
+        calculateNotificationSentAtWeek: calculateNotificationSentAtWeekStub,
         getDeliveryWeek: getDeliveryWeekStub,
         getCurrentWeek: getCurrentWeekStub,
-        calculateNotificationSentAtWeek: calculateNotificationSentAtWeekStub,
-        groupDelayedRecords: groupDelayedRecordsStub
+        addPaperDeliveryRecord: addPaperDeliveryRecordStub
       }
     });
   });
@@ -76,15 +149,36 @@ describe("eventHandler.handleEvent", () => {
     sinon.restore();
   });
 
+  function mockEvent(overrides = {}) {
+    return {
+      kinesisSeqNumber: "1234567890",
+      unifiedDeliveryDriver: "driver1",
+      recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region1" },
+      requestId: "request1",
+      productType: "AR",
+      senderPaId: "sender1",
+      tenderId: "tender1",
+      iun: "iun1",
+      notificationSentAt: "2026-07-21T00:00:00Z",
+      prepareRequestDate: "2026-07-21T00:00:00Z",
+      attempt: "0",
+      senderPriority: 30,
+      ...overrides
+    };
+  }
+
   function mockBuiltRecord(eventItem, overrides = {}) {
     return {
-      pk: "2026-03-31~EVALUATE_SENDER_LIMIT",
+      pk: "2026-07-27~EVALUATE_SENDER_LIMIT",
       sk: `${eventItem.recipientNormalizedAddress.pr}~${eventItem.notificationSentAt}~${eventItem.requestId}`,
       requestId: eventItem.requestId,
       productType: eventItem.productType,
+      senderPaId: eventItem.senderPaId,
       province: eventItem.recipientNormalizedAddress.pr,
       attempt: eventItem.attempt,
       communicationType: eventItem.communicationType || "LEGAL",
+      delayed: false,
+      skipSenderLimit: false,
       ...overrides
     };
   }
@@ -103,91 +197,42 @@ describe("eventHandler.handleEvent", () => {
 
   it("should return no failures when all records are invalid", async () => {
     extractKinesisDataStub.returns([
-      {
+      mockEvent({
         kinesisSeqNumber: "1",
         requestId: "req-1",
-        productType: "RS",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345" },
-        prepareRequestDate: "2024-10-01T00:00:00Z"
-        // notificationSentAt missing
-      },
-      {
+        notificationSentAt: undefined
+      }),
+      mockEvent({
         kinesisSeqNumber: "2",
         requestId: "req-2",
-        productType: "RS",
-        recipientNormalizedAddress: { pr: "MI", cap: "54321" },
-        notificationSentAt: "2023-10-01T00:00:00Z"
-        // attempt missing
-      }
+        attempt: undefined
+      })
     ]);
 
     const result = await lambda.handleEvent({});
 
     expect(result).to.deep.equal({ batchItemFailures: [] });
+    expect(addPaperDeliveryRecordStub.called).to.equal(false);
     expect(batchGetKinesisEventRecordsStub.called).to.equal(false);
   });
 
-  it("should handle a valid Kinesis event", async () => {
+  it("should handle valid current week events", async () => {
     const eventData = [
-      {
-        kinesisSeqNumber: "1234567890",
-        unifiedDeliveryDriver: "driver1",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region1" },
-        requestId: "request1",
-        productType: "RS",
-        senderPaId: "sender1",
-        tenderId: "tender1",
-        iun: "iun1",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0",
-        senderPriority: 30
-      },
-      {
+      mockEvent(),
+      mockEvent({
         kinesisSeqNumber: "1234567891",
-        unifiedDeliveryDriver: "driver2",
-        recipientNormalizedAddress: { pr: "RM", cap: "54321", region: "region2" },
         requestId: "request2",
-        productType: "RS",
-        senderPaId: "sender2",
-        tenderId: "tender2",
-        iun: "iun2",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0",
-        senderPriority: 70
-      }
+        senderPaId: "sender2"
+      })
     ];
 
     extractKinesisDataStub.returns(eventData);
 
-    buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
-    batchGetKinesisEventRecordsStub.resolves([]);
-    groupRecordsByProductAndProvinceStub.returns({
-      "RM~RS": [
-        { entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" },
-        { entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }
-      ]
-    });
-    groupRecordsBySenderPaIdStub.returns({
-      "sender1": [
-        { entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }
-      ],
-      "sender2": [
-        { entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }
-      ],
-    });
-    updateExcludeCounterStub.callsFake(async (_, failures) => failures);
-    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
-    batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-    buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
-    batchWriteKinesisEventRecordsStub.resolves({ UnprocessedItems: {} });
-    getCurrentWeekStub.returns('2026-07-20');
-    calculateNotificationSentAtWeekStub.returns('2026-07-20');
-
     const result = await lambda.handleEvent({});
 
     expect(result).to.deep.equal({ batchItemFailures: [] });
+    expect(addPaperDeliveryRecordStub.callCount).to.equal(2);
+    expect(getSenderLimitStub.called).to.equal(false);
     expect(batchGetKinesisEventRecordsStub.calledOnce).to.equal(true);
     expect(updateExcludeCounterStub.calledOnce).to.equal(true);
     expect(updateSenderPriorityCounterStub.calledOnce).to.equal(true);
@@ -197,222 +242,139 @@ describe("eventHandler.handleEvent", () => {
 
   it("should skip already processed events", async () => {
     const eventData = [
-      {
-        kinesisSeqNumber: "1234567890",
-        unifiedDeliveryDriver: "driver1",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region2" },
-        requestId: "request1",
-        productType: "AR",
-        senderPaId: "sender1",
-        tenderId: "tender1",
-        iun: "iun1",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
-      },
-      {
+      mockEvent(),
+      mockEvent({
         kinesisSeqNumber: "1234567891",
-        unifiedDeliveryDriver: "driver2",
-        recipientNormalizedAddress: { pr: "RM", cap: "54321", region: "region2" },
         requestId: "request2",
-        productType: "AR",
-        senderPaId: "sender2",
-        tenderId: "tender2",
-        iun: "iun2",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0",
-        senderPriority: 70
-      }
+        senderPaId: "sender2"
+      })
     ];
 
     extractKinesisDataStub.returns(eventData);
-    buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
     batchGetKinesisEventRecordsStub.resolves(["request1"]);
-    groupRecordsByProductAndProvinceStub.returns({
-      "RM~AR": [{ entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }]
-    });
-    groupRecordsBySenderPaIdStub.returns({
-      "sender2": [
-        { entity: mockBuiltRecord(eventData[1]), kinesisSeqNumber: "1234567891" }
-      ],
-    });
-    updateExcludeCounterStub.callsFake(async (_, failures) => failures);
-    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
-    batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-    buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
-    batchWriteKinesisEventRecordsStub.resolves({});
-    getCurrentWeekStub.returns('2026-07-20');
-    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
     expect(result).to.deep.equal({ batchItemFailures: [] });
-    expect(batchGetKinesisEventRecordsStub.calledOnce).to.equal(true);
     expect(batchWriteKinesisEventRecordsStub.calledOnce).to.equal(true);
-    expect(updateSenderPriorityCounterStub.calledOnce).to.equal(true);
 
     const eventRecordsArg = batchWriteKinesisEventRecordsStub.firstCall.args[0];
-    expect(eventRecordsArg).to.deep.equal([{ requestId: "request2", ttl: 9999999999 }]);
+    expect(eventRecordsArg).to.deep.equal([
+      { requestId: "request2", ttl: 9999999999 }
+    ]);
   });
 
   it("should skip all already processed events", async () => {
     const eventData = [
-      {
-        kinesisSeqNumber: "1234567890",
-        unifiedDeliveryDriver: "driver1",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region2" },
-        requestId: "1234567890",
-        productType: "type1",
-        senderPaId: "sender1",
-        tenderId: "tender1",
-        iun: "iun1",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
-      },
-      {
+      mockEvent(),
+      mockEvent({
         kinesisSeqNumber: "1234567891",
-        unifiedDeliveryDriver: "driver2",
-        recipientNormalizedAddress: { pr: "RM", cap: "54321", region: "region2" },
-        requestId: "1234567891",
-        productType: "type2",
-        senderPaId: "sender2",
-        tenderId: "tender2",
-        iun: "iun2",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
-      }
+        requestId: "request2",
+        senderPaId: "sender2"
+      })
     ];
 
     extractKinesisDataStub.returns(eventData);
-    buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
-    batchGetKinesisEventRecordsStub.resolves(["1234567890", "1234567891"]);
-    getCurrentWeekStub.returns('2026-07-20');
-    calculateNotificationSentAtWeekStub.returns('2026-07-20');
+    batchGetKinesisEventRecordsStub.resolves(["request1", "request2"]);
 
     const result = await lambda.handleEvent({});
 
     expect(result).to.deep.equal({ batchItemFailures: [] });
+    expect(updateExcludeCounterStub.called).to.equal(false);
+    expect(updateSenderPriorityCounterStub.called).to.equal(false);
+    expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
+    expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
+  });
+
+  it("should return failures when checking already processed events fails", async () => {
+    const eventData = [
+      mockEvent(),
+      mockEvent({
+        kinesisSeqNumber: "1234567891",
+        requestId: "request2"
+      })
+    ];
+
+    extractKinesisDataStub.returns(eventData);
+    batchGetKinesisEventRecordsStub.rejects(new Error("DynamoDB error"));
+
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({
+      batchItemFailures: [
+        { itemIdentifier: "1234567890" },
+        { itemIdentifier: "1234567891" }
+      ]
+    });
     expect(updateExcludeCounterStub.called).to.equal(false);
     expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
     expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
   });
 
   it("should return failure when counter update fails", async () => {
-    const eventData = [
-      {
-        kinesisSeqNumber: "1234567890",
-        unifiedDeliveryDriver: "driver1",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region1" },
-        requestId: "request1",
-        productType: "RS",
-        senderPaId: "sender1",
-        tenderId: "tender1",
-        iun: "iun1",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0"
-      }
-    ];
+    const eventData = [mockEvent()];
 
     extractKinesisDataStub.returns(eventData);
-    buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
-    batchGetKinesisEventRecordsStub.resolves([]);
-    groupRecordsByProductAndProvinceStub.returns({
-      "RM~RS": [{ entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }]
-    });
-    updateExcludeCounterStub.resolves([{ itemIdentifier: "1234567890" }]);
-    batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-    getCurrentWeekStub.returns('2026-07-20');
-    calculateNotificationSentAtWeekStub.returns('2026-07-20');
+    updateExcludeCounterStub.resolves([
+      { itemIdentifier: "1234567890" }
+    ]);
 
     const result = await lambda.handleEvent({});
 
-    expect(result.batchItemFailures).to.deep.equal([{ itemIdentifier: "1234567890" }]);
-    expect(updateSenderPriorityCounterStub.calledOnce).to.equal(false);
+    expect(result).to.deep.equal({
+      batchItemFailures: [
+        { itemIdentifier: "1234567890" }
+      ]
+    });
+    expect(updateSenderPriorityCounterStub.called).to.equal(false);
     expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
+    expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
   });
 
   it("should return failure when incoming batch write fails", async () => {
-    const eventData = [
-      {
-        kinesisSeqNumber: "1234567890",
-        unifiedDeliveryDriver: "driver1",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region1" },
-        requestId: "request1",
-        productType: "RS",
-        senderPaId: "sender1",
-        tenderId: "tender1",
-        iun: "iun1",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0",
-        senderPriority: 70
-      }
-    ];
+    const eventData = [mockEvent()];
 
     extractKinesisDataStub.returns(eventData);
-    buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
-    batchGetKinesisEventRecordsStub.resolves([]);
-    groupRecordsByProductAndProvinceStub.returns({
-      "RM~RS": [{ entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }]
-    });
-    groupRecordsBySenderPaIdStub.returns({
-      "sender1": [
-        { entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }
-      ]
-    });
-    updateExcludeCounterStub.callsFake(async (_, failures) => failures);
-    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
-    batchWritePaperDeliveryRecordsStub.resolves([{ itemIdentifier: "1234567890" }]);
-    getCurrentWeekStub.returns('2026-07-20');
-    calculateNotificationSentAtWeekStub.returns('2026-07-20');
+    batchWritePaperDeliveryRecordsStub.resolves([
+      { itemIdentifier: "1234567890" }
+    ]);
 
     const result = await lambda.handleEvent({});
 
-    expect(result.batchItemFailures).to.deep.equal([{ itemIdentifier: "1234567890" }]);
+    expect(result).to.deep.equal({
+      batchItemFailures: [
+        { itemIdentifier: "1234567890" }
+      ]
+    });
     expect(updateSenderPriorityCounterStub.calledOnce).to.equal(true);
     expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
   });
 
+  it("should return failure when writing Kinesis event records fails", async () => {
+    const eventData = [mockEvent()];
+
+    extractKinesisDataStub.returns(eventData);
+    batchWriteKinesisEventRecordsStub.rejects(new Error("DynamoDB error"));
+
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({
+      batchItemFailures: [
+        { itemIdentifier: "1234567890" }
+      ]
+    });
+  });
+
   it("should process only unique requestIds", async () => {
-    const duplicated = {
-      kinesisSeqNumber: "1234567890",
-      unifiedDeliveryDriver: "driver1",
-      recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region1" },
-      requestId: "request1",
-      productType: "RS",
-      senderPaId: "sender1",
-      tenderId: "tender1",
-      iun: "iun1",
-      notificationSentAt: "2023-10-01T00:00:00Z",
-      prepareRequestDate: "2024-10-01T00:00:00Z",
-      attempt: "0",
-      senderPriority: 40
-    };
+    const duplicated = mockEvent();
 
     extractKinesisDataStub.returns([
       duplicated,
-      { ...duplicated, kinesisSeqNumber: "9999999999" }
+      {
+        ...duplicated,
+        kinesisSeqNumber: "9999999999"
+      }
     ]);
-
-    buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
-    batchGetKinesisEventRecordsStub.resolves([]);
-    groupRecordsByProductAndProvinceStub.callsFake((records) => ({
-      "RM~RS": records
-    }));
-    groupRecordsBySenderPaIdStub.callsFake((records) => ({
-      "sender1": records
-    }));
-    updateExcludeCounterStub.callsFake(async (_, failures) => failures);
-    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
-    batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-    buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
-    batchWriteKinesisEventRecordsStub.resolves({});
-    getCurrentWeekStub.returns('2026-07-20');
-    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -429,54 +391,15 @@ describe("eventHandler.handleEvent", () => {
 
   it("should skip records without attempt instead of failing them", async () => {
     const eventData = [
-      {
-        kinesisSeqNumber: "1234567890",
-        unifiedDeliveryDriver: "driver1",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region2" },
-        requestId: "request1",
-        productType: "AR",
-        senderPaId: "sender1",
-        tenderId: "tender1",
-        iun: "iun1",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        attempt: "0",
-        senderPriority: 40
-      },
-      {
+      mockEvent(),
+      mockEvent({
         kinesisSeqNumber: "1234567891",
-        unifiedDeliveryDriver: "driver2",
-        recipientNormalizedAddress: { pr: "RM", cap: "54321", region: "region2" },
         requestId: "request2",
-        productType: "AR",
-        senderPaId: "sender2",
-        tenderId: "tender2",
-        iun: "iun2",
-        notificationSentAt: "2023-10-01T00:00:00Z",
-        prepareRequestDate: "2024-10-01T00:00:00Z",
-        senderPriority: 15
-        // attempt missing
-      }
+        attempt: undefined
+      })
     ];
 
     extractKinesisDataStub.returns(eventData);
-    buildPaperDeliveryRecordStub.callsFake((item) => mockBuiltRecord(item));
-    batchGetKinesisEventRecordsStub.resolves([]);
-    groupRecordsByProductAndProvinceStub.returns({
-      "RM~AR": [{ entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }]
-    });
-    groupRecordsBySenderPaIdStub.returns({
-      "sender1": [
-        { entity: mockBuiltRecord(eventData[0]), kinesisSeqNumber: "1234567890" }
-      ]
-    });
-    updateExcludeCounterStub.callsFake(async (_, failures) => failures);
-    updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
-    batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-    buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
-    batchWriteKinesisEventRecordsStub.resolves({});
-    getCurrentWeekStub.returns('2026-07-20');
-    calculateNotificationSentAtWeekStub.returns('2026-07-20');
 
     const result = await lambda.handleEvent({});
 
@@ -485,139 +408,221 @@ describe("eventHandler.handleEvent", () => {
     const groupedArg = groupRecordsByProductAndProvinceStub.firstCall.args[0];
     expect(groupedArg).to.have.lengthOf(1);
     expect(groupedArg[0].kinesisSeqNumber).to.equal("1234567890");
-
-    const groupedArgPaId = groupRecordsBySenderPaIdStub.firstCall.args[0];
-    expect(groupedArgPaId).to.have.lengthOf(1);
-    expect(groupedArgPaId[0].kinesisSeqNumber).to.equal("1234567890");
   });
 
-  it("should mark delayed true and create delayed counter when record is not in current week and sender limit exists", async () => {
-      const delayedEvent = {
-        kinesisSeqNumber: "1234567890",
-        unifiedDeliveryDriver: "driver1",
-        recipientNormalizedAddress: { pr: "RM", cap: "12345", region: "region1" },
-        requestId: "request1",
-        productType: "AR",
-        senderPaId: "sender1",
-        tenderId: "tender1",
-        iun: "iun1",
-        notificationSentAt: "2025-05-21T12:34:25Z",
-        prepareRequestDate: "2025-05-21T12:34:25Z",
-        attempt: "0",
-        senderPriority: 30
-      };
-
-      extractKinesisDataStub.returns([delayedEvent]);
-      getDeliveryWeekStub.returns("2025-05-26");
-      getCurrentWeekStub.returns('2026-07-20');
-      calculateNotificationSentAtWeekStub.returns('2026-07-13');
-      groupDelayedRecordsStub.returns({
-        "2025-05-19~sender1~AR~RM": [delayedEvent]
-      });
-      getSenderLimitStub.resolves({ weeklyEstimate: 15 });
-      updateDelayedCounter.resolves();
-      buildPaperDeliveryRecordStub.callsFake((item, deliveryWeek, delayed, skipSenderLimit) =>
-        mockBuiltRecord(item, { deliveryDate: deliveryWeek, delayed, skipSenderLimit })
-      );
-      batchGetKinesisEventRecordsStub.resolves([]);
-      groupRecordsByProductAndProvinceStub.callsFake((records) => ({ "RM~AR": records }));
-      groupRecordsBySenderPaIdStub.callsFake((records) => ({ sender1: records }));
-      updateExcludeCounterStub.callsFake(async (_, failures) => failures);
-      updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
-      batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-      buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
-      batchWriteKinesisEventRecordsStub.resolves({});
-
-      const result = await lambda.handleEvent({});
-
-      expect(result).to.deep.equal({ batchItemFailures: [] });
-      expect(getSenderLimitStub.calledOnceWithExactly("sender1", "AR", "RM", "2025-05-19")).to.equal(true);
-      expect(updateDelayedCounter.calledOnceWithExactly("2025-05-26", "2025-05-19", "sender1", "AR", "RM", 1, 15)).to.equal(true);
-      expect(buildPaperDeliveryRecordStub.firstCall.args[2]).to.equal(true);
-      expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
-      expect(batchWriteKinesisEventRecordsStub.calledOnce).to.equal(true);
+  it("should add delayed records to normal flow when sender limit does not exist", async () => {
+    const delayedEvent = mockEvent({
+      notificationSentAt: "2025-05-21T12:34:25Z",
+      prepareRequestDate: "2025-05-21T12:34:25Z"
     });
 
-    it("should not create delayed counter and should keep delayed false when sender limit is missing", async () => {
-      const delayedEvent = {
-        kinesisSeqNumber: "1234567891",
-        unifiedDeliveryDriver: "driver2",
-        recipientNormalizedAddress: { pr: "MI", cap: "54321", region: "region2" },
-        requestId: "request2",
-        productType: "AR",
-        senderPaId: "sender2",
-        tenderId: "tender2",
-        iun: "iun2",
-        notificationSentAt: "2025-05-21T12:34:25Z",
-        prepareRequestDate: "2025-05-21T12:34:25Z",
-        attempt: "1",
-        senderPriority: 20
-      };
+    extractKinesisDataStub.returns([delayedEvent]);
+    calculateNotificationSentAtWeekStub.returns("2025-05-19");
+    getSenderLimitStub.resolves(null);
 
-      extractKinesisDataStub.returns([delayedEvent]);
-      getDeliveryWeekStub.returns("2025-05-26");
-      getCurrentWeekStub.returns('2026-07-20');
-      calculateNotificationSentAtWeekStub.returns('2026-07-13');
-      groupDelayedRecordsStub.returns({
-        "2025-05-19~sender2~AR~MI": [delayedEvent]
-      });
-      getSenderLimitStub.resolves(null);
-      buildPaperDeliveryRecordStub.callsFake((item, deliveryWeek, delayed, skipSenderLimit) =>
-        mockBuiltRecord(item, { deliveryDate: deliveryWeek, delayed, skipSenderLimit })
-      );
-      batchGetKinesisEventRecordsStub.resolves([]);
-      groupRecordsByProductAndProvinceStub.callsFake((records) => ({ "MI~AR": records }));
-      groupRecordsBySenderPaIdStub.callsFake((records) => ({ sender2: records }));
-      updateExcludeCounterStub.callsFake(async (_, failures) => failures);
-      updateSenderPriorityCounterStub.callsFake(async (_, failures) => failures);
-      batchWritePaperDeliveryRecordsStub.callsFake(async (_, failures) => failures);
-      buildPaperDeliveryKinesisEventRecordStub.callsFake((requestId) => ({ requestId, ttl: 9999999999 }));
-      batchWriteKinesisEventRecordsStub.resolves({});
+    const result = await lambda.handleEvent({});
 
-      const result = await lambda.handleEvent({});
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+    expect(getSenderLimitStub.calledOnceWithExactly(
+      "sender1",
+      "AR",
+      "RM",
+      "2025-05-19"
+    )).to.equal(true);
+    expect(updateUsedSenderLimitAndInsertPaperDeliveriesStub.called).to.equal(false);
 
-      expect(result).to.deep.equal({ batchItemFailures: [] });
-      expect(getSenderLimitStub.calledOnceWithExactly("sender2", "AR", "MI", "2025-05-19")).to.equal(true);
-      expect(updateDelayedCounter.called).to.equal(false);
-      expect(buildPaperDeliveryRecordStub.firstCall.args[2]).to.equal(false);
-      expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
+    const delayedCall = addPaperDeliveryRecordStub.lastCall.args[0];
+    expect(delayedCall.delayed).to.equal(true);
+    expect(delayedCall.skipSenderLimit).to.equal(false);
+
+    const writeRecords = batchWritePaperDeliveryRecordsStub.firstCall.args[0];
+    expect(writeRecords).to.have.lengthOf(1);
+    expect(writeRecords[0].entity.delayed).to.equal(true);
+    expect(writeRecords[0].entity.skipSenderLimit).to.equal(false);
+  });
+
+  it("should process delayed records transactionally when sender limit exists", async () => {
+    const delayedEvent = mockEvent({
+      notificationSentAt: "2025-05-21T12:34:25Z",
+      prepareRequestDate: "2025-05-21T12:34:25Z"
     });
 
-    it("should add delayed records to failures when delayed counter creation fails", async () => {
-      const delayedEvent = {
-        kinesisSeqNumber: "1234567892",
-        unifiedDeliveryDriver: "driver3",
-        recipientNormalizedAddress: { pr: "TO", cap: "10100", region: "region3" },
-        requestId: "request3",
-        productType: "AR",
-        senderPaId: "sender3",
-        tenderId: "tender3",
-        iun: "iun3",
-        notificationSentAt: "2025-05-21T12:34:25Z",
-        prepareRequestDate: "2025-05-21T12:34:25Z",
-        attempt: "0",
-        senderPriority: 10
-      };
+    extractKinesisDataStub.returns([delayedEvent]);
+    calculateNotificationSentAtWeekStub.returns("2025-05-19");
+    getSenderLimitStub.resolves({ weeklyEstimate: 10 });
 
-      extractKinesisDataStub.returns([delayedEvent]);
-      getDeliveryWeekStub.returns("2025-05-26");
-      getCurrentWeekStub.returns('2026-07-20');
-      calculateNotificationSentAtWeekStub.returns('2026-07-13');
-      groupDelayedRecordsStub.returns({
-        "2025-05-19~sender3~AR~TO": [delayedEvent]
+    updateUsedSenderLimitAndInsertPaperDeliveriesStub.callsFake(async (
+      groupRecords,
+      paperDeliveryRecords
+    ) => {
+      paperDeliveryRecords.push({
+        entity: mockBuiltRecord(groupRecords[0], {
+          delayed: true,
+          skipSenderLimit: true
+        }),
+        kinesisSeqNumber: groupRecords[0].kinesisSeqNumber
       });
-      getSenderLimitStub.resolves({ weeklyEstimate: 8 });
-      updateDelayedCounter.rejects(new Error("counter error"));
-
-      const result = await lambda.handleEvent({});
-
-      expect(result).to.deep.equal({ batchItemFailures: [{ itemIdentifier: "1234567892" }] });
-      expect(buildPaperDeliveryRecordStub.called).to.equal(false);
-      expect(batchGetKinesisEventRecordsStub.called).to.equal(false);
-      expect(updateExcludeCounterStub.called).to.equal(false);
-      expect(updateSenderPriorityCounterStub.called).to.equal(false);
-      expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
-      expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
     });
 
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+    expect(updateUsedSenderLimitAndInsertPaperDeliveriesStub.calledOnceWithExactly(
+      [sinon.match.object],
+      sinon.match.array,
+      "2025-05-19",
+      10
+    )).to.equal(true);
+    expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
+    expect(batchWriteKinesisEventRecordsStub.calledOnce).to.equal(true);
+
+    const counterRecords = groupRecordsByProductAndProvinceStub.firstCall.args[0];
+    expect(counterRecords[0].entity.delayed).to.equal(true);
+    expect(counterRecords[0].entity.skipSenderLimit).to.equal(true);
+  });
+
+  it("should insert delayed records normally when sender limit condition is not satisfied", async () => {
+    const delayedEvent = mockEvent({
+      notificationSentAt: "2025-05-21T12:34:25Z",
+      prepareRequestDate: "2025-05-21T12:34:25Z"
+    });
+
+    extractKinesisDataStub.returns([delayedEvent]);
+    calculateNotificationSentAtWeekStub.returns("2025-05-19");
+    getSenderLimitStub.resolves({ weeklyEstimate: 1 });
+
+    updateUsedSenderLimitAndInsertPaperDeliveriesStub.callsFake(async (
+      groupRecords,
+      paperDeliveryRecords
+    ) => {
+      paperDeliveryRecords.push({
+        entity: mockBuiltRecord(groupRecords[0], {
+          delayed: true,
+          skipSenderLimit: false
+        }),
+        kinesisSeqNumber: groupRecords[0].kinesisSeqNumber
+      });
+    });
+
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+    expect(updateUsedSenderLimitAndInsertPaperDeliveriesStub.calledOnce).to.equal(true);
+    expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
+
+    const writeRecords = batchWritePaperDeliveryRecordsStub.firstCall.args[0];
+    expect(writeRecords).to.have.lengthOf(1);
+    expect(writeRecords[0].entity.delayed).to.equal(true);
+    expect(writeRecords[0].entity.skipSenderLimit).to.equal(false);
+  });
+
+  it("should treat zero weekly estimate as missing sender limit", async () => {
+    const delayedEvent = mockEvent({
+      notificationSentAt: "2025-05-21T12:34:25Z"
+    });
+
+    extractKinesisDataStub.returns([delayedEvent]);
+    calculateNotificationSentAtWeekStub.returns("2025-05-19");
+    getSenderLimitStub.resolves({ weeklyEstimate: 0 });
+
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({ batchItemFailures: [] });
+    expect(updateUsedSenderLimitAndInsertPaperDeliveriesStub.called).to.equal(false);
+    expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
+
+    const writeRecords = batchWritePaperDeliveryRecordsStub.firstCall.args[0];
+    expect(writeRecords[0].entity.skipSenderLimit).to.equal(false);
+  });
+
+  it("should add delayed group records to failures when sender limit lookup fails", async () => {
+    const delayedEvent = mockEvent({
+      notificationSentAt: "2025-05-21T12:34:25Z"
+    });
+
+    extractKinesisDataStub.returns([delayedEvent]);
+    calculateNotificationSentAtWeekStub.returns("2025-05-19");
+    getSenderLimitStub.rejects(new Error("DynamoDB error"));
+
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({
+      batchItemFailures: [
+        { itemIdentifier: "1234567890" }
+      ]
+    });
+    expect(batchGetKinesisEventRecordsStub.called).to.equal(false);
+    expect(updateExcludeCounterStub.called).to.equal(false);
+    expect(updateSenderPriorityCounterStub.called).to.equal(false);
+    expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
+    expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
+  });
+
+  it("should add delayed group records to failures when transactional processing fails", async () => {
+    const delayedEvent = mockEvent({
+      notificationSentAt: "2025-05-21T12:34:25Z"
+    });
+
+    extractKinesisDataStub.returns([delayedEvent]);
+    calculateNotificationSentAtWeekStub.returns("2025-05-19");
+    getSenderLimitStub.resolves({ weeklyEstimate: 10 });
+    updateUsedSenderLimitAndInsertPaperDeliveriesStub.rejects(
+      new Error("DynamoDB error")
+    );
+
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({
+      batchItemFailures: [
+        { itemIdentifier: "1234567890" }
+      ]
+    });
+    expect(batchGetKinesisEventRecordsStub.called).to.equal(false);
+    expect(updateExcludeCounterStub.called).to.equal(false);
+    expect(updateSenderPriorityCounterStub.called).to.equal(false);
+    expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
+    expect(batchWriteKinesisEventRecordsStub.called).to.equal(false);
+  });
+
+  it("should process delayed groups independently", async () => {
+    const firstEvent = mockEvent({
+      kinesisSeqNumber: "1",
+      requestId: "request1",
+      senderPaId: "sender1",
+      recipientNormalizedAddress: { pr: "RM", cap: "00100" },
+      notificationSentAt: "2025-05-21T12:34:25Z"
+    });
+
+    const secondEvent = mockEvent({
+      kinesisSeqNumber: "2",
+      requestId: "request2",
+      senderPaId: "sender2",
+      recipientNormalizedAddress: { pr: "MI", cap: "20100" },
+      notificationSentAt: "2025-05-21T12:34:25Z"
+    });
+
+    extractKinesisDataStub.returns([firstEvent, secondEvent]);
+    calculateNotificationSentAtWeekStub.returns("2025-05-19");
+
+    getSenderLimitStub
+      .withArgs("sender1", "AR", "RM", "2025-05-19")
+      .rejects(new Error("DynamoDB error"));
+
+    getSenderLimitStub
+      .withArgs("sender2", "AR", "MI", "2025-05-19")
+      .resolves(null);
+
+    const result = await lambda.handleEvent({});
+
+    expect(result).to.deep.equal({
+      batchItemFailures: [
+        { itemIdentifier: "1" }
+      ]
+    });
+    expect(batchWritePaperDeliveryRecordsStub.calledOnce).to.equal(true);
+
+    const writeRecords = batchWritePaperDeliveryRecordsStub.firstCall.args[0];
+    expect(writeRecords).to.have.lengthOf(1);
+    expect(writeRecords[0].entity.requestId).to.equal("request2");
+  });
 });

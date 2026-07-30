@@ -1,4 +1,14 @@
-const { buildPaperDeliveryRecord, buildPaperDeliveryKinesisEventRecord, groupRecordsByProductAndProvince, groupRecordsBySenderPaId, groupDelayedRecords, isCurrentWeek } = require('../app/lib/utils');
+const {
+  buildPaperDeliveryRecord,
+  buildPaperDeliveryKinesisEventRecord,
+  groupRecordsByProductAndProvince,
+  groupRecordsBySenderPaId,
+  groupDelayedRecords,
+  calculateNotificationSentAtWeek,
+  getCurrentWeek,
+  getDeliveryWeek,
+  addPaperDeliveryRecord
+} = require('../app/lib/utils');
 const { expect } = require("chai");
 const sinon = require("sinon");
 
@@ -35,13 +45,15 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       attempt: 0,
       communicationType: 'INFORMAL',
       senderPaIdOriginalSentAt: 'sender1~2025-01-01T00:00:00Z',
-      deliveryDate: '2025-07-07'
+      deliveryDate: '2025-07-07',
+      delayed: false,
+      skipSenderLimit: false
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
   });
 
-  it('builds a record with all required fields from payload', () => {
+  it('builds a second attempt record using prepareRequestDate', () => {
     const payload = {
       recipientNormalizedAddress: { pr: 'province1', cap: '12345', region: 'region1' },
       requestId: 'req1',
@@ -71,7 +83,9 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       prepareRequestDate: '2024-01-01T00:00:00Z',
       attempt: 1,
       communicationType: 'LEGAL',
-      deliveryDate: '2025-07-07'
+      deliveryDate: '2025-07-07',
+      delayed: false,
+      skipSenderLimit: false
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -79,7 +93,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
   });
 
 
-  it('builds a record with all required fields from payload', () => {
+  it('builds an RS record using prepareRequestDate', () => {
     const payload = {
       recipientNormalizedAddress: { pr: 'province1', cap: '12345', region: 'region1' },
       requestId: 'req1',
@@ -110,7 +124,9 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       prepareRequestDate: '2024-01-01T00:00:00Z',
       attempt: 0,
       communicationType: 'LEGAL',
-      deliveryDate: '2025-07-07'
+      deliveryDate: '2025-07-07',
+      delayed: false,
+      skipSenderLimit: false
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -120,6 +136,52 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
   it('throws an error when payload is missing required fields', () => {
     const payload = { unifiedDeliveryDriver: 'driver1' };
     expect(() => buildPaperDeliveryRecord(payload)).throw();
+  });
+
+  it('sets delayed and skipSenderLimit when requested', () => {
+    const payload = {
+      recipientNormalizedAddress: { pr: 'RM', cap: '00100' },
+      requestId: 'req-delayed',
+      productType: 'AR',
+      senderPaId: 'sender1',
+      notificationSentAt: '2025-01-01T00:00:00Z',
+      prepareRequestDate: '2025-01-02T00:00:00Z',
+      attempt: 0
+    };
+
+    const result = buildPaperDeliveryRecord(
+      payload,
+      '2025-07-07',
+      true,
+      true
+    );
+
+    expect(result.delayed).to.equal(true);
+    expect(result.skipSenderLimit).to.equal(true);
+    expect(result.sk).to.equal('RM~2025-01-01T00:00:00Z~req-delayed');
+    expect(result.senderPaIdOriginalSentAt).to.equal('sender1~2025-01-01T00:00:00Z');
+  });
+
+  it('converts delayed and skipSenderLimit values to booleans', () => {
+    const payload = {
+      recipientNormalizedAddress: { pr: 'RM', cap: '00100' },
+      requestId: 'req-delayed',
+      productType: 'AR',
+      senderPaId: 'sender1',
+      notificationSentAt: '2025-01-01T00:00:00Z',
+      prepareRequestDate: '2025-01-02T00:00:00Z',
+      attempt: 0
+    };
+
+    const result = buildPaperDeliveryRecord(
+      payload,
+      '2025-07-07',
+      1,
+      'true'
+    );
+
+    expect(result.delayed).to.equal(true);
+    expect(result.skipSenderLimit).to.equal(true);
   });
 
   describe('buildPaperDeliveryKinesisEventRecord', () => {
@@ -251,114 +313,178 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       expect(result).to.deep.equal({});
     });
 
-    it('groups records under the same delivery week key', () => {
+    it('groups delayed records by week, sender, product and province', () => {
       const r1 = {
-        notificationSentAt: '2025-05-21T12:34:25Z',
+        notificationSentAtWeek: '2025-05-19',
         senderPaId: 'sender1',
-        productType: 'RS',
-        province: 'MI',
-        notificationSentAtWeek: '2025-05-19'
+        productType: 'AR',
+        recipientNormalizedAddress: { pr: 'RM' }
       };
       const r2 = {
-        notificationSentAt: '2025-05-23T08:15:00Z',
+        notificationSentAtWeek: '2025-05-19',
         senderPaId: 'sender1',
-        productType: 'RS',
-        province: 'MI',
-        notificationSentAtWeek: '2025-05-19'
+        productType: 'AR',
+        recipientNormalizedAddress: { pr: 'RM' }
       };
 
       const result = groupDelayedRecords([r1, r2]);
 
       expect(result).to.deep.equal({
-        '2025-05-19~sender1~RS~MI': [r1, r2]
+        '2025-05-19~sender1~AR~RM': [r1, r2]
       });
     });
 
-    it('groups records with date-only and ISO datetime notificationSentAt values in the same week together', () => {
+    it('creates separate delayed groups when one grouping value changes', () => {
       const r1 = {
-        notificationSentAt: '2025-05-19T00:00:00Z',
+        notificationSentAtWeek: '2025-05-19',
         senderPaId: 'sender1',
-        productType: '890',
-        province: 'RM',
-        notificationSentAtWeek: '2025-05-19'
+        productType: 'AR',
+        recipientNormalizedAddress: { pr: 'RM' }
       };
       const r2 = {
-        notificationSentAt: '2025-05-21T12:34:25Z',
+        notificationSentAtWeek: '2025-05-19',
         senderPaId: 'sender1',
-        productType: '890',
-        province: 'RM',
-        notificationSentAtWeek: '2025-05-19'
+        productType: 'AR',
+        recipientNormalizedAddress: { pr: 'MI' }
       };
 
       const result = groupDelayedRecords([r1, r2]);
 
-      expect(result).to.deep.equal({
-        '2025-05-19~sender1~890~RM': [r1, r2]
-      });
+      expect(result['2025-05-19~sender1~AR~RM']).to.deep.equal([r1]);
+      expect(result['2025-05-19~sender1~AR~MI']).to.deep.equal([r2]);
+    });
+  });
+
+  describe('week calculations', () => {
+    let clock;
+
+    beforeEach(() => {
+      process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK = '1';
+      clock = sinon.useFakeTimers(new Date('2026-04-08T12:00:00Z').getTime());
     });
 
-    it('creates separate groups when records belong to different delivery weeks', () => {
-      const r1 = {
-        notificationSentAt: '2025-05-25T23:59:59Z',
-        senderPaId: 'sender1',
-        productType: 'RS',
-        province: 'MI',
-        notificationSentAtWeek: '2025-05-19'
-      };
-      const r2 = {
-        notificationSentAt: '2025-05-26T00:00:00Z',
-        senderPaId: 'sender1',
-        productType: 'RS',
-        province: 'MI',
-        notificationSentAtWeek: '2025-05-26'
-      };
-
-      const result = groupDelayedRecords([r1, r2]);
-
-      expect(result).to.deep.equal({
-        '2025-05-19~sender1~RS~MI': [r1],
-        '2025-05-26~sender1~RS~MI': [r2]
-      });
+    afterEach(() => {
+      clock.restore();
     });
 
-    it('creates separate groups when sender, product type or province differ within the same week', () => {
-      const r1 = {
-        notificationSentAt: '2025-05-21T12:34:25Z',
-        senderPaId: 'sender1',
-        productType: 'RS',
-        province: 'MI',
-        notificationSentAtWeek: '2025-05-19'
-      };
-      const r2 = {
-        notificationSentAt: '2025-05-22T10:00:00Z',
-        senderPaId: 'sender2',
-        productType: 'RS',
-        province: 'MI',
-        notificationSentAtWeek: '2025-05-19'
-      };
-      const r3 = {
-        notificationSentAt: '2025-05-23T10:00:00Z',
-        senderPaId: 'sender1',
-        productType: '890',
-        province: 'MI',
-        notificationSentAtWeek: '2025-05-19'
-      };
-      const r4 = {
-        notificationSentAt: '2025-05-24T10:00:00Z',
-        senderPaId: 'sender1',
-        productType: 'RS',
-        province: 'RM',
-        notificationSentAtWeek: '2025-05-19'
-      };
+    it('calculates the notification week using previous or same configured day', () => {
+      const result = calculateNotificationSentAtWeek('2026-04-08T12:00:00Z');
+      expect(result).to.equal('2026-04-06');
+    });
 
-      const result = groupDelayedRecords([r1, r2, r3, r4]);
+    it('keeps the same day when notification is on the configured day', () => {
+      const result = calculateNotificationSentAtWeek('2026-04-06T12:00:00Z');
+      expect(result).to.equal('2026-04-06');
+    });
 
-      expect(result).to.deep.equal({
-        '2025-05-19~sender1~RS~MI': [r1],
-        '2025-05-19~sender2~RS~MI': [r2],
-        '2025-05-19~sender1~890~MI': [r3],
-        '2025-05-19~sender1~RS~RM': [r4]
+    it('returns the start of the current week', () => {
+      const result = getCurrentWeek();
+      expect(result).to.equal('2026-04-06');
+    });
+
+    it('returns the next configured delivery day', () => {
+      const result = getDeliveryWeek();
+      expect(result).to.equal('2026-04-13');
+    });
+  });
+
+  describe('addPaperDeliveryRecord', () => {
+    function buildEvent(overrides = {}) {
+      return {
+        recipientNormalizedAddress: { pr: 'RM', cap: '00100' },
+        requestId: 'request1',
+        productType: 'AR',
+        senderPaId: 'sender1',
+        notificationSentAt: '2025-01-01T00:00:00Z',
+        prepareRequestDate: '2025-01-02T00:00:00Z',
+        attempt: 0,
+        kinesisSeqNumber: 'seq1',
+        ...overrides
+      };
+    }
+
+    it('adds a PaperDelivery record to the target list', () => {
+      const requestIds = new Set();
+      const paperDeliveryRecords = [];
+      const eventItem = buildEvent();
+
+      addPaperDeliveryRecord({
+        eventItem,
+        deliveryWeek: '2025-07-07',
+        delayed: true,
+        skipSenderLimit: false,
+        requestIds,
+        paperDeliveryRecords
       });
+
+      expect(paperDeliveryRecords).to.have.lengthOf(1);
+      expect(paperDeliveryRecords[0].kinesisSeqNumber).to.equal('seq1');
+      expect(paperDeliveryRecords[0].entity.requestId).to.equal('request1');
+      expect(paperDeliveryRecords[0].entity.delayed).to.equal(true);
+      expect(paperDeliveryRecords[0].entity.skipSenderLimit).to.equal(false);
+      expect(requestIds.has('request1')).to.equal(true);
+    });
+
+    it('does not add duplicate requestIds', () => {
+      const requestIds = new Set();
+      const paperDeliveryRecords = [];
+      const firstEvent = buildEvent();
+      const secondEvent = buildEvent({
+        kinesisSeqNumber: 'seq2'
+      });
+
+      addPaperDeliveryRecord({
+        eventItem: firstEvent,
+        deliveryWeek: '2025-07-07',
+        delayed: false,
+        skipSenderLimit: false,
+        requestIds,
+        paperDeliveryRecords
+      });
+
+      addPaperDeliveryRecord({
+        eventItem: secondEvent,
+        deliveryWeek: '2025-07-07',
+        delayed: false,
+        skipSenderLimit: false,
+        requestIds,
+        paperDeliveryRecords
+      });
+
+      expect(paperDeliveryRecords).to.have.lengthOf(1);
+      expect(paperDeliveryRecords[0].kinesisSeqNumber).to.equal('seq1');
+    });
+
+    it('adds records with different requestIds', () => {
+      const requestIds = new Set();
+      const paperDeliveryRecords = [];
+
+      addPaperDeliveryRecord({
+        eventItem: buildEvent(),
+        deliveryWeek: '2025-07-07',
+        delayed: false,
+        skipSenderLimit: false,
+        requestIds,
+        paperDeliveryRecords
+      });
+
+      addPaperDeliveryRecord({
+        eventItem: buildEvent({
+          requestId: 'request2',
+          kinesisSeqNumber: 'seq2'
+        }),
+        deliveryWeek: '2025-07-07',
+        delayed: false,
+        skipSenderLimit: false,
+        requestIds,
+        paperDeliveryRecords
+      });
+
+      expect(paperDeliveryRecords).to.have.lengthOf(2);
+      expect(requestIds).to.deep.equal(new Set([
+        'request1',
+        'request2'
+      ]));
     });
   });
 

@@ -1939,6 +1939,7 @@ Resources:
           KINESIS_PAPERDELIVERY_EVENTTABLE: !Ref PaperDeliveryKinesisEventTableName
           KINESIS_PAPERDELIVERY_COUNTERTABLE: !Ref PaperDeliveryCounterTableName
           KINESIS_PAPERDELIVERY_SENDERLIMITTABLE: !Ref PaperDeliverySenderLimitTableName
+          KINESIS_PAPERDELIVERY_USEDSENDERLIMITTABLE: !Ref PaperDeliveryUsedSenderLimitTableName
           KINESIS_BATCHSIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
           KINESIS_PAPERDELIVERY_COUNTERTTLDAYS: !Ref PaperDeliveryCounterTtlDays
@@ -1990,7 +1991,9 @@ Resources:
             Action: kms:Decrypt
             Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
           - Effect: Allow
-            Action: dynamodb:BatchWriteItem
+            Action:
+              - dynamodb:BatchWriteItem
+              - dynamodb:TransactWriteItems
             Resource:
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
@@ -2003,6 +2006,12 @@ Resources:
             Resource:
               - !Ref PaperDeliverySenderLimitTableArn
               - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+          - Effect: Allow
+            Action:
+              - dynamodb:UpdateItem
+              - dynamodb:TransactWriteItems
+            Resource:
+              - !Ref PaperDeliveryUsedSenderLimitTableArn
           - Effect: Allow
             Action:
               - dynamodb:BatchGetItem
@@ -2560,6 +2569,7 @@ Resources:
             Action:
               - dynamodb:Query
               - dynamodb:GetItem
+              - dynamodb:UpdateItem
             Resource:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
