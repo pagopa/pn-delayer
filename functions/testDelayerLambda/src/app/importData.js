@@ -5,7 +5,8 @@ const {
     DynamoDBDocumentClient,
     BatchWriteCommand,
     UpdateCommand,
-    GetCommand
+    GetCommand,
+    TransactWriteCommand
 } = require("@aws-sdk/lib-dynamodb");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
@@ -17,15 +18,15 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
- * @param {Array<string>} params[paperDeliveryTableName, countersTableName, fileName, deliveryWeek]
+ * @param {Array<string>} params[paperDeliveryTableName, countersTableName, senderLimitTableName, usedSenderLimitTableName, fileName, deliveryWeek]
  * @returns {Promise<{message:string, processed:number}>}
  */
 exports.importData = async (params = []) => {
   const BUCKET_NAME = process.env.BUCKET_NAME;
-  let [paperDeliveryTableName, countersTableName, senderLimitTableName, fileName, deliveryWeek] = params;
+  let [paperDeliveryTableName, countersTableName, senderLimitTableName, usedSenderLimitTableName, fileName, deliveryWeek] = params;
 
-  if (!paperDeliveryTableName || !countersTableName || !senderLimitTableName || !fileName) {
-    throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName, senderLimitTableName, fileName]");
+  if (!paperDeliveryTableName || !countersTableName || !senderLimitTableName || !usedSenderLimitTableName || !fileName) {
+    throw new Error("Required parameters must be [paperDeliveryTableName, countersTableName, senderLimitTableName, usedSenderLimitTableName, fileName]");
   }
 
   if (!BUCKET_NAME) {
@@ -59,7 +60,7 @@ exports.importData = async (params = []) => {
     const inCurrentWeek = notificationSentAtWeek === currentWeek;
 
     if (inCurrentWeek) {
-      const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek, false);
+      const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek, false, false);
       itemsBuffer.push(paperDelivery);
     } else {
       console.log(`PaperDelivery ${record.requestId} belongs to a previous notification week`);
@@ -87,42 +88,34 @@ exports.importData = async (params = []) => {
           notificationSentAtWeek
         );
 
-        let hasSenderLimit = senderLimitItem && senderLimitItem.weeklyEstimate > 0;
+        const hasSenderLimit = senderLimitItem && senderLimitItem.weeklyEstimate > 0;
 
-        /*
-        * Il contatore DELAYED viene incrementato solamente
-        * quando esiste un sender limit con weeklyEstimate > 0.
-        */
         if (hasSenderLimit) {
           console.log(`Found sender limit for ${groupKey}: ${senderLimitItem.weeklyEstimate}`);
-          await updateDelayedCounter(
-            countersTableName,
+          await updateUsedSenderLimitAndInsertPaperDeliveries(
+            paperDeliveryTableName,
+            usedSenderLimitTableName,
+            groupRecords,
+            itemsBuffer,
             deliveryWeek,
             notificationSentAtWeek,
-            senderPaId,
-            productType,
-            province,
-            groupRecords.length,
             senderLimitItem.weeklyEstimate
           );
-          console.log(`Updated DELAYED counter for ${groupKey} with ${groupRecords.length} shipments`);
+          console.log(`Updated used sender limit and inserted PaperDeliveries for delayed group ${groupKey}`);
         } else {
           console.log(`No valid sender limit found for delayed group ${groupKey}`);
-        }
 
-        /*
-        * Tutte le spedizioni conformi proseguono nel flusso comune.
-        *
-        * delayed è true solamente quando:
-        * - la spedizione appartiene a una settimana precedente;
-        * - esiste un weeklyEstimate valido.
-        */
-        for (const eventItem of groupRecords) {
-          const paperDelivery = buildPaperDeliveryRecord(eventItem, deliveryWeek, !!hasSenderLimit);
-      	  itemsBuffer.push(paperDelivery);
+          for (const eventItem of groupRecords) {
+            const paperDelivery = buildPaperDeliveryRecord(
+              eventItem,
+              deliveryWeek,
+              true,
+              false
+            );
+            itemsBuffer.push(paperDelivery);
+          }
         }
       } catch (error) {
-        console.error(error);
         console.error(
           `Failed to process delayed group ${groupKey}`,
           error
@@ -142,9 +135,14 @@ exports.importData = async (params = []) => {
 async function processBatch(paperDeliveryTableName, countersTableName, items, deliveryWeek) {
   const grouped = groupRecordsByProductAndProvince(items);
   const groupedBySenderPaId = groupRecordsBySenderPaId(items);
-  await batchWriteItems(paperDeliveryTableName, items);
+  const recordsToWrite = items.filter(record => !record.skipSenderLimit);
+
   await updateExcludeCounter(countersTableName, grouped, deliveryWeek);
   await updateSenderPriorityCounter(countersTableName, groupedBySenderPaId, deliveryWeek);
+
+  if (recordsToWrite.length > 0) {
+    await batchWriteItems(paperDeliveryTableName, recordsToWrite);
+  }
 }
 
 /**
@@ -192,7 +190,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
           );
     } else {
       filteredRecords = records.filter(
-        record => record.attempt && parseInt(record.attempt, 10) === 1 && record.communicationType !== "INFORMAL"
+        record => (record.skipSenderLimit || record.attempt && parseInt(record.attempt, 10) === 1) && record.communicationType !== "INFORMAL"
       );
     }
 
@@ -241,7 +239,7 @@ async function updateExcludeCounter(countersTableName, excludeGroupedRecords, de
     }
 }
 
-async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdRecords, deliveryWeek) {  
+async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdRecords, deliveryWeek) {
     for (const [senderPaId, records] of Object.entries(groupedSenderPaIdRecords)) {
       const sk = `SENDER_PRIORITY~${senderPaId}`;
       try {
@@ -287,55 +285,122 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
       pk: `${senderPaId}~${productType}~${province}`,
       deliveryDate: notificationSentAtWeek
     };
-  
-    try {
-      const command = new GetCommand({
-        TableName: senderLimitTableName,
-        Key: key
-      });
-      const response = await docClient.send(command);
-      return response.Item || null;
-    } catch (error) {
-      console.error(`Failed to get sender limit for key: ${JSON.stringify(key)}`, error);
-      return null;
-    }
+
+    const command = new GetCommand({
+      TableName: senderLimitTableName,
+      Key: key
+    });
+
+    const response = await docClient.send(command);
+    return response.Item || null;
   }
 
-  async function updateDelayedCounter(countersTableName, deliveryWeek, notificationSentAtWeek, senderPaId, productType, province, numberOfShipments, weeklyEstimate) {
-    const sk = `DELAYED~${province}~${productType}~${senderPaId}~${notificationSentAtWeek}`;
-  
-    const input = {
-      TableName: countersTableName,
-      Key: {
-        pk: deliveryWeek,
-        sk: sk
-      },
-      UpdateExpression: 'ADD #numberOfShipments :numberOfShipments SET #notificationSentAtWeek = :notificationSentAtWeek, #weeklyEstimate = :weeklyEstimate',
-      ExpressionAttributeNames: {
-        '#numberOfShipments': 'numberOfShipments',
-        '#notificationSentAtWeek': 'notificationSentAtWeek',
-        '#weeklyEstimate': 'weeklyEstimate'
-      },
-      ExpressionAttributeValues: {
-        ':numberOfShipments': numberOfShipments,
-        ':notificationSentAtWeek': notificationSentAtWeek,
-        ':weeklyEstimate': weeklyEstimate
+  async function updateUsedSenderLimitAndInsertPaperDeliveries(
+    paperDeliveryTableName,
+    usedSenderLimitTableName,
+    groupRecords,
+    itemsBuffer,
+    deliveryWeek,
+    notificationSentAtWeek,
+    weeklyEstimate
+  ) {
+    for (const eventItem of groupRecords) {
+      const transactionalPaperDelivery = buildPaperDeliveryRecord(
+        eventItem,
+        deliveryWeek,
+        true,
+        true
+      );
+
+      const key = {
+        pk: `${eventItem.senderPaId}~${eventItem.productType}~${eventItem.province}`,
+        deliveryWeek: notificationSentAtWeek
+      };
+
+      const expressionAttributeNames = {
+        "#numberOfShipment": "numberOfShipment",
+        "#weeklyEstimate": "weeklyEstimate",
+        "#paId": "paId",
+        "#productType": "productType",
+        "#province": "province"
+      };
+
+      const expressionAttributeValues = {
+        ":one": 1,
+        ":weeklyEstimate": weeklyEstimate,
+        ":paId": eventItem.senderPaId,
+        ":productType": eventItem.productType,
+        ":province": eventItem.province
+      };
+
+      const setExpressions = [
+        "#weeklyEstimate = if_not_exists(#weeklyEstimate, :weeklyEstimate)",
+        "#paId = if_not_exists(#paId, :paId)",
+        "#productType = if_not_exists(#productType, :productType)",
+        "#province = if_not_exists(#province, :province)"
+      ];
+
+      try {
+        await docClient.send(
+          new TransactWriteCommand({
+            TransactItems: [
+              {
+                Update: {
+                  TableName: usedSenderLimitTableName,
+                  Key: key,
+                  UpdateExpression:
+                    `SET ${setExpressions.join(", ")} ` +
+                    "ADD #numberOfShipment :one",
+                  ConditionExpression:
+                    "attribute_not_exists(#numberOfShipment) OR #numberOfShipment < :weeklyEstimate",
+                  ExpressionAttributeNames: expressionAttributeNames,
+                  ExpressionAttributeValues: expressionAttributeValues
+                }
+              },
+              {
+                Put: {
+                  TableName: paperDeliveryTableName,
+                  Item: transactionalPaperDelivery
+                }
+              }
+            ]
+          })
+        );
+
+        itemsBuffer.push(transactionalPaperDelivery);
+      } catch (error) {
+        if (isUsedSenderLimitConditionFailure(error)) {
+          console.log(
+            `Sender limit reached for delayed PaperDelivery ${eventItem.requestId}`
+          );
+
+          itemsBuffer.push(
+            buildPaperDeliveryRecord(
+              eventItem,
+              deliveryWeek,
+              true,
+              false
+            )
+          );
+          continue;
+        }
+
+        console.error(`Failed transactional processing for ${eventItem.requestId}`, error);
+        throw error;
       }
-    };
-  
-    try {
-      const command = new UpdateCommand(input);
-      await docClient.send(command);
-      console.log(`Created/updated DELAYED counter for sk: ${sk}`);
-    } catch (error) {
-      console.error(`Failed to create DELAYED counter for sk: ${sk}`, error);
-      throw error;
     }
   }
 
-function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false) {
-  const skipSenderLimit = isRsOrSecondAttempt(payload);
-  const date = skipSenderLimit ? payload.prepareRequestDate : payload.notificationSentAt
+function isUsedSenderLimitConditionFailure(error) {
+  return (
+    error?.name === "TransactionCanceledException" &&
+    error?.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed"
+  );
+}
+
+function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
+  const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
+  const date = rsOrSecondAttempt ? payload.prepareRequestDate : payload.notificationSentAt
 
   const record = {
     pk: buildPk(deliveryWeek),
@@ -350,15 +415,18 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false) {
     cap: payload.cap,
     attempt: parseInt(payload.attempt, 10),
     iun: payload.iun,
+    unifiedDeliveryDriver: payload.unifiedDeliveryDriver,
+    tenderId: payload.tenderId,
+    recipientId: payload.recipientId,
     workflowStep: 'EVALUATE_SENDER_LIMIT',
     communicationType: payload.communicationType || 'LEGAL',
     senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
     deliveryDate: deliveryWeek,
     delayed: Boolean(delayed),
-    skipSenderLimit
+    skipSenderLimit: Boolean(skipSenderLimit)
   };
 
-  if (payload.senderPaId && !skipSenderLimit) {
+  if (payload.senderPaId && !rsOrSecondAttempt) {
     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
   }
 
