@@ -71,13 +71,13 @@ class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
         entity.setDeliveryDate(nextWeek);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000, 2000).block();
 
         int response = get(nextWeek);
         assert response != 0;
         Assertions.assertEquals(5, response);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000, 2000).block();
 
         int response2 = get(nextWeek);
         assert response2 != 0;

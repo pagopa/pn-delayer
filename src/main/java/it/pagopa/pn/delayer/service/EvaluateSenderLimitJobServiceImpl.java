@@ -56,8 +56,6 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      * <ol>
      *     <li>inizializzazione degli oggetti condivisi utilizzati durante il job;</li>
      *     <li>recupero dei contatori delle stime settimanali per i mittenti;</li>
-     *     <li>recupero dei contatori relativi alle spedizioni ritardate dal sistema e calcolo
-     *     della capacità residua già utilizzata nella settimana di competenza;</li>
      *     <li>recupero della capacità dei recapitisti per la provincia;</li>
      *     <li>lettura paginata delle spedizioni da elaborare e valutazione del
      *     limite garantito;</li>
@@ -76,9 +74,6 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
         senderLimitJobProcessObjects.setPriorityMap(getPriorityMap());
         return senderLimitUtils.retrieveTotalEstimateCounter(deliveryWeek, province)
                 .doOnNext(senderLimitJobProcessObjects::setTotalEstimateCounter)
-                .flatMap(_ -> senderLimitUtils.retrieveDelayedCounters(deliveryWeek, province))
-                .doOnNext(senderLimitJobProcessObjects::setDelayedCounters)
-                .flatMap(_ -> senderLimitUtils.getResidualCapacityForDelayed(senderLimitJobProcessObjects).thenReturn(senderLimitJobProcessObjects))
                 .flatMap(_ -> deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province))
                 .flatMap(driversTotalCapacities -> retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, new HashMap<>(), driversTotalCapacities, senderLimitJobProcessObjects))
                 .flatMap(processObj -> flushCounters(processObj.getSenderLimitMap()))
@@ -106,17 +101,18 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .collectList()
                 .filter(incrementUsedSenderLimitDtoList -> !CollectionUtils.isEmpty(incrementUsedSenderLimitDtoList))
                 .map(incrementUsedSenderLimitDtoList -> incrementUsedSenderLimitDtoList.stream()
-                        .collect(Collectors.groupingBy(incrementUsedSenderLimitDto -> String.join("#", incrementUsedSenderLimitDto.pk(), incrementUsedSenderLimitDto.senderLimit().toString(), incrementUsedSenderLimitDto.shipmentDate().toString()),
+                        .collect(Collectors.groupingBy(incrementUsedSenderLimitDto -> String.join("#", incrementUsedSenderLimitDto.pk(), incrementUsedSenderLimitDto.senderLimit().toString(), incrementUsedSenderLimitDto.weeklyEstimate().toString(), incrementUsedSenderLimitDto.shipmentDate().toString()),
                                 Collectors.summingLong(dto -> dto.increment() == null ? 0 : dto.increment())
                         )))
                 .map(Map::entrySet)
                 .flatMapIterable(entries -> entries)
                 .flatMap(entry -> {
-                    String[] keyParts = entry.getKey().split("#", 3);
+                    String[] keyParts = entry.getKey().split("#", 4);
                     String pk = keyParts[0];
                     Integer senderLimit = Integer.valueOf(keyParts[1]);
-                    LocalDate shipmentDate = LocalDate.parse(keyParts[2]);
-                    return paperDeliverySenderLimitDAO.updateUsedSenderLimit(pk, entry.getValue(), shipmentDate, senderLimit);
+                    Integer weeklyEstimate = Integer.valueOf(keyParts[2]);
+                    LocalDate shipmentDate = LocalDate.parse(keyParts[3]);
+                    return paperDeliverySenderLimitDAO.updateUsedSenderLimit(pk, entry.getValue(), shipmentDate, senderLimit, weeklyEstimate);
                 })
                 .then();
     }
@@ -125,7 +121,8 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
      * Elabora l'elenco delle spedizioni cartacee eseguendo le seguenti operazioni:
      * <ol>
      *     <li>recupera il driver unificato di recapito e lo assegna a ciascuna spedizione;</li>
-     *     <li>esclude dalla valutazione del sender limit le spedizioni di tipo RS e i secondi tentativi,
+     *     <li>esclude dalla valutazione del sender limit le spedizioni di tipo RS, i secondi tentativi e
+     *     i primi tentativi con skipSenderLimit == true,
      *     inoltrandole direttamente allo step {@code EVALUATE_DRIVER_CAPACITY};</li>
      *     <li>raggruppa le restanti spedizioni per tipologia di prodotto, mittente e provincia;</li>
      *     <li>calcola e valuta il sender limit per ciascun gruppo, classificando le spedizioni

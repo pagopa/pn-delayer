@@ -1,13 +1,11 @@
 package it.pagopa.pn.delayer.utils;
 
-import it.pagopa.pn.commons.exceptions.PnInternalException;
 import it.pagopa.pn.delayer.exception.InvalidSenderLimitException;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliverySenderLimitDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliverySenderLimit;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryUsedSenderLimit;
 import it.pagopa.pn.delayer.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,39 +48,6 @@ public class SenderLimitUtils {
                 .thenReturn(totalEstimateCounter);
     }
 
-    public Mono<List<PaperDeliveryCounter>> retrieveDelayedCounters(LocalDate deliveryWeek, String province) {
-        return paperDeliveryCounterDAO.getPaperDeliveryCounter(deliveryWeek.toString(), PaperDeliveryCounter.buildSk(PaperDeliveryCounter.SkPrefix.DELAYED,province), null)
-                .defaultIfEmpty(List.of());
-    }
-
-    /**
-     * Popola la mappa dei SenderLimitData per le spedizioni ritardate dal sistema,
-     * a partire dai contatori di tali spedizioni.
-     * <p>
-     * Le spedizioni vengono raggruppate in base alla settimana di spedizione
-     * originaria e, per ciascun gruppo, viene recuperata dal datastore la quota
-     * di sender limit già utilizzata. Tale valore costituisce la baseline dalla
-     * quale prosegue la valutazione del sender limit durante l'elaborazione
-     * corrente.
-     *
-     * @param senderLimitJobProcessObjects oggetti condivisi utilizzati durante il job
-     * @return oggetti di processo aggiornati con la capacità residua delle
-     * spedizioni ritardate
-     */
-    public Mono<SenderLimitJobProcessObjects> getResidualCapacityForDelayed(SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
-        List<PaperDeliveryCounter> counters = senderLimitJobProcessObjects.getDelayedCounters();
-        if (CollectionUtils.isEmpty(counters)) {
-            return Mono.just(senderLimitJobProcessObjects);
-        }
-
-        return Flux.fromIterable(counters)
-                .collectMultimap(PaperDeliveryCounter::getNotificationSentAtWeek)
-                .flatMapMany(groupedCounters -> Flux.fromIterable(groupedCounters.entrySet()))
-                .concatMap(entry -> buildResidualCapacity(entry.getKey(), List.copyOf(entry.getValue()), senderLimitJobProcessObjects))
-                .then(Mono.just(senderLimitJobProcessObjects));
-    }
-
-
     // metodo che recupera la counter SUM_ESTIMATES con fallback per retro-compatibilità sulla vecchia query
     // a causa del nuovo formato da BEGIN WITH sk = SUM_ESTIMATES~<province>~<product>~
     // a sk EQUALS SUM_ESTIMATES~<province>~<product>
@@ -104,9 +69,7 @@ public class SenderLimitUtils {
      * calcolato il limite garantito in funzione della capacità disponibile dei
      * driver e viene creata una nuova istanza di {@link SenderLimitData}.
      * <p>
-     * I sender già presenti nella mappa vengono ignorati. Questo comportamento è
-     * necessario per evitare di ricalcolare il sender limit dei mittenti già
-     * inizializzati durante la gestione delle spedizioni ritardate.
+     * I sender già presenti nella mappa vengono ignorati.
      *
      * @param shipmentDate settimana di spedizione di riferimento
      * @param driversTotalCapacity capacità dichiarata dei driver
@@ -197,71 +160,9 @@ public class SenderLimitUtils {
                             keyParts[1],
                             data.incrementUsedLimit(),
                             data.calculatedLimit(),
+                            data.weeklyEstimate(),
                             data.date()
                     );
                 });
-    }
-
-    /**
-     * Inizializza le informazioni relative al modulo commessa e alla quota mittente già utilizzata
-     * per le notifiche ritardate dal sistema per una specifica settimana di riferimento.
-     * <p>
-     * Per ciascun mittente vengono recuperate:
-     * <ul>
-     *     <li>la stima settimanale dal contatore delle spedizioni ritardate;</li>
-     *     <li>la quota mittente già utilizzata nella settimana di riferimento,
-     *     recuperata dal datastore.</li>
-     * </ul>
-     * La quota già utilizzata costituisce la baseline da cui ripartire durante la
-     * valutazione corrente, evitando di riconsiderare come disponibili quote di
-     * sender limit già consumate in precedenti esecuzioni dell'algoritmo.
-     * <p>
-     * Se per un mittente non è presente alcun record persistito, la baseline viene
-     * inizializzata a {@code 0}.
-     *
-     * @param notificationSentAtWeek settimana di spedizione originaria
-     * @param counters contatori delle spedizioni ritardate appartenenti alla settimana
-     * @param senderLimitJobProcessObjects oggetti condivisi utilizzati durante il job
-     * @return completamento dell'inizializzazione delle informazioni di sender limit
-     */
-    private Mono<Void> buildResidualCapacity(String notificationSentAtWeek, List<PaperDeliveryCounter> counters, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
-        if (CollectionUtils.isEmpty(counters)) {
-            return Mono.empty();
-        }
-        LocalDate sentAtWeek = LocalDate.parse(notificationSentAtWeek);
-        List<String> senderLimitKeys = counters.stream()
-                .map(PaperDeliveryCounter::getSk)
-                .map(this::extractSk)
-                .distinct()
-                .toList();
-
-        return paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(senderLimitKeys, sentAtWeek)
-                .collectMap(PaperDeliveryUsedSenderLimit::getPk, item -> Optional.ofNullable(item.getNumberOfShipment()).orElse(0))
-                .doOnNext(usedCapacityBySender -> {
-                    for (PaperDeliveryCounter counter : counters) {
-                        String senderLimitKey = extractSk(counter.getSk());
-                        int weeklyEstimate = Objects.requireNonNullElse(counter.getWeeklyEstimate(), 0);
-                        int baselineUsedLimit = usedCapacityBySender.getOrDefault(senderLimitKey, 0);
-                        String resultKey = String.join("~", notificationSentAtWeek, senderLimitKey);
-                        senderLimitJobProcessObjects.getSenderLimitMap().put(resultKey,
-                                SenderLimitData.initialWithBaseline(
-                                        weeklyEstimate,
-                                        baselineUsedLimit,
-                                        sentAtWeek
-                                ));
-                    }
-                })
-                .then();
-    }
-
-    private String extractSk(String sk) {
-        String[] parts = sk.split("~", -1);
-        if (parts.length < 4) {
-            throw new PnInternalException("Invalid PaperDeliveryCounter sk: " + sk,"INVALID USEDSENDERLIMIT_SK");
-        }
-        String province = parts[1];
-        String productType = parts[2];
-        String senderPaId = parts[3];
-        return String.join("~", senderPaId, productType, province);
     }
 }
