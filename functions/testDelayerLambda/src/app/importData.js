@@ -314,7 +314,7 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
 
       const key = {
         pk: `${eventItem.senderPaId}~${eventItem.productType}~${eventItem.province}`,
-        deliveryWeek: notificationSentAtWeek
+        deliveryDate: notificationSentAtWeek
       };
 
       const expressionAttributeNames = {

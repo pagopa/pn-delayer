@@ -17,6 +17,13 @@ const counterTableName = process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE;
 const senderLimitTableName = process.env.KINESIS_PAPERDELIVERY_SENDERLIMITTABLE;
 const paperDeliveryTableName = process.env.KINESIS_PAPERDELIVERY_TABLE;
 const usedSenderLimitTableName = process.env.KINESIS_PAPERDELIVERY_USEDSENDERLIMITTABLE;
+const eventTableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
+
+const TRANSACTION_INDEX = {
+  EVENT_IDEMPOTENCY: 0,
+  USED_SENDER_LIMIT: 1,
+  PAPER_DELIVERY: 2
+};
 
 function calculateTtl(){
   const ttlDays = parseInt(process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS, 10) || 14;
@@ -180,10 +187,14 @@ async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFai
 }
 
 async function batchWriteKinesisEventRecords(eventRecords) {
-  const tableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
+  if (!eventRecords || eventRecords.length === 0) {
+      console.log("No Kinesis event records to write");
+      return;
+  }
+
   const params = {
     RequestItems: {
-      [tableName]: eventRecords.map(record => ({
+      [eventTableName]: eventRecords.map(record => ({
         PutRequest: { Item: record }
       }))
     }
@@ -193,10 +204,9 @@ async function batchWriteKinesisEventRecords(eventRecords) {
 }
 
 async function batchGetKinesisEventRecords(keys) {
-  const tableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
   const params = {
     RequestItems: {
-      [tableName]: {
+      [eventTableName]: {
         Keys: keys.map(key => (
             {
               requestId: key
@@ -250,7 +260,12 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
 
     const key = {
       pk: `${eventItem.senderPaId}~${eventItem.productType}~${eventItem.recipientNormalizedAddress.pr}`,
-      deliveryWeek: notificationSentAtWeek
+      deliveryDate: notificationSentAtWeek
+    };
+
+    const eventRecord = {
+      requestId: eventItem.requestId,
+      ttl: calculateTtl()
     };
 
     const expressionAttributeNames = {
@@ -281,6 +296,13 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
         new TransactWriteCommand({
           TransactItems: [
             {
+              Put: {
+                TableName: eventTableName,
+                Item: eventRecord,
+                ConditionExpression: "attribute_not_exists(requestId)"
+              }
+            },
+            {
               Update: {
                 TableName: usedSenderLimitTableName,
                 Key: key,
@@ -296,7 +318,8 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
             {
               Put: {
                 TableName: paperDeliveryTableName,
-                Item: transactionalPaperDelivery.entity
+                Item: transactionalPaperDelivery.entity,
+                ConditionExpression: 'attribute_not_exists(requestId)',
               }
             }
           ]
@@ -304,6 +327,10 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
       );
       paperDeliveryRecords.push(transactionalPaperDelivery);
     } catch (error) {
+      if(isEventTableConditionalCheckFailed(error)) {
+        console.log(`Duplicate requestId ${eventItem.requestId} found in event table. Skipping processing.`);
+        continue;
+      }
       if (isUsedSenderLimitConditionFailure(error)) {
         console.log(`Sender limit reached for delayed PaperDelivery ${eventItem.requestId}`);
         paperDeliveryRecords.push({
@@ -326,7 +353,14 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
 function isUsedSenderLimitConditionFailure(error) {
   return (
     error?.name === "TransactionCanceledException" &&
-    error?.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed"
+    error?.CancellationReasons?.[TRANSACTION_INDEX.USED_SENDER_LIMIT]?.Code === "ConditionalCheckFailed"
+  );
+}
+
+function isEventTableConditionalCheckFailed(error) {
+  return (
+    error?.name === "TransactionCanceledException" &&
+    error?.CancellationReasons?.[TRANSACTION_INDEX.EVENT_IDEMPOTENCY]?.Code === "ConditionalCheckFailed"
   );
 }
 

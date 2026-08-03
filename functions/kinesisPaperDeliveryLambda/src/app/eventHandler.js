@@ -23,14 +23,51 @@ exports.handleEvent = async event => {
   console.log("Event received:", JSON.stringify(event));
 
   const kinesisData = extractKinesisData(event);
+
   if (!kinesisData?.length) {
     console.log("No events to process");
     return { batchItemFailures: [] };
   }
 
-  const filteredData = filterInvalidRecords(kinesisData);
+  let filteredData = filterInvalidRecords(kinesisData);
+
   if (!filteredData.length) {
     console.log("No valid events to process");
+    return { batchItemFailures: [] };
+  }
+
+  try {
+    const requestIdsToCheck = filteredData.map(
+      record => record.requestId
+    );
+
+    const alreadyEvaluatedEvents = await batchGetKinesisEventRecords(requestIdsToCheck);
+
+    if (alreadyEvaluatedEvents.length > 0) {
+      const alreadyEvaluatedRequestIds = new Set(alreadyEvaluatedEvents);
+      console.log(`Skipping ${alreadyEvaluatedEvents.length} already evaluated events`);
+      filteredData = filteredData.filter(
+        record =>
+          !alreadyEvaluatedRequestIds.has(record.requestId)
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Failed to check already evaluated events",
+      error
+    );
+
+    return {
+      batchItemFailures: uniqueFailures(
+        filteredData.map(record => ({
+          itemIdentifier: record.kinesisSeqNumber
+        }))
+      )
+    };
+  }
+
+  if (filteredData.length === 0) {
+    console.log("All events were already processed");
     return { batchItemFailures: [] };
   }
 
@@ -79,19 +116,42 @@ exports.handleEvent = async event => {
    * Per ogni gruppo viene cercato il relativo sender limit.
    */
   if (delayedPaperDeliveryList.length > 0) {
-    console.log(`Processing ${delayedPaperDeliveryList.length} delayed records`);
+    console.log(
+      `Processing ${delayedPaperDeliveryList.length} delayed records`
+    );
 
-    const groupedDelayedRecords = groupDelayedRecords(delayedPaperDeliveryList);
+    const groupedDelayedRecords =
+      groupDelayedRecords(delayedPaperDeliveryList);
 
-    for (const [groupKey, groupRecords] of Object.entries(groupedDelayedRecords)) {
+    for (
+      const [groupKey, groupRecords]
+      of Object.entries(groupedDelayedRecords)
+    ) {
       console.log(`Processing delayed group: ${groupKey}`);
 
-      const [notificationSentAtWeek, senderPaId, productType, province] = groupKey.split("~");
+      const [
+        notificationSentAtWeek,
+        senderPaId,
+        productType,
+        province
+      ] = groupKey.split("~");
+
       try {
-        const senderLimitItem = await getSenderLimit(senderPaId, productType, province, notificationSentAtWeek);
-        const hasSenderLimit = senderLimitItem?.weeklyEstimate > 0;
+        const senderLimitItem = await getSenderLimit(
+          senderPaId,
+          productType,
+          province,
+          notificationSentAtWeek
+        );
+
+        const hasSenderLimit =
+          senderLimitItem?.weeklyEstimate > 0;
+
         if (hasSenderLimit) {
-          console.log(`Found sender limit for ${groupKey}: ${senderLimitItem.weeklyEstimate}`);
+          console.log(
+            `Found sender limit for ${groupKey}: ${senderLimitItem.weeklyEstimate}`
+          );
+
           await updateUsedSenderLimitAndInsertPaperDeliveries(
             groupRecords,
             paperDeliveryRecords,
@@ -99,11 +159,17 @@ exports.handleEvent = async event => {
             senderLimitItem.weeklyEstimate
           );
 
-          console.log(`Updated used sender limit and inserted PaperDeliveries for delayed group ${groupKey}`);
+          console.log(
+            `Updated used sender limit and inserted PaperDeliveries for delayed group ${groupKey}`
+          );
+
           continue;
         }
 
-        console.log(`No valid sender limit found for delayed group ${groupKey}`);
+        console.log(
+          `No valid sender limit found for delayed group ${groupKey}`
+        );
+
         addPaperDeliveryRecords({
           eventItems: groupRecords,
           deliveryWeek,
@@ -113,48 +179,20 @@ exports.handleEvent = async event => {
           paperDeliveryRecords
         });
       } catch (error) {
-        console.error(`Failed to process delayed group ${groupKey}`,error);
+        console.error(
+          `Failed to process delayed group ${groupKey}`,
+          error
+        );
 
         batchItemFailures.push(
           ...groupRecords.map(item => ({
             itemIdentifier: item.kinesisSeqNumber
           }))
         );
-        batchItemFailures = uniqueFailures(batchItemFailures);
+
+        batchItemFailures =
+          uniqueFailures(batchItemFailures);
       }
-    }
-  }
-
-  /*
-   * Verifica dei record già elaborati.
-   */
-  if (paperDeliveryRecords.length > 0) {
-    try {
-      const requestIdsToCheck = paperDeliveryRecords.map(
-        record => record.entity.requestId
-      );
-
-      const alreadyEvaluatedEvents =await batchGetKinesisEventRecords(requestIdsToCheck);
-
-      if (alreadyEvaluatedEvents.length > 0) {
-        const alreadyEvaluatedRequestIds = new Set(alreadyEvaluatedEvents);
-        console.log(`Skipping ${alreadyEvaluatedEvents.length} already evaluated events`);
-        paperDeliveryRecords = paperDeliveryRecords.filter(
-          record =>
-            !alreadyEvaluatedRequestIds.has(record.entity.requestId)
-        );
-      }
-    } catch (error) {
-      console.error("Failed to check already evaluated events", error);
-
-      batchItemFailures.push(
-        ...paperDeliveryRecords.map(record => ({
-          itemIdentifier: record.kinesisSeqNumber
-        }))
-      );
-
-      batchItemFailures = uniqueFailures(batchItemFailures);
-      paperDeliveryRecords = [];
     }
   }
 
@@ -183,7 +221,9 @@ exports.handleEvent = async event => {
     {
       func: batchWritePaperDeliveryRecords,
       getData: records =>
-        records.filter(record => !record.entity.skipSenderLimit)
+        records.filter(
+          record => !record.entity.skipSenderLimit
+        )
     }
   ];
 
@@ -192,7 +232,9 @@ exports.handleEvent = async event => {
       break;
     }
 
-    const operationData = operation.getData(paperDeliveryRecords);
+    const operationData =
+      operation.getData(paperDeliveryRecords);
+
     if (isEmptyOperationData(operationData)) {
       continue;
     }
@@ -215,7 +257,8 @@ exports.handleEvent = async event => {
       );
     }
 
-    batchItemFailures = uniqueFailures(batchItemFailures);
+    batchItemFailures =
+      uniqueFailures(batchItemFailures);
 
     paperDeliveryRecords = filterFailedRecords(
       paperDeliveryRecords,
@@ -233,18 +276,24 @@ exports.handleEvent = async event => {
     );
 
     return {
-      batchItemFailures: uniqueFailures(batchItemFailures)
+      batchItemFailures:
+        uniqueFailures(batchItemFailures)
     };
   }
 
-  const kinesisEventRecords = paperDeliveryRecords.map(record =>
-    buildPaperDeliveryKinesisEventRecord(
-      record.entity.requestId
-    )
-  );
+  const kinesisEventRecords =
+    paperDeliveryRecords
+    .filter(record => !record.entity.skipSenderLimit)
+    .map(record =>
+      buildPaperDeliveryKinesisEventRecord(
+        record.entity.requestId
+      )
+    );
 
   try {
-    await batchWriteKinesisEventRecords(kinesisEventRecords);
+    await batchWriteKinesisEventRecords(
+      kinesisEventRecords
+    );
 
     console.log(
       `Processed ${paperDeliveryRecords.length} records successfully`
@@ -263,7 +312,8 @@ exports.handleEvent = async event => {
   }
 
   return {
-    batchItemFailures: uniqueFailures(batchItemFailures)
+    batchItemFailures:
+      uniqueFailures(batchItemFailures)
   };
 };
 
@@ -289,11 +339,16 @@ function addPaperDeliveryRecords({
 
 function filterFailedRecords(records, failures) {
   const failedIdentifiers = new Set(
-    failures.map(failure => failure.itemIdentifier)
+    failures.map(
+      failure => failure.itemIdentifier
+    )
   );
 
   return records.filter(
-    record => !failedIdentifiers.has(record.kinesisSeqNumber)
+    record =>
+      !failedIdentifiers.has(
+        record.kinesisSeqNumber
+      )
   );
 }
 

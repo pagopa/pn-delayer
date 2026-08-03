@@ -59,7 +59,7 @@ function getCurrentWeek() {
   return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
 }
 
-function isRsOrSecondAttempt(payload, skipSenderLimit) {
+function isRsOrSecondAttempt(payload) {
   return payload.productType === 'RS' || (payload.attempt && parseInt(payload.attempt, 10) === 1);
 }
 
