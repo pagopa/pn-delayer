@@ -471,7 +471,8 @@ describe("eventHandler.handleEvent", () => {
       [sinon.match.object],
       sinon.match.array,
       "2025-05-19",
-      10
+      10,
+      []
     )).to.equal(true);
     expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
     expect(batchWriteKinesisEventRecordsStub.calledOnce).to.equal(true);

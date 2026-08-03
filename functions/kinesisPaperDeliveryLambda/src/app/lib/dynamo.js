@@ -240,7 +240,7 @@ async function getSenderLimit(senderPaId, productType, province, notificationSen
   return response.Item || null;
 }
 
-async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paperDeliveryRecords, notificationSentAtWeek, weeklyEstimate) {
+async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paperDeliveryRecords, notificationSentAtWeek, weeklyEstimate, batchItemFailures) {
   const deliveryWeek = getDeliveryWeek();
   for (const eventItem of groupRecords) {
     /*
@@ -344,7 +344,10 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
         continue;
       }
       console.error(`Failed transactional processing for ${eventItem.requestId}`, error);
-      throw error;
+      batchItemFailures.push({
+        itemIdentifier: eventItem.kinesisSeqNumber
+      });
+      continue
     }
   }
 }

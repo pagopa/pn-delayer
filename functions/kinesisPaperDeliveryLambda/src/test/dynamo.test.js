@@ -570,7 +570,8 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
       [eventItem],
       [],
       '2025-05-19',
-      7
+      7,
+      []
     );
 
     const update = mockSend.firstCall.args[0].params.TransactItems[1].Update;
@@ -597,7 +598,8 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
       [eventItem],
       paperDeliveryRecords,
       '2025-05-19',
-      10
+      10,
+      []
     );
 
     expect(buildPaperDeliveryRecordStub.callCount).to.equal(2);
@@ -634,52 +636,57 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
   it('does not treat a conditional failure on the Put as sender limit exhaustion', async () => {
     const eventItem = buildEvent();
     const paperDeliveryRecords = [];
-    const cancellation = Object.assign(new Error('conditional failure'), {
-      name: 'TransactionCanceledException',
-      CancellationReasons: [
-        { Code: 'None' },
-        { Code: 'None' },
-        { Code: 'ConditionalCheckFailed' }
-      ]
-    });
+    const batchItemFailures = [];
+
+    const cancellation = Object.assign(
+      new Error('conditional failure'),
+      {
+        name: 'TransactionCanceledException',
+        CancellationReasons: [
+          { Code: 'None' },
+          { Code: 'None' },
+          { Code: 'ConditionalCheckFailed' }
+        ]
+      }
+    );
+
     mockSend.rejects(cancellation);
 
-    let thrown;
-    try {
-      await dynamo.updateUsedSenderLimitAndInsertPaperDeliveries(
-        [eventItem],
-        paperDeliveryRecords,
-        '2025-05-19',
-        10
-      );
-    } catch (error) {
-      thrown = error;
-    }
+    await dynamo.updateUsedSenderLimitAndInsertPaperDeliveries(
+      [eventItem],
+      paperDeliveryRecords,
+      '2025-05-19',
+      10,
+      batchItemFailures
+    );
 
-    expect(thrown).to.equal(cancellation);
+    expect(batchItemFailures).to.deep.equal([
+      { itemIdentifier: 'seq1' }
+    ]);
+
     expect(paperDeliveryRecords).to.deep.equal([]);
     expect(buildPaperDeliveryRecordStub.calledOnce).to.equal(true);
   });
 
-  it('propagates technical transaction errors', async () => {
+  it('adds technical transaction errors to batchItemFailures', async () => {
     const eventItem = buildEvent();
     const paperDeliveryRecords = [];
+    const batchItemFailures = [];
+
     mockSend.rejects(new Error('DynamoDB unavailable'));
 
-    let thrown;
-    try {
-      await dynamo.updateUsedSenderLimitAndInsertPaperDeliveries(
-        [eventItem],
-        paperDeliveryRecords,
-        '2025-05-19',
-        10
-      );
-    } catch (error) {
-      thrown = error;
-    }
+    await dynamo.updateUsedSenderLimitAndInsertPaperDeliveries(
+      [eventItem],
+      paperDeliveryRecords,
+      '2025-05-19',
+      10,
+      batchItemFailures
+    );
 
-    expect(thrown).to.be.instanceOf(Error);
-    expect(thrown.message).to.equal('DynamoDB unavailable');
+    expect(batchItemFailures).to.deep.equal([
+      { itemIdentifier: 'seq1' }
+    ]);
+
     expect(paperDeliveryRecords).to.deep.equal([]);
   });
 
@@ -698,7 +705,8 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
       [firstEvent, secondEvent],
       paperDeliveryRecords,
       '2025-05-19',
-      10
+      10,
+      []
     );
 
     expect(mockSend.callCount).to.equal(2);
@@ -734,7 +742,8 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
       [firstEvent, secondEvent],
       paperDeliveryRecords,
       '2025-05-19',
-      10
+      10,
+      []
     );
 
     expect(mockSend.callCount).to.equal(2);

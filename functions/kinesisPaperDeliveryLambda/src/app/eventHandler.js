@@ -156,7 +156,8 @@ exports.handleEvent = async event => {
             groupRecords,
             paperDeliveryRecords,
             notificationSentAtWeek,
-            senderLimitItem.weeklyEstimate
+            senderLimitItem.weeklyEstimate,
+            batchItemFailures
           );
 
           console.log(
@@ -189,9 +190,6 @@ exports.handleEvent = async event => {
             itemIdentifier: item.kinesisSeqNumber
           }))
         );
-
-        batchItemFailures =
-          uniqueFailures(batchItemFailures);
       }
     }
   }
@@ -256,9 +254,6 @@ exports.handleEvent = async event => {
         }))
       );
     }
-
-    batchItemFailures =
-      uniqueFailures(batchItemFailures);
 
     paperDeliveryRecords = filterFailedRecords(
       paperDeliveryRecords,
