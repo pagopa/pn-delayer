@@ -1535,7 +1535,7 @@ describe("Lambda Delayer Dispatcher", () => {
             assert.strictEqual(update.TableName, "pn-PaperDeliveryUsedSenderLimit");
             assert.deepStrictEqual(update.Key, {
                 pk: "sender1~AR~RM",
-                deliveryWeek: "1969-12-29"
+                deliveryDate: "1969-12-29"
             });
             assert.strictEqual(
                 update.ConditionExpression,
