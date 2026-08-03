@@ -26,9 +26,9 @@ public class PnDelayerUtils {
     /**
      * This method calculates the start day of the delivery week based on the execution batch start date.
      */
-    public LocalDate calculateDeliveryWeek(Instant date) {
-        LocalDate localDate = date.atZone(ZoneOffset.UTC).toLocalDate();
-        return localDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(pnDelayerConfig.getDeliveryDateDayOfWeek())));
+    public LocalDate calculateDeliveryWeek(Instant startExcutionBatch) {
+        LocalDate startDate = startExcutionBatch.atZone(ZoneOffset.UTC).toLocalDate();
+        return startDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.of(pnDelayerConfig.getDeliveryDateDayOfWeek())));
     }
 
     public Map<String, List<PaperDelivery>> groupByCap(List<PaperDelivery> paperDeliveries) {
@@ -136,20 +136,16 @@ public class PnDelayerUtils {
             paperDelivery.setSkipSenderLimit(false);
             return paperDelivery;
         }
-        if (paperDelivery.isDelayed() && paperDelivery.getPreviousStep() == null) {
-            applyWeeklySenderLimit(paperDelivery, processObjects, calculateDeliveryWeek(Instant.parse(paperDelivery.getNotificationSentAt())).toString(), isResidual);
-            return paperDelivery;
-        }
-        applyWeeklySenderLimit(paperDelivery, processObjects, deliveryWeek.minusWeeks(1).toString(), isResidual);
+        evaluateAndSetSkipSenderLimitFlag(paperDelivery, processObjects, deliveryWeek.minusWeeks(1).toString(), isResidual);
         return paperDelivery;
     }
 
-    private void applyWeeklySenderLimit(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, String shipmentDate, boolean isResidual) {
+    private void evaluateAndSetSkipSenderLimitFlag(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, String shipmentDate, boolean isResidual) {
         String key = String.join("~", shipmentDate, paperDelivery.getSenderPaId(), paperDelivery.getProductType(), paperDelivery.getProvince());
         Map<String, SenderLimitData> senderLimitMap = processObjects.getSenderLimitMap();
         SenderLimitData limitData = senderLimitMap.get(key);
         if (Objects.nonNull(limitData) && limitData.weeklyEstimate() > 0) {
-            int availableLimit = limitData.weeklyEstimate() - limitData.totalUsedLimit();
+            int availableLimit = limitData.weeklyEstimate() - limitData.incrementUsedLimit();
             boolean hasAvailableLimit = availableLimit > 0;
             paperDelivery.setSkipSenderLimit(hasAvailableLimit);
             if (hasAvailableLimit && isResidual) {

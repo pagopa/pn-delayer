@@ -10,18 +10,15 @@ import java.util.Objects;
  * @param weeklyEstimate stima settimanale derivante dal modulo commessa del mittente
  * @param calculatedLimit limite garantito calcolato per il mittente in funzione della capacità di recapito disponibile
  *                        nella provincia per la settimana di riferimento
- * @param baselineUsedLimit quota del sender limit già utilizzata dal mittente e persistita
- *                          in precedenti esecuzioni dell'algoritmo
  * @param incrementUsedLimit quota del sender limit utilizzata dal mittente durante l'esecuzione corrente
  *                           dell'algoritmo e non ancora persistita
  * @param date settimana di riferimento del sender limit
  */
-public record SenderLimitData(Integer weeklyEstimate, Integer calculatedLimit, Integer baselineUsedLimit, Integer incrementUsedLimit, LocalDate date) {
+public record SenderLimitData(Integer weeklyEstimate, Integer calculatedLimit, Integer incrementUsedLimit, LocalDate date) {
 
     public SenderLimitData {
         weeklyEstimate = Objects.requireNonNullElse(weeklyEstimate, 0);
         calculatedLimit = Objects.requireNonNullElse(calculatedLimit, 0);
-        baselineUsedLimit = Objects.requireNonNullElse(baselineUsedLimit, 0);
         incrementUsedLimit = Objects.requireNonNullElse(incrementUsedLimit, 0);
     }
 
@@ -30,9 +27,9 @@ public record SenderLimitData(Integer weeklyEstimate, Integer calculatedLimit, I
      * <p>
      * Viene utilizzata per le spedizioni elaborate nella settimana di competenza,
      * per le quali non è necessario recuperare una quota di sender limit già
-     * utilizzata da precedenti esecuzioni dell'algoritmo. In questo caso sia la
-     * quota già persistita ({@code baselineUsedLimit}) sia quella accumulata durante
-     * l'elaborazione corrente ({@code incrementUsedLimit}) vengono inizializzate a zero.
+     * utilizzata da precedenti esecuzioni dell'algoritmo. In questo caso la
+     * quota accumulata durante l'elaborazione corrente
+     * ({@code incrementUsedLimit}) viene inizializzata a zero.
      *
      * @param weeklyEstimate stima settimanale derivante dal modulo commessa del mittente
      * @param calculatedLimit limite garantito calcolato per il mittente per la settimana di riferimento
@@ -40,41 +37,7 @@ public record SenderLimitData(Integer weeklyEstimate, Integer calculatedLimit, I
      * @return una nuova istanza inizializzata per il flusso standard
      */
     public static SenderLimitData initial(Integer weeklyEstimate, Integer calculatedLimit, LocalDate date) {
-        return new SenderLimitData(weeklyEstimate, calculatedLimit, 0, 0, date);
-    }
-
-    /**
-     * Crea un'istanza iniziale valorizzando anche la quota di sender limit già
-     * utilizzata dal mittente.
-     * <p>
-     * Questo metodo viene utilizzato per le spedizioni che arrivano in ritardo al
-     * Delayer rispetto alla settimana di competenza. In questi casi il processo non
-     * può partire da una situazione iniziale "vuota", ma deve recuperare dal datastore
-     * la quota di sender limit già utilizzata nella settimana di riferimento e
-     * continuare ad accumulare gli utilizzi prodotti dall'elaborazione corrente.
-     *
-     * @param weeklyEstimate stima settimanale derivante dal modulo commessa del mittente
-     * @param baselineUsedLimit quota del sender limit già utilizzata dal mittente e
-     *                          persistita in precedenti esecuzioni dell'algoritmo
-     * @param date settimana di riferimento
-     * @return una nuova istanza inizializzata con la baseline recuperata
-     */
-    public static SenderLimitData initialWithBaseline(Integer weeklyEstimate, Integer baselineUsedLimit, LocalDate date) {
-        return new SenderLimitData(weeklyEstimate, null, baselineUsedLimit, 0, date);
-    }
-
-
-    /**
-     * Restituisce il numero totale di spedizioni utilizzate.
-     * <p>
-     * Il valore è dato dalla somma delle spedizioni già presenti a sistema
-     * ({@code baselineUsedLimit}) e di quelle accumulate durante
-     * l'elaborazione corrente ({@code incrementUsedLimit}).
-     *
-     * @return numero totale di spedizioni utilizzate
-     */
-    public int totalUsedLimit() {
-        return baselineUsedLimit + incrementUsedLimit;
+        return new SenderLimitData(weeklyEstimate, calculatedLimit, 0, date);
     }
 
     /**
@@ -89,7 +52,7 @@ public record SenderLimitData(Integer weeklyEstimate, Integer calculatedLimit, I
      * @return capacità residua disponibile
      */
     public int availableLimit() {
-        return Math.max(calculatedLimit - totalUsedLimit(), 0);
+        return Math.max(calculatedLimit - incrementUsedLimit, 0);
     }
 
     /**
@@ -110,7 +73,6 @@ public record SenderLimitData(Integer weeklyEstimate, Integer calculatedLimit, I
         return new SenderLimitData(
                 weeklyEstimate,
                 calculatedLimit,
-                baselineUsedLimit,
                 incrementUsedLimit + quantity,
                 date
         );

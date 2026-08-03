@@ -4,16 +4,26 @@ const {
   BatchGetCommand,
   GetCommand,
   UpdateCommand,
-  DynamoDBDocumentClient
+  DynamoDBDocumentClient,
+  TransactWriteCommand
 } = require("@aws-sdk/lib-dynamodb");
 const {
-  getDeliveryWeek
+  getDeliveryWeek,
+  buildPaperDeliveryRecord
 } = require("./utils");
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 const counterTableName = process.env.KINESIS_PAPERDELIVERY_COUNTERTABLE;
 const senderLimitTableName = process.env.KINESIS_PAPERDELIVERY_SENDERLIMITTABLE;
 const paperDeliveryTableName = process.env.KINESIS_PAPERDELIVERY_TABLE;
+const usedSenderLimitTableName = process.env.KINESIS_PAPERDELIVERY_USEDSENDERLIMITTABLE;
+const eventTableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
+
+const TRANSACTION_INDEX = {
+  EVENT_IDEMPOTENCY: 0,
+  USED_SENDER_LIMIT: 1,
+  PAPER_DELIVERY: 2
+};
 
 function calculateTtl(){
   const ttlDays = parseInt(process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS, 10) || 14;
@@ -36,7 +46,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
             );
         } else {
           filteredRecords = records.filter(
-            record => record.entity.attempt && parseInt(record.entity.attempt, 10) === 1 && record.entity.communicationType !== "INFORMAL"
+            record => (record.entity.skipSenderLimit || record.entity.attempt && parseInt(record.entity.attempt, 10) === 1) && record.entity.communicationType !== "INFORMAL"
           );
         }
 
@@ -48,7 +58,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
 }
 
 async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
-   
+
     const deliveryDate = getDeliveryWeek();
     let ttl = calculateTtl();
     let counterMap = retrieveCounterMap(excludeGroupedRecords);
@@ -159,7 +169,7 @@ async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFai
       console.log(`Unprocessed items: ${writeRequests.length}`);
       for (const writeRequest of writeRequests) {
         const unprocessedEntity = writeRequest.PutRequest.Item;
-        const failedRecord = paperDeliveryRecords.find(record => record.entity.sk === unprocessedEntity.sk.S);
+        const failedRecord = paperDeliveryRecords.find(record => record.entity.sk === unprocessedEntity.sk);
         if (failedRecord) {
           failedIDs.push(failedRecord.kinesisSeqNumber);
         }
@@ -177,10 +187,14 @@ async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFai
 }
 
 async function batchWriteKinesisEventRecords(eventRecords) {
-  const tableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
+  if (!eventRecords || eventRecords.length === 0) {
+      console.log("No Kinesis event records to write");
+      return { UnprocessedItems: {} };
+  }
+
   const params = {
     RequestItems: {
-      [tableName]: eventRecords.map(record => ({
+      [eventTableName]: eventRecords.map(record => ({
         PutRequest: { Item: record }
       }))
     }
@@ -190,10 +204,9 @@ async function batchWriteKinesisEventRecords(eventRecords) {
 }
 
 async function batchGetKinesisEventRecords(keys) {
-  const tableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
   const params = {
     RequestItems: {
-      [tableName]: {
+      [eventTableName]: {
         Keys: keys.map(key => (
             {
               requestId: key
@@ -204,7 +217,7 @@ async function batchGetKinesisEventRecords(keys) {
   };
   const command = new BatchGetCommand(params);
   return await docClient.send(command).then(response => {
-    const items = response.Responses[tableName];
+    const items = response.Responses[eventTableName];
     if (!items || items.length === 0) {
       return [];
     }
@@ -218,50 +231,141 @@ async function getSenderLimit(senderPaId, productType, province, notificationSen
     deliveryDate: notificationSentAtWeek
   };
 
-  try {
-    const command = new GetCommand({
-      TableName: senderLimitTableName,
-      Key: key
-    });
-    const response = await docClient.send(command);
-    return response.Item || null;
-  } catch (error) {
-    console.error(`Failed to get sender limit for key: ${JSON.stringify(key)}`, error);
-    return null;
-  }
+  const command = new GetCommand({
+    TableName: senderLimitTableName,
+    Key: key
+  });
+
+  const response = await docClient.send(command);
+  return response.Item || null;
 }
 
-async function updateDelayedCounter(deliveryWeek, notificationSentAtWeek, senderPaId, productType, province, numberOfShipments, weeklyEstimate) {
-  const sk = `DELAYED~${province}~${productType}~${senderPaId}~${notificationSentAtWeek}`;
+async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paperDeliveryRecords, notificationSentAtWeek, weeklyEstimate, batchItemFailures) {
+  const deliveryWeek = getDeliveryWeek();
+  for (const eventItem of groupRecords) {
+    /*
+     * Il record inserito nella transazione viene marcato con
+     * skipSenderLimit = true perché la scrittura PaperDelivery
+     * avviene già all'interno della TransactWrite.
+     */
+    const transactionalPaperDelivery = {
+      entity: buildPaperDeliveryRecord(
+        eventItem,
+        deliveryWeek,
+        true,
+        true
+      ),
+      kinesisSeqNumber: eventItem.kinesisSeqNumber
+    };
 
-  const input = {
-    TableName: counterTableName,
-    Key: {
-      pk: deliveryWeek,
-      sk: sk
-    },
-    UpdateExpression: 'ADD #numberOfShipments :numberOfShipments SET #notificationSentAtWeek = :notificationSentAtWeek, #weeklyEstimate = :weeklyEstimate',
-    ExpressionAttributeNames: {
-      '#numberOfShipments': 'numberOfShipments',
-      '#notificationSentAtWeek': 'notificationSentAtWeek',
-      '#weeklyEstimate': 'weeklyEstimate'
-    },
-    ExpressionAttributeValues: {
-      ':numberOfShipments': numberOfShipments,
-      ':notificationSentAtWeek': notificationSentAtWeek,
-      ':weeklyEstimate': weeklyEstimate
+    const key = {
+      pk: `${eventItem.senderPaId}~${eventItem.productType}~${eventItem.recipientNormalizedAddress.pr}`,
+      deliveryDate: notificationSentAtWeek
+    };
+
+    const eventRecord = {
+      requestId: eventItem.requestId,
+      ttl: calculateTtl()
+    };
+
+    const expressionAttributeNames = {
+      "#numberOfShipment": "numberOfShipment",
+      "#weeklyEstimate": "weeklyEstimate",
+      "#paId": "paId",
+      "#productType": "productType",
+      "#province": "province"
+    };
+
+    const expressionAttributeValues = {
+      ":one": 1,
+      ":weeklyEstimate": weeklyEstimate,
+      ":paId": eventItem.senderPaId,
+      ":productType": eventItem.productType,
+      ":province": eventItem.recipientNormalizedAddress.pr
+    };
+
+    const setExpressions = [
+      "#weeklyEstimate = if_not_exists(#weeklyEstimate, :weeklyEstimate)",
+      "#paId = if_not_exists(#paId, :paId)",
+      "#productType = if_not_exists(#productType, :productType)",
+      "#province = if_not_exists(#province, :province)"
+    ];
+
+    try {
+      await docClient.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: eventTableName,
+                Item: eventRecord,
+                ConditionExpression: "attribute_not_exists(requestId)"
+              }
+            },
+            {
+              Update: {
+                TableName: usedSenderLimitTableName,
+                Key: key,
+                UpdateExpression:
+                  `SET ${setExpressions.join(", ")} ` +
+                  "ADD #numberOfShipment :one",
+                ConditionExpression:
+                  "attribute_not_exists(#numberOfShipment) OR #numberOfShipment < :weeklyEstimate",
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues
+              }
+            },
+            {
+              Put: {
+                TableName: paperDeliveryTableName,
+                Item: transactionalPaperDelivery.entity
+              }
+            }
+          ]
+        })
+      );
+      paperDeliveryRecords.push(transactionalPaperDelivery);
+    } catch (error) {
+      if(isEventTableConditionalCheckFailed(error)) {
+        console.log(`Duplicate requestId ${eventItem.requestId} found in event table. Skipping processing.`);
+        continue;
+      }
+      if (isUsedSenderLimitConditionFailure(error)) {
+        console.log(`Sender limit reached for delayed PaperDelivery ${eventItem.requestId}`);
+        paperDeliveryRecords.push({
+          entity: buildPaperDeliveryRecord(
+            eventItem,
+            deliveryWeek,
+            true,
+            false
+          ),
+          kinesisSeqNumber: eventItem.kinesisSeqNumber
+        });
+        continue;
+      }
+      console.error(`Failed transactional processing for ${eventItem.requestId}`, error);
+      batchItemFailures.push({
+        itemIdentifier: eventItem.kinesisSeqNumber
+      });
+      continue
     }
-  };
-
-  try {
-    const command = new UpdateCommand(input);
-    await docClient.send(command);
-    console.log(`Created/updated DELAYED counter for sk: ${sk}`);
-  } catch (error) {
-    console.error(`Failed to create DELAYED counter for sk: ${sk}`, error);
-    throw error;
   }
 }
+
+function isUsedSenderLimitConditionFailure(error) {
+  return (
+    error?.name === "TransactionCanceledException" &&
+    error?.CancellationReasons?.[TRANSACTION_INDEX.USED_SENDER_LIMIT]?.Code === "ConditionalCheckFailed"
+  );
+}
+
+function isEventTableConditionalCheckFailed(error) {
+  return (
+    error?.name === "TransactionCanceledException" &&
+    error?.CancellationReasons?.[TRANSACTION_INDEX.EVENT_IDEMPOTENCY]?.Code === "ConditionalCheckFailed"
+  );
+}
+
 
 module.exports = {
   batchWritePaperDeliveryRecords,
@@ -270,5 +374,5 @@ module.exports = {
   batchWriteKinesisEventRecords,
   batchGetKinesisEventRecords,
   getSenderLimit,
-  updateDelayedCounter
+  updateUsedSenderLimitAndInsertPaperDeliveries
 };

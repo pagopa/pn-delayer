@@ -115,7 +115,7 @@ class EvaluateSenderLimitJobServiceTest {
 
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
-        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt(), anyInt()))
                 .thenReturn(Mono.just(2L));
 
         ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
@@ -129,24 +129,11 @@ class EvaluateSenderLimitJobServiceTest {
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
                 .thenReturn(Mono.empty());
-        PaperDeliveryCounter delayedCounter = new PaperDeliveryCounter();
-        delayedCounter.setSk("DELAYED~RM~AR~sender1~2025-01-01");
-        delayedCounter.setNumberOfShipments(5);
-        delayedCounter.setNotificationSentAtWeek("2025-01-01");
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
                 anyString(),
                 anyString(),
                 any()
         )).thenReturn(Mono.just(paperDeliveryCounterList));
-
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
-                eq("2026-07-27"),
-                eq("DELAYED~RM"),
-                isNull()
-        )).thenReturn(Mono.just(List.of(delayedCounter)));
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.empty());
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.parse("2026-07-27")))
                 .verifyComplete();
@@ -154,7 +141,7 @@ class EvaluateSenderLimitJobServiceTest {
         List<List<PaperDelivery>> capturedDeliveries = senderLimitJobPaperDeliveriesCaptor.getAllValues();
         Assertions.assertEquals(3, capturedDeliveries.getFirst().size());
         Assertions.assertEquals(1, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt() ,anyInt());
         verify(paperDeliveryDao, times(2)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
@@ -174,7 +161,7 @@ class EvaluateSenderLimitJobServiceTest {
         Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
         lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_SENDER_LIMIT).build());
         lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
-        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);;
+        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);
 
         List<PaperDelivery> deliveries2 = new ArrayList<>();
         deliveries2.addAll(getPaperDeliveries(false));
@@ -214,8 +201,6 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.enrichWithPriorityAndUnifiedDeliveryDriver(anyList(), any(), any(), any()))
                 .thenReturn(deliveries)
                 .thenReturn(deliveries2);
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), any()))
-                .thenReturn(Mono.just(List.of()));
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
                 .verifyComplete();
@@ -225,7 +210,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(2, capturedDeliveries.get(1).size());
         Assertions.assertEquals(2, capturedDeliveries.get(2).size());
         Assertions.assertEquals(2, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt(),anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
@@ -245,7 +230,7 @@ class EvaluateSenderLimitJobServiceTest {
         Map<String, AttributeValue> lastEvaluatedKey = new HashMap<>();
         lastEvaluatedKey.put("pk", AttributeValue.builder().s("2025-01-01~" + EVALUATE_SENDER_LIMIT).build());
         lastEvaluatedKey.put("sk", AttributeValue.builder().s("driver1~RM~2025-01-01T00:00:00Z~requestId2").build());
-        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);;
+        when(page.lastEvaluatedKey()).thenReturn(lastEvaluatedKey);
 
         List<PaperDelivery> deliveries2 = new ArrayList<>();
         deliveries2.addAll(getPaperDeliveries(false));
@@ -273,7 +258,7 @@ class EvaluateSenderLimitJobServiceTest {
         usedSenderLimit.setNumberOfShipment(4);
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
-        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt(),anyInt()))
                 .thenReturn(Mono.just(2L));
 
         ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
@@ -289,21 +274,11 @@ class EvaluateSenderLimitJobServiceTest {
         PaperDeliveryCounter delayedCounter = new PaperDeliveryCounter();
         delayedCounter.setSk("DELAYED~RM~AR~sender1~2025-01-01");
         delayedCounter.setNumberOfShipments(5);
-        delayedCounter.setNotificationSentAtWeek("2025-01-01");
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
                 anyString(),
                 anyString(),
                 any()
         )).thenReturn(Mono.just(paperDeliveryCounterList));
-
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
-                eq("2026-07-27"),
-                eq("DELAYED~RM"),
-                isNull()
-        )).thenReturn(Mono.just(List.of(delayedCounter)));
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.just(usedSenderLimit));
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.parse("2026-07-27")))
                 .verifyComplete();
@@ -313,7 +288,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(1, capturedDeliveries.get(1).size());
         Assertions.assertEquals(2, capturedDeliveries.get(2).size());
         Assertions.assertEquals(2, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt(),anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
@@ -359,24 +334,12 @@ class EvaluateSenderLimitJobServiceTest {
         List<PaperDeliveryCounter> paperDeliveryCounterList = List.of(paperDeliveryCounter);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
                 .thenReturn(Mono.empty());
-        PaperDeliveryCounter delayedCounter = new PaperDeliveryCounter();
-        delayedCounter.setSk("DELAYED~RM~AR~sender1~2025-01-01");
-        delayedCounter.setNumberOfShipments(5);
-        delayedCounter.setNotificationSentAtWeek("2025-01-01");
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
                 anyString(),
                 anyString(),
                 any()
         )).thenReturn(Mono.just(paperDeliveryCounterList));
 
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(
-                eq("2026-07-27"),
-                eq("DELAYED~RM"),
-                isNull()
-        )).thenReturn(Mono.just(List.of(delayedCounter)));
-
-        when(paperDeliverySenderLimitDAO.retrieveUsedSendersLimit(anyList(), any()))
-                .thenReturn(Flux.just(usedSenderLimit));
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any())).thenReturn(Flux.empty());
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.parse("2026-07-27")))
@@ -388,7 +351,7 @@ class EvaluateSenderLimitJobServiceTest {
         verify(deliveryDriverUtils, times(2)).retrieveFromCache(anyString());
         verify(deliveryDriverUtils, times(1)).insertInCache(anyList());
         verify(deliveryDriverUtils, times(1)).retrieveUnifiedDeliveryDriversFromPaperChannel(anyList(), anyString());
-        verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(0)).updateUsedSenderLimit(any(), any(), any(), anyInt(),anyInt());
         verify(paperDeliveryDao, times(2)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(1)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
     }
@@ -434,7 +397,7 @@ class EvaluateSenderLimitJobServiceTest {
 
         when(paperDeliverySenderLimitDAO.retrieveSendersLimit(anyList(), any()))
                 .thenReturn(Flux.just(paperDeliverySenderLimit));
-        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt()))
+        when(paperDeliverySenderLimitDAO.updateUsedSenderLimit(anyString(), anyLong(), any(), anyInt(),anyInt()))
                 .thenReturn(Mono.just(2L));
 
         ArgumentCaptor<List<PaperDelivery>> senderLimitJobPaperDeliveriesCaptor = ArgumentCaptor.forClass(List.class);
@@ -456,8 +419,6 @@ class EvaluateSenderLimitJobServiceTest {
         when(deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(any(), any(), any())).thenReturn(deliveries2);
         when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString()))
                 .thenReturn(Mono.just(paperDeliveryCounter1));
-        when(paperDeliveryCounterDAO.getPaperDeliveryCounter(anyString(), anyString(), any()))
-                .thenReturn(Mono.just(List.of()));
 
 
         StepVerifier.create(service.startSenderLimitJob(province, tenderId, LocalDate.now()))
@@ -468,7 +429,7 @@ class EvaluateSenderLimitJobServiceTest {
         Assertions.assertEquals(0, capturedDeliveries.get(1).size());
         Assertions.assertEquals(4, capturedDeliveries.get(2).size());
         Assertions.assertEquals(0, capturedDeliveries.getLast().size());
-        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt());
+        verify(paperDeliverySenderLimitDAO, times(1)).updateUsedSenderLimit(any(), any(), any(), anyInt(),anyInt());
         verify(paperDeliveryDao, times(4)).insertPaperDeliveries(anyList());
         verify(paperDeliveryDao, times(2)).retrievePaperDeliveries(eq(WorkflowStepEnum.EVALUATE_SENDER_LIMIT), any(), any(), any(), eq(50), any());
         verify(deliveryDriverUtils, times(5)).retrieveFromCache(anyString());

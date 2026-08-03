@@ -103,13 +103,14 @@ public class SenderLimitUtilsTest {
 
     @Test
     void createIncrementUsedSenderLimitDtos() {
-        Map<String, SenderLimitData> senderLimitMaps = Map.of("2026-07-07~paId~AR~RM", new SenderLimitData(100,100,0, 50, LocalDate.now()));
+        Map<String, SenderLimitData> senderLimitMaps = Map.of("2026-07-07~paId~AR~RM", new SenderLimitData(100,100,50, LocalDate.now()));
 
         StepVerifier.create(senderLimitUtils.createIncrementUsedSenderLimitDtos(senderLimitMaps))
                 .expectNextMatches(incrementUsedSenderLimitDto -> {
                     assertEquals("paId~AR~RM", incrementUsedSenderLimitDto.pk());
                     assertEquals(50, incrementUsedSenderLimitDto.increment());
                     assertEquals(100, incrementUsedSenderLimitDto.senderLimit());
+                    assertEquals(100, incrementUsedSenderLimitDto.weeklyEstimate());
                     return true;
                 })
                 .verifyComplete();

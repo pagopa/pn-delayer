@@ -1,7 +1,6 @@
 package it.pagopa.pn.delayer.model;
 
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
-import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDeliveryCounter;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -17,5 +16,4 @@ public class SenderLimitJobProcessObjects {
     private Map<String, Integer> totalEstimateCounter = new HashMap<>();
     private List<IncrementUsedSenderLimitDto> incrementUsedSenderLimitDtoList = new ArrayList<>();
     private Map<Integer, List<PaperDeliveryPriority>> priorityMap;
-    private List<PaperDeliveryCounter> delayedCounters = new ArrayList<>();
 }

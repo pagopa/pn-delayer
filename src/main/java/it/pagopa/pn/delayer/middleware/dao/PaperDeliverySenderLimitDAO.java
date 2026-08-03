@@ -13,7 +13,7 @@ public interface PaperDeliverySenderLimitDAO {
 
     Flux<PaperDeliverySenderLimit> retrieveSendersLimit(List<String> pks, LocalDate shipmentDate);
 
-    Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate shipmentDate, Integer senderLimit);
+    Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate shipmentDate, Integer senderLimit, Integer weeklyEstimate);
 
     Flux<PaperDeliveryUsedSenderLimit> retrieveUsedSendersLimit(List<String> pks, LocalDate shipmentDate);
 }

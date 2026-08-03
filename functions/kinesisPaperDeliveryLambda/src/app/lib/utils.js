@@ -1,9 +1,9 @@
 const { LocalDate, DayOfWeek, TemporalAdjusters, Clock, Instant, ZoneOffset} = require("@js-joda/core");
 const dayOfWeekEnv = process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK;
 
-function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false) {
-  const skipSenderLimit = isRsOrSecondAttempt(payload);
-  const date = skipSenderLimit   ? payload.prepareRequestDate : payload.notificationSentAt;
+function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
+  const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
+  const date = rsOrSecondAttempt ? payload.prepareRequestDate : payload.notificationSentAt;
 
   const record = {
     pk: buildPk(deliveryWeek),
@@ -26,10 +26,10 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false) {
     senderPriority: payload.senderPriority ? payload.senderPriority : 0,
     deliveryDate: deliveryWeek,
     delayed: Boolean(delayed),
-    skipSenderLimit
+    skipSenderLimit: Boolean(skipSenderLimit)
   };
 
-  if (payload.senderPaId && !skipSenderLimit) {
+  if (payload.senderPaId && !rsOrSecondAttempt) {
     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
   }
 
@@ -106,7 +106,7 @@ function groupRecordsBySenderPaId(records) {
 
 function groupDelayedRecords(records) {
   return records.reduce((acc, record) => {
-    const key = `${record.notificationSentAtWeek}~${record.senderPaId}~${record.productType}~${record.province}`;
+    const key = `${record.notificationSentAtWeek}~${record.senderPaId}~${record.productType}~${record.recipientNormalizedAddress.pr}`;
     if (!acc[key]) {
       acc[key] = [];
     }
@@ -114,6 +114,25 @@ function groupDelayedRecords(records) {
     return acc;
   }, {});
 };
+
+function addPaperDeliveryRecord({
+  eventItem,
+  deliveryWeek,
+  delayed,
+  skipSenderLimit,
+  requestIds,
+  paperDeliveryRecords
+}) {
+  const record = {
+    entity: { ...buildPaperDeliveryRecord(eventItem, deliveryWeek, delayed, skipSenderLimit) },
+    kinesisSeqNumber: eventItem.kinesisSeqNumber
+  };
+
+  if (!requestIds.has(record.entity.requestId)) {
+    requestIds.add(record.entity.requestId);
+    paperDeliveryRecords.push(record);
+  }
+}
 
 module.exports = {
   buildPaperDeliveryRecord,
@@ -123,5 +142,6 @@ module.exports = {
   groupDelayedRecords,
   calculateNotificationSentAtWeek,
   getCurrentWeek,
-  getDeliveryWeek
+  getDeliveryWeek,
+  addPaperDeliveryRecord
 };
