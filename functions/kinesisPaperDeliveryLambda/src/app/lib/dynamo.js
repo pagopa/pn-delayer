@@ -189,7 +189,7 @@ async function batchWritePaperDeliveryRecords(paperDeliveryRecords, batchItemFai
 async function batchWriteKinesisEventRecords(eventRecords) {
   if (!eventRecords || eventRecords.length === 0) {
       console.log("No Kinesis event records to write");
-      return;
+      return { UnprocessedItems: {} };
   }
 
   const params = {
@@ -217,7 +217,7 @@ async function batchGetKinesisEventRecords(keys) {
   };
   const command = new BatchGetCommand(params);
   return await docClient.send(command).then(response => {
-    const items = response.Responses[tableName];
+    const items = response.Responses[eventTableName];
     if (!items || items.length === 0) {
       return [];
     }
@@ -318,8 +318,7 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
             {
               Put: {
                 TableName: paperDeliveryTableName,
-                Item: transactionalPaperDelivery.entity,
-                ConditionExpression: 'attribute_not_exists(requestId)',
+                Item: transactionalPaperDelivery.entity
               }
             }
           ]

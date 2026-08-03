@@ -551,7 +551,7 @@ describe("eventHandler.handleEvent", () => {
         { itemIdentifier: "1234567890" }
       ]
     });
-    expect(batchGetKinesisEventRecordsStub.called).to.equal(false);
+    expect(batchGetKinesisEventRecordsStub.called).to.equal(true);
     expect(updateExcludeCounterStub.called).to.equal(false);
     expect(updateSenderPriorityCounterStub.called).to.equal(false);
     expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);
@@ -577,7 +577,7 @@ describe("eventHandler.handleEvent", () => {
         { itemIdentifier: "1234567890" }
       ]
     });
-    expect(batchGetKinesisEventRecordsStub.called).to.equal(false);
+    expect(batchGetKinesisEventRecordsStub.called).to.equal(true);
     expect(updateExcludeCounterStub.called).to.equal(false);
     expect(updateSenderPriorityCounterStub.called).to.equal(false);
     expect(batchWritePaperDeliveryRecordsStub.called).to.equal(false);

@@ -514,13 +514,20 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
     expect(command).to.be.instanceOf(TransactWriteCommand);
 
     const transaction = command.params;
-    expect(transaction.TransactItems).to.have.lengthOf(2);
+    expect(transaction.TransactItems).to.have.lengthOf(3);
 
-    const update = transaction.TransactItems[0].Update;
-    expect(update.TableName).to.equal('TestUsedSenderLimitTable');
+    const eventPut = transaction.TransactItems[0].Put;
+    expect(eventPut.TableName).to.equal('PaperDeliveryKinesisEventTable');
+    expect(eventPut.Item.requestId).to.equal('request1');
+    expect(eventPut.ConditionExpression).to.equal('attribute_not_exists(requestId)');
+
+    const update = transaction.TransactItems[1].Update;
+
+    const put = transaction.TransactItems[2].Put;
+    expect(put.TableName).to.equal('paperDeliveryTable');
     expect(update.Key).to.deep.equal({
       pk: 'sender1~AR~RM',
-      deliveryWeek: '2025-05-19'
+      deliveryDate: '2025-05-19'
     });
     expect(update.UpdateExpression).to.equal(
       'SET #weeklyEstimate = if_not_exists(#weeklyEstimate, :weeklyEstimate), #paId = if_not_exists(#paId, :paId), #productType = if_not_exists(#productType, :productType), #province = if_not_exists(#province, :province) ADD #numberOfShipment :one'
@@ -534,11 +541,11 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
     expect(update.ExpressionAttributeValues[':productType']).to.equal('AR');
     expect(update.ExpressionAttributeValues[':province']).to.equal('RM');
 
-    const put = transaction.TransactItems[1].Put;
-    expect(put.TableName).to.equal('paperDeliveryTable');
-    expect(put).to.not.have.property('ConditionExpression');
-    expect(put.Item.skipSenderLimit).to.equal(true);
-    expect(put.Item.delayed).to.equal(true);
+    const putTransaction = transaction.TransactItems[2].Put;
+    expect(putTransaction.TableName).to.equal('paperDeliveryTable');
+    expect(putTransaction).to.not.have.property('ConditionExpression');
+    expect(putTransaction.Item.skipSenderLimit).to.equal(true);
+    expect(putTransaction.Item.delayed).to.equal(true);
 
     expect(buildPaperDeliveryRecordStub.calledOnceWithExactly(
       eventItem,
@@ -566,7 +573,7 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
       7
     );
 
-    const update = mockSend.firstCall.args[0].params.TransactItems[0].Update;
+    const update = mockSend.firstCall.args[0].params.TransactItems[1].Update;
     expect(update.ConditionExpression).to.equal(
       'attribute_not_exists(#numberOfShipment) OR #numberOfShipment < :weeklyEstimate'
     );
@@ -579,6 +586,7 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
     const cancellation = Object.assign(new Error('conditional failure'), {
       name: 'TransactionCanceledException',
       CancellationReasons: [
+        { Code: 'None' },
         { Code: 'ConditionalCheckFailed' },
         { Code: 'None' }
       ]
@@ -629,6 +637,7 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
     const cancellation = Object.assign(new Error('conditional failure'), {
       name: 'TransactionCanceledException',
       CancellationReasons: [
+        { Code: 'None' },
         { Code: 'None' },
         { Code: 'ConditionalCheckFailed' }
       ]
@@ -712,6 +721,7 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
     const cancellation = Object.assign(new Error('conditional failure'), {
       name: 'TransactionCanceledException',
       CancellationReasons: [
+        { Code: 'None' },
         { Code: 'ConditionalCheckFailed' },
         { Code: 'None' }
       ]
