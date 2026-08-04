@@ -1,284 +1,112 @@
 # pn-delayer
-Repository contenente i componenti realizzati per gestire in modo efficiente i picchi di recapito in modo tale da:
-- Non appesantire i recapitisti sulla base di spedizioni ricevute dalle notifiche create dagli enti mittenti.
-- Far rispettare le stime dichiarate dai mittenti, in modo tale da dare priorità alle spedizioni che rispettano le stime.
-- Non appesantire lo "stampatore" garantendo al massimo 180 mila spedizioni (configurabile) inviate giornalmente al consolidatore.
 
+## Indice
+- [Descrizione](#descrizione)
+- [Tecnologie Utilizzate](#tecnologie-utilizzate)
+- [Architettura](#architettura)
+- [Interfacce del Servizio](#interfacce-del-servizio)
+- [Configurazioni](#configurazioni)
+- [Allarmi e Monitoraggio](#allarmi-e-monitoraggio)
+- [Esecuzione](#esecuzione)
 
-## Panoramica
-Si compone di:
-- AWS **Step Functions**:
-    - **BatchWorkflowStateMachine**: definisce il workflow di pianificazione delle spedizioni coordinando l'esecuzione
-      dei job di valutazione dei limiti garantiti al mittente, della capacità di recapito settimanali, e dei residui delle capacità di recapito settimanale. (1 volta a settimana il Lunedì)
-    - **DelayerToPaperChannelStateMachine**: definisce il workflow di valutazione della capacità di stampa giornaliera e l'invio delle spedizioni alla prepare fase 2. (tutti i giorni 1 volta al giorno)
-- AWS **Lambda**:
-    - **pn-delayer-kinesisPaperDeliveryLambda**: gestisce la ricezione degli eventi Kinesis relativi alla prepare fase 1 e la scrittura sulle tabelle `pn-DelayerPaperDelivery` e `pn-PaperDeliveryCounters`.
-    - **pn-delayer-submitPaperDeliveryJobLambda**: Si occupa della submit dei Job di schedulazione spedizioni.  Viene lanciata dalla Step Function `BatchWorkflowStateMachine`.
-    - **pn-delayerToPaperChannelLambda**: responsabile della lettura delle spedizioni con `workflowStep = EVALUATE_PRINT_CAPACITY` dalla tabella `pn-DelayerPaperDelivery` e scrittura sulla coda `pn-delayer_to_paperchannel`.
-        Viene lanciata dalla Step Function `DelayerToPaperChannelStateMachine`.
-- Microservizio Spring Boot 3
-    - **pn-delayer**: Contiene i job di valutazione dei limiti garantiti al mittente, della capacità di recapito  settimanali.
-      A seconda del valore della variabile `PN_DELAYER_WORKFLOWSTEP` avvia il job corrispondente.
+## Descrizione
 
-  | WorkFlowStep                 | Descrizione                                                                 |
-      |------------------------------|-----------------------------------------------------------------------------|
-  | `EVALUATE_SENDER_LIMIT`      | Avvia il job di valutazione limite settimanale garantito al mittente        | 
-  | `EVALUATE_DRIVER_CAPACITY`   | Avvia il job di valutazione della capacità di recapito settimanale          | 
-  | `EVALUATE_RESIDUAL_CAPACITY` | Avvia il job di valutazione dei residui di capacità di recapito settimanale | 
+Il servizio `pn-delayer` gestisce la pianificazione delle spedizioni cartacee SEND per ridurre i picchi operativi, applicando in sequenza la priorita mittente, 
+i limiti garantiti per provincia/prodotto, la capacità di recapito e la capacità di stampa. 
+La soluzione è composta da un batch Spring Boot eseguito su AWS Batch (step `EVALUATE_SENDER_PRIORITY`, `EVALUATE_SENDER_LIMIT`, `EVALUATE_DRIVER_CAPACITY`, `EVALUATE_RESIDUAL_CAPACITY`) 
+e da Lambda di supporto che ingestano eventi in ingresso, preparano dati di stima, orchestrano pre-run/retry e inviano le spedizioni verso la prepare phase 2 tramite coda.
 
-Per le spedizioni in eccesso, cioè che superano:
-- "definitivamente" i limiti garantiti (cioè, che non possono essere recuperate dal batch dei residui perché non vi è capacità di recapito residua)
-- le capacità di recapito
-- "definitivamente" le capacità di stampa (cioè, non c'è capacità di stampa nell'ultimo giorno della settimana)
+## Tecnologie Utilizzate
 
-vengono creati i record nella tabella `pn-DelayerPaperDelivery` con `workflowStep = EVALUATE_SENDER_LIMIT` e deliveryDate alla settimana successiva, in modo tale da essere valutati
-alla prossima esecuzione settimanale della Step Function `BatchWorkflowStateMachine`.
+### Stack Tecnologico
+* Java 25
+* Spring Boot 3
+* AWS SDK for Java v2
+* Node.js (package Lambda con engine `>=20`)
+* AWS SDK for JavaScript v3
 
-### Workflow delle spedizione nell’algoritmo di pianificazione
+### Infrastruttura
+* AWS Batch (job di pianificazione)
+* AWS Lambda
+* AWS Step Functions
+* AWS DynamoDB
+* AWS Kinesis Data Streams
+* AWS SQS
+* AWS EventBridge
+* AWS Systems Manager Parameter Store
 
-Siccome l’algoritmo prevede la valutazione dei seguenti step:
-- Valutazione limite settimanale garantito al mittente.
-- Valutazione capacità di recapito settimanale.
-- Valutazione capacità di stampa giornaliera.
+## Architettura
 
-ogni spedizione potrà subire i seguenti i cambi di stati durante l’esecuzione dell’algoritmo:
-![workflow_step_picchi.webp](workflow_step_picchi.webp)
+Il flusso principale prevede ingest da EventBridge/Kinesis verso `pn-DelayerPaperDelivery`, esecuzione settimanale della state machine batch per la pianificazione, e una state machine giornaliera che applica la capacità di stampa e invia le spedizioni al downstream paper channel o le ripianifica alla settimana successiva.
 
-
-### Architettura
 ![Architettura.png](Architettura.svg)
 
-## Pn-delayer-kinesisPaperDeliveryLambda
-### Responsabilità
-- Lettura degli eventi del Kinesis Data Stream `pn-delayer_inputs` relativi alla prepare fase 1
-- Inserimento di tali eventi sulle tabelle `pn-DelayerPaperDelivery` e `pn-PaperDeliveryCounters`
+> [Sorgente Diagramma](Architettura.svg)
 
-### Configurazione
-| Variabile Ambiente                        | Descrizione                                                                                                                                      | Obbligatorio | Default |
-|-------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|--------------|---------|
-| REGION                                    |                                                                                                                                                  | Sì           |         |
-| KINESIS_PAPER_DELIVERY_TABLE_NAME         | Nome della tabella DynamoDB contenente il workflow delle richieste di spedizione elaborate dall'algoritmo di pianificazione                      | Sì           |         |
-| KINESIS_PAPER_DELIVERY_COUNTER_TABLE_NAME | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa  | Sì           |         |
-| KINESIS_BATCH_SIZE                        | Dimensione massima del batch per l'elaborazione delle notifiche                                                                                  | No           | 25      |
+[**Architettura interna**](docs/ms/architettura_interna.md)
 
+## Interfacce del Servizio
 
+| Tipo  | Dir | Risorsa                                 | Protocollo  | Metodo  | Route                                                  | Descrizione                                                                                                                     |
+|-------|-----|-----------------------------------------|-------------|---------|--------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| EVENT | IN  | `PreparePhaseOneOutcomeEvent`           | EventBridge | PUBLISH | `detail-type=PreparePhaseOneOutcomeEvent`              | Evento di prepare phase 1 instradato verso `pn-delayer_inputs` e poi consumato da `kinesisPaperDeliveryLambda`.                 |
+| EVENT | IN  | `SafeStorageOutcomeEvent`               | EventBridge | PUBLISH | `detail-type=SafeStorageOutcomeEvent`                  | Evento SafeStorage usato per alimentare le code verso `delayerReceiverOrdersSendersLambda` e `delayerNotificationOrdersLambda`. |
+| EVENT | IN  | `safestorage_to_delayer_orders_senders` | SQS         | CONSUME | `${ProjectName}-safestorage_to_delayer_orders_senders` | Coda consumata dalla Lambda che aggiorna le stime mittente (`PaperDeliverySenderLimit`).                                        |
+| EVENT | IN  | `safestorage_to_notification_orders`    | SQS         | CONSUME | `${ProjectName}-safestorage_to_notification_orders`    | Coda consumata dalla Lambda che persiste i moduli commessa originari.                                                           |
+| EVENT | OUT | `delayer_to_paperchannel`               | SQS         | PRODUCE | `${ProjectName}-delayer_to_paperchannel`               | Coda popolata da `delayerToPaperChannelLambda` per inviare le spedizioni verso prepare phase 2.                                 |
 
-### pn-delayer-sender-limit-job
+## Configurazioni
 
-#### Responsabilità
-- Recupera le spedizioni che si trovano nello step EVALUATE_SENDER_LIMIT per la settimana corrente.
-- Calcola il limite settimanale, garantito al mittente basato sulle percentuali garantite ai mittenti basate sui moduli commessa,
-  applicate alla capacità di recapito settimanale al netto di RS e Secondi tentativi.
-- Smista le spedizioni tra gli step EVALUATE_DRIVER_CAPACITY (spedizioni che rientrano nel limite garantito al mittente)
-  e EVALUATE_RESIDUAL_CAPACITY (spedizioni che eccedono il limite garantito al mittente)
-- Legge dalle tabelle: PaperDeliveryCounterTable, PaperDeliverySenderLimitTable, PaperDeliveryUsedSenderLimitTable, PaperDeliveryDriverCapacitiesTable, PaperDeliveryTable
-- Scrive sulle tabelle DynamoDB: PaperDeliveryUsedSenderLimitTable
+Per il dettaglio delle configurazioni si rimanda al file [**Architettura interna**](docs/ms/architettura_interna.md)
 
-#### Calcolo limite garantito al mittente
+## Allarmi e Monitoraggio
 
-Il limite garantito al mittente viene calcolato in `SenderLimitUtils.retrieveCapacityAndCalculateLimit` come quota proporzionale
-della capacità disponibile del gruppo di recapitisti associato al prodotto.
+| Tipo      | Nome                                                               | Descrizione                                                                                  |
+|-----------|--------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| DASHBOARD | `${ProjectName}-delayer`                                           | Dashboard CloudWatch con metriche principali di DynamoDB e job batch.                        |
+| ALARM     | `${ProjectName}-BatchWorkflowStateMachine-FailedAlarm`             | Allarme su failure invocations del rule EventBridge associato alle state machine principali. |
+| ALARM     | `${ProjectName}-delayer-sender-limit-job-ErrorFatalLogs-Alarm`     | Allarme su log `ERROR/FATAL/CRITICAL` del job sender-limit.                                  |
+| ALARM     | `${ProjectName}-delayer-driver-capacity-job-ErrorFatalLogs-Alarm`  | Allarme su log `ERROR/FATAL/CRITICAL` del job driver-capacity.                               |
+| ALARM     | `${ProjectName}-delayer-residual-capacity-ErrorFatalLogs-Alarm`    | Allarme su log `ERROR/FATAL/CRITICAL` del job residual-capacity.                             |
+| LOG       | `/aws/lambda/${ProjectName}-delayer-kinesisPaperDeliveryLambda`    | Log group della Lambda di ingest per troubleshooting su eventi in ingresso.                  |
 
-Per ogni tupla `paId~productType~province` presente in `PaperDeliverySenderLimit`:
-
-```text
-driver = primo DriversTotalCapacity che contiene productType
-relevantProducts = driver.products - ["RS"]
-
-se relevantProducts contiene più di un prodotto:
-    totalEstimate = somma totalEstimateCounter[prodotto] per tutti i relevantProducts
-altrimenti:
-    totalEstimate = totalEstimateCounter[productType]
-
-se totalEstimate == 0:
-    limit = 0
-altrimenti:
-    limit = floor(driver.capacity * weeklyEstimate / totalEstimate)
-```
-
-Dove:
-- `weeklyEstimate` è la stima settimanale del mittente per prodotto e provincia.
-- `totalEstimateCounter` contiene le stime totali provinciali per prodotto, recuperate dai contatori `SUM_ESTIMATES`.
-- `driver.capacity` è la capacità disponibile del gruppo di recapitisti sulla provincia. Viene calcolata sommando le capacità
-  dei recapitisti raggruppati per prodotti intersecanti e sottraendo gli eventuali contatori `EXCLUDE` relativi a RS e secondi tentativi.
-- `RS` non partecipa al denominatore del calcolo del limite garantito.
-
-Esempio con un recapitista che gestisce un solo prodotto:
-
-```text
-Fulmine su RM:
-products = [AR]
-capacity = 500
-
-totalEstimateCounter[AR] = 1000
-weeklyEstimate PA1 AR = 120
-
-limit = floor(500 * 120 / 1000) = 60
-```
-
-In questo caso PA1 ha 60 spedizioni AR garantite verso `EVALUATE_DRIVER_CAPACITY`; le spedizioni eccedenti vengono
-indirizzate verso `EVALUATE_RESIDUAL_CAPACITY`.
-
-Esempio con un recapitista che gestisce più prodotti:
-
-```text
-Poste su RM:
-products = [AR, 890]
-capacity = 600
-
-totalEstimateCounter[AR] = 700
-totalEstimateCounter[890] = 300
-totalEstimate = 700 + 300 = 1000
-
-weeklyEstimate PA1 AR = 140
-limit PA1 AR = floor(600 * 140 / 1000) = 84
-
-weeklyEstimate PA2 890 = 50
-limit PA2 890 = floor(600 * 50 / 1000) = 30
-```
-
-Quando il recapitista gestisce più prodotti, il denominatore non è la sola stima del prodotto corrente, ma la somma delle
-stime dei prodotti gestiti dal gruppo, escluso `RS`.
-
-Esempio con due recapitisti che gestiscono lo stesso prodotto:
-
-```text
-Fulmine su PA:
-products = [AR]
-capacity = 300
-
-Poste su PA:
-products = [AR, 890]
-capacity = 400
-```
-
-Poiché i prodotti si intersecano su `AR`, `DeliveryDriverUtils.groupDriversByIntersectingProducts` aggrega i due recapitisti:
-
-```text
-products = [AR, 890]
-capacity = 300 + 400 = 700
-unifiedDeliveryDrivers = [Fulmine, Poste]
-
-totalEstimateCounter[AR] = 800
-totalEstimateCounter[890] = 200
-totalEstimate = 800 + 200 = 1000
-
-weeklyEstimate PA1 AR = 160
-limit PA1 AR = floor(700 * 160 / 1000) = 112
-
-weeklyEstimate PA2 890 = 50
-limit PA2 890 = floor(700 * 50 / 1000) = 35
-```
-
-In questo scenario il limite AR non viene calcolato sulla sola capacità di Fulmine o sulla sola capacità di Poste, ma sulla
-capacità aggregata del gruppo `Fulmine + Poste`. Se invece entrambi i recapitisti gestissero solo `AR`, il gruppo avrebbe
-`products = [AR]`, `capacity = 700` e il denominatore sarebbe solo `totalEstimateCounter[AR]`.
-
-#### Configurazione
-| Variabile Ambiente                                    | Descrizione                                                                                                                                     | Default | Obbligatorio |
-|-------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------|--------------|
-| PN_DELAYER_PAPERDELIVERYPRIORITYPARAMETERNAME         | Nome del parametro contenente l'ordine di priorità delle spedizioni                                                                             | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT                | Query limit per la tabella contenente le spedizioni                                                                                             | 1000    | No           |
-| PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME          | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME      | Nome della tabella DynamoDB contenente le stime dei mittenti derivanti dai moduli commessa                                                      | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME  | Nome della tabella DynamoDB contenente le spedizioni inviate allo step successivo raggruppate per mittente-prodotto-provincia                   | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME | Nome della tabella DynamoDB per le capacità di recapito                                                                                         | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYTABLENAME                 | Nome della tabella DynamoDB contenente le spedizioni da valutare                                                                                | -       | Si           |
-| PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCE       | Provincia di input per la singola esecuzione del JOB                                                                                            |         | No           |
-| PN_DELAYER_ACTUALTENDERID                             | id della gara attiva                                                                                                                            |         | No           |
-| PN_DELAYER_WORKFLOWSTEP                               | Workflow step = EVALUATE_SENDER_LIMIT                                                                                                           |         | No           |
-| PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN             | Nome della lambda di paperChannel per il recupero dei recapitisti                                                                               | -       | Si           |
-| PN_DELAYER_DELIVERYDATEDAYOFWEEK                      | Giorno iniziale per la settimana di cutOff                                                                                                      | 1       | No           |
-| PN_DELAYER_PRINTCAPACITY                              | capacità di stampa giornaliera nel formato '1970-01-01;180000'                                                                                  | -       | Si           |
-
-### pn-delayer-residual-capacity-job-definition
-
-#### Responsabilità
-- Recupera le spedizioni che si trovano nello step EVALUATE_RESIDUAL_CAPACITY per la settimana corrente.
-- Assegna le spedizioni allo step successivo EVALUATE_PRINT_CAPACITY in base alla capacità residua di recapito settimanale presente sia
-  sulla provincia che sul cap al fine di saturare ove possibile la capacità del recapitista
-- Legge sulle tabelle DynamoDB: PaperDeliveryDriverCapacities, PaperDeliveryDriverUsedCapacities, PaperDelivery
-- Scrive sulle tabelle DynamoDB: PaperDeliveryDriverUsedCapacities, PaperDelivery, PaperDeliveryCounter
-
-#### Configurazione
-| Variabile Ambiente                                                | Descrizione                                                                                                                                     | Default | Obbligatorio |
-|-------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------|--------------|
-| PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME             | Nome della tabella DynamoDB per le capacità di recapito                                                                                         | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME         | Nome della tabella DynamoDB contenente le capacità di recapito utilizzate                                                                       | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYTABLENAME                             | Nome della tabella DynamoDB contenente le spedizioni da valutare                                                                                | -       | Si           |
-| PN_DELAYER_DELIVERYDATEDAYOFWEEK                                  | Giorno iniziale per la settimana di cutOff                                                                                                      | 1       | No           |
-| PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER | unifiedDeliveryDriver in input per l'esecuzione del job                                                                                         |         | No           |
-| PN_DELAYER_EVALUATERESIDUALCAPACITYJOBINPUT_PROVINCELIST          | lista di province in input afferenti all'unifiedDeliveryDriver                                                                                  |         | No           |
-| PN_DELAYER_ACTUALTENDERID                                         | id della gara attiva                                                                                                                            |         | No           |
-| PN_DELAYER_WORKFLOWSTEP                                           | Workflow step = EVALUATE_RESIDUAL_CAPACITY                                                                                                      |         | No           |
-| PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS                         | numero di giorni lavorativi della settimana                                                                                                     | 7       | No           |
-| PN_DELAYER_PRINTCOUNTERTTLDURATION                                | Ttl duration per il contatore della capacità di stampa                                                                                          | 30d     | No           |
-| PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT                            | Query limit per la tabella contenente le spedizioni                                                                                             | 1000    | No           |
-| PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME                      | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -       | Si           |
-| PN_DELAYER_PRINTCAPACITY                                          | capacità di stampa giornaliera nel formato '1970-01-01;180000'                                                                                  | -       | Si           |
-
-### pn-delayer-driver-capacity-job-definition
-
-#### Responsabilità
-- Recupera le spedizioni che si trovano nello step EVALUATE_DRIVER_CAPACITY per la settimana corrente.
-- Assegna le spedizioni allo step successivo EVALUATE_PRINT_CAPACITY in base alla capacità di recapito settimanale presente sia
-  sulla provincia che sul cap
-- Legge sulle tabelle DynamoDB: PaperDeliveryDriverCapacities, PaperDeliveryDriverUsedCapacities, PaperDelivery
-- Scrive sulle tabelle DynamoDB: PaperDeliveryDriverUsedCapacities, PaperDelivery, PaperDeliveryCounter
-
-#### Configurazione
-| Variabile Ambiente                                               | Descrizione                                                                                                                                     | Default | Obbligatorio |
-|------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------|--------------|
-| PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME            | Nome della tabella DynamoDB per le capacità di recapito                                                                                         | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYDRIVERUSEDCAPACITIESTABLENAME        | Nome della tabella DynamoDB contenente le capacità di recapito utilizzate                                                                       | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYTABLENAME                            | Nome della tabella DynamoDB contenente le spedizioni da valutare                                                                                | -       | Si           |
-| PN_DELAYER_DELIVERYDATEDAYOFWEEK                                 | Giorno iniziale per la settimana di cutOff                                                                                                      | 1       | No           |
-| PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_UNIFIEDDELIVERYDRIVER  | unifiedDeliveryDriver in input per l'esecuzione del job                                                                                         |         | No           |
-| PN_DELAYER_EVALUATEDRIVERCAPACITYJOBINPUT_PROVINCELIST           | lista di province in input afferenti all'unifiedDeliveryDriver                                                                                  |         | No           |
-| PN_DELAYER_ACTUALTENDERID                                        | id della gara attiva                                                                                                                            |         | No           |
-| PN_DELAYER_WORKFLOWSTEP                                          | Workflow step = EVALUATE_DRIVER_CAPACITY                                                                                                        |         | No           |
-| PN_DELAYER_PRINTCAPACITYWEEKLYWORKINGDAYS                        | numero di giorni lavorativi della settimana                                                                                                     | 7       | No           |
-| PN_DELAYER_PRINTCOUNTERTTLDURATION                               | Ttl duration per il contatore della capacità di stampa                                                                                          | 30d     | No           |
-| PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT                           | Query limit per la tabella contenente le spedizioni                                                                                             | 1000    | No           |
-| PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME                     | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -       | Si           |
-| PN_DELAYER_PRINTCAPACITY                                         | capacità di stampa giornaliera nel formato '1970-01-01;180000'                                                                                  | -       | Si           |
-
-
-### pn-delayerToPaperChannelLambda
-#### Responsabilità
-- Invia le spedizioni che rientrano nella capacità di stampa alla prepare fase 2
-  e le eccedenze alla settimana successiva.
-- Legge e scrive sulla tabella DynamoDB: PaperDelivery e legge dalla tabella PaperDeliveryCounter
-- Scrive sulla coda SQS: DelayerToPaperChannelQueue
-
-#### Configurazione
-| Variabile Ambiente               | Descrizione                                                                                                                                     | Default  | Obbligatorio |
-|----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|
-| PAPER_DELIVERY_QUERYLIMIT        | Query limit per la tabella contenente le spedizioni                                                                                             | 1000     | No           |
-| PN_DELAYER_DELIVERYDATEDAYOFWEEK | Giorno iniziale per la settimana di cutOff                                                                                                      | 1        | No           |
-| PAPERDELIVERY_TABLENAME          | Nome della tabella DynamoDB contenente le spedizioni da valutare                                                                                | -        | Si           |
-| PAPERDELIVERYCOUNTER_TABLENAME   | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -        | Si           |
-
-
-
-### pn-delayer-receiverOrdersSendersLambda
-#### Responsabilità
-- Consuma gli eventi SafeStorage relativi al caricamento dei moduli commessa e censisce le stime dei mittenti per provincia e prodotto
-
-#### Configurazione
-| Variabile Ambiente                    | Descrizione                                                                                                                                     | Default | Obbligatorio   |
-|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------|----------------|
-| PN_SAFESTORAGE_URL                    | BasePath per selfcare ms                                                                                                                        | -       | Si             |
-| PN_SAFESTORAGE_CXID                   | SafeStorage cx-id per le richieste ricevute dal delayer                                                                                         | -       | Si             |
-| PAPER_CHANNEL_PROVINCE_TABLENAME      | Nome della tabella DynamoDB per le province                                                                                                     | -       | Si             |
-| PAPER_DELIVERY_SENDER_LIMIT_TABLENAME | Nome della tabella dynamo db per le stime dei mittenti                                                                                          | -       | Si             |
-| PAPER_DELIVERY_COUNTERS_TABLENAME     | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -       | Si             |
-
-## Testing in locale
+## Esecuzione
 
 ### Prerequisiti
-1. JDK 21 installato in locale
-2. Docker/Podman avviato con container di Localstack (puoi utilizzare il Docker Compose di [Localdev] https://github.com/pagopa/pn-localdev)
+
+* JDK 25
+* Docker o Podman attivo per test con LocalStack
+* Node.js 20+ per i package Lambda
+
+### Build e avvio locale
+
+```bash
+./mvnw clean package
+./mvnw spring-boot:run
+```
+
+### Test
+
+```bash
+./mvnw test
+./mvnw -Dtest=EvaluateSenderLimitJobServiceTest test
+./mvnw -Dtest=EvaluateSenderLimitJobServiceTest#startSenderLimitJob_singleDriver_withoutLastEvaluatedKey test
+./mvnw -Dtest=PaperDeliveryDaoIT test
+```
+
+```bash
+cd functions/kinesisPaperDeliveryLambda
+npm install
+npm test
+npm run build
+```
+
+```bash
+cd functions/delayerToPaperChannelLambda
+npm install
+npm test
+npm run integrazione
+```
 
 I dettagli sui test di integrazione e le procedure di testing sono disponibili in [README_TEST.md](./README_TEST.md).
 
