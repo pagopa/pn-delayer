@@ -192,7 +192,6 @@ Resources:
             senderPaIdOriginalSentAt:struct<S:string>,
             communicationType:struct<S:string>,
             delayed:struct<N:string>,
-            previousStep:struct<S:string>,
             skipSenderLimit:struct<N:string>
           >
 
@@ -237,7 +236,6 @@ Resources:
             senderPaIdOriginalSentAt:struct<S:string>,
             communicationType:struct<S:string>,
             delayed:struct<N:string>,
-            previousStep:struct<S:string>,
             skipSenderLimit:struct<N:string>
           >
 
