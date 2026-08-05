@@ -1993,7 +1993,7 @@ Resources:
           - Effect: Allow
             Action:
               - dynamodb:BatchWriteItem
-              - dynamodb:TransactWriteItems
+              - dynamodb:PutItem
             Resource:
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
@@ -2009,13 +2009,13 @@ Resources:
           - Effect: Allow
             Action:
               - dynamodb:UpdateItem
-              - dynamodb:TransactWriteItems
             Resource:
               - !Ref PaperDeliveryUsedSenderLimitTableArn
           - Effect: Allow
             Action:
               - dynamodb:BatchGetItem
               - dynamodb:BatchWriteItem
+              - dynamodb:PutItem
             Resource: !Ref PaperDeliveryKinesisEventTableArn
           - Effect: Allow
             Action:

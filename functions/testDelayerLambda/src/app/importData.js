@@ -58,8 +58,10 @@ exports.importData = async (params = []) => {
 
     const notificationSentAtWeek = calculateNotificationSentAtWeek(record.notificationSentAt, dayOfWeek);
     const inCurrentWeek = notificationSentAtWeek === currentWeek;
-
-    if (inCurrentWeek) {
+    if (isRsOrSecondAttempt(record)  && record.communicationType !== 'INFORMAL') {
+      const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek, false, true);
+      itemsBuffer.push(paperDelivery);
+    } else if (inCurrentWeek) {
       const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek, false, false);
       itemsBuffer.push(paperDelivery);
     } else {
@@ -135,7 +137,7 @@ exports.importData = async (params = []) => {
 async function processBatch(paperDeliveryTableName, countersTableName, items, deliveryWeek) {
   const grouped = groupRecordsByProductAndProvince(items);
   const groupedBySenderPaId = groupRecordsBySenderPaId(items);
-  const recordsToWrite = items.filter(record => !record.skipSenderLimit);
+  const recordsToWrite = items.filter(record => !record.skipSenderLimit || isRsOrSecondAttempt(record));
 
   await updateExcludeCounter(countersTableName, grouped, deliveryWeek);
   await updateSenderPriorityCounter(countersTableName, groupedBySenderPaId, deliveryWeek);
@@ -249,12 +251,12 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
             .filter(p => p !== 0)
         );
         console.log(`Updating sender priority counter for senderPaId: ${senderPaId} with priorities: ${JSON.stringify(Array.from(priorities))}`);
-  
+
         if (!priorities || priorities.size === 0) {
           console.log(`Skipping updating sender priority for senderPaId: ${senderPaId}`);
           continue;
         }
-  
+
         const input = {
           TableName: countersTableName,
           Key: {

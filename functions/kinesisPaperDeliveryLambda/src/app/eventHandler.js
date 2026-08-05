@@ -16,7 +16,8 @@ const {
   calculateNotificationSentAtWeek,
   getCurrentWeek,
   getDeliveryWeek,
-  addPaperDeliveryRecord
+  addPaperDeliveryRecord,
+  isRsOrSecondAttempt
 } = require("./lib/utils");
 
 exports.handleEvent = async event => {
@@ -84,6 +85,17 @@ exports.handleEvent = async event => {
    */
   for (const eventItem of filteredData) {
     const notificationSentAtWeek = calculateNotificationSentAtWeek(eventItem.notificationSentAt);
+    if(isRsOrSecondAttempt(eventItem)  && eventItem.communicationType !== 'INFORMAL') {
+      addPaperDeliveryRecord({
+        eventItem,
+        deliveryWeek,
+        delayed: false,
+        skipSenderLimit: true,
+        requestIds,
+        paperDeliveryRecords
+      });
+      continue;
+    }
 
     if (notificationSentAtWeek === currentWeek) {
       addPaperDeliveryRecord({
@@ -98,7 +110,6 @@ exports.handleEvent = async event => {
     }
 
     console.log(`PaperDelivery ${eventItem.requestId} belongs to a previous notification week`);
-
     delayedPaperDeliveryList.push({
       ...eventItem,
       notificationSentAtWeek
@@ -220,7 +231,7 @@ exports.handleEvent = async event => {
       func: batchWritePaperDeliveryRecords,
       getData: records =>
         records.filter(
-          record => !record.entity.skipSenderLimit
+           record => !record.entity.skipSenderLimit || isRsOrSecondAttempt(record.entity)
         )
     }
   ];
@@ -278,7 +289,7 @@ exports.handleEvent = async event => {
 
   const kinesisEventRecords =
     paperDeliveryRecords
-    .filter(record => !record.entity.skipSenderLimit)
+    .filter(record => !record.entity.skipSenderLimit || isRsOrSecondAttempt(record.entity))
     .map(record =>
       buildPaperDeliveryKinesisEventRecord(
         record.entity.requestId
