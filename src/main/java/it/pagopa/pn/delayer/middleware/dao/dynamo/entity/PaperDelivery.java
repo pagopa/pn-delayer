@@ -1,5 +1,6 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
+import it.pagopa.pn.delayer.model.CommunicationType;
 import it.pagopa.pn.delayer.model.ProductType;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.Data;
@@ -132,7 +133,7 @@ public class PaperDelivery {
 
     @DynamoDbIgnore
     public boolean isLegacySkipSenderLimit() {
-        return ProductType.RS.getValue().equalsIgnoreCase(productType) || (attempt != null && attempt == 1);
+        return !CommunicationType.INFORMAL.name().equals(communicationType) && (ProductType.RS.getValue().equalsIgnoreCase(productType) || (attempt != null && attempt == 1));
     }
 
     private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {
