@@ -403,6 +403,7 @@ function isUsedSenderLimitConditionFailure(error) {
 function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
   const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
   const date = rsOrSecondAttempt ? payload.prepareRequestDate : payload.notificationSentAt
+  const senderPriority = rsOrSecondAttempt || payload.communicationType === 'INFORMAL' ? 0 : payload.senderPriority ?? 0;
 
   const record = {
     pk: buildPk(deliveryWeek),
@@ -422,13 +423,13 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSe
     recipientId: payload.recipientId,
     workflowStep: 'EVALUATE_SENDER_LIMIT',
     communicationType: payload.communicationType || 'LEGAL',
-    senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
+    senderPriority: senderPriority,
     deliveryDate: deliveryWeek,
     delayed: Boolean(delayed),
     skipSenderLimit: Boolean(skipSenderLimit)
   };
 
-  if (payload.senderPaId && !rsOrSecondAttempt) {
+  if (payload.senderPaId && !rsOrSecondAttempt && payload.communicationType !== 'INFORMAL') {
     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
   }
 
@@ -471,6 +472,9 @@ function groupRecordsByProductAndProvince(records) {
 
 function groupRecordsBySenderPaId(records) {
     return records.reduce((acc, record) => {
+        if (!record.senderPaId || isRsOrSecondAttempt(record) || record.communicationType === 'INFORMAL') {
+          return acc;
+        }
         const key = record.senderPaId;
         if (!key) {
           return acc;
