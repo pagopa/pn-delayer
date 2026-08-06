@@ -25,7 +25,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       unifiedDeliveryDriver: 'driver1',
       attempt: 0,
       iun: 'iun1',
-      communicationType: 'INFORMAL'
+      communicationType: 'INFORMAL',
+      senderPriority: 5
     };
     const result = buildPaperDeliveryRecord(payload, '2025-07-07');
     expect(result).to.include({
@@ -47,7 +48,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       senderPaIdOriginalSentAt: 'sender1~2025-01-01T00:00:00Z',
       deliveryDate: '2025-07-07',
       delayed: false,
-      skipSenderLimit: false
+      skipSenderLimit: false,
+      senderPriority: 5
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -64,7 +66,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       prepareRequestDate: '2024-01-01T00:00:00Z',
       unifiedDeliveryDriver: 'driver1',
       attempt: 1,
-      iun: 'iun1'
+      iun: 'iun1',
+      senderPriority: 5
     };
     const result = buildPaperDeliveryRecord(payload, '2025-07-07');
     expect(result).to.include({
@@ -85,7 +88,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       communicationType: 'LEGAL',
       deliveryDate: '2025-07-07',
       delayed: false,
-      skipSenderLimit: false
+      skipSenderLimit: false,
+      senderPriority: 0
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -105,7 +109,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       unifiedDeliveryDriver: 'driver1',
       attempt: 0,
       iun: 'iun1',
-      communicationType: 'LEGAL'
+      communicationType: 'LEGAL',
+      senderPriority: 5
     };
     const result = buildPaperDeliveryRecord(payload, '2025-07-07');
     expect(result).to.include({
@@ -126,7 +131,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       communicationType: 'LEGAL',
       deliveryDate: '2025-07-07',
       delayed: false,
-      skipSenderLimit: false
+      skipSenderLimit: false,
+      senderPriority: 0
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -304,6 +310,45 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         const result = groupRecordsBySenderPaId([r1, r2]);
         expect(Object.keys(result)).to.have.lengthOf(1);
         expect(result['sender1']).to.deep.equal([r1]);
+    });
+
+    it('ignores RS and second-attempt records before grouping by senderPaId', () => {
+      const validRecord = {
+        entity: {
+          senderPaId: 'sender1',
+          productType: 'AR',
+          attempt: 0
+        },
+        kinesisSeqNumber: 'seq1'
+      };
+
+      const rsRecord = {
+        entity: {
+          senderPaId: 'sender1',
+          productType: 'RS',
+          attempt: 0
+        },
+        kinesisSeqNumber: 'seq2'
+      };
+
+      const secondAttemptRecord = {
+        entity: {
+          senderPaId: 'sender2',
+          productType: 'AR',
+          attempt: 1
+        },
+        kinesisSeqNumber: 'seq3'
+      };
+
+      const result = groupRecordsBySenderPaId([
+        validRecord,
+        rsRecord,
+        secondAttemptRecord
+      ]);
+
+      expect(result).to.deep.equal({
+        sender1: [validRecord]
+      });
     });
   });
 

@@ -23,7 +23,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSe
     recipientId: payload.recipientId,
     communicationType: payload.communicationType || 'LEGAL',
     workflowStep: 'EVALUATE_SENDER_LIMIT',
-    senderPriority: payload.senderPriority ? payload.senderPriority : 0,
+    senderPriority: rsOrSecondAttempt ? 0 : (payload.senderPriority ? payload.senderPriority : 0),
     deliveryDate: deliveryWeek,
     delayed: Boolean(delayed),
     skipSenderLimit: Boolean(skipSenderLimit)
@@ -92,6 +92,9 @@ function groupRecordsByProductAndProvince(records) {
 
 function groupRecordsBySenderPaId(records) {
   return records.reduce((acc, record) => {
+    if (isRsOrSecondAttempt(record.entity)) {
+      return acc;
+    }
     const key = record.entity.senderPaId;
     if (!key) {
       return acc;
