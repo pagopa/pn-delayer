@@ -35,8 +35,7 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
     senderPaIdOriginalSentAt: item.senderPaIdOriginalSentAt,
     communicationType: item.communicationType,
     delayed: item.delayed,
-    skipSenderLimit: item.skipSenderLimit,
-    previousStep: 'EVALUATE_PRINT_CAPACITY'
+    skipSenderLimit: item.skipSenderLimit
   };
 
   return Object.fromEntries(

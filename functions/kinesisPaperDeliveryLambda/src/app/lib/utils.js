@@ -143,5 +143,6 @@ module.exports = {
   calculateNotificationSentAtWeek,
   getCurrentWeek,
   getDeliveryWeek,
-  addPaperDeliveryRecord
+  addPaperDeliveryRecord,
+  isRsOrSecondAttempt
 };

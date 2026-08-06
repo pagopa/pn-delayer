@@ -38,7 +38,6 @@ public class PaperDelivery {
     public static final String COL_OLD_SK = "oldSk";
     public static final String COL_SENDERPAID_ORIGINALSENTAT = "senderPaIdOriginalSentAt";
     public static final String COL_DELAYED = "delayed";
-    public static final String COL_PREVIOUS_STEP = "previousStep";
     public static final String COL_SKIP_SENDER_LIMIT = "skipSenderLimit";
 
     public static final String PK_SENDERPAID_ORIGINALSENTAT_INDEX = "pk-senderPaIdOriginalSentAt-index";
@@ -91,8 +90,6 @@ public class PaperDelivery {
     private String senderPaIdOriginalSentAt;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELAYED)}))
     private boolean delayed;
-    @Getter(onMethod = @__({@DynamoDbAttribute(COL_PREVIOUS_STEP)}))
-    private String previousStep;
     private boolean skipSenderLimit;
 
     public PaperDelivery(){}
@@ -125,7 +122,6 @@ public class PaperDelivery {
         this.oldSk = paperDelivery.getOldSk();
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
         this.delayed = paperDelivery.isDelayed();
-        this.previousStep = paperDelivery.getWorkflowStep();
         this.skipSenderLimit = paperDelivery.isSkipSenderLimit();
     }
 

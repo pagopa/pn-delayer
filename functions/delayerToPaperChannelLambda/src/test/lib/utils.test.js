@@ -46,8 +46,7 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       senderPriority: 60,
       virtualNotificationSentAt: "2025-01-01T00:00:00Z",
       delayed: true,
-      skipSenderLimit: true,
-      previousStep: 'EVALUATE_DRIVER_CAPACITY'
+      skipSenderLimit: true
     };
 
     const deliveryWeek = '2025-01-01';
@@ -74,8 +73,7 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       senderPriority: 60,
       delayed: true,
       skipSenderLimit: true,
-      virtualNotificationSentAt: "2025-01-01T00:00:00Z",
-      previousStep: 'EVALUATE_PRINT_CAPACITY'
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
     });
 
     expect(result2).to.include({
@@ -97,8 +95,7 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       senderPriority: 60,
       virtualNotificationSentAt: "2025-01-01T00:00:00Z",
       delayed: true,
-      skipSenderLimit: true,
-      previousStep: 'EVALUATE_PRINT_CAPACITY'
+      skipSenderLimit: true
     });
   });
 });

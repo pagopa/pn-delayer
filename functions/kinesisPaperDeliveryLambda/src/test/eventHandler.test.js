@@ -19,6 +19,7 @@ describe("eventHandler.handleEvent", () => {
   let getDeliveryWeekStub;
   let getCurrentWeekStub;
   let addPaperDeliveryRecordStub;
+  let isRsOrSecondAttemptStub;
   let lambda;
 
   beforeEach(() => {
@@ -45,6 +46,7 @@ describe("eventHandler.handleEvent", () => {
     getDeliveryWeekStub = sinon.stub();
     getCurrentWeekStub = sinon.stub();
     addPaperDeliveryRecordStub = sinon.stub();
+    isRsOrSecondAttemptStub = sinon.stub();
 
     getDeliveryWeekStub.returns("2026-07-27");
     getCurrentWeekStub.returns("2026-07-20");
@@ -140,7 +142,8 @@ describe("eventHandler.handleEvent", () => {
         calculateNotificationSentAtWeek: calculateNotificationSentAtWeekStub,
         getDeliveryWeek: getDeliveryWeekStub,
         getCurrentWeek: getCurrentWeekStub,
-        addPaperDeliveryRecord: addPaperDeliveryRecordStub
+        addPaperDeliveryRecord: addPaperDeliveryRecordStub,
+        isRsOrSecondAttempt: isRsOrSecondAttemptStub
       }
     });
   });
