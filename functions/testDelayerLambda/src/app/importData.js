@@ -403,7 +403,7 @@ function isUsedSenderLimitConditionFailure(error) {
 function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
   const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
   const date = rsOrSecondAttempt ? payload.prepareRequestDate : payload.notificationSentAt
-  const senderPriority = rsOrSecondAttempt || payload.communicationType === 'INFORMAL' ? 0 : payload.senderPriority ?? 0;
+  const senderPriority = rsOrSecondAttempt || payload.communicationType === 'INFORMAL' ? 0 : parseInt(payload.senderPriority || '0', 10);
 
   const record = {
     pk: buildPk(deliveryWeek),
