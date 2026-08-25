@@ -371,6 +371,7 @@ Resources:
             productType:struct<S:string>,
             province:struct<S:string>,
             fileKey:struct<S:string>,
+            archiveFileKey:struct<S:string>,
             ttl:struct<N:string>
           >
 
@@ -400,6 +401,7 @@ Resources:
             productType:struct<S:string>,
             province:struct<S:string>,
             fileKey:struct<S:string>,
+            archiveFileKey:struct<S:string>,
             ttl:struct<N:string>
           >
         
