@@ -972,6 +972,8 @@ Resources:
                   - !Sub "${PaperDeliveryMockTableArn}/*"
                   - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}"
                   - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
+                  - !Sub "${PaperDeliverySenderLimitMockTableArn}"
+                  - !Sub "${PaperDeliverySenderLimitMockTableArn}/*"
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction
