@@ -2569,6 +2569,11 @@ Resources:
               - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
           - Effect: Allow
             Action:
+              - dynamodb:PutItem
+            Resource:
+              - !Sub "${PaperDeliveryMockTableArn}"
+          - Effect: Allow
+            Action:
               - dynamodb:Query
               - dynamodb:GetItem
               - dynamodb:UpdateItem
@@ -2692,6 +2697,11 @@ Resources:
               - !Sub "${PaperDeliveryCounterTableArn}/*"
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
+          - Effect: Allow
+            Action:
+              - dynamodb:PutItem
+            Resource:
+              - !Sub "${PaperDeliveryTableArn}"
 
   #########################################################
   ###                  PreRunRetryLambdaName                   ###
