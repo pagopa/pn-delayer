@@ -773,7 +773,12 @@ Parameters:
     Description: 'Maximum record age in seconds for notification cancellation lambda'
     Default: 604800 # 7 days in seconds
 
-
+  EnablePriorityResidualFlow:
+    Type: String
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Enable priority residual flow'
 
   DelayerReceiverOrdersSendersReservedConcurrentExecutions:
     Type: Number
@@ -877,6 +882,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+          - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
+            Value: !Ref EnablePriorityResidualFlow
 
       PlatformCapabilities:
         - FARGATE
@@ -1933,6 +1940,8 @@ Resources:
           KINESIS_PAPERDELIVERY_TABLE: !Ref PaperDeliveryTableName
           KINESIS_PAPERDELIVERY_EVENTTABLE: !Ref PaperDeliveryKinesisEventTableName
           KINESIS_PAPERDELIVERY_COUNTERTABLE: !Ref PaperDeliveryCounterTableName
+          KINESIS_PAPERDELIVERY_SENDERLIMITTABLE: !Ref PaperDeliverySenderLimitTableName
+          KINESIS_PAPERDELIVERY_USEDSENDERLIMITTABLE: !Ref PaperDeliveryUsedSenderLimitTableName
           KINESIS_BATCHSIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
           KINESIS_PAPERDELIVERY_COUNTERTTLDAYS: !Ref PaperDeliveryCounterTtlDays
@@ -1984,7 +1993,9 @@ Resources:
             Action: kms:Decrypt
             Resource: !Ref PnDelayerInputsKinesisDataStreamKMSArn
           - Effect: Allow
-            Action: dynamodb:BatchWriteItem
+            Action:
+              - dynamodb:BatchWriteItem
+              - dynamodb:PutItem
             Resource:
               - !Ref PaperDeliveryTableArn
           - Effect: Allow
@@ -1993,8 +2004,20 @@ Resources:
               - !Ref PaperDeliveryCounterTableArn
           - Effect: Allow
             Action:
+              - dynamodb:GetItem
+            Resource:
+              - !Ref PaperDeliverySenderLimitTableArn
+              - !Sub "${PaperDeliverySenderLimitTableArn}/*"
+          - Effect: Allow
+            Action:
+              - dynamodb:UpdateItem
+            Resource:
+              - !Ref PaperDeliveryUsedSenderLimitTableArn
+          - Effect: Allow
+            Action:
               - dynamodb:BatchGetItem
               - dynamodb:BatchWriteItem
+              - dynamodb:PutItem
             Resource: !Ref PaperDeliveryKinesisEventTableArn
           - Effect: Allow
             Action:
@@ -2548,6 +2571,7 @@ Resources:
             Action:
               - dynamodb:Query
               - dynamodb:GetItem
+              - dynamodb:UpdateItem
             Resource:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
@@ -3124,7 +3148,12 @@ Resources:
                   "tableName": ["pn-Timelines"],
                   "dynamodb": {
                     "NewImage": {
-                      "category": { "S": ["NOTIFICATION_CANCELLATION_REQUEST"] },
+                      "category": {
+                        "S": [
+                          "NOTIFICATION_CANCELLATION_REQUEST",
+                          "NOTIFICATION_VIEWED_CREATION_REQUEST"
+                        ]
+                      },
                       "communicationType": {"S": [{ "exists": false }]}
                     }
                   }

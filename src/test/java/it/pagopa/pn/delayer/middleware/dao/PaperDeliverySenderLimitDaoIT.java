@@ -47,12 +47,14 @@ class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
             paperDeliveriesSenderLimit.setMonthlyEstimate(2.6);
             paperDeliveriesSenderLimit.setOriginalEstimate(1000);
             paperDeliveriesSenderLimit.setFileKey("fileKey");
+            paperDeliveriesSenderLimit.setArchiveFileKey("archiveFileKey");
             Map<String, AttributeValue> itemMap = new HashMap<>();
             itemMap.put("pk", AttributeValue.builder().s(paperDeliveriesSenderLimit.getPk()).build());
             itemMap.put("deliveryDate", AttributeValue.builder().s(paperDeliveriesSenderLimit.getDeliveryDate()).build());
             itemMap.put("monthlyEstimate", AttributeValue.builder().n(String.valueOf(paperDeliveriesSenderLimit.getMonthlyEstimate())).build());
             itemMap.put("originalEstimate", AttributeValue.builder().n(String.valueOf(paperDeliveriesSenderLimit.getOriginalEstimate())).build());
             itemMap.put("fileKey", AttributeValue.builder().s(paperDeliveriesSenderLimit.getFileKey()).build());
+            itemMap.put("archiveFileKey", AttributeValue.builder().s(paperDeliveriesSenderLimit.getArchiveFileKey()).build());
             Mono.fromFuture(dynamoDbAsyncClient.putItem(PutItemRequest.builder().item(itemMap).tableName(pnDelayerConfigs.getDao().getPaperDeliverySenderLimitTableName()).build())).block();
         });
 
@@ -71,13 +73,13 @@ class PaperDeliverySenderLimitDaoIT extends BaseTest.WithLocalStack {
         entity.setUnifiedDeliveryDriverGeokey("1~RM");
         entity.setDeliveryDate(nextWeek);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000, 2000).block();
 
         int response = get(nextWeek);
         assert response != 0;
         Assertions.assertEquals(5, response);
 
-        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000).block();
+        paperDeliveriesSenderLimitDAO.updateUsedSenderLimit("1~RS~RM", 5L, nextWeek, 1000, 2000).block();
 
         int response2 = get(nextWeek);
         assert response2 != 0;

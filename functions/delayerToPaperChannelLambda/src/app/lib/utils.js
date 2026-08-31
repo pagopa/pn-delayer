@@ -11,29 +11,31 @@ function mapToPaperDeliveryForGivenStep(item, deliveryWeek, step) {
       deliveryWeek = deliveryWeekLocalDate.plusDays(7).toString();
     }
 
-    const paperDelivery = {
-      pk: `${deliveryWeek}~${step}`,
-      sk: buildSk(step, item),
-      requestId: item.requestId,
-      createdAt: new Date().toISOString(),
-      notificationSentAt: item.notificationSentAt,
-      prepareRequestDate: item.prepareRequestDate,
-      productType: item.productType,
-      senderPaId: item.senderPaId,
-      province: item.province,
-      cap: item.cap,
-      attempt: item.attempt,
-      iun: item.iun,
-      unifiedDeliveryDriver: item.unifiedDeliveryDriver,
-      tenderId: item.tenderId,
-      recipientId: item.recipientId,
-      priority: item.priority,
-      workflowStep: `${step}`,
-      senderPriority: item.senderPriority,
-      virtualNotificationSentAt: item.virtualNotificationSentAt,
-      deliveryDate: deliveryWeek,
-      senderPaIdOriginalSentAt: item.senderPaIdOriginalSentAt,
-      communicationType: item.communicationType
+  const paperDelivery = {
+    pk: `${deliveryWeek}~${step}`,
+    sk: buildSk(step, item),
+    requestId: item.requestId,
+    createdAt: new Date().toISOString(),
+    notificationSentAt: item.notificationSentAt,
+    prepareRequestDate: item.prepareRequestDate,
+    productType: item.productType,
+    senderPaId: item.senderPaId,
+    province: item.province,
+    cap: item.cap,
+    attempt: item.attempt,
+    iun: item.iun,
+    unifiedDeliveryDriver: item.unifiedDeliveryDriver,
+    tenderId: item.tenderId,
+    recipientId: item.recipientId,
+    priority: item.priority,
+    workflowStep: `${step}`,
+    senderPriority: item.senderPriority,
+    virtualNotificationSentAt: item.virtualNotificationSentAt,
+    deliveryDate: deliveryWeek,
+    senderPaIdOriginalSentAt: item.senderPaIdOriginalSentAt,
+    communicationType: item.communicationType,
+    delayed: item.delayed,
+    skipSenderLimit: item.skipSenderLimit
   };
 
   return Object.fromEntries(

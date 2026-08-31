@@ -26,6 +26,7 @@ describe('chunkArray', () => {
 });
 
 describe('mapToPaperDeliveryForGivenStep', () => {
+
   it('should map item and payload correctly', () => {
     global.payload = {
       requestId: "requestId",
@@ -43,7 +44,9 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       recipientId: "RecipientId",
       priority: 3,
       senderPriority: 60,
-      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z",
+      delayed: true,
+      skipSenderLimit: true
     };
 
     const deliveryWeek = '2025-01-01';
@@ -68,6 +71,8 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       recipientId: "RecipientId",
       priority: 3,
       senderPriority: 60,
+      delayed: true,
+      skipSenderLimit: true,
       virtualNotificationSentAt: "2025-01-01T00:00:00Z"
     });
 
@@ -88,7 +93,9 @@ describe('mapToPaperDeliveryForGivenStep', () => {
       recipientId: "RecipientId",
       priority: 3,
       senderPriority: 60,
-      virtualNotificationSentAt: "2025-01-01T00:00:00Z"
+      virtualNotificationSentAt: "2025-01-01T00:00:00Z",
+      delayed: true,
+      skipSenderLimit: true
     });
   });
 });

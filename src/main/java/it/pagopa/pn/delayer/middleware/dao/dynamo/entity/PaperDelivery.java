@@ -1,5 +1,7 @@
 package it.pagopa.pn.delayer.middleware.dao.dynamo.entity;
 
+import it.pagopa.pn.delayer.model.CommunicationType;
+import it.pagopa.pn.delayer.model.ProductType;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
 import lombok.Data;
 import lombok.Getter;
@@ -36,6 +38,8 @@ public class PaperDelivery {
     public static final String COL_VIRTUAL_NOTIFICATION_SENT_AT = "virtualNotificationSentAt";
     public static final String COL_OLD_SK = "oldSk";
     public static final String COL_SENDERPAID_ORIGINALSENTAT = "senderPaIdOriginalSentAt";
+    public static final String COL_DELAYED = "delayed";
+    public static final String COL_SKIP_SENDER_LIMIT = "skipSenderLimit";
 
     public static final String PK_SENDERPAID_ORIGINALSENTAT_INDEX = "pk-senderPaIdOriginalSentAt-index";
 
@@ -85,6 +89,9 @@ public class PaperDelivery {
     private String oldSk;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDERPAID_ORIGINALSENTAT), @DynamoDbSecondarySortKey(indexNames = PK_SENDERPAID_ORIGINALSENTAT_INDEX)}))
     private String senderPaIdOriginalSentAt;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELAYED)}))
+    private boolean delayed;
+    private boolean skipSenderLimit;
 
     public PaperDelivery(){}
 
@@ -115,6 +122,18 @@ public class PaperDelivery {
         this.virtualNotificationSentAt = paperDelivery.getVirtualNotificationSentAt();
         this.oldSk = paperDelivery.getOldSk();
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
+        this.delayed = paperDelivery.isDelayed();
+        this.skipSenderLimit = paperDelivery.isSkipSenderLimit();
+    }
+
+    @DynamoDbAttribute(COL_SKIP_SENDER_LIMIT)
+    public boolean isSkipSenderLimit() {
+        return skipSenderLimit || isLegacySkipSenderLimit();
+    }
+
+    @DynamoDbIgnore
+    public boolean isLegacySkipSenderLimit() {
+        return !CommunicationType.INFORMAL.name().equals(communicationType) && (ProductType.RS.getValue().equalsIgnoreCase(productType) || (attempt != null && attempt == 1));
     }
 
     private static String getSenderPaIdOriginalSentAt(PaperDelivery paperDelivery, String date) {
