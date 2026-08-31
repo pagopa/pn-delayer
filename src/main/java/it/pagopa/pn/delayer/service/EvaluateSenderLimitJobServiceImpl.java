@@ -20,7 +20,6 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.LocalDate;
@@ -49,15 +48,35 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
     private final ObjectMapper objectMapper;
 
 
+    /**
+     * Avvia il processo di valutazione del sender limit per una provincia e una
+     * settimana di recapito.
+     * <p>
+     * Il flusso di elaborazione è composto dalle seguenti fasi:
+     * <ol>
+     *     <li>inizializzazione degli oggetti condivisi utilizzati durante il job;</li>
+     *     <li>recupero dei contatori delle stime settimanali per i mittenti;</li>
+     *     <li>recupero della capacità dei recapitisti per la provincia;</li>
+     *     <li>lettura paginata delle spedizioni da elaborare e valutazione del
+     *     limite garantito;</li>
+     *     <li>persistenza dell'incremento della quota mittente utilizzata durante
+     *     l'elaborazione.</li>
+     * </ol>
+     *
+     * @param province provincia oggetto dell'elaborazione
+     * @param tenderId gara di riferimento
+     * @param deliveryWeek settimana di recapito
+     * @return completamento del job
+     */
     @Override
     public Mono<Void> startSenderLimitJob(String province, String tenderId, LocalDate deliveryWeek){
         SenderLimitJobProcessObjects senderLimitJobProcessObjects = new SenderLimitJobProcessObjects();
         senderLimitJobProcessObjects.setPriorityMap(getPriorityMap());
         return senderLimitUtils.retrieveTotalEstimateCounter(deliveryWeek, province)
                 .doOnNext(senderLimitJobProcessObjects::setTotalEstimateCounter)
-                .flatMap(stringIntegerMap -> deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province))
+                .flatMap(_ -> deliveryDriverUtils.retrieveDriversCapacityOnProvince(deliveryWeek, tenderId, province))
                 .flatMap(driversTotalCapacities -> retrieveAndProcessPaperDeliveries(province, tenderId, deliveryWeek, new HashMap<>(), driversTotalCapacities, senderLimitJobProcessObjects))
-                .flatMap(processObj -> flushCounters(deliveryWeek, processObj.getSenderLimitMap()))
+                .flatMap(processObj -> flushCounters(processObj.getSenderLimitMap()))
                 .doOnError(error -> log.error("Error processing sender limit job for province: {}, tenderId: {}, deliveryWeek: {}", province, tenderId, deliveryWeek, error));
     }
 
@@ -77,39 +96,49 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                         }));
     }
 
-    private Mono<Void> flushCounters(LocalDate deliveryDate, Map<String, Tuple2<Integer, Integer>> senderLimitMap) {
-        LocalDate shipmentDate = deliveryDate.minusWeeks(1);
+    private Mono<Void> flushCounters(Map<String, SenderLimitData> senderLimitMap) {
         return senderLimitUtils.createIncrementUsedSenderLimitDtos(senderLimitMap)
                 .collectList()
                 .filter(incrementUsedSenderLimitDtoList -> !CollectionUtils.isEmpty(incrementUsedSenderLimitDtoList))
                 .map(incrementUsedSenderLimitDtoList -> incrementUsedSenderLimitDtoList.stream()
-                        .collect(Collectors.groupingBy(incrementUsedSenderLimitDto -> String.join("#", incrementUsedSenderLimitDto.pk(), incrementUsedSenderLimitDto.senderLimit().toString()),
+                        .collect(Collectors.groupingBy(incrementUsedSenderLimitDto -> String.join("#", incrementUsedSenderLimitDto.pk(), incrementUsedSenderLimitDto.senderLimit().toString(), incrementUsedSenderLimitDto.weeklyEstimate().toString(), incrementUsedSenderLimitDto.shipmentDate().toString()),
                                 Collectors.summingLong(dto -> dto.increment() == null ? 0 : dto.increment())
                         )))
                 .map(Map::entrySet)
                 .flatMapIterable(entries -> entries)
-                .flatMap(entry ->
-                        paperDeliverySenderLimitDAO.updateUsedSenderLimit(entry.getKey().split("#")[0], entry.getValue(), shipmentDate, Integer.valueOf(entry.getKey().split("#")[1]))
-                )
+                .flatMap(entry -> {
+                    String[] keyParts = entry.getKey().split("#", 4);
+                    String pk = keyParts[0];
+                    Integer senderLimit = Integer.valueOf(keyParts[1]);
+                    Integer weeklyEstimate = Integer.valueOf(keyParts[2]);
+                    LocalDate shipmentDate = LocalDate.parse(keyParts[3]);
+                    return paperDeliverySenderLimitDAO.updateUsedSenderLimit(pk, entry.getValue(), shipmentDate, senderLimit, weeklyEstimate);
+                })
                 .then();
     }
 
     /**
-     * Processes the list of paper deliveries through the following steps:
-     * 1. Retrieves the unified delivery drivers and assigns them to each paper delivery.
-     * 2. Excludes deliveries marked as RS or Second Attempt from sender limit evaluation,
-     * and includes them directly in the list for the EVALUATE_DRIVER_CAPACITY step.
-     * 3. Groups the remaining deliveries by product type, PaId, and province.
-     * 4. Calculates and evaluates the sender limit for each group,returning a SenderLimitJobPaperDeliveries object
-     * that categorizes deliveries for either the EVALUATE_DRIVER_CAPACITY or EVALUATE_RESIDUAL_CAPACITY step.
-     * 5. Inserts new entities into the Pn-DelayerPaperDeliveries collection, mapped to their corresponding evaluation step.
-     * 6. Updates the used sender limits in the database for deliveries assigned to the EVALUATE_DRIVER_CAPACITY step.
+     * Elabora l'elenco delle spedizioni cartacee eseguendo le seguenti operazioni:
+     * <ol>
+     *     <li>recupera il driver unificato di recapito e lo assegna a ciascuna spedizione;</li>
+     *     <li>esclude dalla valutazione del sender limit le spedizioni di tipo RS, i secondi tentativi e
+     *     i primi tentativi con skipSenderLimit == true,
+     *     inoltrandole direttamente allo step {@code EVALUATE_DRIVER_CAPACITY};</li>
+     *     <li>raggruppa le restanti spedizioni per tipologia di prodotto, mittente e provincia;</li>
+     *     <li>calcola e valuta il sender limit per ciascun gruppo, classificando le spedizioni
+     *     tra gli step {@code EVALUATE_DRIVER_CAPACITY} ed {@code EVALUATE_RESIDUAL_CAPACITY};</li>
+     *     <li>persiste le nuove entità nella tabella {@code PaperDelivery}, associate al
+     *     rispettivo step di elaborazione;</li>
+     *     <li>aggiorna i contatori del sender limit utilizzato per le spedizioni destinate
+     *     allo step {@code EVALUATE_DRIVER_CAPACITY}.</li>
+     * </ol>
      *
-     * @param items                List of PaperDelivery items to be processed
-     * @param tenderId             The tender ID associated with the deliveries
-     * @param deliveryWeek         The week of delivery for which the items are being processed
-     * @param driversTotalCapacity List of DriversTotalCapacity containing unified delivery drivers and their capacities
-     * @return Mono<Long> indicating the count of items sent to the next step
+     * @param items elenco delle spedizioni da elaborare
+     * @param tenderId identificativo della gara associata alle spedizioni
+     * @param deliveryWeek settimana di recapito oggetto dell'elaborazione
+     * @param driversTotalCapacity capacità dei driver di recapito per la provincia
+     * @param senderLimitJobProcessObjects oggetti condivisi utilizzati durante l'elaborazione del job
+     * @return gli oggetti di processo aggiornati al termine dell'elaborazione
      */
     private Mono<SenderLimitJobProcessObjects> processItems(List<PaperDelivery> items, String tenderId, LocalDate deliveryWeek, List<DriversTotalCapacity> driversTotalCapacity, SenderLimitJobProcessObjects senderLimitJobProcessObjects) {
         return retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(items, tenderId, driversTotalCapacity, senderLimitJobProcessObjects.getPriorityMap())
@@ -125,11 +154,23 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
     }
 
     /**
-     * This method checks whether there is only one unified delivery driver available for the given province.
-     * If exactly one driver is found, it assigns that driver to all paper deliveries.
-     * Otherwise, it attempts to retrieve the list of unified delivery drivers from the internal cache.
-     * If the drivers are not found in the cache, it retrieves them from the Paper Channel Lambda,
-     * assigns them to the paper deliveries, and updates the cache accordingly.
+     * Recupera e assegna il driver unificato di recapito a ciascuna spedizione.
+     * <p>
+     * Se per la provincia è disponibile un solo driver unificato, questo viene
+     * assegnato direttamente a tutte le spedizioni senza effettuare ulteriori
+     * interrogazioni.
+     * <p>
+     * In caso di più driver disponibili, il metodo tenta innanzitutto di recuperare
+     * le associazioni CAP/prodotto - driver dalla cache. Per le sole associazioni
+     * non presenti in cache viene invocato Paper Channel, che restituisce il driver
+     * unificato da assegnare alle spedizioni. Le associazioni recuperate vengono
+     * quindi salvate in cache per le elaborazioni successive.
+     *
+     * @param paperDelivery elenco delle spedizioni da arricchire
+     * @param tenderId identificativo della gara
+     * @param driversTotalCapacity capacità dei driver disponibili per la provincia
+     * @param priorityMap mappa delle priorità utilizzata per valorizzare le spedizioni
+     * @return elenco delle spedizioni arricchite con driver unificato e priorità
      */
     private Mono<List<PaperDelivery>> retrieveUnifiedDeliveryDriverAndAssignToPaperDeliveries(List<PaperDelivery> paperDelivery, String tenderId, List<DriversTotalCapacity> driversTotalCapacity, Map<Integer, List<PaperDeliveryPriority>> priorityMap) {
         if (driversTotalCapacity.size() == 1 && driversTotalCapacity.getFirst().getUnifiedDeliveryDrivers().size() == 1) {
@@ -170,7 +211,7 @@ public class EvaluateSenderLimitJobServiceImpl implements EvaluateSenderLimitJob
                 .filter(requests -> !CollectionUtils.isEmpty(requests))
                 .map(requests -> deliveryDriverUtils.retrieveUnifiedDeliveryDriversFromPaperChannel(requests, tenderId))
                 .doOnNext(deliveryDriverUtils::insertInCache)
-                .map(responses -> deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(groupedByCapProductTypeNotInCache, tenderId, priorityMap))
+                .map(_ -> deliveryDriverUtils.assignUnifiedDeliveryDriverAndEnrichWithDriverAndPriority(groupedByCapProductTypeNotInCache, tenderId, priorityMap))
                 .defaultIfEmpty(List.of());
     }
 

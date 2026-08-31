@@ -29,7 +29,7 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
     public Mono<Void> startSenderPriorityJob(String senderPaId, LocalDate deliveryWeek) {
 
         String pk = deliveryWeek + "~EVALUATE_SENDER_LIMIT";
-        List<Instant> originalOrderedDates = new ArrayList<>();
+        List<DeliverySlot> originalOrderedSlots = new ArrayList<>();
         NavigableMap<Integer, List<PaperDelivery>> deliveriesByPriority = new TreeMap<>(Comparator.reverseOrder());
         String senderPaIdSkPrefix = senderPaId + "~";
 
@@ -44,14 +44,14 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
                 .flatMapIterable(items -> items)
                 .doOnNext(delivery -> {
                     String sentAt = delivery.getSenderPaIdOriginalSentAt().split("~")[1];
-                    originalOrderedDates.add(Instant.parse(sentAt));
+                    originalOrderedSlots.add(new DeliverySlot(Instant.parse(sentAt), delivery.isSkipSenderLimit()));
                     deliveriesByPriority.computeIfAbsent(delivery.getSenderPriority(), ignored -> new ArrayList<>()).add(delivery);
                 })
                 .then(Mono.defer(() -> {
-                    if (originalOrderedDates.isEmpty()) {
+                    if (originalOrderedSlots.isEmpty()) {
                         return Mono.empty();
                     }
-                    List<PaperDelivery> reorderedDeliveries = buildReorderedDeliveries(originalOrderedDates, deliveriesByPriority);
+                    List<PaperDelivery> reorderedDeliveries = buildReorderedDeliveries(originalOrderedSlots, deliveriesByPriority);
                     return writeReorderedDeliveries(reorderedDeliveries);
                 }));
     }
@@ -60,14 +60,14 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
         return paperDeliveryUtils.retrievePaperDeliveriesToReorder(WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(pk.split("~")[0]), skPrefix, lastEvaluatedKey, pnDelayerConfigs.getDao().getPaperDeliveryQueryLimit(), PaperDelivery.PK_SENDERPAID_ORIGINALSENTAT_INDEX);
     }
 
-    private List<PaperDelivery> buildReorderedDeliveries(List<Instant> originalOrderedDates, NavigableMap<Integer, List<PaperDelivery>> deliveriesByPriority) {
-        List<PaperDelivery> result = new ArrayList<>(originalOrderedDates.size());
+    private List<PaperDelivery> buildReorderedDeliveries(List<DeliverySlot> originalOrderedSlots, NavigableMap<Integer, List<PaperDelivery>> deliveriesByPriority) {
+        List<PaperDelivery> result = new ArrayList<>(originalOrderedSlots.size());
         int index = 0;
         for (Map.Entry<Integer, List<PaperDelivery>> entry : deliveriesByPriority.entrySet()) {
             List<PaperDelivery> deliveriesForPriority = entry.getValue();
             for (PaperDelivery delivery : deliveriesForPriority) {
-                Instant effectiveSortEpochMillis = originalOrderedDates.get(index++);
-                PaperDelivery reordered = copyWithEffectiveSort(delivery, effectiveSortEpochMillis);
+                DeliverySlot assignedSlot = originalOrderedSlots.get(index++);
+                PaperDelivery reordered = copyWithEffectiveSort(delivery, assignedSlot);
                 result.add(reordered);
             }
         }
@@ -75,11 +75,13 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
         return result;
     }
 
-    private PaperDelivery copyWithEffectiveSort(PaperDelivery delivery, Instant effectiveSortEpochMillis) {
+    private PaperDelivery copyWithEffectiveSort(PaperDelivery delivery, DeliverySlot assignedSlot) {
+        Instant effectiveSortEpochMillis = assignedSlot.effectiveSortEpochMillis();
         PaperDelivery copy = new PaperDelivery(delivery, WorkflowStepEnum.EVALUATE_SENDER_LIMIT, LocalDate.parse(delivery.getDeliveryDate()));
         copy.setOldSk(delivery.getSk());
         copy.setSk(buildFinalSortKey(delivery.getProvince(), effectiveSortEpochMillis, delivery.getRequestId()));
         copy.setVirtualNotificationSentAt(effectiveSortEpochMillis.toString());
+        copy.setSkipSenderLimit(assignedSlot.skipSenderLimit());
 
         log.info("Reordering delivery with requestId {}: old sk was {}, new sk is {}", delivery.getRequestId(), copy.getOldSk(), copy.getSk());
 
@@ -96,4 +98,9 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
                 .concatMap(paperDeliveryUtils::transactReorderedDeliveries)
                 .then();
     }
+
+    private record DeliverySlot(
+            Instant effectiveSortEpochMillis,
+            boolean skipSenderLimit
+    ) {}
 }

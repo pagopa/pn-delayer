@@ -24,11 +24,11 @@ const { persistWeeklyEstimates } = require('./dynamo');
  */
 async function calculateWeeklyEstimates(commessa, getProvinceDistribution, fileKey, archiveProcessedAt, archiveFileKey) {
     const { segments, daysInMonth } = getMonthContext(commessa.periodo_riferimento);
-    const partialStart = segments.filter(s => s.weekType === 'PARTIAL_START').length;
-    const partialEnd   = segments.filter(s => s.weekType === 'PARTIAL_END').length;
+    const partialFirstWeeks = segments.filter(s => s.weekType === 'PARTIAL_FIRST_WEEK').length;
+    const partialLastWeeks  = segments.filter(s => s.weekType === 'PARTIAL_LAST_WEEK').length;
 
     console.debug(
-        `[ALGO] Month context – segments: ${segments.length}, partialStart: ${partialStart}, partialEnd: ${partialEnd}, daysInMonth: ${daysInMonth}`
+        `[ALGO] Month context – segments: ${segments.length}, partialFirstWeeks: ${partialFirstWeeks}, partialLastWeeks: ${partialLastWeeks}, daysInMonth: ${daysInMonth}`
       );
     const results = [];
 
@@ -95,9 +95,9 @@ function getMonthContext(periodoRiferimento) {
 
         let weekType = 'FULL';
         if (overlapStart.getTime() === weekStart.getTime() && daysInWeekInMonth < 7) {
-            weekType = 'PARTIAL_END'; // last week: starts Mon, ends before Sun
+            weekType = 'PARTIAL_LAST_WEEK'; // last week: starts Mon, ends before Sun
         } else if (overlapStart.getTime() !== weekStart.getTime()) {
-            weekType = 'PARTIAL_START'; // first week: starts after Mon
+            weekType = 'PARTIAL_FIRST_WEEK'; // first week: starts after Mon
         }
 
         segments.push({ weekStart, daysInWeekInMonth, weekType });
@@ -169,7 +169,7 @@ function buildRecord({ commessa,
         monthlyEstimate,
         originalEstimate,
         lastUpdate: commessa.last_update,
-        weekType,                 // "FULL" | "PARTIAL_START" | "PARTIAL_END"
+        weekType,                 // "FULL" | "PARTIAL_FIRST_WEEK" | "PARTIAL_LAST_WEEK"
         daysInWeekInMonth,       // 7 for FULL, <7 for partials
         archiveProcessedAt
     };

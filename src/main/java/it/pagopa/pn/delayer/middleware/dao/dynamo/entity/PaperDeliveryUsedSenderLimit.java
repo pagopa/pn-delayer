@@ -18,6 +18,7 @@ public class PaperDeliveryUsedSenderLimit {
     public static final String COL_TTL = "ttl";
     public static final String COL_NUMBER_OF_SHIPMENT = "numberOfShipment";
     public static final String COL_SENDER_LIMIT = "senderLimit";
+    public static final String COL_WEEKLY_ESTIMATE = "weeklyEstimate";
 
     @Getter(onMethod = @__({@DynamoDbPartitionKey, @DynamoDbAttribute(COL_PK)}))
     private String pk;
@@ -33,6 +34,8 @@ public class PaperDeliveryUsedSenderLimit {
     private Integer numberOfShipment;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_SENDER_LIMIT)}))
     private Integer senderLimit;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_WEEKLY_ESTIMATE)}))
+    private Integer weeklyEstimate;
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_TTL)}))
     private int ttl;
 }

@@ -22,7 +22,9 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     communicationType: payload.communicationType,
     senderPriority: payload.senderPriority,
     virtualNotificationSentAt: payload.virtualNotificationSentAt,
-    oldSk: payload.oldSk
+    oldSk: payload.oldSk,
+    delayed: payload.delayed,
+    skipSenderLimit: payload.skipSenderLimit
   };
 };
 

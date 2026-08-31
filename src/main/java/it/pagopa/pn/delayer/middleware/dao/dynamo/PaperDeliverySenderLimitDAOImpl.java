@@ -69,26 +69,34 @@ public class PaperDeliverySenderLimitDAOImpl implements PaperDeliverySenderLimit
     }
 
     @Override
-    public Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate shipmentDate, Integer senderLimit) {
+    public Mono<Long> updateUsedSenderLimit(String pk, Long increment, LocalDate shipmentDate, Integer senderLimit, Integer weeklyEstimate) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put(PaperDeliverySenderLimit.COL_PK, AttributeValue.builder().s(pk).build());
         key.put(PaperDeliverySenderLimit.COL_DELIVERY_DATE, AttributeValue.builder().s(shipmentDate.toString()).build());
 
         Map<String, AttributeValue> attributeValue = new HashMap<>();
         attributeValue.put(":v", AttributeValue.builder().n(String.valueOf(increment)).build());
-        attributeValue.put(":senderLimit", AttributeValue.builder().n(String.valueOf(senderLimit)).build());
         attributeValue.put(":paId", AttributeValue.builder().s(pk.split("~")[0]).build());
         attributeValue.put(":province", AttributeValue.builder().s(pk.split("~")[2]).build());
         attributeValue.put(":productType", AttributeValue.builder().s(pk.split("~")[1]).build());
+        attributeValue.put(":weeklyEstimate", AttributeValue.builder().n(String.valueOf(weeklyEstimate)).build());
+
+        String updateExpression = "ADD " + PaperDeliveryUsedSenderLimit.COL_NUMBER_OF_SHIPMENT + " :v" +
+                " SET " +
+                PaperDeliveryUsedSenderLimit.COL_PAID + " = :paId, " +
+                PaperDeliveryUsedSenderLimit.COL_PROVINCE + " = :province, " +
+                PaperDeliveryUsedSenderLimit.COL_PRODUCT_TYPE + " = :productType, " +
+                PaperDeliveryUsedSenderLimit.COL_WEEKLY_ESTIMATE + " = :weeklyEstimate";
+
+        if (senderLimit != null) {
+            attributeValue.put(":senderLimit", AttributeValue.builder().n(String.valueOf(senderLimit)).build());
+            updateExpression += ", " + PaperDeliveryUsedSenderLimit.COL_SENDER_LIMIT + " = :senderLimit";
+        }
 
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                 .tableName(usedSenderLimitTable.tableName())
                 .key(key)
-                .updateExpression("ADD " + PaperDeliveryUsedSenderLimit.COL_NUMBER_OF_SHIPMENT + " :v"+
-                        " SET " + PaperDeliveryUsedSenderLimit.COL_SENDER_LIMIT + " = :senderLimit, "
-                        + PaperDeliveryUsedSenderLimit.COL_PAID + " = :paId, "
-                        + PaperDeliveryUsedSenderLimit.COL_PROVINCE + " = :province, "
-                        + PaperDeliveryUsedSenderLimit.COL_PRODUCT_TYPE + " = :productType")
+                .updateExpression(updateExpression)
                 .expressionAttributeValues(attributeValue)
                 .build();
 

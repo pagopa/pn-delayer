@@ -190,7 +190,9 @@ Resources:
             virtualNotificationSentAt:struct<S:string>,
             oldSk:struct<S:string>,
             senderPaIdOriginalSentAt:struct<S:string>,
-            communicationType:struct<S:string>
+            communicationType:struct<S:string>,
+            delayed:struct<N:string>,
+            skipSenderLimit:struct<N:string>
           >
 
   PaperDeliveryMockDataQualityStack:
@@ -232,7 +234,9 @@ Resources:
             virtualNotificationSentAt:struct<S:string>,
             oldSk:struct<S:string>,
             senderPaIdOriginalSentAt:struct<S:string>,
-            communicationType:struct<S:string>
+            communicationType:struct<S:string>,
+            delayed:struct<N:string>,
+            skipSenderLimit:struct<N:string>
           >
 
   PaperDeliveryDriverUsedCapacitiesDataQualityStack:
@@ -309,6 +313,7 @@ Resources:
             productType:struct<S:string>,
             province:struct<S:string>,
             senderLimit:struct<N:string>,
+            weeklyEstimate:struct<N:string>,
             ttl:struct<N:string>
           >
 
@@ -336,6 +341,7 @@ Resources:
             productType:struct<S:string>,
             province:struct<S:string>,
             senderLimit:struct<N:string>,
+            weeklyEstimate:struct<N:string>,
             ttl:struct<N:string>
           >
 
@@ -365,6 +371,7 @@ Resources:
             productType:struct<S:string>,
             province:struct<S:string>,
             fileKey:struct<S:string>,
+            archiveFileKey:struct<S:string>,
             ttl:struct<N:string>
           >
 
@@ -394,6 +401,7 @@ Resources:
             productType:struct<S:string>,
             province:struct<S:string>,
             fileKey:struct<S:string>,
+            archiveFileKey:struct<S:string>,
             ttl:struct<N:string>
           >
         

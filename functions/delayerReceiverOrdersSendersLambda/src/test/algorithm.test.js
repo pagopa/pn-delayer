@@ -63,11 +63,11 @@ describe('calculateWeeklyEstimates', () => {
         );
 
         const miArJanLastWeek = estimates.find(
-            e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-01-27' && e.weekType === 'PARTIAL_START'
+            e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-01-27' && e.weekType === 'PARTIAL_FIRST_WEEK'
         );
 
         const miArFebLast = estimates.find(
-                    e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-02-24' && e.weekType === 'PARTIAL_END'
+                    e => e.province === 'MI' && e.productType === 'AR' && e.deliveryDate === '2025-02-24' && e.weekType === 'PARTIAL_LAST_WEEK'
                 );
 
         // Lombardia AR 1000 mensile -> Milano 60% di 1000 -> 600 -> 600:28 giorni di feb = 21,4285714 -> x 7 giorni -> 150

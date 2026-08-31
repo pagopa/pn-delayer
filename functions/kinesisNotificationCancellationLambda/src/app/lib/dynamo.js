@@ -57,7 +57,8 @@ async function executeTransactions(paperDeliveryItems, kinesisSequenceNumber) {
         TableName: paperDeliveryTable,
         Item: {
           ...item,
-          pk: `DELETED~${pk}`
+          pk: `DELETED~${pk}`,
+          workflowStep: `DELETED`
         }
       }
     });
