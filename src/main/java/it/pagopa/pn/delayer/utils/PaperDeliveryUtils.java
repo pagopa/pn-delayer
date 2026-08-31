@@ -9,6 +9,7 @@ import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryCounterDAO;
 import it.pagopa.pn.delayer.middleware.dao.PaperDeliveryDAO;
 import it.pagopa.pn.delayer.middleware.dao.dynamo.entity.PaperDelivery;
 import it.pagopa.pn.delayer.model.*;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,13 @@ public class PaperDeliveryUtils {
     private final PaperDeliveryCounterDAO paperDeliveryCounterDAO;
     private static final String AUDIT_LOG_DELIVERIES_RESCHEDULED_NEXT_WEEK_START_CALL_MESSAGE = "Deliveries rescheduled to next week: deliveryWeek={}";
     private static final String AUDIT_LOG_DELIVERIES_RESCHEDULED_NEXT_WEEK_MESSAGE = "Deliveries rescheduled to next week due to saturated delivery driver capacity: fromWeek={}, toWeek={}, requestIds={}";
+    private boolean isMock;
+
+    @PostConstruct
+    public void init() {
+        isMock = pnDelayerConfigs.getDao().getPaperDeliveryDriverUsedCapacitiesTableName() != null &&
+                pnDelayerConfigs.getDao().getPaperDeliveryDriverUsedCapacitiesTableName().endsWith("Mock");
+    }
 
 
     /**
@@ -96,7 +104,7 @@ public class PaperDeliveryUtils {
     private Mono<Integer> processChunkToSendToNextWeek(List<PaperDelivery> chunk, LocalDate deliveryWeek) {
         log.info("Processing chunk of size {} to send to next week", chunk.size());
         PnAuditLogEvent auditLogEvent = buildAuditLogEvent(deliveryWeek);
-        if (!CollectionUtils.isEmpty(chunk)) {
+        if ( (!CollectionUtils.isEmpty(chunk)) && (!isMock)) {
             LocalDate nextWeek = deliveryWeek.plusWeeks(1);
             List<String> requestIds = chunk.stream()
                     .map(PaperDelivery::getRequestId)
