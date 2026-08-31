@@ -58,8 +58,10 @@ exports.importData = async (params = []) => {
 
     const notificationSentAtWeek = calculateNotificationSentAtWeek(record.notificationSentAt, dayOfWeek);
     const inCurrentWeek = notificationSentAtWeek === currentWeek;
-
-    if (inCurrentWeek) {
+    if (isRsOrSecondAttempt(record)  && record.communicationType !== 'INFORMAL') {
+      const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek, false, true);
+      itemsBuffer.push(paperDelivery);
+    } else if (inCurrentWeek) {
       const paperDelivery = buildPaperDeliveryRecord(record, deliveryWeek, false, false);
       itemsBuffer.push(paperDelivery);
     } else {
@@ -135,7 +137,7 @@ exports.importData = async (params = []) => {
 async function processBatch(paperDeliveryTableName, countersTableName, items, deliveryWeek) {
   const grouped = groupRecordsByProductAndProvince(items);
   const groupedBySenderPaId = groupRecordsBySenderPaId(items);
-  const recordsToWrite = items.filter(record => !record.skipSenderLimit);
+  const recordsToWrite = items.filter(record => !record.skipSenderLimit || isRsOrSecondAttempt(record));
 
   await updateExcludeCounter(countersTableName, grouped, deliveryWeek);
   await updateSenderPriorityCounter(countersTableName, groupedBySenderPaId, deliveryWeek);
@@ -249,12 +251,12 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
             .filter(p => p !== 0)
         );
         console.log(`Updating sender priority counter for senderPaId: ${senderPaId} with priorities: ${JSON.stringify(Array.from(priorities))}`);
-  
+
         if (!priorities || priorities.size === 0) {
           console.log(`Skipping updating sender priority for senderPaId: ${senderPaId}`);
           continue;
         }
-  
+
         const input = {
           TableName: countersTableName,
           Key: {
@@ -401,6 +403,7 @@ function isUsedSenderLimitConditionFailure(error) {
 function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
   const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
   const date = rsOrSecondAttempt ? payload.prepareRequestDate : payload.notificationSentAt
+  const senderPriority = rsOrSecondAttempt || payload.communicationType === 'INFORMAL' ? 0 : parseInt(payload.senderPriority || '0', 10);
 
   const record = {
     pk: buildPk(deliveryWeek),
@@ -420,13 +423,13 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSe
     recipientId: payload.recipientId,
     workflowStep: 'EVALUATE_SENDER_LIMIT',
     communicationType: payload.communicationType || 'LEGAL',
-    senderPriority: payload.senderPriority ? parseInt(payload.senderPriority, 10) : 0,
+    senderPriority: senderPriority,
     deliveryDate: deliveryWeek,
     delayed: Boolean(delayed),
     skipSenderLimit: Boolean(skipSenderLimit)
   };
 
-  if (payload.senderPaId && !rsOrSecondAttempt) {
+  if (payload.senderPaId && !rsOrSecondAttempt && payload.communicationType !== 'INFORMAL') {
     record.senderPaIdOriginalSentAt = `${payload.senderPaId}~${date}`;
   }
 
@@ -469,6 +472,9 @@ function groupRecordsByProductAndProvince(records) {
 
 function groupRecordsBySenderPaId(records) {
     return records.reduce((acc, record) => {
+        if (!record.senderPaId || isRsOrSecondAttempt(record) || record.communicationType === 'INFORMAL') {
+          return acc;
+        }
         const key = record.senderPaId;
         if (!key) {
           return acc;

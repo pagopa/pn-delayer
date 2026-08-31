@@ -1672,7 +1672,7 @@ describe("Lambda Delayer Dispatcher", () => {
             const transactionCalls = ddbMock.commandCalls(
                 TransactWriteCommand
             );
-            assert.strictEqual(transactionCalls.length, 2);
+            assert.strictEqual(transactionCalls.length, 1);
 
             const transactionItems = transactionCalls.map(
                 (call) => call.args[0].input.TransactItems[1].Put.Item
@@ -1681,18 +1681,11 @@ describe("Lambda Delayer Dispatcher", () => {
             const delayedAR = transactionItems.find(
                 (item) => item.requestId === "RID-DELAYED-1"
             );
-            const delayedRS = transactionItems.find(
-                (item) => item.requestId === "RID-DELAYED-2"
-            );
 
             assert.strictEqual(delayedAR.delayed, true);
             assert.strictEqual(delayedAR.skipSenderLimit, true);
             assert.strictEqual(delayedAR.senderPaId, "sender1");
             assert.strictEqual(delayedAR.province, "RM");
-
-            assert.strictEqual(delayedRS.productType, "RS");
-            assert.strictEqual(delayedRS.delayed, true);
-            assert.strictEqual(delayedRS.skipSenderLimit, true);
 
             const batchCalls = ddbMock.commandCalls(BatchWriteCommand);
             assert.strictEqual(batchCalls.length, 1);
@@ -1703,7 +1696,7 @@ describe("Lambda Delayer Dispatcher", () => {
                 )
             );
 
-            assert.strictEqual(allBatchWrittenItems.length, 3);
+            assert.strictEqual(allBatchWrittenItems.length, 4);
 
             const currentRecords = allBatchWrittenItems.filter(
                 (record) => record.requestId.includes("CURRENT")
@@ -1729,7 +1722,7 @@ describe("Lambda Delayer Dispatcher", () => {
                 allBatchWrittenItems.some(
                     (record) => record.requestId === "RID-DELAYED-2"
                 ),
-                false
+                true
             );
 
             const updateCalls = ddbMock.commandCalls(UpdateCommand);

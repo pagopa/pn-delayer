@@ -42,7 +42,6 @@ public class EvaluateSenderPriorityJobServiceImpl implements EvaluateSenderPrior
                 })
                 .map(Page::items)
                 .flatMapIterable(items -> items)
-                .filter(paperDelivery -> !paperDelivery.isDelayed() || Objects.nonNull(paperDelivery.getPreviousStep()))
                 .doOnNext(delivery -> {
                     String sentAt = delivery.getSenderPaIdOriginalSentAt().split("~")[1];
                     originalOrderedSlots.add(new DeliverySlot(Instant.parse(sentAt), delivery.isSkipSenderLimit()));

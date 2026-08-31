@@ -24,8 +24,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek) {
     virtualNotificationSentAt: payload.virtualNotificationSentAt,
     oldSk: payload.oldSk,
     delayed: payload.delayed,
-    skipSenderLimit: payload.skipSenderLimit,
-    previousStep: payload.workflowStep
+    skipSenderLimit: payload.skipSenderLimit
   };
 };
 
