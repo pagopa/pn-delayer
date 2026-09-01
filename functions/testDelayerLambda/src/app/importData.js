@@ -15,6 +15,8 @@ const { LocalDate, DayOfWeek, TemporalAdjusters, Instant, ZoneOffset} = require(
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
+const MAX_TRANSACTION_CONFLICT_RETRIES = 5;
+const TRANSACTION_CONFLICT_BASE_DELAY_MS = 50;
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
@@ -45,6 +47,7 @@ exports.importData = async (params = []) => {
   let processed = 0;
   const itemsBuffer = [];
   const delayedPaperDeliveryList = [];
+  const failedRecords = [];
   const dayOfWeek = 1; //lunedì
 
   if (!deliveryWeek) {
@@ -94,16 +97,23 @@ exports.importData = async (params = []) => {
 
         if (hasSenderLimit) {
           console.log(`Found sender limit for ${groupKey}: ${senderLimitItem.weeklyEstimate}`);
-          await updateUsedSenderLimitAndInsertPaperDeliveries(
+          const groupFailures = await updateUsedSenderLimitAndInsertPaperDeliveries(
             paperDeliveryTableName,
             usedSenderLimitTableName,
             groupRecords,
             itemsBuffer,
             deliveryWeek,
             notificationSentAtWeek,
-            senderLimitItem.weeklyEstimate
+            senderLimitItem.weeklyEstimate,
+            groupKey
           );
-          console.log(`Updated used sender limit and inserted PaperDeliveries for delayed group ${groupKey}`);
+          failedRecords.push(...groupFailures);
+
+          if (groupFailures.length === 0) {
+            console.log(`Updated used sender limit and inserted PaperDeliveries for delayed group ${groupKey}`);
+          } else {
+            console.error(`Completed delayed group ${groupKey} with ${groupFailures.length} failed records`);
+          }
         } else {
           console.log(`No valid sender limit found for delayed group ${groupKey}`);
 
@@ -122,6 +132,14 @@ exports.importData = async (params = []) => {
           `Failed to process delayed group ${groupKey}`,
           error
         );
+        failedRecords.push(
+          ...groupRecords.map((record) => ({
+            requestId: record.requestId,
+            groupKey,
+            errorName: error.name,
+            errorMessage: error.message
+          }))
+        );
       }
     }
   }
@@ -131,6 +149,25 @@ exports.importData = async (params = []) => {
   }
 
   console.log("Processed data:", processed);
+
+  if (failedRecords.length > 0) {
+    const failedGroups = new Set(failedRecords.map(({ groupKey }) => groupKey));
+    const failedRequestIds = failedRecords
+      .slice(0, 20)
+      .map(({ requestId }) => requestId)
+      .join(", ");
+    const omittedRequestIds = failedRecords.length - 20;
+    const requestIdSummary = omittedRequestIds > 0
+      ? `${failedRequestIds} and ${omittedRequestIds} more`
+      : failedRequestIds;
+    const message =
+      `CSV import failed for ${failedRecords.length} of ${processed} records ` +
+      `across ${failedGroups.size} delayed groups. Failed requestIds: ${requestIdSummary}`;
+
+    console.error(message);
+    throw new Error(message);
+  }
+
   return { message: "CSV imported successfully", processed };
 };
 
@@ -304,8 +341,11 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
     itemsBuffer,
     deliveryWeek,
     notificationSentAtWeek,
-    weeklyEstimate
+    weeklyEstimate,
+    groupKey
   ) {
+    const failedRecords = [];
+
     for (const eventItem of groupRecords) {
       const transactionalPaperDelivery = buildPaperDeliveryRecord(
         eventItem,
@@ -343,30 +383,34 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
       ];
 
       try {
-        await docClient.send(
-          new TransactWriteCommand({
-            TransactItems: [
-              {
-                Update: {
-                  TableName: usedSenderLimitTableName,
-                  Key: key,
-                  UpdateExpression:
-                    `SET ${setExpressions.join(", ")} ` +
-                    "ADD #numberOfShipment :one",
-                  ConditionExpression:
-                    "attribute_not_exists(#numberOfShipment) OR #numberOfShipment < :weeklyEstimate",
-                  ExpressionAttributeNames: expressionAttributeNames,
-                  ExpressionAttributeValues: expressionAttributeValues
-                }
-              },
-              {
-                Put: {
-                  TableName: paperDeliveryTableName,
-                  Item: transactionalPaperDelivery
-                }
+        const transactionInput = {
+          TransactItems: [
+            {
+              Update: {
+                TableName: usedSenderLimitTableName,
+                Key: key,
+                UpdateExpression:
+                  `SET ${setExpressions.join(", ")} ` +
+                  "ADD #numberOfShipment :one",
+                ConditionExpression:
+                  "attribute_not_exists(#numberOfShipment) OR #numberOfShipment < :weeklyEstimate",
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues
               }
-            ]
-          })
+            },
+            {
+              Put: {
+                TableName: paperDeliveryTableName,
+                Item: transactionalPaperDelivery
+              }
+            }
+          ]
+        };
+
+        await sendTransactionWithRetry(
+          transactionInput,
+          eventItem.requestId,
+          groupKey
         );
 
         itemsBuffer.push(transactionalPaperDelivery);
@@ -388,9 +432,16 @@ async function updateSenderPriorityCounter(countersTableName, groupedSenderPaIdR
         }
 
         console.error(`Failed transactional processing for ${eventItem.requestId}`, error);
-        throw error;
+        failedRecords.push({
+          requestId: eventItem.requestId,
+          groupKey,
+          errorName: error.name,
+          errorMessage: error.message
+        });
       }
     }
+
+    return failedRecords;
   }
 
 function isUsedSenderLimitConditionFailure(error) {
@@ -398,6 +449,40 @@ function isUsedSenderLimitConditionFailure(error) {
     error?.name === "TransactionCanceledException" &&
     error?.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed"
   );
+}
+
+function isTransactionConflict(error) {
+  return (
+    error?.name === "TransactionCanceledException" &&
+    error?.CancellationReasons?.some(({ Code }) => Code === "TransactionConflict")
+  );
+}
+
+async function sendTransactionWithRetry(transactionInput, requestId, groupKey) {
+  let retryCount = 0;
+
+  while (true) {
+    try {
+      return await docClient.send(new TransactWriteCommand(transactionInput));
+    } catch (error) {
+      if (!isTransactionConflict(error) || retryCount >= MAX_TRANSACTION_CONFLICT_RETRIES) {
+        throw error;
+      }
+
+      const retryNumber = retryCount + 1;
+      const maxDelay =
+        TRANSACTION_CONFLICT_BASE_DELAY_MS * Math.pow(2, retryCount);
+      const delay = Math.max(1, Math.floor(Math.random() * maxDelay));
+
+      console.warn(
+        `Transaction conflict for delayed PaperDelivery ${requestId} in group ${groupKey}. ` +
+        `Retrying ${retryNumber}/${MAX_TRANSACTION_CONFLICT_RETRIES} in ${delay} ms`
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      retryCount = retryNumber;
+    }
+  }
 }
 
 function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
@@ -497,4 +582,3 @@ function groupDelayedRecords(records) {
     return acc;
   }, {});
 };
-
