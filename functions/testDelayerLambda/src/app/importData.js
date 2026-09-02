@@ -15,8 +15,10 @@ const { LocalDate, DayOfWeek, TemporalAdjusters, Instant, ZoneOffset} = require(
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
-const MAX_TRANSACTION_CONFLICT_RETRIES = 5;
+// The initial request is not a retry: 8 retries allow at most 9 transaction attempts per record.
+const MAX_TRANSACTION_CONFLICT_RETRIES = 8;
 const TRANSACTION_CONFLICT_BASE_DELAY_MS = 50;
+const TRANSACTION_CONFLICT_MAX_DELAY_MS = 1000;
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
@@ -465,13 +467,18 @@ async function sendTransactionWithRetry(transactionInput, requestId, groupKey) {
     try {
       return await docClient.send(new TransactWriteCommand(transactionInput));
     } catch (error) {
+      // Only transaction conflicts represent transient contention between concurrent part imports.
       if (!isTransactionConflict(error) || retryCount >= MAX_TRANSACTION_CONFLICT_RETRIES) {
         throw error;
       }
 
       const retryNumber = retryCount + 1;
-      const maxDelay =
-        TRANSACTION_CONFLICT_BASE_DELAY_MS * Math.pow(2, retryCount);
+      const maxDelay = Math.min(
+        TRANSACTION_CONFLICT_BASE_DELAY_MS * Math.pow(2, retryCount),
+        TRANSACTION_CONFLICT_MAX_DELAY_MS
+      );
+      // Full jitter spreads concurrent retries across the capped exponential window.
+      // The cap bounds how much a persistently contended record consumes the Lambda timeout.
       const delay = Math.max(1, Math.floor(Math.random() * maxDelay));
 
       console.warn(

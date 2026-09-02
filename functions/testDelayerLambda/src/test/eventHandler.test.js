@@ -1663,7 +1663,13 @@ describe("Lambda Delayer Dispatcher", () => {
             ddbMock.on(UpdateCommand).resolves({});
 
             const originalRandom = Math.random;
-            Math.random = () => 0;
+            const originalSetTimeout = global.setTimeout;
+            const retryDelays = [];
+            Math.random = () => 0.999;
+            global.setTimeout = (callback, delay) => {
+                retryDelays.push(delay);
+                callback();
+            };
 
             let result;
             try {
@@ -1680,12 +1686,13 @@ describe("Lambda Delayer Dispatcher", () => {
                 });
             } finally {
                 Math.random = originalRandom;
+                global.setTimeout = originalSetTimeout;
             }
 
             assert.strictEqual(result.statusCode, 500);
             assert.strictEqual(
                 ddbMock.commandCalls(TransactWriteCommand).length,
-                7
+                10
             );
 
             const transactionRequestIds = ddbMock
@@ -1695,8 +1702,18 @@ describe("Lambda Delayer Dispatcher", () => {
                 );
 
             assert.strictEqual(
+                transactionRequestIds.filter(
+                    (requestId) => requestId === "RID-FAILED"
+                ).length,
+                9
+            );
+            assert.strictEqual(
                 transactionRequestIds.includes("RID-SUCCESS"),
                 true
+            );
+            assert.deepStrictEqual(
+                retryDelays,
+                [49, 99, 199, 399, 799, 999, 999, 999]
             );
 
             const responseBody = JSON.parse(result.body);
