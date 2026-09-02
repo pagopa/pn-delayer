@@ -15,7 +15,7 @@ const { LocalDate, DayOfWeek, TemporalAdjusters, Instant, ZoneOffset} = require(
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
-// The initial request is not a retry: 8 retries allow at most 9 transaction attempts per record.
+// The initial request is not a retry: 10 retries allow at most 11 transaction attempts per record.
 const MAX_TRANSACTION_CONFLICT_RETRIES = 10;
 const TRANSACTION_CONFLICT_BASE_DELAY_MS = 100;
 const TRANSACTION_CONFLICT_MAX_DELAY_MS = 5000;

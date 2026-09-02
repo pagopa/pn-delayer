@@ -1692,7 +1692,7 @@ describe("Lambda Delayer Dispatcher", () => {
             assert.strictEqual(result.statusCode, 500);
             assert.strictEqual(
                 ddbMock.commandCalls(TransactWriteCommand).length,
-                10
+                12
             );
 
             const transactionRequestIds = ddbMock
@@ -1705,7 +1705,7 @@ describe("Lambda Delayer Dispatcher", () => {
                 transactionRequestIds.filter(
                     (requestId) => requestId === "RID-FAILED"
                 ).length,
-                9
+                11
             );
             assert.strictEqual(
                 transactionRequestIds.includes("RID-SUCCESS"),
@@ -1713,7 +1713,7 @@ describe("Lambda Delayer Dispatcher", () => {
             );
             assert.deepStrictEqual(
                 retryDelays,
-                [49, 99, 199, 399, 799, 999, 999, 999]
+                [99, 199, 399, 799, 1598, 3196, 4995, 4995, 4995, 4995]
             );
 
             const responseBody = JSON.parse(result.body);
