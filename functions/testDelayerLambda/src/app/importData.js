@@ -16,9 +16,9 @@ const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 // The initial request is not a retry: 8 retries allow at most 9 transaction attempts per record.
-const MAX_TRANSACTION_CONFLICT_RETRIES = 8;
-const TRANSACTION_CONFLICT_BASE_DELAY_MS = 50;
-const TRANSACTION_CONFLICT_MAX_DELAY_MS = 1000;
+const MAX_TRANSACTION_CONFLICT_RETRIES = 10;
+const TRANSACTION_CONFLICT_BASE_DELAY_MS = 100;
+const TRANSACTION_CONFLICT_MAX_DELAY_MS = 5000;
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
