@@ -1565,6 +1565,168 @@ describe("Lambda Delayer Dispatcher", () => {
             assert.strictEqual(updateCalls.length, 2);
         });
 
+        it("IMPORT_DATA should retry a transaction conflict and complete successfully", async () => {
+            LocalDate.now = () => LocalDate.parse("1970-01-07");
+
+            const csvData = [
+                "requestId;notificationSentAt;prepareRequestDate;productType;senderPaId;province;cap;attempt;iun;senderPriority",
+                "RID-DELAYED-1;1970-01-01T00:00:00Z;1970-01-01T00:00:00Z;AR;sender1;RM;00100;0;IUN-1;10"
+            ].join("\n");
+
+            const transactionConflict = Object.assign(
+                new Error("transaction conflict"),
+                {
+                    name: "TransactionCanceledException",
+                    CancellationReasons: [
+                        { Code: "TransactionConflict" },
+                        { Code: "None" }
+                    ]
+                }
+            );
+            let attempts = 0;
+
+            s3Mock.on(GetObjectCommand).resolves({
+                Body: Readable.from([csvData])
+            });
+            ddbMock.on(GetCommand).resolves({
+                Item: {
+                    weeklyEstimate: 100
+                }
+            });
+            ddbMock.on(TransactWriteCommand).callsFake(async () => {
+                attempts += 1;
+                if (attempts === 1) {
+                    throw transactionConflict;
+                }
+                return {};
+            });
+            ddbMock.on(UpdateCommand).resolves({});
+
+            const result = await handler({
+                operationType: "IMPORT_DATA",
+                parameters: [
+                    "pn-DelayerPaperDelivery",
+                    "pn-PaperDeliveryCounters",
+                    "pn-PaperDeliverySenderLimit",
+                    "pn-PaperDeliveryUsedSenderLimit",
+                    "delayed-conflict.csv",
+                    "1970-01-12"
+                ]
+            });
+
+            assert.strictEqual(result.statusCode, 200);
+            assert.strictEqual(
+                ddbMock.commandCalls(TransactWriteCommand).length,
+                2
+            );
+            assert.strictEqual(
+                ddbMock.commandCalls(BatchWriteCommand).length,
+                0
+            );
+        });
+
+        it("IMPORT_DATA should continue the same group and return 500 after retry exhaustion", async () => {
+            LocalDate.now = () => LocalDate.parse("1970-01-07");
+
+            const csvData = [
+                "requestId;notificationSentAt;prepareRequestDate;productType;senderPaId;province;cap;attempt;iun;senderPriority",
+                "RID-FAILED;1970-01-01T00:00:00Z;1970-01-01T00:00:00Z;AR;sender1;RM;00100;0;IUN-1;10",
+                "RID-SUCCESS;1970-01-01T00:00:00Z;1970-01-01T00:00:00Z;AR;sender1;RM;00100;0;IUN-2;20"
+            ].join("\n");
+
+            const transactionConflict = Object.assign(
+                new Error("transaction conflict"),
+                {
+                    name: "TransactionCanceledException",
+                    CancellationReasons: [
+                        { Code: "TransactionConflict" },
+                        { Code: "None" }
+                    ]
+                }
+            );
+
+            s3Mock.on(GetObjectCommand).resolves({
+                Body: Readable.from([csvData])
+            });
+            ddbMock.on(GetCommand).resolves({
+                Item: {
+                    weeklyEstimate: 100
+                }
+            });
+            ddbMock.on(TransactWriteCommand).callsFake(async (input) => {
+                const requestId = input.TransactItems[1].Put.Item.requestId;
+                if (requestId === "RID-FAILED") {
+                    throw transactionConflict;
+                }
+                return {};
+            });
+            ddbMock.on(UpdateCommand).resolves({});
+
+            const originalRandom = Math.random;
+            const originalSetTimeout = global.setTimeout;
+            const retryDelays = [];
+            Math.random = () => 0.999;
+            global.setTimeout = (callback, delay) => {
+                retryDelays.push(delay);
+                callback();
+            };
+
+            let result;
+            try {
+                result = await handler({
+                    operationType: "IMPORT_DATA",
+                    parameters: [
+                        "pn-DelayerPaperDelivery",
+                        "pn-PaperDeliveryCounters",
+                        "pn-PaperDeliverySenderLimit",
+                        "pn-PaperDeliveryUsedSenderLimit",
+                        "delayed-conflict-exhausted.csv",
+                        "1970-01-12"
+                    ]
+                });
+            } finally {
+                Math.random = originalRandom;
+                global.setTimeout = originalSetTimeout;
+            }
+
+            assert.strictEqual(result.statusCode, 500);
+            assert.strictEqual(
+                ddbMock.commandCalls(TransactWriteCommand).length,
+                12
+            );
+
+            const transactionRequestIds = ddbMock
+                .commandCalls(TransactWriteCommand)
+                .map((call) =>
+                    call.args[0].input.TransactItems[1].Put.Item.requestId
+                );
+
+            assert.strictEqual(
+                transactionRequestIds.filter(
+                    (requestId) => requestId === "RID-FAILED"
+                ).length,
+                11
+            );
+            assert.strictEqual(
+                transactionRequestIds.includes("RID-SUCCESS"),
+                true
+            );
+            assert.deepStrictEqual(
+                retryDelays,
+                [99, 199, 399, 799, 1598, 3196, 4995, 4995, 4995, 4995]
+            );
+
+            const responseBody = JSON.parse(result.body);
+            assert.strictEqual(
+                responseBody.message.includes("failed for 1 of 2 records"),
+                true
+            );
+            assert.strictEqual(
+                responseBody.message.includes("RID-FAILED"),
+                true
+            );
+        });
+
         it("IMPORT_DATA should fallback to normal batch write when sender limit is exhausted", async () => {
             LocalDate.now = () => LocalDate.parse("1970-01-07");
 
@@ -1734,7 +1896,7 @@ describe("Lambda Delayer Dispatcher", () => {
             assert.strictEqual(delayedCounterUpdates.length, 0);
         });
 
-        it("IMPORT_DATA should continue processing other delayed groups when one group fails technically", async () => {
+        it("IMPORT_DATA should continue processing other delayed groups and report technical failures", async () => {
             LocalDate.now = () => LocalDate.parse("1970-01-07");
 
             const csvData = [
@@ -1769,7 +1931,7 @@ describe("Lambda Delayer Dispatcher", () => {
                 ]
             });
 
-            assert.strictEqual(result.statusCode, 200);
+            assert.strictEqual(result.statusCode, 500);
 
             const batchCalls = ddbMock.commandCalls(BatchWriteCommand);
             assert.strictEqual(batchCalls.length, 1);
@@ -1788,6 +1950,16 @@ describe("Lambda Delayer Dispatcher", () => {
             assert.strictEqual(
                 writtenItems[0].skipSenderLimit,
                 false
+            );
+
+            const responseBody = JSON.parse(result.body);
+            assert.strictEqual(
+                responseBody.message.includes("failed for 1 of 2 records"),
+                true
+            );
+            assert.strictEqual(
+                responseBody.message.includes("RID-FAILED"),
+                true
             );
         });
 
