@@ -56,7 +56,7 @@ exports.importData = async (params = []) => {
     deliveryWeek = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.of(dayOfWeek))).toString();
   }
 
-  const currentWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.of(dayOfWeek))).toString();
+  const currentWeek = LocalDate.parse(deliveryWeek).with(TemporalAdjusters.previous(DayOfWeek.of(dayOfWeek))).toString();
 
   for await (const record of stream.pipe(csv({ separator: ";" }))) {
     processed += 1;

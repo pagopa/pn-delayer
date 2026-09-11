@@ -140,18 +140,50 @@ public class PnDelayerUtils {
         return paperDelivery;
     }
 
+    /**
+     * Calcola il limite ancora disponibile per determinare se impostare il flag {@code skipSenderLimit}.
+     *
+     * Il calcolo è diverso a seconda dello step in cui deve essere inserita la spedizione:
+     *
+     * - EVALUATE_DRIVER_CAPACITY:
+     *   le spedizioni hanno già superato il controllo del limite garantito.
+     *   Inoltre, le spedizioni che hanno utilizzato il modulo commessa sono già state conteggiate
+     *   tramite l'incremento del relativo contatore.
+     *   In questo caso è quindi sufficiente verificare la disponibilità del modulo commessa,
+     *   senza sottrarre quanto già utilizzato.
+     *   Questo permette di gestire correttamente anche i casi in cui il limite garantito
+     *   è maggiore del modulo commessa.
+     *
+     * - EVALUATE_RESIDUAL_CAPACITY:
+     *   le spedizioni non hanno superato il controllo del limite garantito.
+     *   È quindi necessario considerare non solo il modulo commessa disponibile,
+     *   ma anche la quota già consumata dalle spedizioni precedentemente inviate
+     *   in EVALUATE_DRIVER_CAPACITY.
+     *   Per questo motivo, dal modulo commessa viene sottratto il valore già utilizzato.
+     *
+     * In entrambi i casi, le spedizioni che rientrano nel limite calcolato avranno
+     * il flag {@code skipSenderLimit} impostato a {@code true}, mentre le altre
+     * lo avranno impostato a {@code false}.
+     */
     private void evaluateAndSetSkipSenderLimitFlag(PaperDelivery paperDelivery, SenderLimitJobProcessObjects processObjects, String shipmentDate, boolean isResidual) {
         String key = String.join("~", shipmentDate, paperDelivery.getSenderPaId(), paperDelivery.getProductType(), paperDelivery.getProvince());
         Map<String, SenderLimitData> senderLimitMap = processObjects.getSenderLimitMap();
         SenderLimitData limitData = senderLimitMap.get(key);
         if (Objects.nonNull(limitData) && limitData.weeklyEstimate() > 0) {
-            int availableLimit = limitData.weeklyEstimate() - limitData.incrementUsedLimit();
+            int availableLimit = calculateAvailableLimit(isResidual, limitData);
             boolean hasAvailableLimit = availableLimit > 0;
             paperDelivery.setSkipSenderLimit(hasAvailableLimit);
             if (hasAvailableLimit && isResidual) {
                 senderLimitMap.put(key, limitData.incrementUsedLimit(1));
             }
         }
+    }
+
+    private static int calculateAvailableLimit(boolean isResidual, SenderLimitData limitData) {
+        if (isResidual) {
+            return limitData.weeklyEstimate() - limitData.incrementUsedLimit();
+        }
+        return limitData.weeklyEstimate();
     }
 
 
