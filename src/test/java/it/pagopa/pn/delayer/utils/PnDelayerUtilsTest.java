@@ -6,6 +6,7 @@ import it.pagopa.pn.delayer.model.PaperChannelDeliveryDriver;
 import it.pagopa.pn.delayer.model.SenderLimitData;
 import it.pagopa.pn.delayer.model.SenderLimitJobProcessObjects;
 import it.pagopa.pn.delayer.model.WorkflowStepEnum;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -166,6 +167,123 @@ class PnDelayerUtilsTest {
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(delivery -> delivery.getPk().equalsIgnoreCase("2023-10-02~" + WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY.name())
                 && delivery.getSk().equalsIgnoreCase(String.join("~", delivery.getUnifiedDeliveryDriver(), delivery.getProvince(), String.valueOf(delivery.getPriority()),  "2023-10-01T12:00:00Z", delivery.getRequestId()))));
+    }
+
+    @Test
+    void mapItemForEvaluateDriverCapacityStep_senderLimitGreaterThanModule_shouldSetSkipTrue() {
+        // limite garantito = 7
+        // modulo commessa = 10
+        // Le spedizioni arrivate al driver hanno già superato il limite garantito.
+        // Il modulo commessa è disponibile -> skipSenderLimit = true.
+
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+
+        SenderLimitJobProcessObjects processObjects = new SenderLimitJobProcessObjects();
+        processObjects.setSenderLimitMap(new HashMap<>(Map.of(
+                "2023-09-25~paId1~AR~RM",
+                new SenderLimitData(10, 7, 7, LocalDate.parse("2023-09-25"))
+        )));
+
+        List<PaperDelivery> deliveries = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            deliveries.add(createPaperDelivery(
+                    "AR",
+                    "00178",
+                    "RM",
+                    "paId1",
+                    0,
+                    1
+            ));
+        }
+
+        processObjects.setSendToDriverCapacityStep(deliveries);
+
+        List<PaperDelivery> result =
+                pnDelayerUtils.mapItemForEvaluateDriverCapacityStep(
+                        processObjects,
+                        deliveryWeek
+                );
+
+        assertEquals(7, result.size());
+        assertTrue(result.stream().allMatch(PaperDelivery::isSkipSenderLimit));
+    }
+
+    @Test
+    void mapItemForResidualCapacityStep_shouldCalculateAvailableLimitUsingUsedLimit() {
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+
+        String key = "2023-09-25~paId1~AR~RM";
+
+        SenderLimitJobProcessObjects processObjects = new SenderLimitJobProcessObjects();
+        processObjects.setSenderLimitMap(new HashMap<>(Map.of(
+                key,
+                new SenderLimitData(
+                        10,
+                        7,
+                        7,
+                        LocalDate.parse("2023-09-25")
+                )
+        )));
+
+        PaperDelivery delivery =
+                createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1);
+
+        processObjects.setSendToResidualCapacityStep(List.of(delivery));
+
+        List<PaperDelivery> result =
+                pnDelayerUtils.mapItemForResidualCapacityStep(
+                        processObjects,
+                        deliveryWeek
+                );
+
+        assertEquals(1, result.size());
+        assertTrue(result.getFirst().isSkipSenderLimit());
+
+        assertEquals(
+                8,
+                processObjects.getSenderLimitMap()
+                        .get(key)
+                        .incrementUsedLimit()
+        );
+    }
+
+    @Test
+    void mapItemForResidualCapacityStep_whenAvailableLimitIsZero_shouldSetSkipFalse() {
+        LocalDate deliveryWeek = LocalDate.parse("2023-10-02");
+
+        String key = "2023-09-25~paId1~AR~RM";
+
+        SenderLimitJobProcessObjects processObjects = new SenderLimitJobProcessObjects();
+        processObjects.setSenderLimitMap(new HashMap<>(Map.of(
+                key,
+                new SenderLimitData(
+                        10,
+                        10,
+                        10,
+                        LocalDate.parse("2023-09-25")
+                )
+        )));
+
+        PaperDelivery delivery =
+                createPaperDelivery("AR", "00178", "RM", "paId1", 0, 1);
+
+        processObjects.setSendToResidualCapacityStep(List.of(delivery));
+
+        List<PaperDelivery> result =
+                pnDelayerUtils.mapItemForResidualCapacityStep(
+                        processObjects,
+                        deliveryWeek
+                );
+
+        Assertions.assertFalse(result.getFirst().isSkipSenderLimit());
+
+        assertEquals(
+                10,
+                processObjects.getSenderLimitMap()
+                        .get(key)
+                        .incrementUsedLimit()
+        );
     }
 
     @Test
