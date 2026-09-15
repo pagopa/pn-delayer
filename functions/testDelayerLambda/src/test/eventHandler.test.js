@@ -325,9 +325,11 @@ describe("Lambda Delayer Dispatcher", () => {
        s3Mock.on(GetObjectCommand).resolves({
            Body: Readable.from([csvData])
        });
-       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
-        unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
-        unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
+       ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", notificationSentAt: "2026-09-01T00:00:00Z", province: "RM", productType: "RS", senderPaId: "PaId",
+        unifiedDeliveryDriver: "driver1", cap: "00178" },
+        { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", notificationSentAt: "2026-09-01T00:00:00Z",province: "RM", productType: "RS", senderPaId: "PaId",
+        unifiedDeliveryDriver: "driver1", cap: "00179" },
+        { pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", notificationSentAt: "2026-09-07T00:00:00Z",province: "NA", productType: "RS", senderPaId: "PaId",
         unifiedDeliveryDriver: "driver1", cap: "20100" }] });
        ddbMock.on(BatchWriteCommand).resolves({});
        ddbMock.on(BatchWriteCommand).resolves({});
@@ -345,9 +347,9 @@ describe("Lambda Delayer Dispatcher", () => {
               s3Mock.on(GetObjectCommand).resolves({
                   Body: Readable.from([csvData])
               });
-        ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", province: "RM", productType: "RS", senderPaId: "PaId", 
-        unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", province: "RM", productType: "RS", senderPaId: "PaId", 
-        unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", province: "NA", productType: "RS", senderPaId: "PaId", 
+        ddbMock.on(QueryCommand).resolves({ Items: [{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk1", notificationSentAt: "2026-09-01T00:00:00Z", province: "RM", productType: "RS", senderPaId: "PaId",
+        unifiedDeliveryDriver: "driver1", cap: "00178" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk2", notificationSentAt: "2026-09-01T00:00:00Z", province: "RM", productType: "RS", senderPaId: "PaId",
+        unifiedDeliveryDriver: "driver1", cap: "00179" },{ pk: "2025-08-25~EVALUATE_PRINT_CAPACITY", sk: "sk3", notificationSentAt: "2026-09-01T00:00:00Z", province: "NA", productType: "RS", senderPaId: "PaId",
         unifiedDeliveryDriver: "driver1", cap: "20100" }] });
        ddbMock.on(BatchWriteCommand).resolves({});
 
@@ -373,6 +375,7 @@ describe("Lambda Delayer Dispatcher", () => {
                productType: "RS",
                senderPaId: "PaId",
                unifiedDeliveryDriver: "driver1",
+               notificationSentAt: "2026-09-01T00:00:00Z",
                cap: "00178"
            }]
        });

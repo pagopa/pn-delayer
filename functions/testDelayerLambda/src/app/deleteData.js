@@ -8,7 +8,7 @@ const {
 } = require("@aws-sdk/lib-dynamodb");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
-const { LocalDate, DayOfWeek, TemporalAdjusters } = require("@js-joda/core");
+const { LocalDate, DayOfWeek, TemporalAdjusters, Instant, ZoneOffset } = require("@js-joda/core");
 
 const s3Client = new S3Client({});
 const ddbClient = new DynamoDBClient({});
@@ -138,17 +138,39 @@ exports.deleteData = async (params = []) => {
 
                             // SENDER LIMIT
                             (async () => {
-                                const grouped = groupRecordsBySenderProductProvince(weekEntities);
+                                const keysMap = new Map();
 
-                                const keys = Object.keys(grouped).map(k => ({
-                                    pk: k,
-                                    sk: previousDeliveryWeek
-                                }));
+                                for (const entity of weekEntities) {
+                                    const pk = `${entity.senderPaId}~${entity.productType}~${entity.province}`;
+
+                                    // 1. Settimana standard: deliveryWeek - 1
+                                    keysMap.set(`${pk}~${previousDeliveryWeek}`, {
+                                        pk,
+                                        sk: previousDeliveryWeek
+                                    });
+
+                                    // 2. Eventuale settimana originale della notification
+                                    if (entity.notificationSentAt) {
+                                        const notificationSentAtWeek = calculateNotificationSentAtWeek(
+                                            entity.notificationSentAt
+                                        );
+
+                                        keysMap.set(`${pk}~${notificationSentAtWeek}`, {
+                                            pk,
+                                            sk: notificationSentAtWeek
+                                        });
+                                    }
+                                }
+
+                                const keys = [...keysMap.values()];
 
                                 return batchDeleteGeneric(
                                     senderUsedLimitTableName,
                                     keys,
-                                    k => ({ pk: k.pk, deliveryDate: k.sk })
+                                    k => ({
+                                        pk: k.pk,
+                                        deliveryDate: k.sk
+                                    })
                                 );
                             })(),
 
@@ -204,6 +226,18 @@ exports.deleteData = async (params = []) => {
         throw err;
     }
 };
+
+function calculateNotificationSentAtWeek(notificationSentAt) {
+    return Instant.parse(notificationSentAt)
+        .atOffset(ZoneOffset.UTC)
+        .toLocalDate()
+        .with(
+            TemporalAdjusters.previousOrSame(
+                DayOfWeek.MONDAY
+            )
+        )
+        .toString();
+}
 
 /**
 * Delete entities from DynamoDB in parallel with concurrency control and retry handling.
