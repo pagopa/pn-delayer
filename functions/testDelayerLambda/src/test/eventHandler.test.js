@@ -16,6 +16,7 @@ process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERCRON = "cron(0 8 ? * MON-FRI *)";
 process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON = "cron(0 12 ? * MON-FRI *)";
 process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
 process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
+process.env.ENABLEPRIORITYRESIDUALFLOW="true";
 
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand , CopyObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");

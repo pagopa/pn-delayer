@@ -18,6 +18,7 @@ const senderLimitTableName = process.env.KINESIS_PAPERDELIVERY_SENDERLIMITTABLE;
 const paperDeliveryTableName = process.env.KINESIS_PAPERDELIVERY_TABLE;
 const usedSenderLimitTableName = process.env.KINESIS_PAPERDELIVERY_USEDSENDERLIMITTABLE;
 const eventTableName = process.env.KINESIS_PAPERDELIVERY_EVENTTABLE;
+const enablePriorityResidualFlow = process.env.KINESIS_PAPERDELIVERY_ENABLEPRIORITYRESIDUALFLOW  === "true";
 
 const TRANSACTION_INDEX = {
   EVENT_IDEMPOTENCY: 0,
@@ -40,15 +41,17 @@ function retrieveCounterMap(excludeGroupedRecords) {
 
     let filteredRecords;
 
-        if (productTypeKey === "RS") {
-            filteredRecords = records.filter(
-               record => record.entity.communicationType !== "INFORMAL"
-            );
-        } else {
-          filteredRecords = records.filter(
-            record => (record.entity.skipSenderLimit || record.entity.attempt && parseInt(record.entity.attempt, 10) === 1) && record.entity.communicationType !== "INFORMAL"
-          );
-        }
+    if (productTypeKey === "RS") {
+      filteredRecords = records.filter(
+        record => record.entity.communicationType !== "INFORMAL"
+      );
+    } else {
+      filteredRecords = records.filter(record => {
+        const entity = record.entity;
+        const isFirstAttempt = entity.attempt && parseInt(entity.attempt, 10) === 1;
+        return ( entity.communicationType !== "INFORMAL" && (isFirstAttempt ||(enablePriorityResidualFlow && entity.skipSenderLimit)));
+      });
+    }
 
     if (filteredRecords.length > 0) {
       result[key] = filteredRecords.length;
