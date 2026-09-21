@@ -1218,6 +1218,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+          - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
+            Value: !Ref EnablePriorityResidualFlow
 
       PlatformCapabilities:
         - FARGATE
@@ -1393,6 +1395,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+          - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
+            Value: !Ref EnablePriorityResidualFlow
 
       PlatformCapabilities:
         - FARGATE
