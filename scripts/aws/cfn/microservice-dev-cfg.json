@@ -42,6 +42,6 @@
     "DelayerNotificationOrdersReservedConcurrentExecutions": "5",
     "SenderPriorityVCPU": "1",
     "SenderPriorityMemory": "4096",
-    "EnablePriorityResidualFlow": "false"
+    "EnablePriorityResidualFlow": "true"
   }
 }
