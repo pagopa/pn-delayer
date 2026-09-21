@@ -24,6 +24,7 @@ beforeEach(() => {
   process.env.KINESIS_BATCHSIZE = '25';
   process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS = '14';
   process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK = '1';
+  process.env.KINESIS_PAPERDELIVERY_ENABLEPRIORITYRESIDUALFLOW = 'true';
 
   BatchWriteCommand = function (params) { this.params = params; };
   BatchGetCommand = function (params) { this.params = params; };

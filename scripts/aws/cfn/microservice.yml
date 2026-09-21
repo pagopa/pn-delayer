@@ -1218,6 +1218,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+          - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
+            Value: !Ref EnablePriorityResidualFlow
 
       PlatformCapabilities:
         - FARGATE
@@ -1393,6 +1395,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelFirstSchedulerStartDate
           - Name: PN_DELAYER_DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
+          - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
+            Value: !Ref EnablePriorityResidualFlow
 
       PlatformCapabilities:
         - FARGATE
@@ -1946,6 +1950,7 @@ Resources:
           KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
           KINESIS_PAPERDELIVERY_COUNTERTTLDAYS: !Ref PaperDeliveryCounterTtlDays
           KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
+          KINESIS_PAPERDELIVERY_ENABLEPRIORITYRESIDUALFLOW: !Ref EnablePriorityResidualFlow
       TracingConfig:
         Mode: Active
       Layers:
@@ -2520,6 +2525,7 @@ Resources:
           ATHENA_DATABASE_NAME: !Ref AthenaDatabaseName
           ATHENA_WORKGROUP_NAME: cdc_analytics_workgroup
           EVENTFILEREADY_LAMBDA_ARN: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EventFileReadyLambdaName}
+          ENABLEPRIORITYRESIDUALFLOW: !Ref EnablePriorityResidualFlow
       TracingConfig:
         Mode: Active
       Layers:

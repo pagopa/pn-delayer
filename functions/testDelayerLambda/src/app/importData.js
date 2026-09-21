@@ -19,6 +19,7 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 const MAX_TRANSACTION_CONFLICT_RETRIES = 10;
 const TRANSACTION_CONFLICT_BASE_DELAY_MS = 100;
 const TRANSACTION_CONFLICT_MAX_DELAY_MS = 5000;
+const enablePriorityResidualFlow = process.env.ENABLEPRIORITYRESIDUALFLOW === "true";
 
 /**
  * IMPORT_DATA operation: downloads the CSV and writes rows to DynamoDB.
@@ -230,9 +231,10 @@ function retrieveCounterMap(excludeGroupedRecords) {
             record => record.communicationType !== "INFORMAL"
           );
     } else {
-      filteredRecords = records.filter(
-        record => (record.skipSenderLimit || record.attempt && parseInt(record.attempt, 10) === 1) && record.communicationType !== "INFORMAL"
-      );
+      filteredRecords = records.filter(record => {
+        const isFirstAttempt = record.attempt && parseInt(record.attempt, 10) === 1;
+        return (record.communicationType !== "INFORMAL" &&(isFirstAttempt ||(enablePriorityResidualFlow && record.skipSenderLimit)));
+      });
     }
 
     if (filteredRecords.length > 0) {

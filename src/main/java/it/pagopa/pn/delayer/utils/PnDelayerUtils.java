@@ -105,7 +105,8 @@ public class PnDelayerUtils {
 
     public Map<String, Long> groupingForExclude(List<PaperDelivery> paperDeliveries) {
         return paperDeliveries.stream()
-                .filter(paperDelivery -> paperDelivery.isSkipSenderLimit() && !CommunicationType.INFORMAL.name().equals(paperDelivery.getCommunicationType()))
+                .filter(this::needToSkipSenderLimit)
+                .filter(paperDelivery -> !CommunicationType.INFORMAL.name().equals(paperDelivery.getCommunicationType()))
                 .collect(Collectors.groupingBy(paperDelivery -> String.join("~", paperDelivery.getProvince(), paperDelivery.getProductType()), Collectors.counting()));
     }
 
