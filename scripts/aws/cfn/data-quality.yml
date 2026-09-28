@@ -191,8 +191,8 @@ Resources:
             oldSk:struct<S:string>,
             senderPaIdOriginalSentAt:struct<S:string>,
             communicationType:struct<S:string>,
-            delayed:struct<N:string>,
-            skipSenderLimit:struct<N:string>
+            delayed:struct<BOOL:string>,
+            skipSenderLimit:struct<BOOL:string>
           >
 
   PaperDeliveryMockDataQualityStack:
@@ -235,8 +235,8 @@ Resources:
             oldSk:struct<S:string>,
             senderPaIdOriginalSentAt:struct<S:string>,
             communicationType:struct<S:string>,
-            delayed:struct<N:string>,
-            skipSenderLimit:struct<N:string>
+            delayed:struct<BOOL:string>,
+            skipSenderLimit:struct<BOOL:string>
           >
 
   PaperDeliveryDriverUsedCapacitiesDataQualityStack:
