@@ -965,6 +965,8 @@ Resources:
                   - !Sub "${PaperDeliveryMockTableArn}/*"
                   - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}"
                   - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
+                  - !Sub "${PaperDeliverySenderLimitMockTableArn}"
+                  - !Sub "${PaperDeliverySenderLimitMockTableArn}/*"
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction
@@ -2544,8 +2546,14 @@ Resources:
               - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
           - Effect: Allow
             Action:
+              - dynamodb:PutItem
+            Resource:
+              - !Sub "${PaperDeliveryMockTableArn}"
+          - Effect: Allow
+            Action:
               - dynamodb:Query
               - dynamodb:GetItem
+              - dynamodb:UpdateItem
             Resource:
               - !Sub "${PaperDeliveryTableArn}"
               - !Sub "${PaperDeliveryTableArn}/*"
