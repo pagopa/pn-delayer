@@ -1,0 +1,140 @@
+[
+  {
+    "TableName": "pn-DelayerPaperDeliveryMock",
+    "AttributeDefinitions": [
+      { "AttributeName": "pk", "AttributeType": "S" },
+      { "AttributeName": "sk", "AttributeType": "S" },
+      { "AttributeName": "requestId", "AttributeType": "S" },
+      { "AttributeName": "createdAt", "AttributeType": "S" }
+    ],
+    "KeySchema": [
+      { "AttributeName": "pk", "KeyType": "HASH" },
+      { "AttributeName": "sk", "KeyType": "RANGE" }
+    ],
+    "GlobalSecondaryIndexes": [
+      {
+        "IndexName": "requestId-CreatedAt-index",
+        "KeySchema": [
+          { "AttributeName": "requestId", "KeyType": "HASH" },
+          { "AttributeName": "createdAt", "KeyType": "RANGE" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "StreamSpecification": {
+      "StreamEnabled": true,
+      "StreamViewType": "NEW_IMAGE"
+    }
+  },
+  {
+    "TableName": "pn-PaperDeliveryCountersMock",
+    "AttributeDefinitions": [
+      { "AttributeName": "pk", "AttributeType": "S" },
+      { "AttributeName": "sk", "AttributeType": "S" }
+    ],
+    "KeySchema": [
+      { "AttributeName": "pk", "KeyType": "HASH" },
+      { "AttributeName": "sk", "KeyType": "RANGE" }
+    ],
+    "BillingMode": "PAY_PER_REQUEST"
+  },
+  {
+    "TableName": "pn-PaperDeliveryDriverCapacitiesMock",
+    "AttributeDefinitions": [
+      { "AttributeName": "pk", "AttributeType": "S" },
+      { "AttributeName": "activationDateFrom", "AttributeType": "S" },
+      { "AttributeName": "tenderIdGeoKey", "AttributeType": "S" }
+    ],
+    "KeySchema": [
+      { "AttributeName": "pk", "KeyType": "HASH" },
+      { "AttributeName": "activationDateFrom", "KeyType": "RANGE" }
+    ],
+    "GlobalSecondaryIndexes": [
+      {
+        "IndexName": "tenderIdGeoKey-index",
+        "KeySchema": [
+          { "AttributeName": "tenderIdGeoKey", "KeyType": "HASH" },
+          { "AttributeName": "activationDateFrom", "KeyType": "RANGE" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      }
+    ],
+    "BillingMode": "PAY_PER_REQUEST"
+  },
+  {
+    "TableName": "pn-PaperDeliveryDriverUsedCapacitiesMock",
+    "AttributeDefinitions": [
+      { "AttributeName": "unifiedDeliveryDriverGeokey", "AttributeType": "S" },
+      { "AttributeName": "deliveryDate", "AttributeType": "S" }
+    ],
+    "KeySchema": [
+      { "AttributeName": "unifiedDeliveryDriverGeokey", "KeyType": "HASH" },
+      { "AttributeName": "deliveryDate", "KeyType": "RANGE" }
+    ],
+    "GlobalSecondaryIndexes": [
+      {
+        "IndexName": "deliveryDate-index",
+        "KeySchema": [
+          { "AttributeName": "deliveryDate", "KeyType": "HASH" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      }
+    ],
+    "BillingMode": "PAY_PER_REQUEST"
+  },
+  {
+    "TableName": "pn-PaperDeliverySenderLimitMock",
+    "AttributeDefinitions": [
+      { "AttributeName": "pk", "AttributeType": "S" },
+      { "AttributeName": "deliveryDate", "AttributeType": "S" },
+      { "AttributeName": "province", "AttributeType": "S" },
+      { "AttributeName": "fileKey", "AttributeType": "S" }
+    ],
+    "KeySchema": [
+      { "AttributeName": "pk", "KeyType": "HASH" },
+      { "AttributeName": "deliveryDate", "KeyType": "RANGE" }
+    ],
+    "GlobalSecondaryIndexes": [
+      {
+        "IndexName": "deliveryDateProvince-index",
+        "KeySchema": [
+          { "AttributeName": "deliveryDate", "KeyType": "HASH" },
+          { "AttributeName": "province", "KeyType": "RANGE" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      },
+      {
+        "IndexName": "fileKey-index",
+        "KeySchema": [
+          { "AttributeName": "fileKey", "KeyType": "HASH" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      }
+    ],
+    "BillingMode": "PAY_PER_REQUEST"
+  },
+  {
+    "TableName": "pn-PaperDeliveryUsedSenderLimitMock",
+    "AttributeDefinitions": [
+      { "AttributeName": "pk", "AttributeType": "S" },
+      { "AttributeName": "deliveryDate", "AttributeType": "S" },
+      { "AttributeName": "province", "AttributeType": "S" }
+    ],
+    "KeySchema": [
+      { "AttributeName": "pk", "KeyType": "HASH" },
+      { "AttributeName": "deliveryDate", "KeyType": "RANGE" }
+    ],
+    "GlobalSecondaryIndexes": [
+      {
+        "IndexName": "deliveryDate-province-index",
+        "KeySchema": [
+          { "AttributeName": "deliveryDate", "KeyType": "HASH" },
+          { "AttributeName": "province", "KeyType": "RANGE" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      }
+    ],
+    "BillingMode": "PAY_PER_REQUEST"
+  }
+]
