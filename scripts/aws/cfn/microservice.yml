@@ -2575,6 +2575,26 @@ Resources:
               - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
           - Effect: Allow
             Action:
+              - dynamodb:CreateTable
+              - dynamodb:DeleteTable
+              - dynamodb:DescribeTable
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-DelayerPaperDeliveryMock"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-DelayerPaperDeliveryMock/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryMock"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryMock/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryCounterMock"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryCounterMock/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryDriverCapacitiesMock"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryDriverCapacitiesMock/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryUsedSenderLimitMock"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryUsedSenderLimitMock/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryDriverUsedCapacitiesMock"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryDriverUsedCapacitiesMock/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliverySenderLimitMock"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliverySenderLimitMock/*"
+          - Effect: Allow
+            Action:
               - dynamodb:PutItem
             Resource:
               - !Sub "${PaperDeliveryMockTableArn}"
