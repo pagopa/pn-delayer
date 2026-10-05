@@ -87,37 +87,6 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  PaperDeliveryDriverCapacitiesMockTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryDriverCapacitiesMock'
-      AttributeDefinitions:
-        - AttributeName: "pk"
-          AttributeType: "S"
-        - AttributeName: "activationDateFrom"
-          AttributeType: "S"
-        - AttributeName: "tenderIdGeoKey"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "pk"
-          KeyType: "HASH"
-        - AttributeName: "activationDateFrom"
-          KeyType: "RANGE"
-      GlobalSecondaryIndexes:
-        - IndexName: "tenderIdGeoKey-index"
-          KeySchema:
-            - AttributeName: "tenderIdGeoKey"
-              KeyType: "HASH"
-            - AttributeName: "activationDateFrom"
-              KeyType: "RANGE"
-          Projection:
-            ProjectionType: "ALL"
-      BillingMode: "PAY_PER_REQUEST"
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-
   PaperDeliveryDriverUsedCapacitiesTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
@@ -149,38 +118,6 @@ Resources:
               KeyType: "HASH"
             - AttributeName: "unifiedDeliveryDriver"
               KeyType: "RANGE"
-          Projection:
-            ProjectionType: "ALL"
-      BillingMode: "PAY_PER_REQUEST"
-      TimeToLiveSpecification:
-        AttributeName: "ttl"
-        Enabled: true
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-      KinesisStreamSpecification:
-        StreamArn: !Ref CdcKinesisSourceStreamArn
-
-  PaperDeliveryDriverUsedCapacitiesMockTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryDriverUsedCapacitiesMock'
-      AttributeDefinitions:
-        - AttributeName: "unifiedDeliveryDriverGeokey"
-          AttributeType: "S"
-        - AttributeName: "deliveryDate"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "unifiedDeliveryDriverGeokey"
-          KeyType: "HASH"
-        - AttributeName: "deliveryDate"
-          KeyType: "RANGE"
-      GlobalSecondaryIndexes:
-        - IndexName: "deliveryDate-index"
-          KeySchema:
-            - AttributeName: "deliveryDate"
-              KeyType: "HASH"
           Projection:
             ProjectionType: "ALL"
       BillingMode: "PAY_PER_REQUEST"
@@ -255,92 +192,12 @@ Resources:
       KinesisStreamSpecification:
         StreamArn: !Ref CdcKinesisSourceStreamArn
 
-  PaperDeliverySenderLimitMockTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliverySenderLimitMock'
-      AttributeDefinitions:
-        - AttributeName: "pk"
-          AttributeType: "S"
-        - AttributeName: "deliveryDate"
-          AttributeType: "S"
-        - AttributeName: "province"
-          AttributeType: "S"
-        - AttributeName: "fileKey"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "pk"
-          KeyType: "HASH"
-        - AttributeName: "deliveryDate"
-          KeyType: "RANGE"
-      GlobalSecondaryIndexes:
-        - IndexName: "deliveryDateProvince-index"
-          KeySchema:
-            - AttributeName: "deliveryDate"
-              KeyType: "HASH"
-            - AttributeName: "province"
-              KeyType: "RANGE"
-          Projection:
-            ProjectionType: "ALL"
-        - IndexName: "fileKey-index"
-          KeySchema:
-            - AttributeName: "fileKey"
-              KeyType: "HASH"
-          Projection:
-            ProjectionType: "ALL"
-      BillingMode: "PAY_PER_REQUEST"
-      TimeToLiveSpecification:
-        AttributeName: "ttl"
-        Enabled: true
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-      KinesisStreamSpecification:
-        StreamArn: !Ref CdcKinesisSourceStreamArn
-
   PaperDeliveryUsedSenderLimitTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
       TableName: !Sub '${ProjectName}-PaperDeliveryUsedSenderLimit'
-      AttributeDefinitions:
-        - AttributeName: "pk"
-          AttributeType: "S"
-        - AttributeName: "deliveryDate"
-          AttributeType: "S"
-        - AttributeName: "province"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "pk"
-          KeyType: "HASH"
-        - AttributeName: "deliveryDate"
-          KeyType: "RANGE"
-      GlobalSecondaryIndexes:
-        - IndexName: "deliveryDate-province-index"
-          KeySchema:
-            - AttributeName: "deliveryDate"
-              KeyType: "HASH"
-            - AttributeName: "province"
-              KeyType: "RANGE"
-          Projection:
-            ProjectionType: "ALL"
-      BillingMode: "PAY_PER_REQUEST"
-      TimeToLiveSpecification:
-        AttributeName: "ttl"
-        Enabled: true
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-      KinesisStreamSpecification:
-        StreamArn: !Ref CdcKinesisSourceStreamArn
-
-  PaperDeliveryUsedSenderLimitMockTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryUsedSenderLimitMock'
       AttributeDefinitions:
         - AttributeName: "pk"
           AttributeType: "S"
@@ -445,31 +302,6 @@ Resources:
       KinesisStreamSpecification:
         StreamArn: !Ref CdcKinesisSourceStreamArn
 
-  PaperDeliveryCounterMockTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-PaperDeliveryCountersMock'
-      AttributeDefinitions:
-        - AttributeName: "pk"
-          AttributeType: "S"
-        - AttributeName: "sk"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "pk"
-          KeyType: "HASH"
-        - AttributeName: "sk"
-          KeyType: "RANGE"
-      BillingMode: "PAY_PER_REQUEST"
-      TimeToLiveSpecification:
-        AttributeName: "ttl"
-        Enabled: true
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-      KinesisStreamSpecification:
-        StreamArn: !Ref CdcKinesisSourceStreamArn
-
   PaperDeliveryTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
@@ -506,46 +338,6 @@ Resources:
             - AttributeName: "pk"
               KeyType: "HASH"
             - AttributeName: "senderPaIdOriginalSentAt"
-              KeyType: "RANGE"
-          Projection:
-            ProjectionType: "ALL"
-      BillingMode: "PAY_PER_REQUEST"
-      TimeToLiveSpecification:
-        AttributeName: "ttl"
-        Enabled: true
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-      StreamSpecification:
-        StreamViewType: NEW_IMAGE
-      KinesisStreamSpecification:
-        StreamArn: !Ref CdcKinesisSourceStreamArn
-
-  PaperDeliveryMockTable:
-    Type: AWS::DynamoDB::Table
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub '${ProjectName}-DelayerPaperDeliveryMock'
-      AttributeDefinitions:
-        - AttributeName: "pk"
-          AttributeType: "S"
-        - AttributeName: "sk"
-          AttributeType: "S"
-        - AttributeName: "requestId"
-          AttributeType: "S"
-        - AttributeName: "createdAt"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "pk"
-          KeyType: "HASH"
-        - AttributeName: "sk"
-          KeyType: "RANGE"
-      GlobalSecondaryIndexes:
-        - IndexName: "requestId-CreatedAt-index"
-          KeySchema:
-            - AttributeName: "requestId"
-              KeyType: "HASH"
-            - AttributeName: "createdAt"
               KeyType: "RANGE"
           Projection:
             ProjectionType: "ALL"
@@ -878,10 +670,10 @@ Outputs:
 
   PaperDeliveryDriverCapacitiesMockTableName:
     Description: Name of dynamodb table containing mock capacities
-    Value: !Ref PaperDeliveryDriverCapacitiesMockTable
+    Value: !Sub '${ProjectName}-PaperDeliveryDriverCapacitiesMock'
   PaperDeliveryDriverCapacitiesMockTableArn:
     Description: ARN of dynamodb table containing mock capacities
-    Value: !Sub '${PaperDeliveryDriverCapacitiesMockTable.Arn}'
+    Value: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-PaperDeliveryDriverCapacitiesMock'
 
   PaperDeliveryDriverUsedCapacitiesTableName:
     Description: Name of dynamodb table containing used capacities
@@ -892,10 +684,10 @@ Outputs:
 
   PaperDeliveryDriverUsedCapacitiesMockTableName:
     Description: Name of dynamodb table containing mock used capacities
-    Value: !Ref PaperDeliveryDriverUsedCapacitiesMockTable
+    Value: !Sub '${ProjectName}-PaperDeliveryDriverUsedCapacitiesMock'
   PaperDeliveryDriverUsedCapacitiesMockTableArn:
     Description: ARN of dynamodb table containing mock used capacities
-    Value: !Sub '${PaperDeliveryDriverUsedCapacitiesMockTable.Arn}'
+    Value: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-PaperDeliveryDriverUsedCapacitiesMock'
 
   PaperDeliveryKinesisEventTableName:
     Description: Name of dynamodb table containing Kinesis sequenceNumber for paper deliveries
@@ -916,13 +708,10 @@ Outputs:
 
   PaperDeliveryMockTableName:
     Description: Name of dynamodb table containing paper mock deliveries workflow
-    Value: !Ref PaperDeliveryMockTable
+    Value: !Sub '${ProjectName}-DelayerPaperDeliveryMock'
   PaperDeliveryMockTableArn:
     Description: ARN of dynamodb table containing mock paper deliveries workflow
-    Value: !Sub '${PaperDeliveryMockTable.Arn}'
-  PaperDeliveryMockTableStreamArn:
-    Description: ARN of dynamodb table stream containing mock paper deliveries workflow
-    Value: !GetAtt PaperDeliveryMockTable.StreamArn
+    Value: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-DelayerPaperDeliveryMock'
 
   PaperDeliveryCounterTableName:
     Description: Name of dynamodb table containing PaperDeliveryCounter
@@ -940,10 +729,10 @@ Outputs:
 
   PaperDeliveryCounterMockTableName:
     Description: Name of dynamodb table containing PaperDeliveryCounterMock
-    Value: !Ref PaperDeliveryCounterMockTable
+    Value: !Sub '${ProjectName}-PaperDeliveryCountersMock'
   PaperDeliveryCounterMockTableArn:
     Description: ARN of dynamodb table containing PaperDeliveryCounterMock
-    Value: !Sub '${PaperDeliveryCounterMockTable.Arn}'
+    Value: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-PaperDeliveryCountersMock'
 
   PaperDeliverySenderLimitTableName:
     Description: Name of dynamodb table containing PaperDeliverySenderLimit
@@ -954,10 +743,10 @@ Outputs:
 
   PaperDeliverySenderLimitMockTableName:
     Description: Name of dynamodb table containing PaperDeliverySenderLimit mock
-    Value: !Ref PaperDeliverySenderLimitMockTable
+    Value: !Sub '${ProjectName}-PaperDeliverySenderLimitMock'
   PaperDeliverySenderLimitMockTableArn:
     Description: ARN of dynamodb table containing PaperDeliverySenderLimit mock
-    Value: !Sub '${PaperDeliverySenderLimitMockTable.Arn}'
+    Value: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-PaperDeliverySenderLimitMock'
 
   PaperDeliveryUsedSenderLimitTableName:
     Description: Name of dynamodb table containing PaperDeliveryUsedSenderLimit
@@ -968,10 +757,10 @@ Outputs:
 
   PaperDeliveryUsedSenderLimitMockTableName:
     Description: Name of dynamodb table containing PaperDeliveryUsedSenderLimitMock
-    Value: !Ref PaperDeliveryUsedSenderLimitMockTable
+    Value: !Sub '${ProjectName}-PaperDeliveryUsedSenderLimitMock'
   PaperDeliveryUsedSenderLimitMockTableArn:
     Description: ARN of dynamodb table containing PaperDeliveryUsedSenderLimitMock
-    Value: !Sub '${PaperDeliveryUsedSenderLimitMockTable.Arn}'
+    Value: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-PaperDeliveryUsedSenderLimitMock'
 
   ProvinceTableName:
     Description: Name of dynamodb table containing Province

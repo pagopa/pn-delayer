@@ -2575,6 +2575,24 @@ Resources:
               - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
           - Effect: Allow
             Action:
+              - dynamodb:CreateTable
+              - dynamodb:DeleteTable
+              - dynamodb:DescribeTable
+            Resource:
+              - !Ref PaperDeliveryMockTableArn
+              - !Sub "${PaperDeliveryMockTableArn}/*"
+              - !Ref PaperDeliveryCounterMockTableArn
+              - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+              - !Ref PaperDeliveryDriverCapacitiesMockTableArn
+              - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+              - !Ref PaperDeliveryUsedSenderLimitMockTableArn
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
+              - !Ref PaperDeliveryDriverUsedCapacitiesMockTableArn
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
+              - !Ref PaperDeliverySenderLimitMockTableArn
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}/*"
+          - Effect: Allow
+            Action:
               - dynamodb:PutItem
             Resource:
               - !Sub "${PaperDeliveryMockTableArn}"

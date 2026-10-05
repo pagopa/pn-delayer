@@ -17,14 +17,17 @@ process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERCRON = "cron(0 12 ? * MON-FRI *)
 process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
 process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
 process.env.ENABLEPRIORITYRESIDUALFLOW="true";
+process.env.DELETE_MOCK_TABLES_WAIT_DELAY_MS = "0";
 
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand , CopyObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand } = require("@aws-sdk/client-athena");
+const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, DescribeTableCommand } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand, UpdateCommand, TransactWriteCommand } = require("@aws-sdk/lib-dynamodb");
 const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
 const s3Mock = mockClient(S3Client);
+const dynamoDbMock = mockClient(DynamoDBClient);
 const ddbMock = mockClient(DynamoDBDocumentClient);
 const sfnMock = mockClient(SFNClient);
 const lambdaMock = mockClient(LambdaClient);
@@ -37,6 +40,7 @@ let handler;
 describe("Lambda Delayer Dispatcher", () => {
     beforeEach(() => {
         s3Mock.reset();
+        dynamoDbMock.reset();
         ddbMock.reset();
         sfnMock.reset();
         lambdaMock.reset();
@@ -410,6 +414,53 @@ describe("Lambda Delayer Dispatcher", () => {
        const body = JSON.parse(result.body);
        assert.strictEqual(body.message.includes("Delete completed with unprocessed items"), true);
        assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length >= 3, true);
+   });
+
+   it("DELETE_MOCK_TABLES deletes and recreates only configured mock tables", async () => {
+       const expectedTables = [
+           "pn-DelayerPaperDeliveryMock",
+           "pn-PaperDeliveryCountersMock",
+           "pn-PaperDeliveryDriverCapacitiesMock",
+           "pn-PaperDeliveryDriverUsedCapacitiesMock",
+           "pn-PaperDeliverySenderLimitMock",
+           "pn-PaperDeliveryUsedSenderLimitMock"
+       ];
+       const existingTables = new Set(expectedTables);
+
+       dynamoDbMock.on(DescribeTableCommand).callsFake((input) => {
+           if (!existingTables.has(input.TableName)) {
+               const err = new Error("Cannot do operations on a non-existent table");
+               err.name = "ResourceNotFoundException";
+               throw err;
+           }
+           return { Table: { TableName: input.TableName, TableStatus: "ACTIVE" } };
+       });
+       dynamoDbMock.on(DeleteTableCommand).callsFake((input) => {
+           assert.ok(expectedTables.includes(input.TableName));
+           existingTables.delete(input.TableName);
+           return {};
+       });
+       dynamoDbMock.on(CreateTableCommand).callsFake((input) => {
+           assert.ok(expectedTables.includes(input.TableName));
+           existingTables.add(input.TableName);
+           return {};
+       });
+
+       const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
+
+       assert.strictEqual(result.statusCode, 200);
+       const body = JSON.parse(result.body);
+       assert.deepStrictEqual(body.tables, expectedTables);
+       assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 6);
+       assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 6);
+       assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length, 0);
+
+       const paperDeliveryCreate = dynamoDbMock.commandCalls(CreateTableCommand)
+           .find(call => call.args[0].input.TableName === "pn-DelayerPaperDeliveryMock")
+           .args[0].input;
+       assert.strictEqual(paperDeliveryCreate.BillingMode, "PAY_PER_REQUEST");
+       assert.strictEqual(paperDeliveryCreate.GlobalSecondaryIndexes[0].IndexName, "requestId-CreatedAt-index");
+       assert.strictEqual(paperDeliveryCreate.StreamSpecification.StreamViewType, "NEW_IMAGE");
    });
 
    it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
