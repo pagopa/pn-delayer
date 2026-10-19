@@ -128,7 +128,17 @@ exports.handleEvent = async (event) => {
         type: "MONTHLY",
         day: 25 //Max 25th of the month to avoid issues with months with less than 31 days
       },
-    }
+    },
+    ClusterPrioritario: {
+      query: await prepareQuery(
+        "ClusterPrioritario",
+        specificDate
+      ),
+      outputName: specificDate,
+      cron: {
+        type: "DAILY",
+      },
+    },
   };
   await runAllQueries(workgroupName, queries, database, monitoringBucketName, basePath);
 };

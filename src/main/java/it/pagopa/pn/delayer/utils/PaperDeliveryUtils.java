@@ -104,7 +104,19 @@ public class PaperDeliveryUtils {
     private Mono<Integer> processChunkToSendToNextWeek(List<PaperDelivery> chunk, LocalDate deliveryWeek) {
         log.info("Processing chunk of size {} to send to next week", chunk.size());
         PnAuditLogEvent auditLogEvent = buildAuditLogEvent(deliveryWeek);
-        if ( (!CollectionUtils.isEmpty(chunk)) && (!isMock)) {
+        if (!CollectionUtils.isEmpty(chunk)) {
+            this.logAuditLogEvent(chunk, auditLogEvent, deliveryWeek);
+            return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek))
+                    .thenReturn(chunk)
+                    .map(pnDelayerUtils::groupingForExclude)
+                    .flatMap(grouped -> paperDeliveryCounterDAO.updateExcludeCounter(deliveryWeek.plusWeeks(1), grouped))
+                    .thenReturn(chunk.size());
+        }
+        return Mono.just(0);
+    }
+
+    private void logAuditLogEvent(List<PaperDelivery> chunk, PnAuditLogEvent auditLogEvent, LocalDate deliveryWeek) {
+        if(!isMock) {
             LocalDate nextWeek = deliveryWeek.plusWeeks(1);
             List<String> requestIds = chunk.stream()
                     .map(PaperDelivery::getRequestId)
@@ -117,13 +129,8 @@ public class PaperDeliveryUtils {
                     nextWeek,
                     requestIds
             ).log();
-            return paperDeliveryDAO.insertPaperDeliveries(pnDelayerUtils.mapItemForEvaluateSenderLimitOnNextWeek(chunk, deliveryWeek))
-                    .thenReturn(chunk)
-                    .map(pnDelayerUtils::groupingForExclude)
-                    .flatMap(grouped -> paperDeliveryCounterDAO.updateExcludeCounter(deliveryWeek.plusWeeks(1), grouped))
-                    .thenReturn(chunk.size());
         }
-        return Mono.just(0);
+
     }
 
     private static PnAuditLogEvent buildAuditLogEvent(LocalDate deliveryWeek) {
