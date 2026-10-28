@@ -25,7 +25,8 @@
     "StreamSpecification": {
       "StreamEnabled": true,
       "StreamViewType": "NEW_IMAGE"
-    }
+    },
+    "cdc": true
   },
   {
     "TableName": "pn-PaperDeliveryCountersMock",
@@ -37,7 +38,8 @@
       { "AttributeName": "pk", "KeyType": "HASH" },
       { "AttributeName": "sk", "KeyType": "RANGE" }
     ],
-    "BillingMode": "PAY_PER_REQUEST"
+    "BillingMode": "PAY_PER_REQUEST",
+    "cdc": true
   },
   {
     "TableName": "pn-PaperDeliveryDriverCapacitiesMock",
@@ -81,7 +83,8 @@
         "Projection": { "ProjectionType": "ALL" }
       }
     ],
-    "BillingMode": "PAY_PER_REQUEST"
+    "BillingMode": "PAY_PER_REQUEST",
+    "cdc": true
   },
   {
     "TableName": "pn-PaperDeliverySenderLimitMock",
@@ -112,7 +115,8 @@
         "Projection": { "ProjectionType": "ALL" }
       }
     ],
-    "BillingMode": "PAY_PER_REQUEST"
+    "BillingMode": "PAY_PER_REQUEST",
+    "cdc": true
   },
   {
     "TableName": "pn-PaperDeliveryUsedSenderLimitMock",
@@ -135,6 +139,7 @@
         "Projection": { "ProjectionType": "ALL" }
       }
     ],
-    "BillingMode": "PAY_PER_REQUEST"
+    "BillingMode": "PAY_PER_REQUEST",
+    "cdc": true
   }
 ]

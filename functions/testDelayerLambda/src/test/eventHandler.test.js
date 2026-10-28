@@ -18,11 +18,12 @@ process.env.DELAYERTOPAPERCHANNELFIRSTSCHEDULERSTARTDATE = "2025-07-01T08:00:00.
 process.env.DELAYERTOPAPERCHANNELSECONDSCHEDULERSTARTDATE = "2025-07-01T08:00:00.000Z";
 process.env.ENABLEPRIORITYRESIDUALFLOW="true";
 process.env.DELETE_MOCK_TABLES_WAIT_DELAY_MS = "0";
+process.env.CDC_KINESIS_STREAM_ARN = "arn:aws:kinesis:eu-south-1:123456789012:stream/cdc-source";
 
 const { mockClient } = require("aws-sdk-client-mock");
 const { S3Client, GetObjectCommand , CopyObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand } = require("@aws-sdk/client-athena");
-const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, DescribeTableCommand } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, DescribeTableCommand, EnableKinesisStreamingDestinationCommand, DescribeKinesisStreamingDestinationCommand } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, BatchWriteCommand, GetCommand, QueryCommand, UpdateCommand, TransactWriteCommand } = require("@aws-sdk/lib-dynamodb");
 const { SFNClient, StartExecutionCommand, DescribeExecutionCommand, ListExecutionsCommand } = require("@aws-sdk/client-sfn");
 
@@ -442,8 +443,28 @@ describe("Lambda Delayer Dispatcher", () => {
        });
        dynamoDbMock.on(CreateTableCommand).callsFake((input) => {
            assert.ok(expectedTables.includes(input.TableName));
+           assert.strictEqual(input.cdc, undefined);
            existingTables.add(input.TableName);
            return {};
+       });
+       const enabledTables = [];
+       const destinationChecks = new Map();
+       dynamoDbMock.on(EnableKinesisStreamingDestinationCommand).callsFake((input) => {
+           assert.ok(existingTables.has(input.TableName));
+           assert.strictEqual(input.StreamArn, process.env.CDC_KINESIS_STREAM_ARN);
+           enabledTables.push(input.TableName);
+           return {};
+       });
+       dynamoDbMock.on(DescribeKinesisStreamingDestinationCommand).callsFake((input) => {
+           assert.ok(enabledTables.includes(input.TableName));
+           const checks = destinationChecks.get(input.TableName) || 0;
+           destinationChecks.set(input.TableName, checks + 1);
+           return {
+               KinesisDataStreamDestinations: [{
+                   StreamArn: process.env.CDC_KINESIS_STREAM_ARN,
+                   DestinationStatus: checks === 0 ? "ENABLING" : "ACTIVE"
+               }]
+           };
        });
 
        const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
@@ -453,6 +474,8 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.deepStrictEqual(body.tables, expectedTables);
        assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 6);
        assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 6);
+       assert.deepStrictEqual(enabledTables, expectedTables.filter(table => table !== "pn-PaperDeliveryDriverCapacitiesMock"));
+       assert.strictEqual(dynamoDbMock.commandCalls(DescribeKinesisStreamingDestinationCommand).length, 10);
        assert.strictEqual(ddbMock.commandCalls(BatchWriteCommand).length, 0);
 
        const paperDeliveryCreate = dynamoDbMock.commandCalls(CreateTableCommand)
@@ -461,6 +484,77 @@ describe("Lambda Delayer Dispatcher", () => {
        assert.strictEqual(paperDeliveryCreate.BillingMode, "PAY_PER_REQUEST");
        assert.strictEqual(paperDeliveryCreate.GlobalSecondaryIndexes[0].IndexName, "requestId-CreatedAt-index");
        assert.strictEqual(paperDeliveryCreate.StreamSpecification.StreamViewType, "NEW_IMAGE");
+   });
+
+   it("DELETE_MOCK_TABLES refuses to delete tables without the CDC stream ARN", async () => {
+       const streamArn = process.env.CDC_KINESIS_STREAM_ARN;
+       delete process.env.CDC_KINESIS_STREAM_ARN;
+       try {
+           const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
+           assert.strictEqual(result.statusCode, 500);
+           assert.match(JSON.parse(result.body).message, /CDC_KINESIS_STREAM_ARN/);
+           assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 0);
+           assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 0);
+       } finally {
+           process.env.CDC_KINESIS_STREAM_ARN = streamArn;
+       }
+   });
+
+   for (const status of ["ARCHIVING", "ARCHIVED", "INACCESSIBLE_ENCRYPTION_CREDENTIALS"]) {
+       it(`DELETE_MOCK_TABLES fails immediately for table status ${status}`, async () => {
+           dynamoDbMock.on(DescribeTableCommand).resolves({
+               Table: { TableStatus: status }
+           });
+
+           const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
+           assert.strictEqual(result.statusCode, 500);
+           assert.match(JSON.parse(result.body).message, new RegExp(`pn-DelayerPaperDeliveryMock.*${status}`));
+           assert.strictEqual(dynamoDbMock.commandCalls(DescribeTableCommand).length, 2);
+           assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 0);
+           assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 0);
+       });
+   }
+
+   it("DELETE_MOCK_TABLES fails if a table becomes archived while waiting for ACTIVE", async () => {
+       dynamoDbMock.on(DescribeTableCommand)
+           .resolvesOnce({ Table: { TableStatus: "CREATING" } })
+           .resolvesOnce({ Table: { TableStatus: "CREATING" } })
+           .resolves({ Table: { TableStatus: "ARCHIVED" } });
+
+       const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
+       assert.strictEqual(result.statusCode, 500);
+       assert.match(JSON.parse(result.body).message, /pn-DelayerPaperDeliveryMock.*ARCHIVED/);
+       assert.strictEqual(dynamoDbMock.commandCalls(DescribeTableCommand).length, 3);
+       assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 0);
+   });
+
+   it("DELETE_MOCK_TABLES reports a failed CDC destination instead of reporting success", async () => {
+       let tableExists = false;
+       dynamoDbMock.on(DescribeTableCommand).callsFake(() => {
+           if (!tableExists) {
+               const err = new Error("Table not found");
+               err.name = "ResourceNotFoundException";
+               throw err;
+           }
+           return { Table: { TableStatus: "ACTIVE" } };
+       });
+       dynamoDbMock.on(CreateTableCommand).callsFake(() => {
+           tableExists = true;
+           return {};
+       });
+       dynamoDbMock.on(EnableKinesisStreamingDestinationCommand).resolves({});
+       dynamoDbMock.on(DescribeKinesisStreamingDestinationCommand).resolves({
+           KinesisDataStreamDestinations: [{
+               StreamArn: process.env.CDC_KINESIS_STREAM_ARN,
+               DestinationStatus: "ENABLE_FAILED",
+               DestinationStatusDescription: "stream unavailable"
+           }]
+       });
+
+       const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
+       assert.strictEqual(result.statusCode, 500);
+       assert.match(JSON.parse(result.body).message, /stream unavailable/);
+       assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 1);
    });
 
    it("GET_SENDER_LIMIT returns the items and lastEvaluatedKey", async () => {
