@@ -2511,6 +2511,7 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
+          CDC_KINESIS_STREAM_ARN: !Ref CdcKinesisSourceStreamArn
           BUCKET_NAME: !Ref TestDelayerBucketName
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
@@ -2573,6 +2574,49 @@ Resources:
               - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
               - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}"
               - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
+          - Effect: Allow
+            Action:
+              - dynamodb:CreateTable
+              - dynamodb:DeleteTable
+              - dynamodb:DescribeTable
+              - dynamodb:EnableKinesisStreamingDestination
+              - dynamodb:DescribeKinesisStreamingDestination
+            Resource:
+              - !Ref PaperDeliveryMockTableArn
+              - !Sub "${PaperDeliveryMockTableArn}/*"
+              - !Ref PaperDeliveryCounterMockTableArn
+              - !Sub "${PaperDeliveryCounterMockTableArn}/*"
+              - !Ref PaperDeliveryDriverCapacitiesMockTableArn
+              - !Sub "${PaperDeliveryDriverCapacitiesMockTableArn}/*"
+              - !Ref PaperDeliveryUsedSenderLimitMockTableArn
+              - !Sub "${PaperDeliveryUsedSenderLimitMockTableArn}/*"
+              - !Ref PaperDeliveryDriverUsedCapacitiesMockTableArn
+              - !Sub "${PaperDeliveryDriverUsedCapacitiesMockTableArn}/*"
+              - !Ref PaperDeliverySenderLimitMockTableArn
+              - !Sub "${PaperDeliverySenderLimitMockTableArn}/*"
+          - Effect: Allow
+            Action:
+              - kinesis:PutRecords
+              - kinesis:PutRecord
+              - kinesis:DescribeStream
+              - kinesis:DescribeStreamSummary
+            Resource: !Ref CdcKinesisSourceStreamArn
+          - Effect: Allow
+            Action:
+              - kinesis:ListStreams
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - kms:GenerateDataKey
+              - kms:DescribeKey
+            Resource: !Ref CdcKinesisSourceStreamKeyArn
+          - Effect: Allow
+            Action:
+              - iam:CreateServiceLinkedRole
+            Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/aws-service-role/kinesisreplication.dynamodb.amazonaws.com/AWSServiceRoleForDynamoDBKinesisDataStreamsReplication
+            Condition:
+              StringEquals:
+                iam:AWSServiceName: kinesisreplication.dynamodb.amazonaws.com
           - Effect: Allow
             Action:
               - dynamodb:PutItem

@@ -10,6 +10,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 |-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **IMPORT_DATA**               | Importa un CSV da S3 nella tabella `pn-DelayerPaperDelivery` tramite scritture `BatchWrite`.                                                                         | `["delayerPaperDeliveryTableName", "paperDeliveryCountersTableName", "senderLimitTableName", "usedSenderLimitTableName", "filename", "deliveryWeek"]` deliveryWeek opzionale                                                     |
 | **DELETE_DATA**               | Cancella i dati generati dal test dalle tabelle dynamo interessate partendo da un CSV presebte su S3 tramite cancellazioni `BatchWrite`.                             | `["delayerPaperDeliveryTableName","deliveryDriverUsedCapacityTableName", "usedSenderLimitTableName", "paperDeliveryCountersTableName","filename", "]` filename opzionale                                                         |
+| **DELETE_MOCK_TABLES**        | Cancella e ricrea le sole tabelle mock `pn-*` del Simulatore, evitando cancellazioni record-level.                                                                   | `[]`                                                                                                                                                                                                                             |
 | **GET_USED_CAPACITY**         | Legge la capacità utilizzata per la combinazione `unifiedDeliveryDriver~geoKey` alla `deliveryDate` indicata, dalla tabella `pn-PaperDeliveryDriverUsedCapacities`.  | `[ "paperDeliveryDriverUsedCapacitiesTableName", unifiedDeliveryDriver", "geoKey", "deliveryDate (ISO‑8601 UTC)" ]`                                                                                                              |
 | **GET_BY_REQUEST_ID**         | Restituisce **tutte** le righe aventi lo stesso `requestId` interrogando la GSI **`requestId-CreatedAt-index`** della tabella `pn-DelayerPaperDelivery`.             | `[ requestId ]`                                                                                                                                                                                                                  |
 | **RUN_ALGORITHM**             | Avvia la Step Function BatchWorkflowStateMachine passandole i parametri statici per i nomi delle tabelle.                                                            | `["delayerPaperDeliveryTableName","deliveryDriverCapacityTabelName","deliveryDriverUsedCapacityTableName", "senderLimitTableName","usedSenderLimitTableName", "paperDeliveryCountersTableName","printCapacity", "deliveryWeek"]` |
@@ -18,7 +19,7 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
 | **GET_PAPER_DELIVERY**        | Restituisce le spedizioni data `deliveryDate` e `workFlowStep`.                                                                                                      | `["delayerPaperDeliveryTableName", "deliveryDate", "workFlowStep", "lastEvaluatedKey"]`  lastEvaluatedKey opzionale                                                                                                              |
 | **GET_SENDER_LIMIT**          | Restituisce le stime dichiarate dai mittenti. Se `pk` è presente esegue una get puntuale, altrimenti filtra per settimana di spedizione e provincia tramite GSI.     | `{ "table": "pn-PaperDeliverySenderLimit", "deliveryDate": "yyyy-MM-dd", "province"?, "lastEvaluatedKey"?, "pk"? }`                                                                                                              |
 | **GET_PRESIGNED_URL**         | Restituisce un URL presigned per l'upload o il download dei CSV delle spedizioni o delle capacità dichiarate dai recapitisti                                         | `{ "fileName", "checksumSha256B64"?, "presignedUrlType"? }`                                                                                                                                                                      |
-| **GET_DECLARED_CAPACITY**     | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                 | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 | 
+| **GET_DECLARED_CAPACITY**     | Legge la capacità dichiarata di un driver per una specifica data ed area geografica.                                                                                 | `["deliveryDriverCapacityTabelName", province", "deliveryDate"]`                                                                                                                                                                 |
 | **INSERT_MOCK_CAPACITIES**    | Importa un CSV da S3 nella tabella `pn-PaperDeliveryDriverCapacitiesMock`.                                                                                           | `["deliveryDriverCapacityTableName","filename"]`                                                                                                                                                                                 |
 | **GET_COUNTERS**              | Restituisce l'entità del contatore per la verifica della capacità di stampa settimanale.                                                                             | `{table":"pn-PaperDeliveryCounters", "counterType": "one of PRINT, SUM_ESTIMATES, EXCLUDE", "deliveryDate": "yyyy-mm-dd", "province"?, "productType"?, "lastEvaluatedKey"?}`                                                     |
 | **INSERT_MOCK_SENDER_LIMITS** | Legge un file zip da S3 e avvia il flusso di caricamento commesse .                                                                                                  | `["zipFilename"]`                                                                                                                                                                                                                |
@@ -59,6 +60,30 @@ La lambda utilizza un dispatcher per supportare più tipi di operazioni utili pe
     "pn-PaperDeliveryUsedSenderLimit", "pn-PaperDeliveryCounters","example.csv"]
 }
 ```
+
+`DELETE_DATA` resta l'operazione dedicata agli scenari QA: elimina record specifici letti dal CSV e non viene usata per la pulizia massiva del Simulatore.
+
+*DELETE_MOCK_TABLES*
+
+```json
+{
+  "operationType": "DELETE_MOCK_TABLES",
+  "parameters": []
+}
+```
+
+La Lambda elimina, attende la rimozione e ricrea esclusivamente queste tabelle mock:
+
+| Tabella                                    | Chiavi e indici ricreati                                                   |
+|--------------------------------------------|----------------------------------------------------------------------------|
+| `pn-DelayerPaperDeliveryMock`              | `pk`/`sk`, GSI `requestId-CreatedAt-index`, stream `NEW_IMAGE`             |
+| `pn-PaperDeliveryCountersMock`             | `pk`/`sk`                                                                  |
+| `pn-PaperDeliveryDriverCapacitiesMock`     | `pk`/`activationDateFrom`, GSI `tenderIdGeoKey-index`                      |
+| `pn-PaperDeliveryDriverUsedCapacitiesMock` | `unifiedDeliveryDriverGeokey`/`deliveryDate`, GSI `deliveryDate-index`     |
+| `pn-PaperDeliverySenderLimitMock`          | `pk`/`deliveryDate`, GSI `deliveryDateProvince-index`, GSI `fileKey-index` |
+| `pn-PaperDeliveryUsedSenderLimitMock`      | `pk`/`deliveryDate`, GSI `deliveryDate-province-index`                     |
+
+Le definizioni usate per le `CreateTable` sono mantenute in `src/app/mockTableDefinitions.json`.
 
 #### CAMPI DEL CSV
 | Nome                   | Descrizione                                                                                                 |
