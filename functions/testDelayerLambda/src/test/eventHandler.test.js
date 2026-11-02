@@ -427,9 +427,12 @@ describe("Lambda Delayer Dispatcher", () => {
            "pn-PaperDeliveryUsedSenderLimitMock"
        ];
        const existingTables = new Set(expectedTables);
+       const pendingDeletes = [];
+       const deletionChecks = new Set();
 
        dynamoDbMock.on(DescribeTableCommand).callsFake((input) => {
            if (!existingTables.has(input.TableName)) {
+               deletionChecks.add(input.TableName);
                const err = new Error("Cannot do operations on a non-existent table");
                err.name = "ResourceNotFoundException";
                throw err;
@@ -439,9 +442,19 @@ describe("Lambda Delayer Dispatcher", () => {
        dynamoDbMock.on(DeleteTableCommand).callsFake((input) => {
            assert.ok(expectedTables.includes(input.TableName));
            existingTables.delete(input.TableName);
-           return {};
+           return new Promise(resolve => {
+               pendingDeletes.push(resolve);
+               if (pendingDeletes.length === expectedTables.length) {
+                   pendingDeletes.forEach(complete => complete({}));
+               }
+           });
        });
        dynamoDbMock.on(CreateTableCommand).callsFake((input) => {
+           assert.strictEqual(deletionChecks.size, expectedTables.length);
+           const previousTable = expectedTables[existingTables.size - 1];
+           if (previousTable && previousTable !== "pn-PaperDeliveryDriverCapacitiesMock") {
+               assert.strictEqual(destinationChecks.get(previousTable), 2);
+           }
            assert.ok(expectedTables.includes(input.TableName));
            assert.strictEqual(input.cdc, undefined);
            existingTables.add(input.TableName);
@@ -500,36 +513,119 @@ describe("Lambda Delayer Dispatcher", () => {
        }
    });
 
-   for (const status of ["ARCHIVING", "ARCHIVED", "INACCESSIBLE_ENCRYPTION_CREDENTIALS"]) {
-       it(`DELETE_MOCK_TABLES fails immediately for table status ${status}`, async () => {
-           dynamoDbMock.on(DescribeTableCommand).resolves({
-               Table: { TableStatus: status }
-           });
-
-           const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
-           assert.strictEqual(result.statusCode, 500);
-           assert.match(JSON.parse(result.body).message, new RegExp(`pn-DelayerPaperDeliveryMock.*${status}`));
-           assert.strictEqual(dynamoDbMock.commandCalls(DescribeTableCommand).length, 2);
-           assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 0);
-           assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 0);
+   it("DELETE_MOCK_TABLES stops creation and CDC activation when the creation waiter fails", async () => {
+       const { deleteMockTables } = proxyquire("../app/deleteMockTables", {
+           "@aws-sdk/client-dynamodb": {
+               ...require("@aws-sdk/client-dynamodb"),
+               waitUntilTableExists: async (config, input) => {
+                   assert.ok(config.client instanceof DynamoDBClient);
+                   assert.strictEqual(config.maxWaitTime, 60);
+                   assert.strictEqual(config.minDelay, 2);
+                   assert.strictEqual(input.TableName, "pn-DelayerPaperDeliveryMock");
+                   throw new Error("Table activation timed out");
+               }
+           }
        });
-   }
+       dynamoDbMock.on(DeleteTableCommand).rejects({ name: "ResourceNotFoundException" });
+       dynamoDbMock.on(CreateTableCommand).resolves({});
 
-   it("DELETE_MOCK_TABLES fails if a table becomes archived while waiting for ACTIVE", async () => {
-       dynamoDbMock.on(DescribeTableCommand)
-           .resolvesOnce({ Table: { TableStatus: "CREATING" } })
-           .resolvesOnce({ Table: { TableStatus: "CREATING" } })
-           .resolves({ Table: { TableStatus: "ARCHIVED" } });
+       await assert.rejects(deleteMockTables(), /Table activation timed out/);
+       assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 6);
+       assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 1);
+       assert.strictEqual(dynamoDbMock.commandCalls(EnableKinesisStreamingDestinationCommand).length, 0);
+   });
+
+   it("DELETE_MOCK_TABLES recreates missing tables without checking their initial state", async () => {
+       dynamoDbMock.on(DeleteTableCommand).rejects({ name: "ResourceNotFoundException" });
+       dynamoDbMock.on(CreateTableCommand).resolves({});
+       dynamoDbMock.on(DescribeTableCommand).callsFake(() => {
+           assert.ok(dynamoDbMock.commandCalls(CreateTableCommand).length > 0);
+           return { Table: { TableStatus: "ACTIVE" } };
+       });
+       dynamoDbMock.on(EnableKinesisStreamingDestinationCommand).resolves({});
+       dynamoDbMock.on(DescribeKinesisStreamingDestinationCommand).resolves({
+           KinesisDataStreamDestinations: [{
+               StreamArn: process.env.CDC_KINESIS_STREAM_ARN,
+               DestinationStatus: "ACTIVE"
+           }]
+       });
+
+       const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
+       assert.strictEqual(result.statusCode, 200);
+       assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 6);
+       assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 6);
+       assert.strictEqual(dynamoDbMock.commandCalls(DescribeTableCommand).length, 6);
+   });
+
+   it("DELETE_MOCK_TABLES does not create tables when deletion fails", async () => {
+       dynamoDbMock.on(DeleteTableCommand).rejects(new Error("Access denied"));
 
        const result = await handler({ operationType: "DELETE_MOCK_TABLES", parameters: [] });
        assert.strictEqual(result.statusCode, 500);
-       assert.match(JSON.parse(result.body).message, /pn-DelayerPaperDeliveryMock.*ARCHIVED/);
-       assert.strictEqual(dynamoDbMock.commandCalls(DescribeTableCommand).length, 3);
-       assert.strictEqual(dynamoDbMock.commandCalls(DeleteTableCommand).length, 0);
+       assert.match(JSON.parse(result.body).message, /Access denied/);
+       assert.strictEqual(dynamoDbMock.commandCalls(DescribeTableCommand).length, 0);
+       assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 0);
+   });
+
+   it("DELETE_MOCK_TABLES does not create tables when the deletion waiter fails", async () => {
+       const { deleteMockTables } = proxyquire("../app/deleteMockTables", {
+           "@aws-sdk/client-dynamodb": {
+               ...require("@aws-sdk/client-dynamodb"),
+               waitUntilTableNotExists: async (config, input) => {
+                   assert.ok(config.client instanceof DynamoDBClient);
+                   assert.ok(input.TableName.endsWith("Mock"));
+                   throw new Error("Table deletion timed out");
+               }
+           }
+       });
+       dynamoDbMock.on(DeleteTableCommand).resolves({});
+
+       await assert.rejects(deleteMockTables(), /Table deletion timed out/);
+       assert.strictEqual(dynamoDbMock.commandCalls(CreateTableCommand).length, 0);
+   });
+
+   it("DELETE_MOCK_TABLES uses configured timing for both DynamoDB waiters", async () => {
+       const previousMaxWaitTime = process.env.DELETE_MOCK_TABLES_MAX_WAIT_TIME_SECONDS;
+       const previousMinDelay = process.env.DELETE_MOCK_TABLES_MIN_DELAY_SECONDS;
+       process.env.DELETE_MOCK_TABLES_MAX_WAIT_TIME_SECONDS = "240";
+       process.env.DELETE_MOCK_TABLES_MIN_DELAY_SECONDS = "2";
+       try {
+           const waiterCalls = [];
+           const waitForTable = async (config, input) => {
+               assert.strictEqual(config.maxWaitTime, 240);
+               assert.strictEqual(config.minDelay, 2);
+               waiterCalls.push(input.TableName);
+           };
+           const { deleteMockTables } = proxyquire("../app/deleteMockTables", {
+               "@aws-sdk/client-dynamodb": {
+                   ...require("@aws-sdk/client-dynamodb"),
+                   waitUntilTableNotExists: waitForTable,
+                   waitUntilTableExists: waitForTable
+               }
+           });
+           dynamoDbMock.on(DeleteTableCommand).resolves({});
+           dynamoDbMock.on(CreateTableCommand).resolves({});
+           dynamoDbMock.on(EnableKinesisStreamingDestinationCommand).resolves({});
+           dynamoDbMock.on(DescribeKinesisStreamingDestinationCommand).resolves({
+               KinesisDataStreamDestinations: [{
+                   StreamArn: process.env.CDC_KINESIS_STREAM_ARN,
+                   DestinationStatus: "ACTIVE"
+               }]
+           });
+
+           const result = await deleteMockTables();
+           assert.deepStrictEqual(waiterCalls, [...result.tables, ...result.tables]);
+       } finally {
+           if (previousMaxWaitTime === undefined) delete process.env.DELETE_MOCK_TABLES_MAX_WAIT_TIME_SECONDS;
+           else process.env.DELETE_MOCK_TABLES_MAX_WAIT_TIME_SECONDS = previousMaxWaitTime;
+           if (previousMinDelay === undefined) delete process.env.DELETE_MOCK_TABLES_MIN_DELAY_SECONDS;
+           else process.env.DELETE_MOCK_TABLES_MIN_DELAY_SECONDS = previousMinDelay;
+       }
    });
 
    it("DELETE_MOCK_TABLES reports a failed CDC destination instead of reporting success", async () => {
        let tableExists = false;
+       dynamoDbMock.on(DeleteTableCommand).rejects({ name: "ResourceNotFoundException" });
        dynamoDbMock.on(DescribeTableCommand).callsFake(() => {
            if (!tableExists) {
                const err = new Error("Table not found");

@@ -42,6 +42,10 @@
     "DelayerNotificationOrdersReservedConcurrentExecutions": "5",
     "SenderPriorityVCPU": "1",
     "SenderPriorityMemory": "4096",
-    "EnablePriorityResidualFlow": "true"
+    "EnablePriorityResidualFlow": "true",
+    "DeleteMockTablesMaxWaitTimeSeconds": "60",
+    "DeleteMockTablesMinDelaySeconds": "2",
+    "DeleteMockTablesWaitDelayMs": "2000",
+    "DeleteMockTablesMaxWaitAttempts": "60"
   }
 }

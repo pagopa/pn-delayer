@@ -4,19 +4,20 @@ const {
     DynamoDBClient,
     CreateTableCommand,
     DeleteTableCommand,
-    DescribeTableCommand,
     EnableKinesisStreamingDestinationCommand,
     DescribeKinesisStreamingDestinationCommand,
-    ResourceNotFoundException
+    ResourceNotFoundException,
+    waitUntilTableNotExists,
+    waitUntilTableExists
 } = require("@aws-sdk/client-dynamodb");
 const mockTableDefinitions = require("./mockTableDefinitions.json");
 
 const ddbClient = new DynamoDBClient({});
 const ACTIVE_STATUS = "ACTIVE";
-const DELETING_STATUS = "DELETING";
-const UNAVAILABLE_TABLE_STATUSES = new Set(["ARCHIVING", "ARCHIVED", "INACCESSIBLE_ENCRYPTION_CREDENTIALS"]);
-const WAIT_DELAY_MS = Number(process.env.DELETE_MOCK_TABLES_WAIT_DELAY_MS || 1000);
-const MAX_WAIT_ATTEMPTS = Number(process.env.DELETE_MOCK_TABLES_MAX_WAIT_ATTEMPTS || 120);
+const TABLE_MAX_WAIT_TIME_SECONDS = Number(process.env.DELETE_MOCK_TABLES_MAX_WAIT_TIME_SECONDS || 60);
+const TABLE_MIN_DELAY_SECONDS = Number(process.env.DELETE_MOCK_TABLES_MIN_DELAY_SECONDS || 2);
+const KINESIS_WAIT_DELAY_MS = Number(process.env.DELETE_MOCK_TABLES_WAIT_DELAY_MS || 2000);
+const KINESIS_MAX_WAIT_ATTEMPTS = Number(process.env.DELETE_MOCK_TABLES_MAX_WAIT_ATTEMPTS || 60);
 
 const buildTableDefinitions = () => mockTableDefinitions.map(definition =>
     JSON.parse(JSON.stringify(definition))
@@ -30,39 +31,65 @@ exports.deleteMockTables = async () => {
         throw new Error("CDC_KINESIS_STREAM_ARN is required to recreate mock tables");
     }
 
+    console.log(`Resetting ${tableDefinitions.length} mock tables`);
+    await Promise.all(tableDefinitions.map(({ TableName }) => deleteTable(TableName)));
+
+    console.log("All mock tables deleted; starting creation");
     for (const tableDefinition of tableDefinitions) {
-        await recreateTable(tableDefinition, streamArn);
+        await createTable(tableDefinition, streamArn);
     }
 
+    console.log(`Successfully recreated ${tableDefinitions.length} mock tables`);
     return {
         message: "Mock tables recreated",
         tables: tableDefinitions.map(({ TableName }) => TableName)
     };
 };
 
-async function recreateTable(tableDefinition, streamArn) {
-    const { cdc, ...createTableInput } = tableDefinition;
-    const tableName = tableDefinition.TableName;
-    const status = await getTableStatus(tableName);
-
-    if (status && status !== DELETING_STATUS) {
-        if (status !== ACTIVE_STATUS) {
-            await waitForTableStatus(tableName, ACTIVE_STATUS);
-        }
+async function deleteTable(tableName) {
+    console.log(`Deleting mock table ${tableName}`);
+    try {
         await ddbClient.send(new DeleteTableCommand({ TableName: tableName }));
+    } catch (err) {
+        if (isResourceNotFound(err)) {
+            console.log(`Mock table ${tableName} does not exist; ready for creation`);
+            return;
+        }
+        throw err;
     }
 
-    await waitForTableDeletion(tableName);
+    console.log(`Waiting for mock table ${tableName} to be deleted`);
+    await waitUntilTableNotExists(
+      { client: ddbClient, maxWaitTime: TABLE_MAX_WAIT_TIME_SECONDS, minDelay: TABLE_MIN_DELAY_SECONDS },
+      { TableName: tableName }
+    );
+    console.log(`Mock table ${tableName} deleted`);
+}
+
+async function createTable(tableDefinition, streamArn) {
+    const { cdc, ...createTableInput } = tableDefinition;
+    const tableName = tableDefinition.TableName;
+
+    console.log(`Creating mock table ${tableName}`);
     await ddbClient.send(new CreateTableCommand(createTableInput));
-    await waitForTableStatus(tableName, ACTIVE_STATUS);
+
+    console.log(`Waiting for mock table ${tableName} to become ACTIVE`);
+    await waitUntilTableExists(
+      { client: ddbClient, maxWaitTime: TABLE_MAX_WAIT_TIME_SECONDS, minDelay: TABLE_MIN_DELAY_SECONDS },
+      { TableName: tableName }
+    );
+    console.log(`Mock table ${tableName} is ACTIVE`);
+
     if (cdc) {
+        console.log(`Enabling Kinesis streaming for mock table ${tableName} on ${streamArn}`);
         await ddbClient.send(new EnableKinesisStreamingDestinationCommand({ TableName: tableName, StreamArn: streamArn }));
         await waitForKinesisDestination(tableName, streamArn);
+        console.log(`Kinesis streaming is ACTIVE for mock table ${tableName}`);
     }
 }
 
 async function waitForKinesisDestination(tableName, streamArn) {
-    for (let attempt = 0; attempt < MAX_WAIT_ATTEMPTS; attempt++) {
+    for (let attempt = 0; attempt < KINESIS_MAX_WAIT_ATTEMPTS; attempt++) {
         const result = await ddbClient.send(new DescribeKinesisStreamingDestinationCommand({ TableName: tableName }));
         const destination = result.KinesisDataStreamDestinations?.find(item => item.StreamArn === streamArn);
         if (destination?.DestinationStatus === ACTIVE_STATUS) {
@@ -71,46 +98,9 @@ async function waitForKinesisDestination(tableName, streamArn) {
         if (destination?.DestinationStatus === "ENABLE_FAILED") {
             throw new Error(`Kinesis streaming destination failed for table: ${tableName}: ${destination.DestinationStatusDescription || "unknown reason"}`);
         }
-        await sleep(WAIT_DELAY_MS);
+        await sleep(KINESIS_WAIT_DELAY_MS);
     }
     throw new Error(`Timed out waiting for Kinesis streaming destination: ${tableName}`);
-}
-
-async function getTableStatus(tableName) {
-    try {
-        const result = await ddbClient.send(new DescribeTableCommand({ TableName: tableName }));
-        return result.Table?.TableStatus;
-    } catch (err) {
-        if (isResourceNotFound(err)) {
-            return null;
-        }
-        throw err;
-    }
-}
-
-async function waitForTableDeletion(tableName) {
-    for (let attempt = 0; attempt < MAX_WAIT_ATTEMPTS; attempt++) {
-        const status = await getTableStatus(tableName);
-        if (!status) {
-            return;
-        }
-        await sleep(WAIT_DELAY_MS);
-    }
-    throw new Error(`Timed out waiting for table deletion: ${tableName}`);
-}
-
-async function waitForTableStatus(tableName, expectedStatus) {
-    for (let attempt = 0; attempt < MAX_WAIT_ATTEMPTS; attempt++) {
-        const status = await getTableStatus(tableName);
-        if (status === expectedStatus) {
-            return;
-        }
-        if (UNAVAILABLE_TABLE_STATUSES.has(status)) {
-            throw new Error(`Table ${tableName} cannot reach ${expectedStatus}: current status ${status}`);
-        }
-        await sleep(WAIT_DELAY_MS);
-    }
-    throw new Error(`Timed out waiting for table ${tableName} status ${expectedStatus}`);
 }
 
 function isResourceNotFound(err) {
