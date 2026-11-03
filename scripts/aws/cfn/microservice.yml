@@ -424,6 +424,22 @@ Parameters:
     Type: String
     Description: 'TestDelayerLambda function name'
 
+  DeleteMockTablesMaxWaitTimeSeconds:
+    Type: String
+    Description: 'Maximum wait time in seconds for each mock DynamoDB table creation or deletion'
+
+  DeleteMockTablesMinDelaySeconds:
+    Type: String
+    Description: 'Minimum polling delay in seconds for mock DynamoDB table waiters'
+
+  DeleteMockTablesWaitDelayMs:
+    Type: String
+    Description: 'Polling delay in milliseconds for mock table Kinesis streaming activation'
+
+  DeleteMockTablesMaxWaitAttempts:
+    Type: String
+    Description: 'Maximum polling attempts for mock table Kinesis streaming activation'
+
   PreRunRetryLambdaName:
     Type: String
     Description: 'PreRunRetryLambdaName function name'
@@ -2512,6 +2528,10 @@ Resources:
         Variables:
           REGION: !Sub ${AWS::Region}
           CDC_KINESIS_STREAM_ARN: !Ref CdcKinesisSourceStreamArn
+          DELETE_MOCK_TABLES_MAX_WAIT_TIME_SECONDS: !Ref DeleteMockTablesMaxWaitTimeSeconds
+          DELETE_MOCK_TABLES_MIN_DELAY_SECONDS: !Ref DeleteMockTablesMinDelaySeconds
+          DELETE_MOCK_TABLES_WAIT_DELAY_MS: !Ref DeleteMockTablesWaitDelayMs
+          DELETE_MOCK_TABLES_MAX_WAIT_ATTEMPTS: !Ref DeleteMockTablesMaxWaitAttempts
           BUCKET_NAME: !Ref TestDelayerBucketName
           OBJECT_KEY: !Ref TestDelayerObjectKeyBucket
           SFN_ARN: !Ref PaperDeliveryStateMachine
