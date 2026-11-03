@@ -29,17 +29,32 @@ commessa AS (
     WHERE rn = 1
 ),
 
+-- Each ADD on numberOfShipment produces a new CDC record: keep only the latest one per key
+used_sender_limit_latest AS (
+    SELECT
+        paId,
+        province,
+        productType,
+        senderLimit,
+        ROW_NUMBER() OVER (
+            PARTITION BY pk, deliveryDate
+            ORDER BY kinesis_dynamodb_ApproximateCreationDateTime DESC
+        ) AS rn
+    FROM pn_paper_delivery_used_sender_limit_json_view
+    WHERE p_year = '<YYYY>'
+      AND p_month = '<MM>'
+      AND p_day = '<DD>'
+      AND deliveryDate = '<YYYY-MM-DD-LAST-WEEK>'
+),
+
 limite AS (
     SELECT 
         paId,
         province,
         productType,
         senderLimit
-    FROM pn_paper_delivery_used_sender_limit_json_view
-    WHERE p_year = '<YYYY>'
-      AND p_month = '<MM>'
-      AND p_day = '<DD>'
-      AND deliveryDate = '<YYYY-MM-DD-LAST-WEEK>'
+    FROM used_sender_limit_latest
+    WHERE rn = 1
 ),
 
 total AS (
@@ -105,34 +120,25 @@ in_prepare_fase_2 AS (
     GROUP BY senderPaId, province, productType
 ),
 
+chiavi AS (
+    SELECT paId, province, productType FROM commessa
+    UNION
+    SELECT paId, province, productType FROM limite
+    UNION
+    SELECT senderPaId, province, productType FROM total
+    UNION
+    SELECT senderPaId, province, productType FROM passed
+    UNION
+    SELECT senderPaId, province, productType FROM not_passed
+    UNION
+    SELECT senderPaId, province, productType FROM in_prepare_fase_2
+),
+
 joined AS (
     SELECT
-        COALESCE(
-            c.paId,
-            t.senderPaId,
-            p.senderPaId,
-            n.senderPaId,
-            l.paId,
-            f.senderPaId
-        ) AS paId,
-
-        COALESCE(
-            c.province,
-            t.province,
-            p.province,
-            n.province,
-            l.province,
-            f.province
-        ) AS province,
-
-        COALESCE(
-            c.productType,
-            t.productType,
-            p.productType,
-            n.productType,
-            l.productType,
-            f.productType
-        ) AS productType,
+        k.paId,
+        k.province,
+        k.productType,
 
         c.deliveryDate,
 
@@ -152,27 +158,31 @@ joined AS (
         TRY_CAST(n.tot_not_passed_rs AS INTEGER) AS tot_not_passed_rs,
         TRY_CAST(f.in_prepare_fase_2 AS INTEGER) AS in_prepare_fase_2
 
-    FROM commessa c
-    FULL JOIN limite l
-        ON c.paId = l.paId
-       AND c.province = l.province
-       AND c.productType = l.productType
-    FULL JOIN total t
-        ON c.paId = t.senderPaId
-       AND c.province = t.province
-       AND c.productType = t.productType
-    FULL JOIN passed p
-        ON c.paId = p.senderPaId
-       AND c.province = p.province
-       AND c.productType = p.productType
-    FULL JOIN not_passed n
-        ON c.paId = n.senderPaId
-       AND c.province = n.province
-       AND c.productType = n.productType
-    FULL JOIN in_prepare_fase_2 f
-        ON c.paId = f.senderPaId
-       AND c.province = f.province
-       AND c.productType = f.productType
+    FROM chiavi k
+    LEFT JOIN commessa c
+        ON k.paId = c.paId
+       AND k.province = c.province
+       AND k.productType = c.productType
+    LEFT JOIN limite l
+        ON k.paId = l.paId
+       AND k.province = l.province
+       AND k.productType = l.productType
+    LEFT JOIN total t
+        ON k.paId = t.senderPaId
+       AND k.province = t.province
+       AND k.productType = t.productType
+    LEFT JOIN passed p
+        ON k.paId = p.senderPaId
+       AND k.province = p.province
+       AND k.productType = p.productType
+    LEFT JOIN not_passed n
+        ON k.paId = n.senderPaId
+       AND k.province = n.province
+       AND k.productType = n.productType
+    LEFT JOIN in_prepare_fase_2 f
+        ON k.paId = f.senderPaId
+       AND k.province = f.province
+       AND k.productType = f.productType
 )
 
 SELECT
