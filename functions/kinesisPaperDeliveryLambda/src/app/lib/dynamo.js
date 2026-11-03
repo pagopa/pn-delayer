@@ -352,7 +352,7 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
        * il record finisce sulla OnFailure destination S3 e scatta l'allarme
        * ${ProjectName}-PaperDeliveryLambda-ESM-Alarm (PaperDeliveryKinesisFailuresAlarm in microservice.yml).
        */
-      console.warn(` vfor ${eventItem.requestId}`, error);
+      console.warn(`Failed transactional processing for ${eventItem.requestId}`, error);
       batchItemFailures.push({
         itemIdentifier: eventItem.kinesisSeqNumber
       });
