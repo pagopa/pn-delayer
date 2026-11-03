@@ -691,6 +691,41 @@ describe('updateUsedSenderLimitAndInsertPaperDeliveries', () => {
     expect(paperDeliveryRecords).to.deep.equal([]);
   });
 
+  it('logs a transaction conflict as warning and adds it to batchItemFailures', async () => {
+    const eventItem = buildEvent();
+    const paperDeliveryRecords = [];
+    const batchItemFailures = [];
+
+    mockSend.rejects(Object.assign(
+      new Error('Transaction cancelled'),
+      {
+        name: 'TransactionCanceledException',
+        CancellationReasons: [
+          { Code: 'None' },
+          { Code: 'TransactionConflict', Message: 'Transaction is ongoing for the item' },
+          { Code: 'None' }
+        ]
+      }
+    ));
+    const errorSpy = sinon.spy(console, 'error');
+    const warnSpy = sinon.spy(console, 'warn');
+
+    await dynamo.updateUsedSenderLimitAndInsertPaperDeliveries(
+      [eventItem],
+      paperDeliveryRecords,
+      '2025-05-19',
+      10,
+      batchItemFailures
+    );
+
+    expect(batchItemFailures).to.deep.equal([
+      { itemIdentifier: 'seq1' }
+    ]);
+    expect(paperDeliveryRecords).to.deep.equal([]);
+    expect(errorSpy.called).to.equal(false);
+    expect(warnSpy.calledOnce).to.equal(true);
+  });
+
   it('processes group records one at a time in order', async () => {
     const firstEvent = buildEvent();
     const secondEvent = buildEvent({
