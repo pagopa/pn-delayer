@@ -346,7 +346,13 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
         });
         continue;
       }
-      console.error(`Failed transactional processing for ${eventItem.requestId}`, error);
+      /*
+       * Log a WARN: il record viene restituito come batchItemFailure e ritentato dall'ESM
+       * (es. TransactionConflict sul contatore UsedSenderLimit). Se i retry si esauriscono,
+       * il record finisce sulla OnFailure destination S3 e scatta l'allarme
+       * ${ProjectName}-PaperDeliveryLambda-ESM-Alarm (PaperDeliveryKinesisFailuresAlarm in microservice.yml).
+       */
+      console.warn(` vfor ${eventItem.requestId}`, error);
       batchItemFailures.push({
         itemIdentifier: eventItem.kinesisSeqNumber
       });
