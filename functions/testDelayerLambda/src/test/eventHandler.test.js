@@ -39,6 +39,10 @@ const proxyquire = require("proxyquire").noCallThru();
 let handler;
 
 describe("Lambda Delayer Dispatcher", () => {
+    after(() => {
+        [s3Mock, dynamoDbMock, ddbMock, sfnMock, lambdaMock, athenaMock].forEach((mock) => mock.restore());
+    });
+
     beforeEach(() => {
         s3Mock.reset();
         dynamoDbMock.reset();
