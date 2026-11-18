@@ -11,17 +11,17 @@
     "coverage": "nyc report --reporter=lcov"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "3.995.0",
-    "@aws-sdk/client-lambda": "3.995.0",
-    "@aws-sdk/lib-dynamodb": "3.995.0",
-    "@aws-sdk/client-s3": "3.995.0",
-    "@aws-sdk/client-sfn": "3.995.0",
-    "@aws-sdk/s3-request-presigner": "3.995.0",
-    "csv-parser": "^3.0.0",
-    "csv-stringify": "^6.0.0",
+    "@aws-sdk/client-athena": "3.1171.0",
+    "@aws-sdk/client-dynamodb": "3.1171.0",
+    "@aws-sdk/client-lambda": "3.1171.0",
+    "@aws-sdk/client-s3": "3.1171.0",
+    "@aws-sdk/client-sfn": "3.1171.0",
+    "@aws-sdk/lib-dynamodb": "3.1171.0",
+    "@aws-sdk/lib-storage": "3.1171.0",
+    "@aws-sdk/s3-request-presigner": "3.1171.0",
     "@js-joda/core": "^5.6.5",
-    "@aws-sdk/client-athena": "3.995.0",
-    "@aws-sdk/lib-storage": "3.995.0"
+    "csv-parser": "^3.0.0",
+    "csv-stringify": "^6.0.0"
   },
   "devDependencies": {
     "aws-sdk-client-mock": "^2.0.2",
