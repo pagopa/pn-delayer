@@ -10,8 +10,8 @@
     "coverage": "nyc report --reporter=lcov"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "3.995.0",
-    "@aws-sdk/util-dynamodb": "3.995.0",
+    "@aws-sdk/client-dynamodb": "3.1171.0",
+    "@aws-sdk/util-dynamodb": "3.996.9",
     "dotenv": "^16.4.7"
   },
   "devDependencies": {

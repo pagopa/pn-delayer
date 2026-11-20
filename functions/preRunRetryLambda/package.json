@@ -10,8 +10,8 @@
     "test-build": "npm run test && npm run coverage && npm run build"
   },
   "dependencies": {
-    "@aws-sdk/client-sfn": "3.995.0",
-    "@aws-sdk/client-scheduler": "3.995.0",
+    "@aws-sdk/client-sfn": "3.1171.0",
+    "@aws-sdk/client-scheduler": "3.1171.0",
     "@js-joda/core": "^5.6.5",
     "dotenv": "^16.4.7"
   },
