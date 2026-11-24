@@ -5,7 +5,8 @@
       { "AttributeName": "pk", "AttributeType": "S" },
       { "AttributeName": "sk", "AttributeType": "S" },
       { "AttributeName": "requestId", "AttributeType": "S" },
-      { "AttributeName": "createdAt", "AttributeType": "S" }
+      { "AttributeName": "createdAt", "AttributeType": "S" },
+      { "AttributeName": "senderPaIdOriginalSentAt", "AttributeType": "S" }
     ],
     "KeySchema": [
       { "AttributeName": "pk", "KeyType": "HASH" },
@@ -17,6 +18,14 @@
         "KeySchema": [
           { "AttributeName": "requestId", "KeyType": "HASH" },
           { "AttributeName": "createdAt", "KeyType": "RANGE" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      },
+      {
+        "IndexName": "pk-senderPaIdOriginalSentAt-index",
+        "KeySchema": [
+          { "AttributeName": "pk", "KeyType": "HASH" },
+          { "AttributeName": "senderPaIdOriginalSentAt", "KeyType": "RANGE" }
         ],
         "Projection": { "ProjectionType": "ALL" }
       }
@@ -68,7 +77,8 @@
     "TableName": "pn-PaperDeliveryDriverUsedCapacitiesMock",
     "AttributeDefinitions": [
       { "AttributeName": "unifiedDeliveryDriverGeokey", "AttributeType": "S" },
-      { "AttributeName": "deliveryDate", "AttributeType": "S" }
+      { "AttributeName": "deliveryDate", "AttributeType": "S" },
+      { "AttributeName": "unifiedDeliveryDriver", "AttributeType": "S" }
     ],
     "KeySchema": [
       { "AttributeName": "unifiedDeliveryDriverGeokey", "KeyType": "HASH" },
@@ -79,6 +89,14 @@
         "IndexName": "deliveryDate-index",
         "KeySchema": [
           { "AttributeName": "deliveryDate", "KeyType": "HASH" }
+        ],
+        "Projection": { "ProjectionType": "ALL" }
+      },
+      {
+        "IndexName": "deliveryDate-driver-index",
+        "KeySchema": [
+          { "AttributeName": "deliveryDate", "KeyType": "HASH" },
+          { "AttributeName": "unifiedDeliveryDriver", "KeyType": "RANGE" }
         ],
         "Projection": { "ProjectionType": "ALL" }
       }
