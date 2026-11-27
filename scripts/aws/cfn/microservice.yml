@@ -233,7 +233,7 @@ Parameters:
 
   PaperDeliveryTtlDays:
     Type: Number
-    Description: 'Ttl duration for paper delivery'
+    Description: 'TTL in days for PaperDelivery records (DynamoDB automatic deletion).'
     Default: 1825
 
   VpcCidr:

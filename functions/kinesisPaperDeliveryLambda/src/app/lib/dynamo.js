@@ -9,7 +9,8 @@ const {
 } = require("@aws-sdk/lib-dynamodb");
 const {
   getDeliveryWeek,
-  buildPaperDeliveryRecord
+  buildPaperDeliveryRecord,
+  calculateTtl
 } = require("./utils");
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -26,12 +27,7 @@ const TRANSACTION_INDEX = {
   PAPER_DELIVERY: 2
 };
 
-function calculateTtl(){
-  const ttlDays = parseInt(process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS, 10) || 14;
-  const expireDate = new Date();
-  expireDate.setDate(expireDate.getDate() + ttlDays);
-  return Math.floor(expireDate.getTime() / 1000);
-}
+const ttlDays = parseInt(process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS, 10) || 14;
 
 function retrieveCounterMap(excludeGroupedRecords) {
   const result = {};
@@ -63,7 +59,7 @@ function retrieveCounterMap(excludeGroupedRecords) {
 async function updateExcludeCounter(excludeGroupedRecords, batchItemFailures) {
 
     const deliveryDate = getDeliveryWeek();
-    let ttl = calculateTtl();
+    let ttl = calculateTtl(ttlDays);
     let counterMap = retrieveCounterMap(excludeGroupedRecords);
 
     for (const [productTypeProvince, inc] of Object.entries(counterMap)) {
@@ -268,7 +264,7 @@ async function updateUsedSenderLimitAndInsertPaperDeliveries(groupRecords, paper
 
     const eventRecord = {
       requestId: eventItem.requestId,
-      ttl: calculateTtl()
+      ttl: calculateTtl(ttlDays)
     };
 
     const expressionAttributeNames = {

@@ -48,11 +48,24 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       deliveryDate: '2025-07-07',
       delayed: false,
       skipSenderLimit: false,
-      senderPriority: 0,
-      ttl: '1825'
+      senderPriority: 0
     });
+    expect(result.ttl).to.be.a('number');
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
+  });
+
+  it('sets ttl to now plus configured days (default 1825)', () => {
+    const payload = {
+      recipientNormalizedAddress: { pr: 'p', cap: '1', region: 'r' },
+      requestId: 'req1', productType: 'type1', senderPaId: 's', tenderId: 't',
+      notificationSentAt: '2025-01-01T00:00:00Z', prepareRequestDate: '2024-01-01T00:00:00Z',
+      unifiedDeliveryDriver: 'd', attempt: 0, iun: 'i', communicationType: 'LEGAL'
+    };
+    const before = Math.floor(Date.now() / 1000) + 1825 * 86400;
+    const result = buildPaperDeliveryRecord(payload, '2025-07-07');
+    const after = Math.floor(Date.now() / 1000) + 1825 * 86400;
+    expect(result.ttl).to.be.within(before, after);
   });
 
   it('builds a record with all required fields from payload LEGAL', () => {
@@ -91,8 +104,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         deliveryDate: '2025-07-07',
         delayed: false,
         skipSenderLimit: false,
-        senderPriority: 5,
-        ttl: '1825'
+        senderPriority: 5
       });
       expect(result).to.have.property('createdAt');
       expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -132,8 +144,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       deliveryDate: '2025-07-07',
       delayed: false,
       skipSenderLimit: false,
-      senderPriority: 0,
-      ttl: '1825'
+      senderPriority: 0
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -176,8 +187,7 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       deliveryDate: '2025-07-07',
       delayed: false,
       skipSenderLimit: false,
-      senderPriority: 0,
-      ttl: '1825'
+      senderPriority: 0
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');

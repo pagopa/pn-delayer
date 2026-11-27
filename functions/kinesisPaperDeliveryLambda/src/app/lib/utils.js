@@ -1,12 +1,9 @@
-const { LocalDate, DayOfWeek, TemporalAdjusters, Clock, Instant, ZoneOffset} = require("@js-joda/core");
+const { LocalDate, DayOfWeek, TemporalAdjusters, Instant, ZoneOffset} = require("@js-joda/core");
 const dayOfWeekEnv = process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK;
-const ttlDaysEnv = process.env.KINESIS_PAPERDELIVERY_TTLDAYS;
+const paperDeliveryTtlDays = parseInt(process.env.KINESIS_PAPERDELIVERY_TTLDAYS, 10) || 1825;
 
-function calculateTtl(){
-  const ttlDays = parseInt(ttlDaysEnv, 10) || 1825;
-  const expireDate = new Date();
-  expireDate.setDate(expireDate.getDate() + ttlDays);
-  return Math.floor(expireDate.getTime() / 1000);
+function calculateTtl(ttlDays){
+  return Math.floor(Date.now() / 1000) + ttlDays * 86400;
 }
 
 function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
@@ -36,7 +33,7 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSe
     deliveryDate: deliveryWeek,
     delayed: Boolean(delayed),
     skipSenderLimit: Boolean(skipSenderLimit),
-    ttl: calculateTtl()
+    ttl: calculateTtl(paperDeliveryTtlDays)
   };
 
   if (payload.senderPaId && !rsOrSecondAttempt && payload.communicationType !== 'INFORMAL') {
@@ -98,7 +95,7 @@ function groupRecordsByProductAndProvince(records) {
     acc[key].push(record);
     return acc;
   }, {});
-};
+}
 
 function groupRecordsBySenderPaId(records) {
   return records.reduce((acc, record) => {
@@ -115,7 +112,7 @@ function groupRecordsBySenderPaId(records) {
     acc[key].push(record);
     return acc;
   }, {});
-};
+}
 
 function groupDelayedRecords(records) {
   return records.reduce((acc, record) => {
@@ -126,7 +123,7 @@ function groupDelayedRecords(records) {
     acc[key].push(record);
     return acc;
   }, {});
-};
+}
 
 function addPaperDeliveryRecord({
   eventItem,
@@ -157,5 +154,6 @@ module.exports = {
   getCurrentWeek,
   getDeliveryWeek,
   addPaperDeliveryRecord,
-  isRsOrSecondAttempt
+  isRsOrSecondAttempt,
+  calculateTtl
 };

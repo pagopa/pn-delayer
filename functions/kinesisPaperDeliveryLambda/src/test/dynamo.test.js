@@ -47,11 +47,14 @@ beforeEach(() => {
     })
   );
 
+  dynamo = loadDynamo();
+});
+
+function loadDynamo() {
   const DynamoDBDocumentClient = {
     from: sinon.stub().returns({ send: mockSend })
   };
-
-  dynamo = proxyquire('../app/lib/dynamo', {
+  return proxyquire('../app/lib/dynamo', {
     '@aws-sdk/client-dynamodb': {
       DynamoDBClient: function () { }
     },
@@ -65,10 +68,11 @@ beforeEach(() => {
     },
     './utils': {
       getDeliveryWeek: getDeliveryWeekStub,
-      buildPaperDeliveryRecord: buildPaperDeliveryRecordStub
+      buildPaperDeliveryRecord: buildPaperDeliveryRecordStub,
+      calculateTtl: (days) => Math.floor(Date.now() / 1000) + days * 86400
     }
   });
-});
+}
 
 afterEach(() => {
   sinon.restore();
@@ -173,6 +177,7 @@ describe('updateExcludeCounter', () => {
 
   it('uses custom ttl days from env', async () => {
     process.env.KINESIS_PAPERDELIVERY_COUNTERTTLDAYS = '2';
+    dynamo = loadDynamo();
     mockSend.resolves({});
 
     const now = Math.floor(Date.now() / 1000);
