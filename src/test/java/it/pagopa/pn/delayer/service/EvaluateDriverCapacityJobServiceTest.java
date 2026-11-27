@@ -57,6 +57,7 @@ class EvaluateDriverCapacityJobServiceTest {
         pnDelayerConfigs.setDao(dao);
         pnDelayerConfigs.setPrintCapacityWeeklyWorkingDays(7);
         pnDelayerConfigs.setPrintCapacity(List.of("1970-01-01;180000"));
+        pnDelayerConfigs.setPaperDeliveryTtlDays(1825);
 
         PaperDeliveryUtils paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, pnDelayerConfigs, new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs)), deliveryDriverUtils, paperDeliveryCounterDAO);
         evaluateDr = new EvaluateDriverCapacityJobServiceImpl(paperDeliveryUtils);

@@ -34,6 +34,7 @@ class PnDelayerUtilsTest {
     void setUp() {
         PnDelayerConfigs pnDelayerConfigs = new PnDelayerConfigs();
         pnDelayerConfigs.setDeliveryDateDayOfWeek(1);
+        pnDelayerConfigs.setPaperDeliveryTtlDays(1825);
         pnDelayerUtils = new PnDelayerUtils(pnDelayerConfigs, new PrintCapacityUtils(pnDelayerConfigs));
     }
 

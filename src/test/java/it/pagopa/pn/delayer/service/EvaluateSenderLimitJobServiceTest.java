@@ -74,6 +74,7 @@ class EvaluateSenderLimitJobServiceTest {
         PnDelayerConfigs.Dao daoConfig = new PnDelayerConfigs.Dao();
         daoConfig.setPaperDeliveryQueryLimit(50);
         pnDelayerConfigs.setDao(daoConfig);
+        pnDelayerConfigs.setPaperDeliveryTtlDays(1825);
 
         service = new EvaluateSenderLimitJobServiceImpl(
                 pnDelayerUtils,

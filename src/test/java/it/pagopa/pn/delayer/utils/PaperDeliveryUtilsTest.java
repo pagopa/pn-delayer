@@ -52,6 +52,7 @@ public class PaperDeliveryUtilsTest {
         config.setPrintCapacity(List.of("1970-01-01;180000"));
         config.setPrintCounterTtlDuration(Duration.ofDays(7));
         config.setDeliveryDateDayOfWeek(1);
+        config.setPaperDeliveryTtlDays(1825);
         paperDeliveryUtils = new PaperDeliveryUtils(paperDeliveryDAO, config, new PnDelayerUtils(config, new PrintCapacityUtils(config)), deliveryDriverUtils, paperDeliveryCounterDAO);
     }
 
