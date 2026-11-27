@@ -46,6 +46,7 @@
     "DeleteMockTablesMaxWaitTimeSeconds": "60",
     "DeleteMockTablesMinDelaySeconds": "2",
     "DeleteMockTablesWaitDelayMs": "2000",
-    "DeleteMockTablesMaxWaitAttempts": "60"
+    "DeleteMockTablesMaxWaitAttempts": "60",
+    "PaperDeliveryTtlDays": "1825"
   }
 }

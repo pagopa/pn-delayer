@@ -15,6 +15,8 @@ import reactor.test.StepVerifier;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -407,6 +409,7 @@ class EvaluateSenderPriorityJobServiceTest {
         paperDelivery.setProductType("AR");
         paperDelivery.setAttempt(0);
         paperDelivery.setDelayed(delayed);
+        paperDelivery.setTtl(Instant.now().plus(Duration.ofDays(pnDelayerConfigs.getPaperDeliveryTtlDays())).getEpochSecond());
         return paperDelivery;
     }
 }

@@ -80,6 +80,7 @@ la lambda job valorizza `skipSenderLimit = true` e incrementa la quota mittente 
 | KINESIS_PAPERDELIVERY_COUNTERTTLDAYS        | TTL in giorni per i contatori                                                                                                                    | No           | 14      |
 | KINESIS_EVENTSRECORDTTLSECONDS              | TTL in secondi per i record degli eventi Kinesis                                                                                                 | Sì           |         |
 | KINESIS_BATCHSIZE                           | Dimensione massima del batch per l'elaborazione delle notifiche                                                                                  | No           |         |
+| KINESIS_PAPERDELIVERY_TTLDAYS               | TTL in giorni per i record della tabella pn-PaperDelivery                                                                                        | No           | 1825    |
 
 ### pn-delayer-sender-priority-job
 
@@ -279,22 +280,23 @@ capacità aggregata del gruppo `Fulmine + Poste`. Se invece entrambi i recapitis
 `products = [AR]`, `capacity = 700` e il denominatore sarebbe solo `totalEstimateCounter[AR]`.
 
 #### Configurazione
-| Variabile Ambiente                                    | Descrizione                                                                                                                                    | Default | Obbligatorio |
-|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|---------|--------------|
-| PN_DELAYER_PAPERDELIVERYPRIORITYPARAMETERNAME         | Nome del parametro contenente l'ordine di priorità delle spedizioni                                                                            | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT                | Query limit per la tabella contenente le spedizioni                                                                                            | 5       | No           |
+| Variabile Ambiente                                    | Descrizione                                                                                                                                     | Default | Obbligatorio |
+|-------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------|--------------|
+| PN_DELAYER_PAPERDELIVERYPRIORITYPARAMETERNAME         | Nome del parametro contenente l'ordine di priorità delle spedizioni                                                                             | -       | Si           |
+| PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT                | Query limit per la tabella contenente le spedizioni                                                                                             | 5       | No           |
 | PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME          | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME      | Nome della tabella DynamoDB contenente le stime dei mittenti derivanti dai moduli commessa                                                     | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME  | Nome della tabella DynamoDB contenente le spedizioni inviate allo step successivo raggruppate per mittente-prodotto-provincia                  | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME | Nome della tabella DynamoDB per le capacità di recapito                                                                                        | -       | Si           |
-| PN_DELAYER_DAO_PAPERDELIVERYTABLENAME                 | Nome della tabella DynamoDB contenente le spedizioni da valutare                                                                               | -       | Si           |
-| PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCE       | Provincia di input per la singola esecuzione del JOB                                                                                           |         | No           |
-| PN_DELAYER_ACTUALTENDERID                             | id della gara attiva                                                                                                                           |         | No           |
-| PN_DELAYER_WORKFLOWSTEP                               | Workflow step = EVALUATE_SENDER_LIMIT                                                                                                          |         | No           |
-| PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN             | Nome della lambda di paperChannel per il recupero dei recapitisti                                                                              | -       | Si           |
-| PN_DELAYER_DELIVERYDATEDAYOFWEEK                      | Giorno iniziale per la settimana di cutOff                                                                                                     | 1       | No           |
-| PN_DELAYER_PRINTCAPACITY                              | capacità di stampa giornaliera nel formato '1970-01-01;180000'                                                                                 | -       | Si           |
-| PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW                 | Abilita il flusso prioritario residual nei job di pianificazione                                                                               | false   | Si           |
+| PN_DELAYER_DAO_PAPERDELIVERYSENDERLIMITTABLENAME      | Nome della tabella DynamoDB contenente le stime dei mittenti derivanti dai moduli commessa                                                      | -       | Si           |
+| PN_DELAYER_DAO_PAPERDELIVERYUSEDSENDERLIMITTABLENAME  | Nome della tabella DynamoDB contenente le spedizioni inviate allo step successivo raggruppate per mittente-prodotto-provincia                   | -       | Si           |
+| PN_DELAYER_DAO_PAPERDELIVERYDRIVERCAPACITIESTABLENAME | Nome della tabella DynamoDB per le capacità di recapito                                                                                         | -       | Si           |
+| PN_DELAYER_DAO_PAPERDELIVERYTABLENAME                 | Nome della tabella DynamoDB contenente le spedizioni da valutare                                                                                | -       | Si           |
+| PN_DELAYER_EVALUATESENDERLIMITJOBINPUT_PROVINCE       | Provincia di input per la singola esecuzione del JOB                                                                                            |         | No           |
+| PN_DELAYER_ACTUALTENDERID                             | id della gara attiva                                                                                                                            |         | No           |
+| PN_DELAYER_WORKFLOWSTEP                               | Workflow step = EVALUATE_SENDER_LIMIT                                                                                                           |         | No           |
+| PN_DELAYER_PAPERCHANNELTENDERAPILAMBDAARN             | Nome della lambda di paperChannel per il recupero dei recapitisti                                                                               | -       | Si           |
+| PN_DELAYER_DELIVERYDATEDAYOFWEEK                      | Giorno iniziale per la settimana di cutOff                                                                                                      | 1       | No           |
+| PN_DELAYER_PRINTCAPACITY                              | capacità di stampa giornaliera nel formato '1970-01-01;180000'                                                                                  | -       | Si           |
+| PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW                 | Abilita il flusso prioritario residual nei job di pianificazione                                                                                | false   | Si           |
+| PN_DELAYER_PAPERDELIVERYTTLDAYS                       | TTL in giorni per i record della tabella pn-PaperDelivery                                                                                       | -       | Si           |
 
 ### pn-delayer-residual-capacity-job-definition
 
@@ -321,6 +323,7 @@ capacità aggregata del gruppo `Fulmine + Poste`. Se invece entrambi i recapitis
 | PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT                            | Query limit per la tabella contenente le spedizioni                                                                                             | 5       | No           |
 | PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME                      | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -       | Si           |
 | PN_DELAYER_PRINTCAPACITY                                          | capacità di stampa giornaliera nel formato '1970-01-01;180000'                                                                                  | -       | Si           |
+| PN_DELAYER_PAPERDELIVERYTTLDAYS                                   | TTL in giorni per i record della tabella pn-PaperDelivery                                                                                       | -       | Si           |
 
 ### pn-delayer-driver-capacity-job-definition
 
@@ -347,6 +350,7 @@ capacità aggregata del gruppo `Fulmine + Poste`. Se invece entrambi i recapitis
 | PN_DELAYER_DAO_PAPERDELIVERYQUERYLIMIT                           | Query limit per la tabella contenente le spedizioni                                                                                             | 5       | No           |
 | PN_DELAYER_DAO_PAPERDELIVERYCOUNTERTABLENAME                     | Nome della tabella DynamoDB per i contatori di RS e Secondi tentativi, il contatore della capacità di stampa, e i contatori dei moduli commessa | -       | Si           |
 | PN_DELAYER_PRINTCAPACITY                                         | capacità di stampa giornaliera nel formato '1970-01-01;180000'                                                                                  | -       | Si           |
+| PN_DELAYER_PAPERDELIVERYTTLDAYS                                  | TTL in giorni per i record della tabella pn-PaperDelivery                                                                                       | -       | Si           |
 
 
 ### pn-delayerToPaperChannelLambda

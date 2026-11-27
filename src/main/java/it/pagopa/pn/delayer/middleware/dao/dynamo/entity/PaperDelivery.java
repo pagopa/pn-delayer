@@ -8,6 +8,7 @@ import lombok.Getter;
 import org.springframework.util.StringUtils;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -40,6 +41,7 @@ public class PaperDelivery {
     public static final String COL_SENDERPAID_ORIGINALSENTAT = "senderPaIdOriginalSentAt";
     public static final String COL_DELAYED = "delayed";
     public static final String COL_SKIP_SENDER_LIMIT = "skipSenderLimit";
+    public static final String COL_TTL = "ttl";
 
     public static final String PK_SENDERPAID_ORIGINALSENTAT_INDEX = "pk-senderPaIdOriginalSentAt-index";
 
@@ -92,10 +94,12 @@ public class PaperDelivery {
     @Getter(onMethod = @__({@DynamoDbAttribute(COL_DELAYED)}))
     private boolean delayed;
     private boolean skipSenderLimit;
+    @Getter(onMethod = @__({@DynamoDbAttribute(COL_TTL)}))
+    private long ttl;
 
     public PaperDelivery(){}
 
-    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek){
+    public PaperDelivery(PaperDelivery paperDelivery, WorkflowStepEnum workflowStepEnum, LocalDate deliveryWeek, Integer paperDeliveryTtlDays){
         String date =  paperDelivery.getProductType().equalsIgnoreCase("RS") || paperDelivery.getAttempt() == 1 ?
                 paperDelivery.getPrepareRequestDate() : paperDelivery.getNotificationSentAt();
 
@@ -124,6 +128,7 @@ public class PaperDelivery {
         this.senderPaIdOriginalSentAt = getSenderPaIdOriginalSentAt(paperDelivery, date);
         this.delayed = paperDelivery.isDelayed();
         this.skipSenderLimit = paperDelivery.isSkipSenderLimit();
+        this.ttl = Instant.now().plus(Duration.ofDays(paperDeliveryTtlDays)).getEpochSecond();
     }
 
     @DynamoDbAttribute(COL_SKIP_SENDER_LIMIT)

@@ -48,7 +48,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       deliveryDate: '2025-07-07',
       delayed: false,
       skipSenderLimit: false,
-      senderPriority: 0
+      senderPriority: 0,
+      ttl: '1825'
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -90,7 +91,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
         deliveryDate: '2025-07-07',
         delayed: false,
         skipSenderLimit: false,
-        senderPriority: 5
+        senderPriority: 5,
+        ttl: '1825'
       });
       expect(result).to.have.property('createdAt');
       expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -130,7 +132,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       deliveryDate: '2025-07-07',
       delayed: false,
       skipSenderLimit: false,
-      senderPriority: 0
+      senderPriority: 0,
+      ttl: '1825'
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');
@@ -173,7 +176,8 @@ describe('buildPaperDeliveryHighPriorityRecord', () => {
       deliveryDate: '2025-07-07',
       delayed: false,
       skipSenderLimit: false,
-      senderPriority: 0
+      senderPriority: 0,
+      ttl: '1825'
     });
     expect(result).to.have.property('createdAt');
     expect(new Date(result.createdAt).toString()).to.not.equal('Invalid Date');

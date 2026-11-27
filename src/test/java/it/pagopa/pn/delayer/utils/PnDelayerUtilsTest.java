@@ -492,6 +492,7 @@ class PnDelayerUtilsTest {
         delivery.setDeliveryDate("2023-10-02");
         delivery.setPk("2023-10-02~EVALUATE_RESIDUAL_CAPACITY");
         delivery.setPrepareRequestDate("2023-10-01T12:00:00Z");
+        delivery.setTtl(Instant.now().getEpochSecond());
         return delivery;
     }
 }

@@ -41,6 +41,7 @@ public class PnDelayerConfigs {
     private Instant delayerToPaperChannelFirstSchedulerStartDate;
     private Instant delayerToPaperChannelSecondSchedulerStartDate;
     private boolean enablePriorityResidualFlow;
+    private Integer paperDeliveryTtlDays;
 
     @Data
     public static class EvaluateSenderPriorityJobInput {

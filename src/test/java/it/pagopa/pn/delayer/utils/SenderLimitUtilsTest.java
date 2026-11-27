@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -130,6 +131,7 @@ public class SenderLimitUtilsTest {
         delivery.setAttempt(attempt);
         delivery.setDeliveryDate("2023-10-02");
         delivery.setPk("2023-10-02~EVALUATE_RESIDUAL_CAPACITY");
+        delivery.setTtl(Instant.now().getEpochSecond());
         return delivery;
     }
 }

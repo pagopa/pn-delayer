@@ -231,6 +231,11 @@ Parameters:
     Description: 'Kinesis sequence number TTL duration in days for paper delivery.'
     Default: 14
 
+  PaperDeliveryTtlDays:
+    Type: Number
+    Description: 'Ttl duration for paper delivery'
+    Default: 1825
+
   VpcCidr:
     Type: String
     Description: 'VPC Cidr default'
@@ -900,6 +905,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
             Value: !Ref EnablePriorityResidualFlow
+          - Name: PN_DELAYER_PAPERDELIVERYTTLDAYS
+            Value: !Ref PaperDeliveryTtlDays
 
       PlatformCapabilities:
         - FARGATE
@@ -1064,6 +1071,8 @@ Resources:
             Value: !Ref PaperDeliveryTableName
           - Name: PN_DELAYER_WORKFLOWSTEP
             Value: !Ref WorkflowStep
+          - Name: PN_DELAYER_PAPERDELIVERYTTLDAYS
+            Value: !Ref PaperDeliveryTtlDays
 
 
       PlatformCapabilities:
@@ -1236,6 +1245,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
             Value: !Ref EnablePriorityResidualFlow
+          - Name: PN_DELAYER_PAPERDELIVERYTTLDAYS
+            Value: !Ref PaperDeliveryTtlDays
 
       PlatformCapabilities:
         - FARGATE
@@ -1413,6 +1424,8 @@ Resources:
             Value: !Ref DelayerToPaperChannelSecondSchedulerStartDate
           - Name: PN_DELAYER_ENABLEPRIORITYRESIDUALFLOW
             Value: !Ref EnablePriorityResidualFlow
+          - Name: PN_DELAYER_PAPERDELIVERYTTLDAYS
+            Value: !Ref PaperDeliveryTtlDays
 
       PlatformCapabilities:
         - FARGATE
@@ -1965,6 +1978,7 @@ Resources:
           KINESIS_BATCHSIZE: !Ref KinesisPaperDeliveryLambdaBatchSize
           KINESIS_EVENTSRECORDTTLSECONDS: !Ref PaperDeliveryKinesisRecordsTtlSeconds
           KINESIS_PAPERDELIVERY_COUNTERTTLDAYS: !Ref PaperDeliveryCounterTtlDays
+          KINESIS_PAPERDELIVERY_TTLDAYS: !Ref PaperDeliveryTtlDays
           KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK: !Ref DeliveryDateDayOfWeek
           KINESIS_PAPERDELIVERY_ENABLEPRIORITYRESIDUALFLOW: !Ref EnablePriorityResidualFlow
       TracingConfig:

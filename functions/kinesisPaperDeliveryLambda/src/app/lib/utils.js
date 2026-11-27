@@ -1,5 +1,13 @@
 const { LocalDate, DayOfWeek, TemporalAdjusters, Clock, Instant, ZoneOffset} = require("@js-joda/core");
 const dayOfWeekEnv = process.env.KINESIS_PAPERDELIVERY_DELIVERYDATEDAYOFWEEK;
+const ttlDaysEnv = process.env.KINESIS_PAPERDELIVERY_TTLDAYS;
+
+function calculateTtl(){
+  const ttlDays = parseInt(ttlDaysEnv, 10) || 1825;
+  const expireDate = new Date();
+  expireDate.setDate(expireDate.getDate() + ttlDays);
+  return Math.floor(expireDate.getTime() / 1000);
+}
 
 function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSenderLimit = false) {
   const rsOrSecondAttempt = isRsOrSecondAttempt(payload);
@@ -27,7 +35,8 @@ function buildPaperDeliveryRecord(payload, deliveryWeek, delayed = false, skipSe
     senderPriority: senderPriority,
     deliveryDate: deliveryWeek,
     delayed: Boolean(delayed),
-    skipSenderLimit: Boolean(skipSenderLimit)
+    skipSenderLimit: Boolean(skipSenderLimit),
+    ttl: calculateTtl()
   };
 
   if (payload.senderPaId && !rsOrSecondAttempt && payload.communicationType !== 'INFORMAL') {

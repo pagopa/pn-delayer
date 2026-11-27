@@ -113,7 +113,7 @@ public class PnDelayerUtils {
     public List<PaperDelivery> mapItemForResidualCapacityStep(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
         return senderLimitJobProcessObjects.getSendToResidualCapacityStep().stream()
                 .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek, true))
-                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, deliveryWeek))
+                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_RESIDUAL_CAPACITY, deliveryWeek, pnDelayerConfig.getPaperDeliveryTtlDays()))
                 .toList();
     }
 
@@ -121,7 +121,7 @@ public class PnDelayerUtils {
     public List<PaperDelivery> mapItemForEvaluateDriverCapacityStep(SenderLimitJobProcessObjects senderLimitJobProcessObjects, LocalDate deliveryWeek) {
         return senderLimitJobProcessObjects.getSendToDriverCapacityStep().stream()
                 .map(paperDelivery -> evaluateAndSetSkipSenderLimit(paperDelivery, senderLimitJobProcessObjects, deliveryWeek, false))
-                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, deliveryWeek))
+                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_DRIVER_CAPACITY, deliveryWeek, pnDelayerConfig.getPaperDeliveryTtlDays()))
                 .toList();
     }
 
@@ -190,13 +190,13 @@ public class PnDelayerUtils {
 
     public List<PaperDelivery> mapItemForEvaluatePrintCapacityStep(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
         return paperDeliveries.stream()
-                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_PRINT_CAPACITY, deliveryWeek))
+                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_PRINT_CAPACITY, deliveryWeek, pnDelayerConfig.getPaperDeliveryTtlDays()))
                 .toList();
     }
 
     public List<PaperDelivery> mapItemForEvaluateSenderLimitOnNextWeek(List<PaperDelivery> paperDeliveries, LocalDate deliveryWeek) {
         return paperDeliveries.stream()
-                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek.plusWeeks(1)))
+                .map(paperDelivery -> new PaperDelivery(paperDelivery, WorkflowStepEnum.EVALUATE_SENDER_LIMIT, deliveryWeek.plusWeeks(1), pnDelayerConfig.getPaperDeliveryTtlDays()))
                 .toList();
     }
 
